@@ -67,6 +67,21 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   List<Batch> findByTenantIdAndStatusIn(UUID tenantId, Collection<BatchStatus> statuses);
 
+  @Query(
+      """
+      SELECT b.id AS batchId,
+             c.id AS colorId,
+             c.code AS colorCode,
+             c.name AS colorName,
+             c.colorHex AS colorHex
+      FROM Batch b
+      JOIN Color c ON c.id = b.colorId AND c.tenantId = b.tenantId
+      WHERE b.tenantId = :tenantId
+        AND b.id IN :batchIds
+      """)
+  List<BatchColorProjection> findColorReferencesByBatchIds(
+      @Param("tenantId") UUID tenantId, @Param("batchIds") Collection<UUID> batchIds);
+
   List<Batch> findByTenantIdAndProductIdAndStatusIn(
       UUID tenantId, UUID productId, Collection<BatchStatus> statuses);
 
@@ -106,4 +121,16 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
    */
   boolean existsByTenantIdAndProductIdAndStatusIn(
       UUID tenantId, UUID productId, Collection<BatchStatus> statuses);
+
+  interface BatchColorProjection {
+    UUID getBatchId();
+
+    UUID getColorId();
+
+    String getColorCode();
+
+    String getColorName();
+
+    String getColorHex();
+  }
 }

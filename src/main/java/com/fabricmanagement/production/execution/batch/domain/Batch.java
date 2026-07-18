@@ -57,6 +57,9 @@ public class Batch extends BaseEntity {
   @Column(name = "product_id", nullable = false)
   private UUID productId;
 
+  @Column(name = "color_id")
+  private UUID colorId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "product_type", nullable = false)
   private ProductType productType;
@@ -145,6 +148,7 @@ public class Batch extends BaseEntity {
     Batch batch = new Batch();
     batch.setTenantId(cmd.tenantId());
     batch.setProductId(cmd.productId());
+    batch.setColorId(cmd.colorId());
     batch.setProductType(cmd.productType());
     batch.setBatchCode(cmd.batchCode());
     batch.setSupplierBatchCode(cmd.supplierBatchCode());
@@ -211,7 +215,13 @@ public class Batch extends BaseEntity {
             remarks,
             attributes,
             null,
+            null,
             null));
+  }
+
+  /** Assign or clear the tenant color-card identity for this batch. */
+  public void assignColor(UUID colorId) {
+    this.colorId = colorId;
   }
 
   /**

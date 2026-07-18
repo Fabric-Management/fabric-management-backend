@@ -35,6 +35,9 @@ public class BatchDto {
   @Schema(description = "ID of the parent product this batch belongs to")
   private UUID productId;
 
+  @Schema(description = "Assigned tenant color-card ID; null means unassigned", nullable = true)
+  private UUID colorId;
+
   @Schema(description = "Type of the product (FIBER, YARN, FABRIC)")
   private ProductType productType;
 
@@ -130,6 +133,7 @@ public class BatchDto {
             .tenantId(entity.getTenantId())
             .uid(entity.getUid())
             .productId(entity.getProductId())
+            .colorId(entity.getColorId())
             .productType(entity.getProductType())
             .attributes(entity.getAttributes())
             .fiberSpecs(

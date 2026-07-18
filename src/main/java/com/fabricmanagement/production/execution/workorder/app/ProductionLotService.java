@@ -74,8 +74,8 @@ public class ProductionLotService {
                 request.remarks(),
                 new HashMap<>(), // attributes
                 BatchSourceType.INTERNAL_PRODUCTION,
-                workOrderId // sourceId defines the 1:N relationship
-                ));
+                workOrderId, // sourceId defines the 1:N relationship
+                null)); // New production lots have no inferred color identity
 
     lot.setStatus(BatchStatus.AVAILABLE);
     Batch saved;

@@ -316,6 +316,7 @@ class WalkingSkeletonIT {
                 null,
                 null,
                 BatchSourceType.INITIAL_STOCK,
+                null,
                 null));
     rawBatch1.transitionStatus(BatchStatus.AVAILABLE, adminUserId);
     rawBatch1 = batchRepository.save(rawBatch1);
@@ -353,6 +354,7 @@ class WalkingSkeletonIT {
                 null,
                 null,
                 BatchSourceType.INITIAL_STOCK,
+                null,
                 null));
     rawBatch2.transitionStatus(BatchStatus.AVAILABLE, adminUserId);
     rawBatch2 = batchRepository.save(rawBatch2);

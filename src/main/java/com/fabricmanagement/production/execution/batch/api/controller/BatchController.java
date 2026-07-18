@@ -54,6 +54,21 @@ public class BatchController {
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(batch));
   }
 
+  @PatchMapping("/{id}/color")
+  @Operation(
+      operationId = "updateBatchColor",
+      summary = "Assign or clear a batch color",
+      description =
+          "Assigns an active color card from the current tenant. A null colorId clears the assignment.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "404",
+      description = "Batch or active tenant color card not found")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  public ResponseEntity<ApiResponse<BatchDto>> updateBatchColor(
+      @PathVariable UUID id, @Valid @RequestBody UpdateBatchColorRequest request) {
+    return ResponseEntity.ok(ApiResponse.success(batchService.updateColor(id, request.colorId())));
+  }
+
   @GetMapping
   @Operation(summary = "Get All Batches", description = "Retrieves a list of all active batches.")
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
@@ -366,7 +381,12 @@ public class BatchController {
   @PostMapping("/{id}/attributes")
   @Operation(
       summary = "Add Batch Attribute",
-      description = "Adds a dynamic attribute to the batch.")
+      description =
+          "Adds a dynamic attribute to the batch. Legacy color-family attributes are rejected with LEGACY_COLOR_ATTRIBUTE_WRITE.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "409",
+      description =
+          "Legacy color-family attributes must use batch.colorId (LEGACY_COLOR_ATTRIBUTE_WRITE)")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchAttributeDto>> addAttribute(
       @PathVariable UUID id, @Valid @RequestBody AddBatchAttributeRequest request) {
@@ -377,7 +397,12 @@ public class BatchController {
   @DeleteMapping("/{id}/attributes/{attributeId}")
   @Operation(
       summary = "Delete Batch Attribute",
-      description = "Removes a dynamic attribute from the batch.")
+      description =
+          "Removes a dynamic attribute from the batch. Legacy color-family attributes are rejected with LEGACY_COLOR_ATTRIBUTE_WRITE.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "409",
+      description =
+          "Legacy color-family attributes must use batch.colorId (LEGACY_COLOR_ATTRIBUTE_WRITE)")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<Void> deleteAttribute(
       @PathVariable UUID id, @PathVariable UUID attributeId) {

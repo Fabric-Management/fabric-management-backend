@@ -27786,7 +27786,8 @@ paths:
       tags:
       - Batch
     post:
-      description: Adds a dynamic attribute to the batch.
+      description: Adds a dynamic attribute to the batch. Legacy color-family attributes
+        are rejected with LEGACY_COLOR_ATTRIBUTE_WRITE.
       operationId: addAttribute
       parameters:
       - in: path
@@ -27840,7 +27841,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
+          description: Legacy color-family attributes must use batch.colorId (LEGACY_COLOR_ATTRIBUTE_WRITE)
         "422":
           content:
             application/problem+json:
@@ -27864,7 +27865,8 @@ paths:
       - Batch
   /api/v1/production/batches/{id}/attributes/{attributeId}:
     delete:
-      description: Removes a dynamic attribute from the batch.
+      description: Removes a dynamic attribute from the batch. Legacy color-family
+        attributes are rejected with LEGACY_COLOR_ATTRIBUTE_WRITE.
       operationId: deleteAttribute
       parameters:
       - in: path
@@ -27914,7 +27916,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
+          description: Legacy color-family attributes must use batch.colorId (LEGACY_COLOR_ATTRIBUTE_WRITE)
         "422":
           content:
             application/problem+json:
@@ -28334,6 +28336,85 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Update batch certification
+      tags:
+      - Batch
+  /api/v1/production/batches/{id}/color:
+    patch:
+      description: Assigns an active color card from the current tenant. A null colorId
+        clears the assignment.
+      operationId: updateBatchColor
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBatchColorRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseBatchDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Batch or active tenant color card not found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Assign or clear a batch color
       tags:
       - Batch
   /api/v1/production/batches/{id}/consume:
@@ -49222,6 +49303,12 @@ components:
           type: string
           description: Internal unique batch code/lot number
           example: B-2026-001
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Assigned tenant color-card ID; null means unassigned
         composition:
           type: object
           additionalProperties:
@@ -50602,6 +50689,12 @@ components:
           description: Internal unique batch code/lot number
           example: B-2026-001
           minLength: 1
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Optional active tenant color-card ID; null means unassigned
         composition:
           type: object
           additionalProperties:
@@ -60427,6 +60520,16 @@ components:
           format: date
       required:
       - changeReason
+    UpdateBatchColorRequest:
+      type: object
+      description: Request to assign or clear a batch color card
+      properties:
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Active tenant color-card ID; null clears the batch color
     UpdateColorPartnerCodeRequest:
       type: object
       description: Full mutable state of a partner code; its code identity is immutable

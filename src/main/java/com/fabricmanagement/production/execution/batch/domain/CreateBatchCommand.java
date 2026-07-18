@@ -30,7 +30,8 @@ public record CreateBatchCommand(
     String remarks,
     Map<String, Object> attributes,
     BatchSourceType sourceType,
-    UUID sourceId) {
+    UUID sourceId,
+    UUID colorId) {
 
   /**
    * Compact constructor — validates required fields eagerly.

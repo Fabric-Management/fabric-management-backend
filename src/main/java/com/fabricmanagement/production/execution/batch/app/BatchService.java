@@ -15,6 +15,7 @@ import com.fabricmanagement.production.execution.batch.dto.*;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
+import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
@@ -48,6 +49,7 @@ public class BatchService {
   private final BatchCertificationRepository batchCertificationRepository;
   private final FiberRepository fiberRepository;
   private final FiberQualityStandardRepository qualityStandardRepository;
+  private final ColorQueryService colorQueryService;
   private final ApplicationEventPublisher applicationEventPublisher;
 
   @Value("${batch.certification.enforce-on-reserve:true}")
@@ -74,6 +76,7 @@ public class BatchService {
     }
 
     UUID qualityStandardId = resolveQualityStandardId(request);
+    UUID colorId = requireActiveColor(request.getColorId());
 
     Batch batch =
         Batch.create(
@@ -92,7 +95,8 @@ public class BatchService {
                 request.getRemarks(),
                 attributes,
                 request.getSourceType(),
-                request.getSourceId()));
+                request.getSourceId(),
+                colorId));
 
     batch = batchRepository.save(batch);
 
@@ -103,6 +107,28 @@ public class BatchService {
     log.info("Created batch: id={}, batchCode={}", batch.getId(), batch.getBatchCode());
 
     return toBatchDto(batch);
+  }
+
+  @Transactional
+  public BatchDto updateColor(UUID batchId, UUID colorId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Batch batch =
+        batchRepository
+            .findByIdAndTenantId(batchId, tenantId)
+            .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
+
+    batch.assignColor(requireActiveColor(colorId));
+    return toBatchDto(batchRepository.save(batch));
+  }
+
+  private UUID requireActiveColor(UUID colorId) {
+    if (colorId == null) {
+      return null;
+    }
+    return colorQueryService
+        .findActiveReferenceById(colorId)
+        .map(ColorQueryService.ColorReference::id)
+        .orElseThrow(() -> new NotFoundException("Active color not found: " + colorId));
   }
 
   /**

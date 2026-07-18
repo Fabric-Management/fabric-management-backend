@@ -1,0 +1,121 @@
+package com.fabricmanagement.production.execution.batch.api.query;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
+import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class ProductionSalesLotQueryServiceTest {
+
+  private static final UUID TENANT_ID = UUID.randomUUID();
+
+  @Mock private BatchRepository batchRepository;
+  @Mock private BatchReservationRepository reservationRepository;
+  @Mock private BatchLotQuantityIntentRepository lotIntentRepository;
+  @Mock private StockUnitRepository stockUnitRepository;
+  @Mock private StockUnitSoftHoldRepository softHoldRepository;
+  @Mock private QualityGradeQueryService qualityGradeQueryService;
+  @Mock private WorkOrderRepository workOrderRepository;
+  @Mock private PrimaryMeasureResolver primaryMeasureResolver;
+
+  private ProductionSalesLotQueryService service;
+
+  @BeforeEach
+  void setUp() {
+    TenantContext.setCurrentTenantId(TENANT_ID);
+    service =
+        new ProductionSalesLotQueryService(
+            batchRepository,
+            reservationRepository,
+            lotIntentRepository,
+            stockUnitRepository,
+            softHoldRepository,
+            qualityGradeQueryService,
+            workOrderRepository,
+            primaryMeasureResolver);
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
+  }
+
+  @Test
+  void listSaleableLots_resolvesColorsWithOneBulkJoinAndLeavesNullColorUnmapped() {
+    Batch colored = batch("LOT-COLOR", UUID.randomUUID());
+    Batch uncolored = batch("LOT-NULL", null);
+    List<UUID> batchIds = List.of(colored.getId(), uncolored.getId());
+    BatchRepository.BatchColorProjection projection =
+        mock(BatchRepository.BatchColorProjection.class);
+    when(projection.getBatchId()).thenReturn(colored.getId());
+    when(projection.getColorId()).thenReturn(colored.getColorId());
+    when(projection.getColorCode()).thenReturn("NAVY-01");
+    when(projection.getColorName()).thenReturn("Navy");
+    when(projection.getColorHex()).thenReturn("#1F2A44");
+
+    when(batchRepository.findByTenantIdAndStatusIn(eq(TENANT_ID), any()))
+        .thenReturn(List.of(colored, uncolored));
+    when(stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(TENANT_ID, batchIds))
+        .thenReturn(List.of());
+    when(softHoldRepository.countActiveByStockUnitIds(TENANT_ID, List.of())).thenReturn(Map.of());
+    when(lotIntentRepository.sumActiveByBatchIds(TENANT_ID, batchIds, null)).thenReturn(Map.of());
+    when(reservationRepository.sumActiveRemainingByBatchIds(TENANT_ID, batchIds))
+        .thenReturn(Map.of());
+    when(lotIntentRepository.findActiveByBatchIds(TENANT_ID, batchIds, null)).thenReturn(List.of());
+    when(batchRepository.findColorReferencesByBatchIds(TENANT_ID, batchIds))
+        .thenReturn(List.of(projection));
+    when(primaryMeasureResolver.resolve(any(), any())).thenReturn(PrimaryMeasure.WEIGHT);
+
+    var lots = service.listSaleableLots();
+
+    assertThat(lots).hasSize(2);
+    assertThat(lots.get(0).colour().id()).isEqualTo(colored.getColorId());
+    assertThat(lots.get(0).colour().code()).isEqualTo("NAVY-01");
+    assertThat(lots.get(1).colour()).isNull();
+    verify(batchRepository).findColorReferencesByBatchIds(TENANT_ID, batchIds);
+  }
+
+  private Batch batch(String code, UUID colorId) {
+    Batch batch =
+        Batch.builder()
+            .productId(UUID.randomUUID())
+            .productType(ProductType.FABRIC)
+            .colorId(colorId)
+            .batchCode(code)
+            .quantity(new BigDecimal("10"))
+            .unit("KG")
+            .status(BatchStatus.AVAILABLE)
+            .sourceType(BatchSourceType.INITIAL_STOCK)
+            .build();
+    batch.setId(UUID.randomUUID());
+    batch.setTenantId(TENANT_ID);
+    batch.setIsActive(true);
+    return batch;
+  }
+}
