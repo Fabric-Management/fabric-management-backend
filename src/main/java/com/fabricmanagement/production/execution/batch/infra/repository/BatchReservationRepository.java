@@ -48,6 +48,24 @@ public interface BatchReservationRepository extends JpaRepository<BatchReservati
       @Param("batchIds") Collection<UUID> batchIds,
       @Param("statuses") Collection<ReservationStatus> statuses);
 
+  @Query(
+      """
+      SELECT r.batchId AS batchId,
+             UPPER(TRIM(r.unit)) AS unit,
+             COALESCE(SUM(r.reservedQuantity - r.consumedQuantity), 0) AS quantity,
+             COUNT(r.id) AS rowCount
+      FROM BatchReservation r
+      WHERE r.tenantId = :tenantId
+        AND r.batchId IN :batchIds
+        AND r.status IN :statuses
+        AND r.isActive = true
+      GROUP BY r.batchId, UPPER(TRIM(r.unit))
+      """)
+  List<ReservationUnitQuantityRow> sumRemainingRowsByBatchIdsAndUnit(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchIds") Collection<UUID> batchIds,
+      @Param("statuses") Collection<ReservationStatus> statuses);
+
   default Map<UUID, BigDecimal> sumActiveRemainingByBatchIds(
       UUID tenantId, Collection<UUID> batchIds) {
     if (batchIds == null || batchIds.isEmpty()) {
@@ -67,5 +85,15 @@ public interface BatchReservationRepository extends JpaRepository<BatchReservati
     UUID getBatchId();
 
     BigDecimal getQuantity();
+  }
+
+  interface ReservationUnitQuantityRow {
+    UUID getBatchId();
+
+    String getUnit();
+
+    BigDecimal getQuantity();
+
+    long getRowCount();
   }
 }

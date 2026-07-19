@@ -10,9 +10,12 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchReservation;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchUnitMeasureMismatchException;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
+import com.fabricmanagement.production.execution.batch.dto.ReserveRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
@@ -30,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -46,6 +50,7 @@ class BatchServiceTest {
   @Mock private FiberQualityStandardRepository qualityStandardRepository;
   @Mock private ColorQueryService colorQueryService;
   @Mock private ApplicationEventPublisher applicationEventPublisher;
+  @Spy private BatchPrimaryMeasureService primaryMeasureService = new BatchPrimaryMeasureService();
 
   @InjectMocks private BatchService batchService;
 
@@ -147,6 +152,44 @@ class BatchServiceTest {
     assertThat(result.getColorId()).isEqualTo(colorId);
   }
 
+  @Test
+  void reserve_rejectsBatchUnitThatContradictsPrimaryMeasure() {
+    Batch batch = availableBatch(ProductType.FABRIC, "KG", "100");
+    when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
+
+    assertThatThrownBy(
+            () ->
+                batchService.reserve(
+                    BATCH_ID,
+                    ReserveRequest.builder()
+                        .quantity(BigDecimal.TEN)
+                        .referenceType("SALES_ORDER")
+                        .build()))
+        .isInstanceOf(BatchUnitMeasureMismatchException.class)
+        .extracting(error -> ((BatchUnitMeasureMismatchException) error).getErrorCode())
+        .isEqualTo("BATCH_UNIT_MEASURE_MISMATCH");
+
+    verify(reservationRepository, never()).save(any());
+  }
+
+  @Test
+  void reserve_convertsCompatibleBatchQuantityAndStoresCanonicalUnit() {
+    Batch batch = availableBatch(ProductType.FIBER, "MT", "2");
+    when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
+    when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(reservationRepository.save(any(BatchReservation.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    var result =
+        batchService.reserve(
+            BATCH_ID,
+            ReserveRequest.builder().quantity(BigDecimal.ONE).referenceType("SALES_ORDER").build());
+
+    assertThat(result.getUnit()).isEqualTo("KG");
+    assertThat(result.getReservedQuantity()).isEqualByComparingTo("1000");
+    assertThat(batch.getReservedQuantity()).isEqualByComparingTo("1");
+  }
+
   private Batch pendingQcBatch() {
     Batch batch =
         Batch.builder()
@@ -159,6 +202,24 @@ class BatchServiceTest {
             .build();
     batch.setId(BATCH_ID);
     batch.setTenantId(TENANT_ID);
+    return batch;
+  }
+
+  private Batch availableBatch(ProductType productType, String unit, String quantity) {
+    Batch batch =
+        Batch.builder()
+            .productId(UUID.randomUUID())
+            .productType(productType)
+            .batchCode("LOT-RESERVE")
+            .quantity(new BigDecimal(quantity))
+            .consumedQuantity(BigDecimal.ZERO)
+            .reservedQuantity(BigDecimal.ZERO)
+            .unit(unit)
+            .status(BatchStatus.AVAILABLE)
+            .build();
+    batch.setId(BATCH_ID);
+    batch.setTenantId(TENANT_ID);
+    batch.setIsActive(true);
     return batch;
   }
 }

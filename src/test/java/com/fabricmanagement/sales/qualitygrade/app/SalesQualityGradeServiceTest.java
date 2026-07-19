@@ -35,7 +35,7 @@ class SalesQualityGradeServiceTest {
         .thenReturn(
             Optional.of(
                 new QualityGradeReference(
-                    qualityGradeId, "A", "Grade A", new BigDecimal("1.125"), true, true)));
+                    qualityGradeId, "A", "Grade A", 1, new BigDecimal("1.125"), true, true)));
 
     SalesQualityGradeSnapshot snapshot = salesQualityGradeService.resolveSnapshot(qualityGradeId);
 
@@ -53,7 +53,7 @@ class SalesQualityGradeServiceTest {
         .thenReturn(
             Optional.of(
                 new QualityGradeReference(
-                    qualityGradeId, "A", "Grade A", new BigDecimal("1.125"), true, false)));
+                    qualityGradeId, "A", "Grade A", 1, new BigDecimal("1.125"), true, false)));
 
     SalesDomainException ex =
         assertThrows(
@@ -72,7 +72,7 @@ class SalesQualityGradeServiceTest {
         .thenReturn(
             Optional.of(
                 new QualityGradeReference(
-                    qualityGradeId, "A", "Grade A", new BigDecimal("1.125"), false, true)));
+                    qualityGradeId, "A", "Grade A", 1, new BigDecimal("1.125"), false, true)));
 
     SalesDomainException ex =
         assertThrows(

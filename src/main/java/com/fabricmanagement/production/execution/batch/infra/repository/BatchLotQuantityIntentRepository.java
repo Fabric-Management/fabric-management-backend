@@ -47,6 +47,26 @@ public interface BatchLotQuantityIntentRepository
 
   @Query(
       """
+      SELECT i.batchId AS batchId,
+             UPPER(TRIM(i.unit)) AS unit,
+             COALESCE(SUM(i.quantity), 0) AS quantity,
+             COUNT(i.id) AS rowCount
+      FROM BatchLotQuantityIntent i
+      WHERE i.tenantId = :tenantId
+        AND i.batchId IN :batchIds
+        AND i.status = :status
+        AND i.isActive = true
+        AND (:excludedQuoteLineId IS NULL OR i.quoteLineId <> :excludedQuoteLineId)
+      GROUP BY i.batchId, UPPER(TRIM(i.unit))
+      """)
+  List<IntentUnitQuantityRow> sumActiveRowsByBatchIdsAndUnit(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchIds") Collection<UUID> batchIds,
+      @Param("status") BatchLotQuantityIntentStatus status,
+      @Param("excludedQuoteLineId") UUID excludedQuoteLineId);
+
+  @Query(
+      """
       SELECT i FROM BatchLotQuantityIntent i
       WHERE i.tenantId = :tenantId
         AND i.batchId IN :batchIds
@@ -85,5 +105,15 @@ public interface BatchLotQuantityIntentRepository
     UUID getBatchId();
 
     BigDecimal getQuantity();
+  }
+
+  interface IntentUnitQuantityRow {
+    UUID getBatchId();
+
+    String getUnit();
+
+    BigDecimal getQuantity();
+
+    long getRowCount();
   }
 }

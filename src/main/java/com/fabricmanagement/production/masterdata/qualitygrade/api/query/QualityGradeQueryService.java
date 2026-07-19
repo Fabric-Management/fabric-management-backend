@@ -5,6 +5,7 @@ import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.production.masterdata.qualitygrade.infra.repository.QualityGradeRepository;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -65,13 +66,30 @@ public class QualityGradeQueryService {
         .map(QualityGradeReference::from);
   }
 
+  public List<QualityGradeReference> findReferencesByIds(Collection<UUID> gradeIds) {
+    if (gradeIds == null || gradeIds.isEmpty()) {
+      return List.of();
+    }
+    UUID tenantId = TenantContext.requireTenantId();
+    return qualityGradeRepository.findByTenantIdAndIdIn(tenantId, gradeIds).stream()
+        .map(QualityGradeReference::from)
+        .toList();
+  }
+
   public record QualityGradeReference(
-      UUID id, String code, String name, BigDecimal priceFactor, boolean saleable, boolean active) {
+      UUID id,
+      String code,
+      String name,
+      int rank,
+      BigDecimal priceFactor,
+      boolean saleable,
+      boolean active) {
     static QualityGradeReference from(QualityGrade grade) {
       return new QualityGradeReference(
           grade.getId(),
           grade.getCode(),
           grade.getName(),
+          grade.getRank(),
           grade.getPriceFactor(),
           grade.isSaleable(),
           Boolean.TRUE.equals(grade.getIsActive()));

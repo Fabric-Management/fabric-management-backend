@@ -11,6 +11,7 @@ import com.fabricmanagement.production.execution.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.execution.batch.domain.event.*;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchCertificationExpiredException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchUnitMeasureMismatchException;
 import com.fabricmanagement.production.execution.batch.dto.*;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -51,6 +52,7 @@ public class BatchService {
   private final FiberQualityStandardRepository qualityStandardRepository;
   private final ColorQueryService colorQueryService;
   private final ApplicationEventPublisher applicationEventPublisher;
+  private final BatchPrimaryMeasureService primaryMeasureService;
 
   @Value("${batch.certification.enforce-on-reserve:true}")
   private boolean certEnforceOnReserve;
@@ -300,6 +302,14 @@ public class BatchService {
 
     Batch batch = loadBatchWithLock(batchId, tenantId);
     assertGotsCertificationValid(batch);
+    var resolution = primaryMeasureService.resolve(batch);
+    BigDecimal canonicalQuantity =
+        primaryMeasureService
+            .toCanonical(request.getQuantity(), batch.getUnit(), resolution.primaryMeasure())
+            .orElseThrow(
+                () ->
+                    new BatchUnitMeasureMismatchException(
+                        batch.getId(), batch.getUnit(), resolution.primaryUnit()));
     batch.reserve(request.getQuantity());
 
     BatchReservation reservation =
@@ -308,8 +318,8 @@ public class BatchService {
             batchId,
             request.getReferenceId(),
             request.getReferenceType(),
-            request.getQuantity(),
-            batch.getUnit(),
+            canonicalQuantity,
+            resolution.primaryUnit(),
             request.getRemarks());
 
     batchRepository.save(batch);
@@ -358,8 +368,9 @@ public class BatchService {
     BigDecimal releasedQty = reservation.cancel();
 
     Batch batch = loadBatchWithLock(reservation.getBatchId(), tenantId);
+    BigDecimal releasedBatchQuantity = toBatchUnit(batch, reservation.getUnit(), releasedQty);
     if (releasedQty.compareTo(BigDecimal.ZERO) > 0) {
-      batch.release(releasedQty);
+      batch.release(releasedBatchQuantity);
     }
 
     reservationRepository.save(reservation);
@@ -369,7 +380,7 @@ public class BatchService {
         new BatchReservationReleasedEvent(
             tenantId,
             batch.getId(),
-            releasedQty,
+            releasedBatchQuantity,
             batch.getUnit(),
             batch.getLocationId(),
             reservationId));
@@ -406,8 +417,9 @@ public class BatchService {
     BigDecimal releasedQty = reservation.complete();
 
     Batch batch = loadBatchWithLock(reservation.getBatchId(), tenantId);
+    BigDecimal releasedBatchQuantity = toBatchUnit(batch, reservation.getUnit(), releasedQty);
     if (releasedQty.compareTo(BigDecimal.ZERO) > 0) {
-      batch.release(releasedQty);
+      batch.release(releasedBatchQuantity);
     }
 
     reservationRepository.save(reservation);
@@ -418,7 +430,7 @@ public class BatchService {
             tenantId,
             batch.getId(),
             reservationId,
-            releasedQty,
+            releasedBatchQuantity,
             batch.getUnit(),
             batch.getLocationId()));
 
@@ -479,7 +491,7 @@ public class BatchService {
             "Reservation " + reservation.getId() + " does not belong to batch " + batchId);
       }
 
-      reservation.consume(qty);
+      reservation.consume(toReservationUnit(batch, reservation.getUnit(), qty));
       batch.consumeFromReservation(qty);
 
       reservationRepository.save(reservation);
@@ -589,6 +601,45 @@ public class BatchService {
         .filter(Objects::nonNull)
         .max(LocalDate::compareTo)
         .orElse(null);
+  }
+
+  private BigDecimal toBatchUnit(Batch batch, String reservationUnit, BigDecimal quantity) {
+    if (Objects.equals(
+        primaryMeasureService.normalizeUnit(reservationUnit),
+        primaryMeasureService.normalizeUnit(batch.getUnit()))) {
+      return quantity;
+    }
+    var resolution = primaryMeasureService.resolve(batch);
+    return primaryMeasureService
+        .toCanonical(quantity, reservationUnit, resolution.primaryMeasure())
+        .flatMap(
+            canonical ->
+                primaryMeasureService.fromCanonical(
+                    canonical, batch.getUnit(), resolution.primaryMeasure()))
+        .orElseThrow(
+            () ->
+                new BatchUnitMeasureMismatchException(
+                    batch.getId(), batch.getUnit(), resolution.primaryUnit()));
+  }
+
+  private BigDecimal toReservationUnit(
+      Batch batch, String reservationUnit, BigDecimal batchQuantity) {
+    if (Objects.equals(
+        primaryMeasureService.normalizeUnit(reservationUnit),
+        primaryMeasureService.normalizeUnit(batch.getUnit()))) {
+      return batchQuantity;
+    }
+    var resolution = primaryMeasureService.resolve(batch);
+    return primaryMeasureService
+        .toCanonical(batchQuantity, batch.getUnit(), resolution.primaryMeasure())
+        .flatMap(
+            canonical ->
+                primaryMeasureService.fromCanonical(
+                    canonical, reservationUnit, resolution.primaryMeasure()))
+        .orElseThrow(
+            () ->
+                new BatchUnitMeasureMismatchException(
+                    batch.getId(), batch.getUnit(), resolution.primaryUnit()));
   }
 
   private Batch loadBatchWithLock(UUID id, UUID tenantId) {
