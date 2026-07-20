@@ -34,8 +34,6 @@ tags:
   name: Costing
 - description: Inventory Balance operations
   name: Inventory Balance
-- description: "Canonical stock availability by product, colour, lot, and quality"
-  name: Stock Availability
 - description: Cash flow forecasting operations
   name: Finance - Cash Flow
 - description: IWM Warehouse Location Management API
@@ -134,6 +132,9 @@ tags:
   name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
+- description: "Canonical FABRIC, YARN, and FIBER stock availability by product, colour,\
+    \ lot, and quality"
+  name: Stock Availability
 - description: Sales-readable quality grade projection
   name: Sales Quality Grade
 - description: Approval Request operations
