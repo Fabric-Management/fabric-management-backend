@@ -16,6 +16,8 @@ updates:
           - "*"
         exclude-patterns:
           - "org.springframework.cloud:spring-cloud-dependencies"
+          # JSONB serialization changes need their own focused compatibility PR.
+          - "io.hypersistence:hypersistence-utils-hibernate-63"
         update-types:
           - minor
           - patch
@@ -25,6 +27,14 @@ updates:
       - dependency-name: "org.springframework.cloud:spring-cloud-dependencies"
         versions:
           - "[2025.1,)"
+      # Major framework/library upgrades require a dedicated migration ticket.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+      # 3.15.4 rejects the project's non-Serializable JSONB spec records at runtime.
+      - dependency-name: "io.hypersistence:hypersistence-utils-hibernate-63"
+        versions:
+          - "[3.15,)"
     commit-message:
       prefix: "chore(deps)"
 
@@ -52,5 +62,13 @@ updates:
       time: "06:30"
       timezone: Europe/London
     open-pull-requests-limit: 3
+    ignore:
+      # Dependabot mixes the Maven and JDK versions in this tag. Keep the builder
+      # on the Java 21 image line and update it manually as a coordinated change.
+      - dependency-name: "maven"
+      # The runtime remains on the Java 21 LTS line.
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "chore(container)"
