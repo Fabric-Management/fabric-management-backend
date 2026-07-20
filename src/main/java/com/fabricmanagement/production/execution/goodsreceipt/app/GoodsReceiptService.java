@@ -1,9 +1,12 @@
 package com.fabricmanagement.production.execution.goodsreceipt.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.procurement.purchaseorder.api.query.PurchaseOrderQueryService;
 import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService;
 import com.fabricmanagement.production.execution.batch.api.query.BatchQueryService;
+import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
+import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceipt;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptItem;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptStatus;
@@ -13,6 +16,9 @@ import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsRec
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptItemRepository;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptRepository;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +43,8 @@ public class GoodsReceiptService {
   private final BatchQueryService batchQueryService;
   private final PurchaseOrderQueryService poQueryService;
   private final SubcontractOrderQueryService scQueryService;
+  private final ProductFacade productFacade;
+  private final BatchPrimaryMeasureService primaryMeasureService;
   private final ApplicationEventPublisher eventPublisher;
 
   /** Retrieves a GoodsReceipt with its items by ID. */
@@ -53,11 +61,18 @@ public class GoodsReceiptService {
    */
   @Transactional
   public GoodsReceiptResponse createGoodsReceipt(CreateGoodsReceiptRequest request) {
+    ProductType purchaseProductType =
+        resolvePurchaseProductType(
+            request.getSourceType(), request.getSourceId(), request.getSourceLineId());
+    validatePurchaseRequestItemLengths(purchaseProductType, request.getItems());
+
     GoodsReceipt receipt =
         GoodsReceipt.builder()
             .receiptNumber(generateReceiptNumber())
             .sourceType(request.getSourceType())
             .sourceId(request.getSourceId())
+            .sourceLineId(purchaseProductType != null ? request.getSourceLineId() : null)
+            .supplierBatchCode(request.getSupplierBatchCode())
             .receivedById(request.getReceivedById())
             .receivedAt(request.getReceivedAt() != null ? request.getReceivedAt() : Instant.now())
             .packageCount(request.getPackageCount())
@@ -76,7 +91,9 @@ public class GoodsReceiptService {
     AtomicInteger seq = new AtomicInteger(1);
     for (CreateGoodsReceiptRequest.GoodsReceiptItemRequest itemReq : request.getItems()) {
       int seqNo = seq.getAndIncrement();
-      String barcode = generateBarcode(sourceIdentifier, seqNo);
+      String barcode =
+          generateBarcode(
+              request.getSourceType(), sourceIdentifier, saved.getReceiptNumber(), seqNo);
       GoodsReceiptItem item =
           GoodsReceiptItem.builder()
               .goodsReceiptId(saved.getId())
@@ -85,6 +102,8 @@ public class GoodsReceiptService {
               .serialNumber(itemReq.getSerialNumber())
               .netWeight(itemReq.getNetWeight())
               .grossWeight(itemReq.getGrossWeight())
+              .length(itemReq.getLength())
+              .lengthUnit(primaryMeasureService.normalizeUnit(itemReq.getLengthUnit()))
               .notes(itemReq.getNotes())
               .build();
       items.add(item);
@@ -143,6 +162,11 @@ public class GoodsReceiptService {
           "Cannot confirm a GoodsReceipt with no items: " + receipt.getReceiptNumber());
     }
 
+    ProductType purchaseProductType =
+        resolvePurchaseProductType(
+            receipt.getSourceType(), receipt.getSourceId(), receipt.getSourceLineId());
+    validatePurchaseEntityItemLengths(purchaseProductType, items);
+
     receipt.setStatus(GoodsReceiptStatus.CONFIRMED);
     GoodsReceipt saved = receiptRepository.save(receipt);
 
@@ -155,6 +179,8 @@ public class GoodsReceiptService {
                         .barcode(i.getBarcode())
                         .netWeight(i.getNetWeight())
                         .grossWeight(i.getGrossWeight())
+                        .length(i.getLength())
+                        .lengthUnit(i.getLengthUnit())
                         .build())
             .toList();
 
@@ -165,6 +191,8 @@ public class GoodsReceiptService {
             .receiptNumber(saved.getReceiptNumber())
             .sourceType(saved.getSourceType())
             .sourceId(saved.getSourceId())
+            .sourceLineId(saved.getSourceLineId())
+            .supplierBatchCode(saved.getSupplierBatchCode())
             .confirmedAt(Instant.now())
             .items(eventItems)
             .build());
@@ -221,8 +249,114 @@ public class GoodsReceiptService {
     };
   }
 
-  /** Generates item barcode from source identifier. Format: {sourceIdentifier}-{3-digit-seq} */
-  private String generateBarcode(String sourceIdentifier, int sequenceNo) {
+  private ProductType resolvePurchaseProductType(
+      com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
+          sourceType,
+      UUID sourceId,
+      UUID sourceLineId) {
+    if (sourceType
+        != com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
+            .PURCHASE_ORDER) {
+      return null;
+    }
+    if (sourceLineId == null) {
+      throw unprocessable(
+          "Purchase-order receipts require sourceLineId", "GR_SOURCE_LINE_REQUIRED");
+    }
+
+    UUID tenantId = TenantContext.requireTenantId();
+    PurchaseOrderQueryService.PurchaseOrderLineInfo lineInfo;
+    try {
+      lineInfo = poQueryService.getPurchaseOrderLineInfo(tenantId, sourceId, sourceLineId);
+    } catch (NotFoundException ignored) {
+      throw unprocessable(
+          "Purchase-order line cannot be resolved for receipt materialization",
+          "GR_PO_LINE_NOT_MATERIALIZABLE");
+    }
+    if (lineInfo.productId() == null) {
+      throw unprocessable("Purchase-order line has no product", "GR_PO_LINE_NOT_MATERIALIZABLE");
+    }
+
+    ProductType productType =
+        productFacade
+            .findById(tenantId, lineInfo.productId())
+            .map(product -> product.getProductType())
+            .orElseThrow(
+                () ->
+                    unprocessable(
+                        "Purchase-order line product cannot be resolved",
+                        "GR_PO_LINE_NOT_MATERIALIZABLE"));
+    if (productType == null
+        || productType == ProductType.CHEMICAL
+        || productType == ProductType.CONSUMABLE) {
+      throw unprocessable(
+          "Product type is not supported for stock-unit materialization: " + productType,
+          "GR_PO_LINE_NOT_MATERIALIZABLE");
+    }
+    return productType;
+  }
+
+  private void validatePurchaseRequestItemLengths(
+      ProductType productType, List<CreateGoodsReceiptRequest.GoodsReceiptItemRequest> items) {
+    if (productType == null) {
+      return;
+    }
+    for (CreateGoodsReceiptRequest.GoodsReceiptItemRequest item : items) {
+      validatePurchaseItemLength(productType, item.getLength(), item.getLengthUnit());
+    }
+  }
+
+  private void validatePurchaseEntityItemLengths(
+      ProductType productType, List<GoodsReceiptItem> items) {
+    if (productType == null) {
+      return;
+    }
+    for (GoodsReceiptItem item : items) {
+      validatePurchaseItemLength(productType, item.getLength(), item.getLengthUnit());
+    }
+  }
+
+  private void validatePurchaseItemLength(
+      ProductType productType, BigDecimal length, String lengthUnit) {
+    boolean lengthRequired =
+        primaryMeasureService.primaryMeasure(productType) == PrimaryMeasure.LENGTH;
+    boolean hasLength = length != null;
+    boolean hasUnit = lengthUnit != null && !lengthUnit.isBlank();
+
+    if (lengthRequired && (!hasLength || !hasUnit)) {
+      throw unprocessable(
+          "Length and lengthUnit are required for fabric receipt items", "GR_ITEM_LENGTH_REQUIRED");
+    }
+    if (!hasLength && !hasUnit) {
+      return;
+    }
+    if (!hasLength
+        || !hasUnit
+        || length.signum() <= 0
+        || primaryMeasureService.toCanonical(length, lengthUnit, PrimaryMeasure.LENGTH).isEmpty()) {
+      throw unprocessable(
+          "Receipt item length must be positive and use M, CM, or MM", "GR_ITEM_UNIT_INVALID");
+    }
+  }
+
+  private GoodsReceiptDomainException unprocessable(String message, String errorCode) {
+    return new GoodsReceiptDomainException(message, errorCode, 422);
+  }
+
+  /**
+   * Generates an item barcode. Purchase receipts include receipt identity to remain collision-safe.
+   */
+  private String generateBarcode(
+      com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
+          sourceType,
+      String sourceIdentifier,
+      String receiptNumber,
+      int sequenceNo) {
+    if (sourceType
+        == com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
+            .PURCHASE_ORDER) {
+      return String.format("%s-%s-%03d", sourceIdentifier, receiptNumber, sequenceNo);
+    }
     return String.format("%s-%03d", sourceIdentifier, sequenceNo);
   }
 
@@ -238,6 +372,8 @@ public class GoodsReceiptService {
                         .serialNumber(item.getSerialNumber())
                         .netWeight(item.getNetWeight())
                         .grossWeight(item.getGrossWeight())
+                        .length(item.getLength())
+                        .lengthUnit(item.getLengthUnit())
                         .notes(item.getNotes())
                         .build())
             .toList();
@@ -248,6 +384,8 @@ public class GoodsReceiptService {
         .receiptNumber(receipt.getReceiptNumber())
         .sourceType(receipt.getSourceType())
         .sourceId(receipt.getSourceId())
+        .sourceLineId(receipt.getSourceLineId())
+        .supplierBatchCode(receipt.getSupplierBatchCode())
         .receivedById(receipt.getReceivedById())
         .receivedAt(receipt.getReceivedAt())
         .packageCount(receipt.getPackageCount())

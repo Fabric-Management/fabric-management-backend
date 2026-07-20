@@ -35,11 +35,13 @@ import com.fabricmanagement.production.quality.result.domain.event.FiberTestResu
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,6 +55,69 @@ import org.springframework.modulith.events.core.EventSerializer;
 class DomainEventSerializationTest {
 
   @Autowired private EventSerializer eventSerializer;
+  @Autowired private ObjectMapper objectMapper;
+
+  @Test
+  void legacyGoodsReceiptEventWithoutNewFieldsDeserializesWithNulls() throws Exception {
+    UUID eventId = uuid();
+    String json =
+        """
+        {
+          "eventId":"%s",
+          "tenantId":"%s",
+          "eventType":"GOODS_RECEIPT_CONFIRMED",
+          "occurredAt":"2026-01-01T10:00:00Z",
+          "receiptId":"%s",
+          "receiptNumber":"GR-LEGACY",
+          "sourceType":"PURCHASE_ORDER",
+          "sourceId":"%s",
+          "items":[{"itemId":"%s","barcode":"BC-1","netWeight":10,"grossWeight":11}]
+        }
+        """
+            .formatted(eventId, uuid(), uuid(), uuid(), uuid());
+
+    GoodsReceiptConfirmedEvent restored =
+        objectMapper.readValue(json, GoodsReceiptConfirmedEvent.class);
+
+    assertThat(restored.getEventId()).isEqualTo(eventId);
+    assertThat(restored.getSourceLineId()).isNull();
+    assertThat(restored.getSupplierBatchCode()).isNull();
+    assertThat(restored.getItems().get(0).length()).isNull();
+    assertThat(restored.getItems().get(0).lengthUnit()).isNull();
+  }
+
+  @Test
+  void goodsReceiptEventRoundTripPreservesMaterializationFields() {
+    UUID sourceLineId = uuid();
+    GoodsReceiptConfirmedEvent original =
+        GoodsReceiptConfirmedEvent.builder()
+            .tenantId(uuid())
+            .receiptId(uuid())
+            .receiptNumber("GR-2026-ABC12345")
+            .sourceType(GoodsReceiptSourceType.PURCHASE_ORDER)
+            .sourceId(uuid())
+            .sourceLineId(sourceLineId)
+            .supplierBatchCode("LOT-42")
+            .items(
+                List.of(
+                    new GoodsReceiptConfirmedEvent.ReceiptItemData(
+                        uuid(),
+                        "BC-1",
+                        new BigDecimal("10.00"),
+                        new BigDecimal("10.50"),
+                        new BigDecimal("150"),
+                        "CM")))
+            .build();
+
+    Object serialized = eventSerializer.serialize(original);
+    GoodsReceiptConfirmedEvent restored =
+        eventSerializer.deserialize(serialized, GoodsReceiptConfirmedEvent.class);
+
+    assertThat(restored.getSourceLineId()).isEqualTo(sourceLineId);
+    assertThat(restored.getSupplierBatchCode()).isEqualTo("LOT-42");
+    assertThat(restored.getItems().get(0).length()).isEqualByComparingTo("150");
+    assertThat(restored.getItems().get(0).lengthUnit()).isEqualTo("CM");
+  }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("idempotentHandlerConsumedEvents")
@@ -142,7 +207,12 @@ class DomainEventSerializationTest {
                 .items(
                     List.of(
                         new GoodsReceiptConfirmedEvent.ReceiptItemData(
-                            uuid(), "BC-1", new BigDecimal("10.00"), new BigDecimal("10.50"))))
+                            uuid(),
+                            "BC-1",
+                            new BigDecimal("10.00"),
+                            new BigDecimal("10.50"),
+                            null,
+                            null)))
                 .build()),
         event(new WorkOrderRecipeAssignmentNeededEvent(tenantId, uuid(), uuid(), "GOTS", "TR")),
         event(new QuoteSendRequestedEvent(tenantId, uuid(), uuid(), "Q-1", uuid())),

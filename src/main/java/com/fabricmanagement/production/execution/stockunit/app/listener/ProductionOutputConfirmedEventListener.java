@@ -70,6 +70,8 @@ public class ProductionOutputConfirmedEventListener {
                                       item.netWeight(),
                                       item.grossWeight(),
                                       event.getUnit(),
+                                      null,
+                                      null,
                                       item.locationId(),
                                       StockUnitSourceType.PRODUCTION,
                                       item.itemId()))

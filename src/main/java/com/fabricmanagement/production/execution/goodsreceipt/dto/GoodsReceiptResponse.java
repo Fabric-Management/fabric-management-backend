@@ -19,6 +19,8 @@ public class GoodsReceiptResponse {
   String receiptNumber;
   GoodsReceiptSourceType sourceType;
   UUID sourceId;
+  UUID sourceLineId;
+  String supplierBatchCode;
   UUID receivedById;
   Instant receivedAt;
   Integer packageCount;
@@ -38,6 +40,8 @@ public class GoodsReceiptResponse {
     String serialNumber;
     BigDecimal netWeight;
     BigDecimal grossWeight;
+    BigDecimal length;
+    String lengthUnit;
     String notes;
   }
 }

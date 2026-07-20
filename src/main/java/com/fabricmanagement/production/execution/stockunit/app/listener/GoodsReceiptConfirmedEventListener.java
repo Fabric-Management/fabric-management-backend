@@ -2,11 +2,17 @@ package com.fabricmanagement.production.execution.stockunit.app.listener;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.procurement.purchaseorder.api.query.PurchaseOrderQueryService;
 import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService;
 import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService.SubcontractOutputInfo;
+import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.execution.batch.domain.CreateBatchCommand;
+import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
+import com.fabricmanagement.production.execution.batch.domain.event.BatchCreatedEvent;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
@@ -14,11 +20,15 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourc
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitMaterializationException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitMaterializationException.Reason;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
@@ -30,8 +40,8 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>Failure contract:</b> Every non-duplicate receipt either creates its StockUnits or fails
  * closed. The exception is allowed to escape so the idempotency record rolls back and Spring
- * Modulith can retry the incomplete publication. BATCH and SUBCONTRACT_ORDER source types are
- * handled; PURCHASE_ORDER remains incomplete until its cross-module Batch creation flow exists.
+ * Modulith can retry the incomplete publication. BATCH, SUBCONTRACT_ORDER, and PURCHASE_ORDER
+ * receipts are materialized without re-querying the goods-receipt tables.
  */
 @Slf4j
 @Component
@@ -42,6 +52,10 @@ public class GoodsReceiptConfirmedEventListener {
   private final BatchRepository batchRepository;
   private final StockUnitRepository stockUnitRepository;
   private final SubcontractOrderQueryService scQueryService;
+  private final PurchaseOrderQueryService poQueryService;
+  private final ProductFacade productFacade;
+  private final BatchPrimaryMeasureService primaryMeasureService;
+  private final ApplicationEventPublisher eventPublisher;
   private final IdempotentEventHandler idempotentHandler;
 
   @ApplicationModuleListener
@@ -51,19 +65,6 @@ public class GoodsReceiptConfirmedEventListener {
         this.getClass(),
         "onGoodsReceiptConfirmed",
         () -> {
-          if (event.getSourceType() == GoodsReceiptSourceType.PURCHASE_ORDER) {
-            log.info(
-                "StockUnit materialization pending: reason={}, receipt={}, sourceType={}, eventId={}",
-                Reason.PO_MATERIALIZATION_PENDING,
-                event.getReceiptNumber(),
-                event.getSourceType(),
-                event.getEventId());
-            throw materializationFailure(
-                Reason.PO_MATERIALIZATION_PENDING,
-                event,
-                "purchase-order materialization is not implemented");
-          }
-
           if (event.getItems() == null || event.getItems().isEmpty()) {
             throw materializationFailure(
                 Reason.EMPTY_RECEIPT_ITEMS, event, "confirmed receipt contains no items");
@@ -92,9 +93,7 @@ public class GoodsReceiptConfirmedEventListener {
                   switch (event.getSourceType()) {
                     case BATCH -> handleBatchReceipt(event, tenantId);
                     case SUBCONTRACT_ORDER -> handleSubcontractReceipt(event, tenantId);
-                    case PURCHASE_ORDER ->
-                        throw new IllegalStateException(
-                            "PURCHASE_ORDER must be rejected before tenant processing");
+                    case PURCHASE_ORDER -> handlePurchaseOrderReceipt(event, tenantId);
                   }
                   return null;
                 });
@@ -129,6 +128,8 @@ public class GoodsReceiptConfirmedEventListener {
                         item.netWeight(),
                         item.grossWeight(),
                         batch.getUnit(),
+                        null,
+                        null,
                         batch.getLocationId(),
                         StockUnitSourceType.GOODS_RECEIPT,
                         item.itemId()))
@@ -167,6 +168,8 @@ public class GoodsReceiptConfirmedEventListener {
                         item.netWeight(),
                         item.grossWeight(),
                         outputInfo.outputUnit(),
+                        null,
+                        null,
                         null, // locationId not available in SC yet
                         StockUnitSourceType.GOODS_RECEIPT,
                         item.itemId()))
@@ -178,6 +181,212 @@ public class GoodsReceiptConfirmedEventListener {
         "Auto-created {} StockUnits for SC GoodsReceipt {}",
         requests.size(),
         event.getReceiptNumber());
+  }
+
+  private void handlePurchaseOrderReceipt(GoodsReceiptConfirmedEvent event, UUID tenantId) {
+    if (event.getSourceLineId() == null) {
+      throw dataTerminalFailure(
+          Reason.PO_EVENT_PREDATES_CONTRACT,
+          event,
+          "sourceLineId is absent",
+          "cancel stale publication and recreate receipt");
+    }
+
+    PurchaseMaterial material = resolvePurchaseMaterial(event, tenantId);
+    var lineInfo = material.lineInfo();
+    ProductType productType = material.productType();
+
+    PrimaryMeasure primaryMeasure = primaryMeasureService.primaryMeasure(productType);
+    List<BigDecimal> canonicalLengths =
+        event.getItems().stream().map(item -> canonicalLength(item, event)).toList();
+    if (primaryMeasure == PrimaryMeasure.LENGTH
+        && canonicalLengths.stream().anyMatch(java.util.Objects::isNull)) {
+      throw dataTerminalFailure(
+          Reason.PO_ITEM_MEASURE_INVALID,
+          event,
+          "fabric receipt item is missing length",
+          "fix item length data or re-seed");
+    }
+    BigDecimal batchQuantity =
+        primaryMeasure == PrimaryMeasure.LENGTH
+            ? canonicalLengths.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+            : event.getItems().stream()
+                .map(GoodsReceiptConfirmedEvent.ReceiptItemData::netWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    String batchUnit = primaryMeasureService.canonicalUnit(primaryMeasure);
+
+    Batch batch =
+        batchRepository
+            .findFirstByTenantIdAndSourceIdAndSourceType(
+                tenantId, event.getReceiptId(), BatchSourceType.PURCHASE)
+            .orElseGet(
+                () ->
+                    createPurchaseBatch(
+                        event,
+                        tenantId,
+                        lineInfo.productId(),
+                        productType,
+                        batchQuantity,
+                        batchUnit));
+
+    PackageType packageType = determineDefaultPackageType(productType);
+    List<StockUnitService.CreateStockUnitRequest> requests =
+        java.util.stream.IntStream.range(0, event.getItems().size())
+            .mapToObj(
+                index -> {
+                  var item = event.getItems().get(index);
+                  BigDecimal length = canonicalLengths.get(index);
+                  return new StockUnitService.CreateStockUnitRequest(
+                      productType,
+                      item.barcode(),
+                      null,
+                      packageType,
+                      item.netWeight(),
+                      item.grossWeight(),
+                      "KG",
+                      length,
+                      length != null ? "M" : null,
+                      null,
+                      StockUnitSourceType.GOODS_RECEIPT,
+                      item.itemId());
+                })
+            .toList();
+
+    stockUnitService.createBulk(batch.getId(), requests, TenantContext.SYSTEM_ACTOR_ID);
+    log.info(
+        "Auto-created {} StockUnits and purchase Batch {} for GoodsReceipt {}",
+        requests.size(),
+        batch.getBatchCode(),
+        event.getReceiptNumber());
+  }
+
+  private PurchaseMaterial resolvePurchaseMaterial(
+      GoodsReceiptConfirmedEvent event, UUID tenantId) {
+    PurchaseOrderQueryService.PurchaseOrderLineInfo lineInfo;
+    try {
+      lineInfo =
+          poQueryService.getPurchaseOrderLineInfo(
+              tenantId, event.getSourceId(), event.getSourceLineId());
+    } catch (NotFoundException exception) {
+      throw dataTerminalFailure(
+          Reason.PO_LINE_UNRESOLVED,
+          event,
+          "purchase-order line could not be resolved",
+          "fix purchase-order line data or re-seed",
+          exception);
+    }
+    if (lineInfo.productId() == null) {
+      throw dataTerminalFailure(
+          Reason.PO_LINE_UNRESOLVED,
+          event,
+          "purchase-order line has no productId",
+          "fix purchase-order line data or re-seed");
+    }
+    ProductType productType =
+        productFacade
+            .findById(tenantId, lineInfo.productId())
+            .orElseThrow(
+                () ->
+                    dataTerminalFailure(
+                        Reason.PO_LINE_UNRESOLVED,
+                        event,
+                        "purchase-order line product does not exist",
+                        "fix product data or re-seed"))
+            .getProductType();
+    if (productType == null
+        || productType == ProductType.CHEMICAL
+        || productType == ProductType.CONSUMABLE) {
+      throw dataTerminalFailure(
+          Reason.PO_LINE_UNRESOLVED,
+          event,
+          "unsupported purchase product type=" + productType,
+          "fix product data or re-seed");
+    }
+    return new PurchaseMaterial(lineInfo, productType);
+  }
+
+  private record PurchaseMaterial(
+      PurchaseOrderQueryService.PurchaseOrderLineInfo lineInfo, ProductType productType) {}
+
+  private Batch createPurchaseBatch(
+      GoodsReceiptConfirmedEvent event,
+      UUID tenantId,
+      UUID productId,
+      ProductType productType,
+      BigDecimal quantity,
+      String unit) {
+    String receiptNumber = event.getReceiptNumber();
+    String batchCode =
+        receiptNumber.startsWith("GR-")
+            ? "PUR-" + receiptNumber.substring("GR-".length())
+            : "PUR-" + receiptNumber;
+    Batch batch =
+        Batch.create(
+            new CreateBatchCommand(
+                tenantId,
+                productId,
+                productType,
+                batchCode,
+                event.getSupplierBatchCode(),
+                quantity,
+                unit,
+                null,
+                null,
+                null,
+                null,
+                null,
+                Map.of(),
+                BatchSourceType.PURCHASE,
+                event.getReceiptId(),
+                null));
+    Batch saved = batchRepository.save(batch);
+    eventPublisher.publishEvent(
+        new BatchCreatedEvent(
+            tenantId, saved.getId(), saved.getQuantity(), saved.getUnit(), saved.getLocationId()));
+    return saved;
+  }
+
+  private BigDecimal canonicalLength(
+      GoodsReceiptConfirmedEvent.ReceiptItemData item, GoodsReceiptConfirmedEvent event) {
+    if (item.length() == null && (item.lengthUnit() == null || item.lengthUnit().isBlank())) {
+      return null;
+    }
+    return primaryMeasureService
+        .toCanonical(item.length(), item.lengthUnit(), PrimaryMeasure.LENGTH)
+        .filter(value -> value.signum() > 0)
+        .orElseThrow(
+            () ->
+                dataTerminalFailure(
+                    Reason.PO_ITEM_MEASURE_INVALID,
+                    event,
+                    "invalid item length for barcode=" + item.barcode(),
+                    "fix item length data or re-seed"));
+  }
+
+  private StockUnitMaterializationException dataTerminalFailure(
+      Reason reason, GoodsReceiptConfirmedEvent event, String detail, String guidance) {
+    log.warn(
+        "StockUnit materialization data-terminal: reason={}, receipt={}, eventId={}, guidance={}",
+        reason,
+        event.getReceiptNumber(),
+        event.getEventId(),
+        guidance);
+    return materializationFailure(reason, event, detail + "; guidance=" + guidance);
+  }
+
+  private StockUnitMaterializationException dataTerminalFailure(
+      Reason reason,
+      GoodsReceiptConfirmedEvent event,
+      String detail,
+      String guidance,
+      Throwable cause) {
+    log.warn(
+        "StockUnit materialization data-terminal: reason={}, receipt={}, eventId={}, guidance={}",
+        reason,
+        event.getReceiptNumber(),
+        event.getEventId(),
+        guidance);
+    return materializationFailure(reason, event, detail + "; guidance=" + guidance, cause);
   }
 
   private PackageType determineDefaultPackageType(ProductType productType) {
