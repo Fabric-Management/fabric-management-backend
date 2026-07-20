@@ -47,6 +47,7 @@ class BatchServiceProductLinkTest {
   @Mock private FiberRepository fiberRepository;
   @Mock private FiberQualityStandardRepository qualityStandardRepository;
   @Mock private ApplicationEventPublisher applicationEventPublisher;
+  @Mock private BatchPrimaryMeasureService primaryMeasureService;
 
   @InjectMocks private BatchService batchService;
 

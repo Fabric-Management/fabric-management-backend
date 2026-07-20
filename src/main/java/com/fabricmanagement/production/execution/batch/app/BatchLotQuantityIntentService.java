@@ -8,10 +8,11 @@ import com.fabricmanagement.production.execution.batch.domain.BatchLotQuantityIn
 import com.fabricmanagement.production.execution.batch.domain.BatchLotQuantityIntentStatus;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchLotQuantityIntentPlacedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchLotQuantityIntentReleasedEvent;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchUnitMeasureMismatchException;
 import com.fabricmanagement.production.execution.batch.domain.exception.LotIntentQuantityExceededException;
+import com.fabricmanagement.production.execution.batch.domain.exception.LotIntentUnitMismatchException;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,8 +35,9 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
 
   private final BatchLotQuantityIntentRepository intentRepository;
   private final BatchRepository batchRepository;
-  private final BatchReservationRepository reservationRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final BatchPrimaryMeasureService primaryMeasureService;
+  private final BatchCommitmentQuantityService commitmentQuantityService;
 
   @Override
   @Transactional(readOnly = true)
@@ -46,6 +48,7 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
       return new LotIntentCoverage(true);
     }
     Map<UUID, Batch> batches = loadBatches(tenantId, requested);
+    requested = canonicalize(batches, requested);
     validateAgainstPhysicalQuantity(batches, requested);
     return new LotIntentCoverage(isCovered(tenantId, quoteLineId, batches, requested));
   }
@@ -63,6 +66,7 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
     UUID tenantId = TenantContext.requireTenantId();
     List<LotIntentRequest> requested = normalize(intents);
     Map<UUID, Batch> batches = loadBatches(tenantId, requested);
+    requested = canonicalize(batches, requested);
     validateAgainstPhysicalQuantity(batches, requested);
     boolean covered = isCovered(tenantId, quoteLineId, batches, requested);
 
@@ -192,9 +196,7 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
     }
     List<UUID> batchIds = requested.stream().map(LotIntentRequest::batchId).distinct().toList();
     Map<UUID, Batch> batches =
-        batchRepository.findAllById(batchIds).stream()
-            .filter(batch -> tenantId.equals(batch.getTenantId()))
-            .filter(batch -> Boolean.TRUE.equals(batch.getIsActive()))
+        batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, batchIds).stream()
             .collect(Collectors.toMap(Batch::getId, Function.identity()));
     batchIds.stream()
         .filter(batchId -> !batches.containsKey(batchId))
@@ -204,6 +206,28 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
               throw new NotFoundException("Lot not found: " + batchId);
             });
     return batches;
+  }
+
+  private List<LotIntentRequest> canonicalize(
+      Map<UUID, Batch> batches, List<LotIntentRequest> requested) {
+    return requested.stream()
+        .map(
+            request -> {
+              Batch batch = batches.get(request.batchId());
+              var resolution = primaryMeasureService.resolve(batch);
+              BigDecimal canonicalQuantity =
+                  primaryMeasureService
+                      .toCanonical(request.quantity(), request.unit(), resolution.primaryMeasure())
+                      .orElseThrow(
+                          () ->
+                              new LotIntentUnitMismatchException(
+                                  batch.getId(),
+                                  primaryMeasureService.normalizeUnit(request.unit()),
+                                  resolution.primaryUnit()));
+              return new LotIntentRequest(
+                  request.batchId(), canonicalQuantity, resolution.primaryUnit());
+            })
+        .toList();
   }
 
   private void validateAgainstPhysicalQuantity(
@@ -222,18 +246,16 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
   private boolean isCovered(
       UUID tenantId, UUID quoteLineId, Map<UUID, Batch> batches, List<LotIntentRequest> requested) {
     List<UUID> batchIds = requested.stream().map(LotIntentRequest::batchId).distinct().toList();
-    Map<UUID, BigDecimal> softByBatch =
-        intentRepository.sumActiveByBatchIds(tenantId, batchIds, quoteLineId);
-    Map<UUID, BigDecimal> hardByBatch =
-        reservationRepository.sumActiveRemainingByBatchIds(tenantId, batchIds);
+    Map<UUID, BatchCommitmentQuantityService.Summary> commitments =
+        commitmentQuantityService.summarize(tenantId, batches.values(), quoteLineId);
     return requested.stream()
         .allMatch(
             request -> {
               Batch batch = batches.get(request.batchId());
               BigDecimal free =
                   physicalQuantity(batch)
-                      .subtract(softByBatch.getOrDefault(request.batchId(), BigDecimal.ZERO))
-                      .subtract(hardByBatch.getOrDefault(request.batchId(), BigDecimal.ZERO));
+                      .subtract(commitments.get(request.batchId()).softIntent())
+                      .subtract(commitments.get(request.batchId()).hardReserved());
               if (free.compareTo(BigDecimal.ZERO) < 0) {
                 free = BigDecimal.ZERO;
               }
@@ -242,7 +264,16 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
   }
 
   private BigDecimal physicalQuantity(Batch batch) {
-    return batch.getQuantity().subtract(batch.getConsumedQuantity());
+    var resolution = primaryMeasureService.resolve(batch);
+    return primaryMeasureService
+        .toCanonical(
+            batch.getQuantity().subtract(batch.getConsumedQuantity()),
+            batch.getUnit(),
+            resolution.primaryMeasure())
+        .orElseThrow(
+            () ->
+                new BatchUnitMeasureMismatchException(
+                    batch.getId(), batch.getUnit(), resolution.primaryUnit()));
   }
 
   private void release(UUID tenantId, BatchLotQuantityIntent intent, Instant releasedAt) {

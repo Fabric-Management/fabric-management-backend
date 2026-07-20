@@ -2,6 +2,7 @@ package com.fabricmanagement.production.masterdata.qualitygrade.infra.repository
 
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,8 @@ public interface QualityGradeRepository extends JpaRepository<QualityGrade, UUID
   Optional<QualityGrade> findByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
 
   Optional<QualityGrade> findByTenantIdAndId(UUID tenantId, UUID id);
+
+  List<QualityGrade> findByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
   Optional<QualityGrade> findByTenantIdAndProductTypeAndCodeAndIsActiveTrue(
       UUID tenantId, ProductType productType, String code);

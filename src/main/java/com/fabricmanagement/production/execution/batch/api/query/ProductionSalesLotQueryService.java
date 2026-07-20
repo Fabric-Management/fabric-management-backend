@@ -1,17 +1,17 @@
 package com.fabricmanagement.production.execution.batch.api.query;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.execution.batch.app.BatchCommitmentQuantityService;
+import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,12 +25,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Public production read contract for sales lot/piece selection. */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class ProductionSalesLotQueryService {
 
@@ -39,13 +41,12 @@ public class ProductionSalesLotQueryService {
   private static final Set<StockUnitStatus> SELECTABLE_PIECE_STATUSES =
       Set.of(StockUnitStatus.AVAILABLE, StockUnitStatus.PARTIAL);
   private final BatchRepository batchRepository;
-  private final BatchReservationRepository reservationRepository;
   private final BatchLotQuantityIntentRepository lotIntentRepository;
   private final StockUnitRepository stockUnitRepository;
   private final StockUnitSoftHoldRepository softHoldRepository;
   private final QualityGradeQueryService qualityGradeQueryService;
-  private final WorkOrderRepository workOrderRepository;
-  private final PrimaryMeasureResolver primaryMeasureResolver;
+  private final BatchPrimaryMeasureService primaryMeasureService;
+  private final BatchCommitmentQuantityService commitmentQuantityService;
 
   public List<ProductionSalesLotReference> listSaleableLots() {
     return listSaleableLots(null);
@@ -91,10 +92,8 @@ public class ProductionSalesLotQueryService {
                 .flatMap(Collection::stream)
                 .map(StockUnit::getId)
                 .toList());
-    Map<UUID, BigDecimal> softIntentQuantities =
-        lotIntentRepository.sumActiveByBatchIds(tenantId, batchIds, excludedQuoteLineId);
-    Map<UUID, BigDecimal> hardReservedQuantities =
-        reservationRepository.sumActiveRemainingByBatchIds(tenantId, batchIds);
+    Map<UUID, BatchCommitmentQuantityService.Summary> commitments =
+        commitmentQuantityService.summarize(tenantId, batches, excludedQuoteLineId);
     Map<UUID, List<ProductionSalesLotIntentReference>> intentsByBatch =
         lotIntentRepository.findActiveByBatchIds(tenantId, batchIds, excludedQuoteLineId).stream()
             .map(BatchLotIntentView::from)
@@ -111,9 +110,8 @@ public class ProductionSalesLotQueryService {
                   unitsByBatch.getOrDefault(batch.getId(), List.of()).stream()
                       .sorted(Comparator.comparing(StockUnit::getBarcode))
                       .toList();
-              PrimaryMeasure primaryMeasure =
-                  primaryMeasureResolver.resolve(
-                      resolveProcessType(tenantId, batch), batch.getProductType());
+              var resolution = primaryMeasureService.resolve(batch);
+              PrimaryMeasure primaryMeasure = resolution.primaryMeasure();
               LotQualityReference quality = resolveLotQuality(units).orElse(null);
               LotColourReference colour = coloursByBatch.get(batch.getId());
               List<ProductionSalesPieceReference> pieces =
@@ -126,16 +124,19 @@ public class ProductionSalesLotQueryService {
                                   softHoldCounts.getOrDefault(unit.getId(), 0L)))
                       .toList();
               BigDecimal physicalQuantity =
-                  pieces.isEmpty()
-                      ? physicalBatchQuantity(batch)
-                      : sumSelectablePieces(pieces, primaryMeasure);
-              BigDecimal softIntentQuantity =
-                  softIntentQuantities.getOrDefault(batch.getId(), BigDecimal.ZERO);
-              BigDecimal hardReservedQuantity =
-                  hardReservedQuantities.getOrDefault(batch.getId(), BigDecimal.ZERO);
+                  pieces.isEmpty() ? physicalBatchQuantity(batch) : sumSelectablePieces(pieces);
+              var commitment = commitments.get(batch.getId());
+              BigDecimal softIntentQuantity = commitment.softIntent();
+              BigDecimal hardReservedQuantity = commitment.hardReserved();
               BigDecimal freeQuantity =
                   physicalQuantity.subtract(softIntentQuantity).subtract(hardReservedQuantity);
-              if (freeQuantity.compareTo(BigDecimal.ZERO) < 0) {
+              boolean overCommitted = freeQuantity.compareTo(BigDecimal.ZERO) < 0;
+              if (overCommitted) {
+                log.warn(
+                    "Over-committed sales lot: tenantId={}, batchId={}, deficit={}",
+                    tenantId,
+                    batch.getId(),
+                    freeQuantity.abs());
                 freeQuantity = BigDecimal.ZERO;
               }
               return new ProductionSalesLotReference(
@@ -144,16 +145,17 @@ public class ProductionSalesLotQueryService {
                   batch.getStatus().name(),
                   SALEABLE_BATCH_STATUSES.contains(batch.getStatus()),
                   primaryMeasure.name(),
-                  resolveUnit(batch, pieces, primaryMeasure),
+                  resolution.primaryUnit(),
                   quality,
                   colour,
                   pieces.isEmpty()
-                      ? batch.getAvailableQuantity()
-                      : sumSelectablePieces(pieces, primaryMeasure),
+                      ? canonicalBatchQuantity(batch, batch.getAvailableQuantity(), primaryMeasure)
+                      : sumSelectablePieces(pieces),
                   physicalQuantity,
                   softIntentQuantity,
                   hardReservedQuantity,
                   freeQuantity,
+                  overCommitted,
                   intentsByBatch.getOrDefault(batch.getId(), List.of()),
                   pieces);
             })
@@ -164,12 +166,13 @@ public class ProductionSalesLotQueryService {
       StockUnit unit, PrimaryMeasure primaryMeasure, long softReservedCount) {
     BigDecimal primaryValue =
         primaryMeasure == PrimaryMeasure.LENGTH && unit.getLength() != null
-            ? unit.getLength()
-            : unit.getCurrentWeight();
-    String primaryUnit =
-        primaryMeasure == PrimaryMeasure.LENGTH && unit.getLengthUnit() != null
-            ? unit.getLengthUnit()
-            : unit.getUnit();
+            ? primaryMeasureService
+                .toCanonical(unit.getLength(), unit.getLengthUnit(), PrimaryMeasure.LENGTH)
+                .orElse(null)
+            : primaryMeasureService
+                .toCanonical(unit.getCurrentWeight(), unit.getUnit(), PrimaryMeasure.WEIGHT)
+                .orElse(null);
+    String primaryUnit = primaryMeasureService.canonicalUnit(primaryMeasure);
     return new ProductionSalesPieceReference(
         unit.getId(),
         unit.getBarcode(),
@@ -186,43 +189,25 @@ public class ProductionSalesLotQueryService {
         unit.getQualityGradeId());
   }
 
-  private String resolveProcessType(UUID tenantId, Batch batch) {
-    if (batch.getSourceType() == null) {
-      return "UNSPECIFIED";
-    }
-    if (batch.getSourceType() == BatchSourceType.INTERNAL_PRODUCTION
-        && batch.getSourceId() != null) {
-      return workOrderRepository
-          .findByIdAndTenantIdAndIsActiveTrue(batch.getSourceId(), tenantId)
-          .map(workOrder -> workOrder.getModuleType().name())
-          .orElse(batch.getSourceType().name());
-    }
-    return batch.getSourceType().name();
-  }
-
-  private String resolveUnit(
-      Batch batch, List<ProductionSalesPieceReference> pieces, PrimaryMeasure primaryMeasure) {
-    if (primaryMeasure == PrimaryMeasure.LENGTH) {
-      return pieces.stream()
-          .map(ProductionSalesPieceReference::lengthUnit)
-          .filter(Objects::nonNull)
-          .findFirst()
-          .orElse(batch.getUnit());
-    }
-    return batch.getUnit();
-  }
-
-  private BigDecimal sumSelectablePieces(
-      List<ProductionSalesPieceReference> pieces, PrimaryMeasure primaryMeasure) {
+  private BigDecimal sumSelectablePieces(List<ProductionSalesPieceReference> pieces) {
     return pieces.stream()
         .filter(ProductionSalesPieceReference::selectable)
-        .map(piece -> primaryMeasure == PrimaryMeasure.LENGTH ? piece.length() : piece.weight())
+        .map(ProductionSalesPieceReference::primaryMeasureValue)
         .filter(Objects::nonNull)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   private BigDecimal physicalBatchQuantity(Batch batch) {
-    return batch.getQuantity().subtract(batch.getConsumedQuantity());
+    PrimaryMeasure measure = primaryMeasureService.resolve(batch).primaryMeasure();
+    return canonicalBatchQuantity(
+        batch, batch.getQuantity().subtract(batch.getConsumedQuantity()), measure);
+  }
+
+  private BigDecimal canonicalBatchQuantity(
+      Batch batch, BigDecimal quantity, PrimaryMeasure measure) {
+    return primaryMeasureService
+        .toCanonical(quantity, batch.getUnit(), measure)
+        .orElse(BigDecimal.ZERO);
   }
 
   private Optional<LotQualityReference> resolveLotQuality(List<StockUnit> units) {
@@ -265,6 +250,7 @@ public class ProductionSalesLotQueryService {
       BigDecimal softIntentQuantity,
       BigDecimal hardReservedQuantity,
       BigDecimal freeQuantity,
+      boolean overCommitted,
       List<ProductionSalesLotIntentReference> intents,
       List<ProductionSalesPieceReference> pieces) {}
 

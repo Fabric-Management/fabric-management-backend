@@ -175,6 +175,7 @@ class SalesLotServiceTest {
         new BigDecimal("10.000"),
         new BigDecimal("10.000"),
         new BigDecimal("100.000"),
+        false,
         intents,
         pieces);
   }

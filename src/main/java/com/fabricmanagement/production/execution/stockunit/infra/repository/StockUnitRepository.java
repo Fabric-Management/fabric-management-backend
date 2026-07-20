@@ -4,6 +4,7 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +42,78 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
   List<StockUnit> findByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
 
+  @Query(
+      """
+      SELECT s.batchId AS batchId,
+             s.status AS status,
+             s.qualityGradeId AS qualityGradeId,
+             UPPER(TRIM(s.unit)) AS weightUnit,
+             COALESCE(SUM(s.currentWeight), 0) AS weightQuantity,
+             UPPER(TRIM(s.lengthUnit)) AS lengthUnit,
+             SUM(s.length) AS lengthQuantity,
+             COUNT(s.id) AS pieceCount
+      FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId IN :batchIds
+        AND s.isActive = true
+      GROUP BY s.batchId, s.status, s.qualityGradeId,
+               UPPER(TRIM(s.unit)), UPPER(TRIM(s.lengthUnit))
+      """)
+  List<AvailabilityVectorRow> findAvailabilityVectorRows(
+      @Param("tenantId") UUID tenantId, @Param("batchIds") Collection<UUID> batchIds);
+
+  @Query(
+      """
+      SELECT s.batchId AS batchId,
+             s.packageType AS packageType,
+             UPPER(TRIM(s.unit)) AS weightUnit,
+             COALESCE(SUM(s.currentWeight), 0) AS weightQuantity,
+             UPPER(TRIM(s.lengthUnit)) AS lengthUnit,
+             SUM(s.length) AS lengthQuantity,
+             COUNT(s.id) AS pieceCount
+      FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId IN :batchIds
+        AND s.isActive = true
+        AND s.status IN :statuses
+        AND (:qualityGradeId IS NULL OR s.qualityGradeId = :qualityGradeId)
+        AND (:qualityUnassigned = false OR s.qualityGradeId IS NULL)
+      GROUP BY s.batchId, s.packageType,
+               UPPER(TRIM(s.unit)), UPPER(TRIM(s.lengthUnit))
+      """)
+  List<AvailabilityPieceBreakdownRow> findAvailabilityPieceBreakdownRows(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchIds") Collection<UUID> batchIds,
+      @Param("statuses") Collection<StockUnitStatus> statuses,
+      @Param("qualityGradeId") UUID qualityGradeId,
+      @Param("qualityUnassigned") boolean qualityUnassigned);
+
+  @Query(
+      """
+      SELECT s.batchId AS batchId,
+             s.qualityGradeId AS qualityGradeId,
+             UPPER(TRIM(s.unit)) AS weightUnit,
+             COALESCE(SUM(s.currentWeight), 0) AS weightQuantity,
+             UPPER(TRIM(s.lengthUnit)) AS lengthUnit,
+             SUM(s.length) AS lengthQuantity,
+             COUNT(s.id) AS pieceCount
+      FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId IN :batchIds
+        AND s.isActive = true
+        AND s.status IN :statuses
+        AND (:qualityGradeId IS NULL OR s.qualityGradeId = :qualityGradeId)
+        AND (:qualityUnassigned = false OR s.qualityGradeId IS NULL)
+      GROUP BY s.batchId, s.qualityGradeId,
+               UPPER(TRIM(s.unit)), UPPER(TRIM(s.lengthUnit))
+      """)
+  List<AvailabilityQualityBreakdownRow> findAvailabilityQualityBreakdownRows(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchIds") Collection<UUID> batchIds,
+      @Param("statuses") Collection<StockUnitStatus> statuses,
+      @Param("qualityGradeId") UUID qualityGradeId,
+      @Param("qualityUnassigned") boolean qualityUnassigned);
+
   /**
    * Returns the sum of current weights for all non-disposed, active stock units of a batch. Used by
    * {@code StockUnitReconciliationService} to compare against {@code Batch.quantity}.
@@ -63,4 +136,54 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
       @Param("tenantId") UUID tenantId,
       @Param("batchId") UUID batchId,
       @Param("excludedStatus") StockUnitStatus excludedStatus);
+
+  interface AvailabilityVectorRow {
+    UUID getBatchId();
+
+    StockUnitStatus getStatus();
+
+    UUID getQualityGradeId();
+
+    String getWeightUnit();
+
+    BigDecimal getWeightQuantity();
+
+    String getLengthUnit();
+
+    BigDecimal getLengthQuantity();
+
+    long getPieceCount();
+  }
+
+  interface AvailabilityPieceBreakdownRow {
+    UUID getBatchId();
+
+    com.fabricmanagement.production.execution.stockunit.domain.PackageType getPackageType();
+
+    String getWeightUnit();
+
+    BigDecimal getWeightQuantity();
+
+    String getLengthUnit();
+
+    BigDecimal getLengthQuantity();
+
+    long getPieceCount();
+  }
+
+  interface AvailabilityQualityBreakdownRow {
+    UUID getBatchId();
+
+    UUID getQualityGradeId();
+
+    String getWeightUnit();
+
+    BigDecimal getWeightQuantity();
+
+    String getLengthUnit();
+
+    BigDecimal getLengthQuantity();
+
+    long getPieceCount();
+  }
 }

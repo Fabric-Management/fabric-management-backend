@@ -8,15 +8,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.execution.batch.app.BatchCommitmentQuantityService;
+import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
@@ -36,13 +37,12 @@ class ProductionSalesLotQueryServiceTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
 
   @Mock private BatchRepository batchRepository;
-  @Mock private BatchReservationRepository reservationRepository;
   @Mock private BatchLotQuantityIntentRepository lotIntentRepository;
   @Mock private StockUnitRepository stockUnitRepository;
   @Mock private StockUnitSoftHoldRepository softHoldRepository;
   @Mock private QualityGradeQueryService qualityGradeQueryService;
-  @Mock private WorkOrderRepository workOrderRepository;
-  @Mock private PrimaryMeasureResolver primaryMeasureResolver;
+  @Mock private BatchPrimaryMeasureService primaryMeasureService;
+  @Mock private BatchCommitmentQuantityService commitmentQuantityService;
 
   private ProductionSalesLotQueryService service;
 
@@ -52,13 +52,12 @@ class ProductionSalesLotQueryServiceTest {
     service =
         new ProductionSalesLotQueryService(
             batchRepository,
-            reservationRepository,
             lotIntentRepository,
             stockUnitRepository,
             softHoldRepository,
             qualityGradeQueryService,
-            workOrderRepository,
-            primaryMeasureResolver);
+            primaryMeasureService,
+            commitmentQuantityService);
   }
 
   @AfterEach
@@ -84,13 +83,22 @@ class ProductionSalesLotQueryServiceTest {
     when(stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(TENANT_ID, batchIds))
         .thenReturn(List.of());
     when(softHoldRepository.countActiveByStockUnitIds(TENANT_ID, List.of())).thenReturn(Map.of());
-    when(lotIntentRepository.sumActiveByBatchIds(TENANT_ID, batchIds, null)).thenReturn(Map.of());
-    when(reservationRepository.sumActiveRemainingByBatchIds(TENANT_ID, batchIds))
-        .thenReturn(Map.of());
     when(lotIntentRepository.findActiveByBatchIds(TENANT_ID, batchIds, null)).thenReturn(List.of());
     when(batchRepository.findColorReferencesByBatchIds(TENANT_ID, batchIds))
         .thenReturn(List.of(projection));
-    when(primaryMeasureResolver.resolve(any(), any())).thenReturn(PrimaryMeasure.WEIGHT);
+    when(primaryMeasureService.resolve(any(Batch.class)))
+        .thenReturn(new BatchPrimaryMeasureService.Resolution(PrimaryMeasure.LENGTH, "M"));
+    when(primaryMeasureService.toCanonical(any(), any(), any()))
+        .thenReturn(java.util.Optional.of(BigDecimal.TEN));
+    when(commitmentQuantityService.summarize(TENANT_ID, List.of(colored, uncolored), null))
+        .thenReturn(
+            Map.of(
+                colored.getId(),
+                new BatchCommitmentQuantityService.Summary(
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of()),
+                uncolored.getId(),
+                new BatchCommitmentQuantityService.Summary(
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of())));
 
     var lots = service.listSaleableLots();
 
@@ -99,6 +107,34 @@ class ProductionSalesLotQueryServiceTest {
     assertThat(lots.get(0).colour().code()).isEqualTo("NAVY-01");
     assertThat(lots.get(1).colour()).isNull();
     verify(batchRepository).findColorReferencesByBatchIds(TENANT_ID, batchIds);
+  }
+
+  @Test
+  void listSaleableLots_flagsAndClampsNegativeFreeQuantity() {
+    Batch batch = batch("LOT-OVER", null);
+    List<UUID> batchIds = List.of(batch.getId());
+    when(batchRepository.findByTenantIdAndStatusIn(eq(TENANT_ID), any()))
+        .thenReturn(List.of(batch));
+    when(stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(TENANT_ID, batchIds))
+        .thenReturn(List.of());
+    when(softHoldRepository.countActiveByStockUnitIds(TENANT_ID, List.of())).thenReturn(Map.of());
+    when(lotIntentRepository.findActiveByBatchIds(TENANT_ID, batchIds, null)).thenReturn(List.of());
+    when(batchRepository.findColorReferencesByBatchIds(TENANT_ID, batchIds)).thenReturn(List.of());
+    when(primaryMeasureService.resolve(batch))
+        .thenReturn(new BatchPrimaryMeasureService.Resolution(PrimaryMeasure.LENGTH, "M"));
+    when(primaryMeasureService.toCanonical(any(), any(), any()))
+        .thenReturn(java.util.Optional.of(BigDecimal.TEN));
+    when(commitmentQuantityService.summarize(TENANT_ID, List.of(batch), null))
+        .thenReturn(
+            Map.of(
+                batch.getId(),
+                new BatchCommitmentQuantityService.Summary(
+                    new BigDecimal("15"), BigDecimal.ZERO, List.of())));
+
+    var lot = service.listSaleableLots().getFirst();
+
+    assertThat(lot.freeQuantity()).isZero();
+    assertThat(lot.overCommitted()).isTrue();
   }
 
   private Batch batch(String code, UUID colorId) {

@@ -132,6 +132,9 @@ tags:
   name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
+- description: "Canonical FABRIC, YARN, and FIBER stock availability by product, colour,\
+    \ lot, and quality"
+  name: Stock Availability
 - description: Sales-readable quality grade projection
   name: Sales Quality Grade
 - description: Approval Request operations
@@ -36403,6 +36406,269 @@ paths:
       summary: Initiate a transfer — StockUnit transitions to IN_TRANSIT
       tags:
       - StockUnit
+  /api/v1/production/stock/availability/lots:
+    get:
+      description: Returns deterministic lot pages with package and quality breakdowns.
+      operationId: listStockAvailabilityLots
+      parameters:
+      - description: Batch colour-card identifier
+        in: query
+        name: colorId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Filter explicitly colourless batches
+        in: query
+        name: colourless
+        required: false
+        schema:
+          type: boolean
+      - description: Product identifier
+        in: query
+        name: productId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Batch/lot identifier
+        in: query
+        name: batchId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Piece-level quality-grade identifier
+        in: query
+        name: qualityGradeId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Filter pieces whose quality grade is not assigned
+        in: query
+        name: qualityUnassigned
+        required: false
+        schema:
+          type: boolean
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseProductionStockAvailabilityLot"
+          description: Lot availability page
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List lot-level stock availability
+      tags:
+      - Stock Availability
+  /api/v1/production/stock/availability/summary:
+    get:
+      description: "Returns whole-filter-set totals, paged deterministically over\
+        \ products."
+      operationId: listStockAvailabilitySummary
+      parameters:
+      - description: Batch colour-card identifier
+        in: query
+        name: colorId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Filter explicitly colourless batches
+        in: query
+        name: colourless
+        required: false
+        schema:
+          type: boolean
+      - description: Product identifier
+        in: query
+        name: productId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Batch/lot identifier
+        in: query
+        name: batchId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Piece-level quality-grade identifier
+        in: query
+        name: qualityGradeId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: Filter pieces whose quality grade is not assigned
+        in: query
+        name: qualityUnassigned
+        required: false
+        schema:
+          type: boolean
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseProductionStockAvailabilitySummary"
+          description: Product availability summary page
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List product-level stock availability summaries
+      tags:
+      - Stock Availability
   /api/v1/production/work-orders:
     get:
       description: Returns a paginated list of WorkOrders for the current tenant.
@@ -47336,6 +47602,42 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponseProductionStockAvailabilityLot:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseProductionStockAvailabilityLot"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseProductionStockAvailabilitySummary:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseProductionStockAvailabilitySummary"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponsePurchaseOrderResponse:
       type: object
       properties:
@@ -55640,6 +55942,52 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponseProductionStockAvailabilityLot:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityLot"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseProductionStockAvailabilitySummary:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilitySummary"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponsePurchaseOrderResponse:
       type: object
       properties:
@@ -56880,6 +57228,325 @@ components:
         workOrderId:
           type: string
           format: uuid
+    ProductionStockAvailabilityColour:
+      type: object
+      description: Batch-level colour-card reference
+      properties:
+        code:
+          type: string
+          description: Tenant colour code
+        hex:
+          type:
+          - string
+          - "null"
+          description: Optional screen approximation in hexadecimal form
+        id:
+          type: string
+          format: uuid
+          description: Colour-card identifier
+        name:
+          type: string
+          description: Human-readable colour name
+      required:
+      - code
+      - hex
+      - id
+      - name
+    ProductionStockAvailabilityLot:
+      type: object
+      description: Lot-level stock availability and physical breakdowns
+      properties:
+        batchId:
+          type: string
+          format: uuid
+          description: Batch/lot identifier
+        colour:
+          type: "null"
+          $ref: "#/components/schemas/ProductionStockAvailabilityColour"
+          description: Batch colour; null for explicitly colourless stock
+        free:
+          type: number
+          description: Non-negative lot-grain free quantity in the canonical unit
+        hardReserved:
+          type: number
+          description: Active hard-reservation quantity in the canonical unit
+        lotNo:
+          type: string
+          description: Tenant lot number
+        overCommitted:
+          type: boolean
+          description: True when raw lot-grain free quantity was negative
+        physical:
+          $ref: "#/components/schemas/ProductionStockAvailabilityPhysical"
+          description: Physical stock vector
+        physicalSource:
+          type: string
+          description: Whether physical values come from pieces or the batch fallback
+          enum:
+          - PIECES
+          - BATCH_FALLBACK
+        pieceBreakdown:
+          type: array
+          description: Selectable pieces grouped by package type
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityPieceBreakdown"
+        primaryMeasure:
+          type: string
+          description: Canonical primary measure
+          enum:
+          - LENGTH
+          - WEIGHT
+        primaryMeasureUnit:
+          type: string
+          description: Canonical primary unit (M or KG)
+        product:
+          $ref: "#/components/schemas/ProductionStockAvailabilityProduct"
+          description: Product identity
+        qualityBreakdown:
+          type: array
+          description: Selectable pieces grouped by quality grade
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityQualityBreakdown"
+        softIntent:
+          type: number
+          description: Active lot-intent quantity in the canonical unit
+        status:
+          type: string
+          description: Current batch lifecycle status
+        unitMismatches:
+          type: array
+          description: Excluded incompatible quantities grouped by source and unit
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityUnitMismatch"
+      required:
+      - batchId
+      - colour
+      - free
+      - hardReserved
+      - lotNo
+      - overCommitted
+      - physical
+      - physicalSource
+      - pieceBreakdown
+      - primaryMeasure
+      - primaryMeasureUnit
+      - product
+      - qualityBreakdown
+      - softIntent
+      - status
+      - unitMismatches
+    ProductionStockAvailabilityPhysical:
+      type: object
+      description: Physical stock vector; null means not measured
+      properties:
+        kg:
+          type:
+          - number
+          - "null"
+          description: Selectable physical weight in canonical kilograms
+        metres:
+          type:
+          - number
+          - "null"
+          description: Selectable physical length in canonical metres
+        pieceCount:
+          type: integer
+          format: int64
+          description: Selectable physical piece count; zero is a measured value
+      required:
+      - kg
+      - metres
+      - pieceCount
+    ProductionStockAvailabilityPieceBreakdown:
+      type: object
+      description: Selectable pieces grouped by package type
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Selectable piece count
+        packageType:
+          type: string
+          description: Physical package type
+          enum:
+          - BALE
+          - ROLL
+          - BOBBIN
+          - SACK
+          - CARTON
+          - DRUM
+          - BAG
+          - PALLET
+          - CONE
+          - HANK
+        totalPrimaryQuantity:
+          type:
+          - number
+          - "null"
+          description: Canonical quantity in the product primary measure
+      required:
+      - count
+      - packageType
+      - totalPrimaryQuantity
+    ProductionStockAvailabilityProduct:
+      type: object
+      description: Product identity for an availability row
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Product identifier
+        type:
+          type: string
+          description: Product type
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
+      required:
+      - id
+      - type
+    ProductionStockAvailabilityQualityBreakdown:
+      type: object
+      description: Selectable pieces grouped by quality grade
+      properties:
+        grade:
+          type: "null"
+          $ref: "#/components/schemas/ProductionStockAvailabilityQualityGrade"
+          description: Quality grade; null represents UNASSIGNED pieces
+        kg:
+          type:
+          - number
+          - "null"
+          description: Selectable grade weight in canonical kilograms
+        metres:
+          type:
+          - number
+          - "null"
+          description: Selectable grade length in canonical metres
+        pieceCount:
+          type: integer
+          format: int64
+          description: Selectable piece count in the grade
+      required:
+      - grade
+      - kg
+      - metres
+      - pieceCount
+    ProductionStockAvailabilityQualityGrade:
+      type: object
+      description: Quality-grade reference for physical pieces
+      properties:
+        code:
+          type: string
+          description: Tenant quality-grade code
+        id:
+          type: string
+          format: uuid
+          description: Quality-grade identifier
+        name:
+          type: string
+          description: Human-readable quality-grade name
+        rank:
+          type: integer
+          format: int32
+          description: Natural order; lower rank is better
+        saleable:
+          type: boolean
+          description: Whether this grade may be sold
+      required:
+      - code
+      - id
+      - name
+      - rank
+      - saleable
+    ProductionStockAvailabilitySummary:
+      type: object
+      description: Whole-filter-set availability totals for one product
+      properties:
+        free:
+          type: number
+          description: Non-negative free quantity in the canonical unit
+        hardReserved:
+          type: number
+          description: Active hard-reservation quantity in the canonical unit
+        lotCount:
+          type: integer
+          format: int64
+          description: Number of matching saleable lots
+        overCommitted:
+          type: boolean
+          description: True when any contributing lot had negative raw free stock
+        physical:
+          $ref: "#/components/schemas/ProductionStockAvailabilityPhysical"
+          description: Summed physical vector
+        primaryMeasure:
+          type: string
+          description: Canonical primary measure
+          enum:
+          - LENGTH
+          - WEIGHT
+        primaryMeasureUnit:
+          type: string
+          description: Canonical primary unit (M or KG)
+        product:
+          $ref: "#/components/schemas/ProductionStockAvailabilityProduct"
+          description: Product identity
+        qualityBreakdown:
+          type: array
+          description: Selectable physical stock grouped by quality grade
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityQualityBreakdown"
+        softIntent:
+          type: number
+          description: Active lot-intent quantity in the canonical unit
+        unitMismatches:
+          type: array
+          description: Excluded incompatible quantities grouped by source and unit
+          items:
+            $ref: "#/components/schemas/ProductionStockAvailabilityUnitMismatch"
+      required:
+      - free
+      - hardReserved
+      - lotCount
+      - overCommitted
+      - physical
+      - primaryMeasure
+      - primaryMeasureUnit
+      - product
+      - qualityBreakdown
+      - softIntent
+      - unitMismatches
+    ProductionStockAvailabilityUnitMismatch:
+      type: object
+      description: Quantity excluded from canonical arithmetic
+      properties:
+        quantity:
+          type: number
+          description: Quantity summed only within this source and unit
+        rowCount:
+          type: integer
+          format: int64
+          description: Number of contributing rows
+        source:
+          type: string
+          description: Source of the incompatible quantity
+          enum:
+          - SOFT_INTENT
+          - HARD_RESERVATION
+          - PIECE_WEIGHT
+          - PIECE_LENGTH
+          - BATCH_QUANTITY
+        unit:
+          type: string
+          description: Normalised incompatible source unit
+      required:
+      - quantity
+      - rowCount
+      - source
+      - unit
     ProductionSummaryProductBreakdown:
       type: object
       properties:
@@ -58377,6 +59044,7 @@ components:
           type: string
     SalesLotDto:
       type: object
+      description: Sales-readable lot availability and selectable pieces
       properties:
         availableQuantity:
           type: number
@@ -58395,6 +59063,9 @@ components:
             $ref: "#/components/schemas/SalesLotIntentDto"
         lotNo:
           type: string
+        overCommitted:
+          type: boolean
+          description: True when the unclamped free quantity is negative
         physicalQuantity:
           type: number
         pieces:
@@ -58411,6 +59082,8 @@ components:
           type: string
         unit:
           type: string
+      required:
+      - overCommitted
     SalesLotIntentDto:
       type: object
       properties:

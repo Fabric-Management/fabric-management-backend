@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,9 +19,9 @@ import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchLotQuantityIntentPlacedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchLotQuantityIntentReleasedEvent;
 import com.fabricmanagement.production.execution.batch.domain.exception.LotIntentQuantityExceededException;
+import com.fabricmanagement.production.execution.batch.domain.exception.LotIntentUnitMismatchException;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -42,8 +43,9 @@ class BatchLotQuantityIntentServiceTest {
 
   @Mock private BatchLotQuantityIntentRepository intentRepository;
   @Mock private BatchRepository batchRepository;
-  @Mock private BatchReservationRepository reservationRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private BatchCommitmentQuantityService commitmentQuantityService;
+  @Spy private BatchPrimaryMeasureService primaryMeasureService = new BatchPrimaryMeasureService();
 
   @InjectMocks private BatchLotQuantityIntentService service;
 
@@ -64,11 +66,15 @@ class BatchLotQuantityIntentServiceTest {
 
   @Test
   void shouldCalculateCoverageAfterOtherSoftIntentsAndHardReservations() {
-    when(batchRepository.findAllById(anyList())).thenReturn(List.of(batch("100.000")));
-    when(intentRepository.sumActiveByBatchIds(tenantId, List.of(batchId), quoteLineId))
-        .thenReturn(Map.of(batchId, new BigDecimal("20.000")));
-    when(reservationRepository.sumActiveRemainingByBatchIds(tenantId, List.of(batchId)))
-        .thenReturn(Map.of(batchId, new BigDecimal("30.000")));
+    Batch batch = batch("100.000");
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch));
+    when(commitmentQuantityService.summarize(eq(tenantId), any(), eq(quoteLineId)))
+        .thenReturn(
+            Map.of(
+                batchId,
+                new BatchCommitmentQuantityService.Summary(
+                    new BigDecimal("20.000"), new BigDecimal("30.000"), List.of())));
 
     assertTrue(
         service
@@ -84,7 +90,8 @@ class BatchLotQuantityIntentServiceTest {
 
   @Test
   void shouldRejectIntentQuantityAbovePhysicalQuantity() {
-    when(batchRepository.findAllById(anyList())).thenReturn(List.of(batch("100.000")));
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch("100.000")));
 
     LotIntentQuantityExceededException ex =
         assertThrows(
@@ -96,6 +103,85 @@ class BatchLotQuantityIntentServiceTest {
 
     assertEquals("PRODUCTION_015_LOT_INTENT_QUANTITY_EXCEEDED", ex.getErrorCode());
     assertEquals(422, ex.getHttpStatus());
+  }
+
+  @Test
+  void shouldRejectWrongUnitFromCoverageAndReplaceWithTheSameCodedError() {
+    Batch batch = batch("100.000");
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch));
+    LotIntentRequest wrong = new LotIntentRequest(batchId, BigDecimal.TEN, "KG");
+
+    LotIntentUnitMismatchException coverageError =
+        assertThrows(
+            LotIntentUnitMismatchException.class,
+            () -> service.checkCoverage(quoteLineId, List.of(wrong)));
+    LotIntentUnitMismatchException replaceError =
+        assertThrows(
+            LotIntentUnitMismatchException.class,
+            () ->
+                service.replaceIntents(
+                    quoteId,
+                    "Q-001",
+                    quoteLineId,
+                    UUID.randomUUID(),
+                    "Ayse",
+                    LocalDate.now().plusDays(5),
+                    List.of(wrong)));
+
+    assertEquals("LOT_INTENT_UNIT_MISMATCH", coverageError.getErrorCode());
+    assertEquals(422, coverageError.getHttpStatus());
+    assertEquals(coverageError.getErrorCode(), replaceError.getErrorCode());
+  }
+
+  @Test
+  void shouldAcceptExactMetricUnitAndPersistCanonicalQuantityAndUnit() {
+    Batch batch = batch("100.000");
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch));
+    when(commitmentQuantityService.summarize(eq(tenantId), any(), eq(quoteLineId)))
+        .thenReturn(
+            Map.of(
+                batchId,
+                new BatchCommitmentQuantityService.Summary(
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of())));
+    when(intentRepository.findByTenantIdAndQuoteLineId(tenantId, quoteLineId))
+        .thenReturn(List.of());
+    when(intentRepository.save(any(BatchLotQuantityIntent.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    service.replaceIntents(
+        quoteId,
+        "Q-001",
+        quoteLineId,
+        UUID.randomUUID(),
+        "Ayse",
+        LocalDate.now().plusDays(5),
+        List.of(new LotIntentRequest(batchId, new BigDecimal("250"), "CM")));
+
+    var captor = org.mockito.ArgumentCaptor.forClass(BatchLotQuantityIntent.class);
+    verify(intentRepository).save(captor.capture());
+    assertEquals(0, captor.getValue().getQuantity().compareTo(new BigDecimal("2.5")));
+    assertEquals("M", captor.getValue().getUnit());
+  }
+
+  @Test
+  void shouldCompareCoverageInCanonicalUnits() {
+    Batch batch = batch("2", ProductType.FIBER, "MT");
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch));
+    when(commitmentQuantityService.summarize(eq(tenantId), any(), eq(quoteLineId)))
+        .thenReturn(
+            Map.of(
+                batchId,
+                new BatchCommitmentQuantityService.Summary(
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of())));
+
+    assertTrue(
+        service
+            .checkCoverage(
+                quoteLineId, List.of(new LotIntentRequest(batchId, new BigDecimal("1500"), "KG")))
+            .covered());
   }
 
   @Test
@@ -114,11 +200,15 @@ class BatchLotQuantityIntentServiceTest {
             "M",
             LocalDate.now().plusDays(5));
 
-    when(batchRepository.findAllById(anyList())).thenReturn(List.of(batch("100.000")));
-    when(intentRepository.sumActiveByBatchIds(tenantId, List.of(batchId), quoteLineId))
-        .thenReturn(Map.of());
-    when(reservationRepository.sumActiveRemainingByBatchIds(tenantId, List.of(batchId)))
-        .thenReturn(Map.of());
+    Batch batch = batch("100.000");
+    when(batchRepository.findByTenantIdAndIdInAndIsActiveTrue(tenantId, List.of(batchId)))
+        .thenReturn(List.of(batch));
+    when(commitmentQuantityService.summarize(eq(tenantId), any(), eq(quoteLineId)))
+        .thenReturn(
+            Map.of(
+                batchId,
+                new BatchCommitmentQuantityService.Summary(
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of())));
     when(intentRepository.findByTenantIdAndQuoteLineId(tenantId, quoteLineId))
         .thenReturn(List.of(removed));
     when(intentRepository.save(any(BatchLotQuantityIntent.class)))
@@ -231,15 +321,19 @@ class BatchLotQuantityIntentServiceTest {
   }
 
   private Batch batch(String physicalQuantity) {
+    return batch(physicalQuantity, ProductType.FABRIC, "M");
+  }
+
+  private Batch batch(String physicalQuantity, ProductType productType, String unit) {
     Batch batch =
         Batch.builder()
             .productId(UUID.randomUUID())
-            .productType(ProductType.FABRIC)
+            .productType(productType)
             .batchCode("LOT-001")
             .quantity(new BigDecimal(physicalQuantity))
             .consumedQuantity(BigDecimal.ZERO)
             .reservedQuantity(BigDecimal.ZERO)
-            .unit("M")
+            .unit(unit)
             .status(BatchStatus.AVAILABLE)
             .build();
     batch.setId(batchId);

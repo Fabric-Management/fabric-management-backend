@@ -22,7 +22,8 @@ import org.springframework.stereotype.Repository;
  * derived query methods for filtering by productId, productType, batchCode, or status.
  */
 @Repository
-public interface BatchRepository extends JpaRepository<Batch, UUID> {
+public interface BatchRepository
+    extends JpaRepository<Batch, UUID>, StockAvailabilityBatchRepository {
 
   List<Batch> findByTenantId(UUID tenantId);
 
@@ -39,6 +40,8 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
   List<Batch> findByTenantIdAndProductId(UUID tenantId, UUID productId);
 
   List<Batch> findByTenantIdAndProductIdAndIsActiveTrue(UUID tenantId, UUID productId);
+
+  List<Batch> findByTenantIdAndIdInAndIsActiveTrue(UUID tenantId, Collection<UUID> ids);
 
   Optional<Batch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 

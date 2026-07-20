@@ -175,6 +175,7 @@ public class SalesLotService {
         ref.softIntentQuantity(),
         ref.hardReservedQuantity(),
         ref.freeQuantity(),
+        ref.overCommitted(),
         ref.intents().stream()
             .map(
                 intent ->
