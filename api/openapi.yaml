@@ -51618,12 +51618,24 @@ components:
         sourceId:
           type: string
           format: uuid
+        sourceLineId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Required PO line ID when sourceType is PURCHASE_ORDER; ignored
+            otherwise
         sourceType:
           type: string
           enum:
           - BATCH
           - PURCHASE_ORDER
           - SUBCONTRACT_ORDER
+        supplierBatchCode:
+          type: string
+          description: Optional supplier lot or batch reference
+          maxLength: 100
+          minLength: 0
         vehicleInfo:
           type: string
       required:
@@ -54369,6 +54381,14 @@ components:
       properties:
         grossWeight:
           type: number
+        length:
+          type: number
+          description: Physical item length; required for FABRIC purchase receipts
+        lengthUnit:
+          type: string
+          description: "Metric length unit: M, CM, or MM"
+          maxLength: 10
+          minLength: 0
         netWeight:
           type: number
         notes:
@@ -54387,6 +54407,10 @@ components:
         id:
           type: string
           format: uuid
+        length:
+          type: number
+        lengthUnit:
+          type: string
         netWeight:
           type: number
         notes:
@@ -54426,6 +54450,9 @@ components:
         sourceId:
           type: string
           format: uuid
+        sourceLineId:
+          type: string
+          format: uuid
         sourceType:
           type: string
           enum:
@@ -54437,6 +54464,8 @@ components:
           enum:
           - DRAFT
           - CONFIRMED
+        supplierBatchCode:
+          type: string
         uid:
           type: string
         vehicleInfo:

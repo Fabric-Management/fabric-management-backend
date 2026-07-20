@@ -288,6 +288,6 @@ class GoodsReceiptConfirmedEventListenerIT {
   private List<GoodsReceiptConfirmedEvent.ReceiptItemData> oneItem() {
     return List.of(
         new GoodsReceiptConfirmedEvent.ReceiptItemData(
-            UUID.randomUUID(), "UNIT-001", BigDecimal.TEN, BigDecimal.valueOf(11)));
+            UUID.randomUUID(), "UNIT-001", BigDecimal.TEN, BigDecimal.valueOf(11), null, null));
   }
 }

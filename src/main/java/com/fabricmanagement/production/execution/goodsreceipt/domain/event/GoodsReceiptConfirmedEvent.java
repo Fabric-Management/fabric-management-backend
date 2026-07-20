@@ -22,6 +22,8 @@ public class GoodsReceiptConfirmedEvent extends DomainEvent {
   private final String receiptNumber;
   private final GoodsReceiptSourceType sourceType;
   private final UUID sourceId;
+  private final UUID sourceLineId;
+  private final String supplierBatchCode;
   private final List<ReceiptItemData> items;
 
   @Builder
@@ -31,6 +33,8 @@ public class GoodsReceiptConfirmedEvent extends DomainEvent {
       String receiptNumber,
       GoodsReceiptSourceType sourceType,
       UUID sourceId,
+      UUID sourceLineId,
+      String supplierBatchCode,
       Instant confirmedAt,
       List<ReceiptItemData> items) {
     super(tenantId, "GOODS_RECEIPT_CONFIRMED");
@@ -38,12 +42,19 @@ public class GoodsReceiptConfirmedEvent extends DomainEvent {
     this.receiptNumber = receiptNumber;
     this.sourceType = sourceType;
     this.sourceId = sourceId;
+    this.sourceLineId = sourceLineId;
+    this.supplierBatchCode = supplierBatchCode;
     this.items = items;
   }
 
   @Builder
   public record ReceiptItemData(
-      UUID itemId, String barcode, BigDecimal netWeight, BigDecimal grossWeight) {}
+      UUID itemId,
+      String barcode,
+      BigDecimal netWeight,
+      BigDecimal grossWeight,
+      BigDecimal length,
+      String lengthUnit) {}
 
   @JsonCreator
   public GoodsReceiptConfirmedEvent(
@@ -56,6 +67,8 @@ public class GoodsReceiptConfirmedEvent extends DomainEvent {
       @JsonProperty("receiptNumber") String receiptNumber,
       @JsonProperty("sourceType") GoodsReceiptSourceType sourceType,
       @JsonProperty("sourceId") UUID sourceId,
+      @JsonProperty("sourceLineId") UUID sourceLineId,
+      @JsonProperty("supplierBatchCode") String supplierBatchCode,
       @JsonProperty("items") List<ReceiptItemData> items) {
     super(
         eventId,
@@ -67,6 +80,8 @@ public class GoodsReceiptConfirmedEvent extends DomainEvent {
     this.receiptNumber = receiptNumber;
     this.sourceType = sourceType;
     this.sourceId = sourceId;
+    this.sourceLineId = sourceLineId;
+    this.supplierBatchCode = supplierBatchCode;
     this.items = items;
   }
 }

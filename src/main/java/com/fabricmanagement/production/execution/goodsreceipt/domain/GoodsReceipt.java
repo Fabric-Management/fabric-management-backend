@@ -50,6 +50,14 @@ public class GoodsReceipt extends BaseEntity {
   @Column(name = "source_id", nullable = false)
   private UUID sourceId;
 
+  /** PO line received by this document. Set only for PURCHASE_ORDER receipts. */
+  @Column(name = "source_line_id")
+  private UUID sourceLineId;
+
+  /** Supplier-provided lot/dye-batch reference copied to the materialized Batch. */
+  @Column(name = "supplier_batch_code", length = 100)
+  private String supplierBatchCode;
+
   /** User who physically received the goods on the warehouse floor. */
   @Column(name = "received_by_id", nullable = false)
   private UUID receivedById;

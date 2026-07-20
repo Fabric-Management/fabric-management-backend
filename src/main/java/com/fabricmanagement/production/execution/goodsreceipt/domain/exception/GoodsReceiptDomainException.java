@@ -12,4 +12,8 @@ public class GoodsReceiptDomainException extends ProductionDomainException {
   public GoodsReceiptDomainException(String message, Throwable cause) {
     super(message, "GOODS_RECEIPT_RULE_VIOLATION", 400, cause);
   }
+
+  public GoodsReceiptDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
 }

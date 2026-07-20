@@ -94,11 +94,11 @@ class GoodsReceiptItemBarcodeTenantScopeIT {
         """
         INSERT INTO production.goods_receipt (
             id, tenant_id, uid, created_at, updated_at, is_active, version,
-            receipt_number, source_type, source_id, received_by_id, received_at,
+            receipt_number, source_type, source_id, source_line_id, received_by_id, received_at,
             package_count, gross_weight, net_weight, status
         ) VALUES (
             ?::uuid, ?::uuid, ? || '-UID', NOW(), NOW(), true, 0,
-            ?, 'PURCHASE_ORDER', gen_random_uuid(), gen_random_uuid(), NOW(),
+            ?, 'PURCHASE_ORDER', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), NOW(),
             1, 12.000, 10.000, 'DRAFT'
         )
         """,

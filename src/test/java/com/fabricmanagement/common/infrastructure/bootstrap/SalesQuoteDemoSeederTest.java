@@ -174,11 +174,11 @@ class SalesQuoteDemoSeederTest {
         ArgumentCaptor.forClass(CreateBatchRequest.class);
     verify(batchService, times(7)).create(batchCaptor.capture());
     verify(batchService, times(7)).releaseFromQc(any(UUID.class));
-    // Regression guard: production_execution_batch.chk_batch_unit admits only KG/MT/PIECE — a
-    // batch header with unit "M" aborts the INSERT and poisoned real signup transactions.
+    // Regression guard: production_execution_batch.chk_batch_unit admits canonical batch units;
+    // demo lots currently remain weight-based, while FABRIC purchase lots may use M.
     assertThat(batchCaptor.getAllValues())
         .extracting(CreateBatchRequest::getUnit)
-        .allMatch(List.of("KG", "MT", "PIECE")::contains);
+        .allMatch(List.of("KG", "MT", "PIECE", "M")::contains);
 
     assertThat(batchCaptor.getAllValues())
         .extracting(CreateBatchRequest::getColorId)

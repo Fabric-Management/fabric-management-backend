@@ -25,4 +25,6 @@ public interface PurchaseOrderRepository
 
   Optional<PurchaseOrder> findByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
       UUID tenantId, UUID supplierQuoteId);
+
+  Optional<PurchaseOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);
 }

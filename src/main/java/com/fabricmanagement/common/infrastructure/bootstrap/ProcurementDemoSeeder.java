@@ -453,7 +453,14 @@ public class ProcurementDemoSeeder {
       UUID ownerUserId) {
     PurchaseOrderResponse po =
         createConfirmedPurchaseOrder(workOrderId, supplierId, quoteId, rfqLines, ownerUserId);
-    createConfirmedGoodsReceipt(po.getId());
+    UUID sourceLineId =
+        po.getLines().stream()
+            .filter(line -> line.getProductId() != null)
+            .findFirst()
+            .orElseThrow(
+                () -> new IllegalStateException("Demo purchase order requires a product line"))
+            .getId();
+    createConfirmedGoodsReceipt(po.getId(), sourceLineId);
     return po;
   }
 
@@ -477,12 +484,14 @@ public class ProcurementDemoSeeder {
     }
   }
 
-  private void createConfirmedGoodsReceipt(UUID poId) {
+  private void createConfirmedGoodsReceipt(UUID poId, UUID sourceLineId) {
     var receipt =
         goodsReceiptService.createGoodsReceipt(
             CreateGoodsReceiptRequest.builder()
                 .sourceType(GoodsReceiptSourceType.PURCHASE_ORDER)
                 .sourceId(poId)
+                .sourceLineId(sourceLineId)
+                .supplierBatchCode("DEMO-COTTON-LOT-001")
                 .receivedById(SystemUser.ID)
                 .receivedAt(Instant.now(clock).minusSeconds(2L * 24 * 60 * 60))
                 .packageCount(3)

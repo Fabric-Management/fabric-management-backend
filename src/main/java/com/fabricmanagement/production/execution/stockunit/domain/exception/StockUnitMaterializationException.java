@@ -14,7 +14,9 @@ public class StockUnitMaterializationException extends StockUnitDomainException 
   public static final String ERROR_CODE = "STOCK_UNIT_MATERIALIZATION_FAILED";
 
   public enum Reason {
-    PO_MATERIALIZATION_PENDING,
+    PO_EVENT_PREDATES_CONTRACT,
+    PO_LINE_UNRESOLVED,
+    PO_ITEM_MEASURE_INVALID,
     EMPTY_RECEIPT_ITEMS,
     MISSING_SC_OUTPUT_TYPE,
     PROCESSING_FAILED
