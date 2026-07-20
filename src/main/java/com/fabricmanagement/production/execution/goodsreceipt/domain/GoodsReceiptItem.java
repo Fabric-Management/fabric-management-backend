@@ -57,6 +57,14 @@ public class GoodsReceiptItem extends BaseEntity {
   @Column(name = "gross_weight", precision = 15, scale = 3)
   private BigDecimal grossWeight;
 
+  /** Optional physical length; required for length-primary purchased products. */
+  @Column(name = "length", precision = 15, scale = 3)
+  private BigDecimal length;
+
+  /** Metric unit for {@link #length}. */
+  @Column(name = "length_unit", length = 10)
+  private String lengthUnit;
+
   /** Item-level notes (damage, condition, labelling issues). */
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;

@@ -50,6 +50,7 @@ import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -238,6 +239,7 @@ class ProcurementDemoSeederTest {
                 PurchaseOrderResponse.builder()
                     .id(UUID.randomUUID())
                     .status(PurchaseOrderStatus.DRAFT)
+                    .lines(List.of(purchaseLine()))
                     .build());
     when(purchaseOrderService.changeStatus(any(), any()))
         .thenAnswer(
@@ -245,6 +247,7 @@ class ProcurementDemoSeederTest {
                 PurchaseOrderResponse.builder()
                     .id(invocation.getArgument(0))
                     .status(invocation.getArgument(1))
+                    .lines(List.of(purchaseLine()))
                     .build());
 
     when(goodsReceiptService.createGoodsReceipt(any(CreateGoodsReceiptRequest.class)))
@@ -343,6 +346,7 @@ class ProcurementDemoSeederTest {
             PurchaseOrderResponse.builder()
                 .id(winningOrderId)
                 .status(PurchaseOrderStatus.DRAFT)
+                .lines(List.of(purchaseLine()))
                 .build());
     when(purchaseOrderService.changeStatus(any(), any()))
         .thenAnswer(
@@ -350,6 +354,7 @@ class ProcurementDemoSeederTest {
                 PurchaseOrderResponse.builder()
                     .id(invocation.getArgument(0))
                     .status(invocation.getArgument(1))
+                    .lines(List.of(purchaseLine()))
                     .build());
     UUID receiptId = UUID.randomUUID();
     when(goodsReceiptService.createGoodsReceipt(any(CreateGoodsReceiptRequest.class)))
@@ -374,6 +379,8 @@ class ProcurementDemoSeederTest {
         ArgumentCaptor.forClass(CreateGoodsReceiptRequest.class);
     verify(goodsReceiptService).createGoodsReceipt(receiptCaptor.capture());
     assertThat(receiptCaptor.getValue().getSourceId()).isEqualTo(winningOrderId);
+    assertThat(receiptCaptor.getValue().getSourceLineId()).isNotNull();
+    assertThat(receiptCaptor.getValue().getSupplierBatchCode()).isEqualTo("DEMO-COTTON-LOT-001");
     verify(goodsReceiptService).confirmGoodsReceipt(receiptId);
   }
 
@@ -382,6 +389,16 @@ class ProcurementDemoSeederTest {
         .id(UUID.randomUUID())
         .displayName(name)
         .productType(ProductType.FIBER)
+        .unit("KG")
+        .build();
+  }
+
+  private PurchaseOrderResponse.PurchaseOrderLineResponse purchaseLine() {
+    return PurchaseOrderResponse.PurchaseOrderLineResponse.builder()
+        .id(UUID.randomUUID())
+        .productId(UUID.randomUUID())
+        .productDesc("Demo cotton")
+        .qty(BigDecimal.TEN)
         .unit("KG")
         .build();
   }
