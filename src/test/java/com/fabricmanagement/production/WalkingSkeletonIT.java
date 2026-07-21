@@ -334,7 +334,8 @@ class WalkingSkeletonIT {
             "KG",
             null,
             StockUnitSourceType.GOODS_RECEIPT,
-            rawBatch1.getId());
+            rawBatch1.getId(),
+            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED);
     su1 = stockUnitRepository.save(su1);
 
     Batch rawBatch2 =
@@ -372,7 +373,8 @@ class WalkingSkeletonIT {
             "KG",
             null,
             StockUnitSourceType.GOODS_RECEIPT,
-            rawBatch2.getId());
+            rawBatch2.getId(),
+            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED);
     su2 = stockUnitRepository.save(su2);
 
     // ----------------------------------------------------------------------------------
@@ -415,7 +417,9 @@ class WalkingSkeletonIT {
             "KG",
             null,
             StockUnitSourceType.PRODUCTION,
-            lotResponse.id());
+            lotResponse.id(),
+            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition
+                .PENDING_INSPECTION);
     outputSu = stockUnitRepository.save(outputSu);
 
     productionRecordService.recordProduction(

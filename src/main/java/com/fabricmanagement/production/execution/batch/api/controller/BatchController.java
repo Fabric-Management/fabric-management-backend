@@ -272,14 +272,14 @@ public class BatchController {
 
   /**
    * Override batch status (QC_REJECTED or QUARANTINE → AVAILABLE). Requires reason (min 10 chars).
-   * Logged to override_log for audit. Manager-only: SUPERVISOR/WORKER/VIEWER → 403.
+   * Records an immutable superseding quality decision and retains the legacy override audit row.
    */
   @PatchMapping("/{id}/override-status")
   @Operation(
       summary = "Override Batch Status",
       description =
-          "Overrides batch status (e.g., QC_REJECTED to AVAILABLE). Requires reason. Admin/Manager only.")
-  @PreAuthorize("@auth.can(authentication, 'products', 'manage')")
+          "Records a superseding RELEASED quality decision. Requires quality approval permission and a reason.")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'approve')")
   public ResponseEntity<ApiResponse<BatchDto>> overrideStatus(
       @PathVariable UUID id, @Valid @RequestBody OverrideStatusRequest request) {
     BatchDto batch = batchOperationsService.overrideStatus(id, request);

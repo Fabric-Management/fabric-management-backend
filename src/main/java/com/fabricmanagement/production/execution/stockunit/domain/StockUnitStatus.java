@@ -43,12 +43,12 @@ import java.util.Set;
  *   <li>DISPOSED → (terminal — no transitions)
  * </ul>
  *
- * <h2>Batch Status as Gate</h2>
+ * <h2>Batch and quality gates</h2>
  *
- * <p>StockUnit statuses are independent of the parent Batch status. The Batch status acts as a
- * <b>gate</b> at the service layer — when a Batch is ON_HOLD, new consumption is blocked, but
- * individual StockUnit statuses are NOT cascaded. This avoids the operational nightmare of updating
- * hundreds of StockUnit statuses and then reverting them.
+ * <p>StockUnit statuses are independent of the parent Batch status and quality disposition.
+ * Identified-unit operations enforce quality through {@link QualityDisposition}; true operational
+ * batch states such as ON_HOLD remain service-layer gates. Statuses are not cascaded across all
+ * units.
  *
  * @see StockUnit
  */

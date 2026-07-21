@@ -24,6 +24,9 @@ public interface WarehouseLocationRepository extends JpaRepository<WarehouseLoca
 
   List<WarehouseLocation> findByIsActiveTrueOrderBySortOrderAscNameAsc();
 
+  List<WarehouseLocation> findByQualityAreaAndIsActiveTrueOrderBySortOrderAscNameAsc(
+      boolean qualityArea);
+
   List<WarehouseLocation> findByTypeAndIsActiveTrue(WarehouseLocationType type);
 
   List<WarehouseLocation> findByTypeInAndIsActiveTrue(List<WarehouseLocationType> types);

@@ -51,7 +51,7 @@ public class QualityGradeController {
   }
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'manage')")
   @Operation(summary = "Create a new quality grade")
   public ResponseEntity<ApiResponse<QualityGradeDto>> create(
       @Valid @RequestBody CreateQualityGradeRequest request) {
@@ -71,7 +71,7 @@ public class QualityGradeController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'manage')")
   @Operation(summary = "Update a quality grade (code and productType are immutable)")
   public ResponseEntity<ApiResponse<QualityGradeDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateQualityGradeRequest request) {
@@ -89,7 +89,7 @@ public class QualityGradeController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'manage')")
   @Operation(summary = "Deactivate (soft-delete) a quality grade")
   public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
     qualityGradeService.deactivate(id);

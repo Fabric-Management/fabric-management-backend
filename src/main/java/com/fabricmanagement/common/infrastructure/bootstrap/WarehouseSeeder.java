@@ -26,7 +26,8 @@ public class WarehouseSeeder implements DataSeeder {
   private final TransactionTemplate transactionTemplate;
 
   /** All expected warehouse codes — used for granular isSeeded() verification. */
-  private static final List<String> EXPECTED_CODES = List.of("RAW_MAT", "SHOP_FL", "FIN_MAT");
+  private static final List<String> EXPECTED_CODES =
+      List.of("RAW_MAT", "SHOP_FL", "FIN_MAT", "QC_HOLD");
 
   @Override
   public boolean isSeeded() {
@@ -39,7 +40,7 @@ public class WarehouseSeeder implements DataSeeder {
         tenantOpt.get().getId(),
         () -> {
           UUID tenantId = tenantOpt.get().getId();
-          // Granular check: verify ALL 3 expected warehouse codes exist
+          // Granular check: verify all expected warehouse codes exist.
           return EXPECTED_CODES.stream()
               .allMatch(
                   code -> warehouseLocationRepository.existsByTenantIdAndCode(tenantId, code));
@@ -63,18 +64,27 @@ public class WarehouseSeeder implements DataSeeder {
                     "RAW_MAT",
                     "Ana Hammadde Deposu",
                     "Tüm hammaddeler buraya iner",
-                    tenant.getId());
+                    tenant.getId(),
+                    false);
                 seedWarehouse(
                     "SHOP_FL",
                     "Üretim Sahası",
                     "İş emirlerinin tüketim yaptığı alan",
-                    tenant.getId());
-                seedWarehouse("FIN_MAT", "Mamül Deposu", "Biten mallar", tenant.getId());
+                    tenant.getId(),
+                    false);
+                seedWarehouse("FIN_MAT", "Mamül Deposu", "Biten mallar", tenant.getId(), false);
+                seedWarehouse(
+                    "QC_HOLD",
+                    "Kalite Kontrol ve Karantina Alanı",
+                    "Muayene bekleyen veya karantinadaki fiziksel stok",
+                    tenant.getId(),
+                    true);
               });
         });
   }
 
-  private void seedWarehouse(String code, String name, String desc, UUID tenantId) {
+  private void seedWarehouse(
+      String code, String name, String desc, UUID tenantId, boolean qualityArea) {
     if (warehouseLocationRepository.existsByTenantIdAndCode(tenantId, code)) {
       log.debug("Warehouse already exists (code={}), skipping: {}", code, name);
       return;
@@ -86,6 +96,7 @@ public class WarehouseSeeder implements DataSeeder {
             .name(name)
             .description(desc)
             .type(WarehouseLocationType.WAREHOUSE)
+            .qualityArea(qualityArea)
             .build();
     warehouseLocationService.create(req);
     log.info("Created Warehouse: {}", name);

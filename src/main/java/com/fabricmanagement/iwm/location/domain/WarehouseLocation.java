@@ -77,6 +77,10 @@ public class WarehouseLocation extends BaseEntity {
   @Column(name = "linked_machine_id")
   private UUID linkedMachineId;
 
+  /** Functional designation; independent from the location's physical hierarchy type. */
+  @Column(name = "is_quality_area", nullable = false)
+  private boolean qualityArea;
+
   public WarehouseLocation(
       UUID parentId,
       String code,
@@ -89,7 +93,8 @@ public class WarehouseLocation extends BaseEntity {
       BigDecimal maxWeightKg,
       BigDecimal maxVolumeM3,
       Integer sortOrder,
-      UUID linkedMachineId) {
+      UUID linkedMachineId,
+      boolean qualityArea) {
     this.parentId = parentId;
     this.code = code;
     this.name = name;
@@ -105,6 +110,7 @@ public class WarehouseLocation extends BaseEntity {
     this.currentVolumeM3 = BigDecimal.ZERO;
     this.sortOrder = sortOrder != null ? sortOrder : 0;
     this.linkedMachineId = linkedMachineId;
+    assignQualityArea(qualityArea);
     this.setIsActive(true);
   }
 
@@ -117,7 +123,8 @@ public class WarehouseLocation extends BaseEntity {
       BigDecimal maxWeightKg,
       BigDecimal maxVolumeM3,
       Integer sortOrder,
-      UUID linkedMachineId) {
+      UUID linkedMachineId,
+      boolean qualityArea) {
     this.name = name;
     this.description = description;
     this.storageCondition = storageCondition;
@@ -127,6 +134,7 @@ public class WarehouseLocation extends BaseEntity {
     this.maxVolumeM3 = maxVolumeM3;
     this.sortOrder = sortOrder;
     this.linkedMachineId = linkedMachineId;
+    assignQualityArea(qualityArea);
   }
 
   public void assignPath(String path, int level) {
@@ -258,6 +266,14 @@ public class WarehouseLocation extends BaseEntity {
     return this.getIsActive()
         && this.status != LocationStatus.BLOCKED
         && this.status != LocationStatus.MAINTENANCE;
+  }
+
+  private void assignQualityArea(boolean qualityArea) {
+    if (qualityArea && !isStorageLocation()) {
+      throw new IwmDomainException(
+          "Only storage-capable warehouse locations can be designated as QC areas");
+    }
+    this.qualityArea = qualityArea;
   }
 
   private void recalculateStatus() {

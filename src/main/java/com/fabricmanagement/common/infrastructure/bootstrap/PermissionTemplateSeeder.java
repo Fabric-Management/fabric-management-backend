@@ -157,7 +157,15 @@ public class PermissionTemplateSeeder {
             // even though PermissionEvaluator short-circuits ADMIN before consulting rows.
             new String[] {"ADMIN", "sales", "approve", "GLOBAL"},
             new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "sales", "approve", "ORGANIZATION"}));
+            new String[] {"SUPERVISOR", "sales", "approve", "ORGANIZATION"},
+            new String[] {"ADMIN", "quality", "read", "GLOBAL"},
+            new String[] {"ADMIN", "quality", "write", "GLOBAL"},
+            new String[] {"ADMIN", "quality", "approve", "GLOBAL"},
+            new String[] {"ADMIN", "quality", "manage", "GLOBAL"},
+            new String[] {"PLATFORM_ADMIN", "quality", "read", "GLOBAL"},
+            new String[] {"PLATFORM_ADMIN", "quality", "write", "GLOBAL"},
+            new String[] {"PLATFORM_ADMIN", "quality", "approve", "GLOBAL"},
+            new String[] {"PLATFORM_ADMIN", "quality", "manage", "GLOBAL"}));
 
     // 2. SALES
     seedDepartment(
@@ -248,12 +256,21 @@ public class PermissionTemplateSeeder {
         List.of(
             new String[] {"WORKER", "fiber", "read", "OWN"},
             new String[] {"WORKER", "products", "read", "OWN"},
+            new String[] {"WORKER", "quality", "read", "ORGANIZATION"},
+            new String[] {"WORKER", "quality", "write", "ORGANIZATION"},
             new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
             new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
             new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
+            new String[] {"SUPERVISOR", "quality", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "quality", "write", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "quality", "approve", "ORGANIZATION"},
             new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
+            new String[] {"MANAGER", "quality", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "quality", "write", "ORGANIZATION"},
+            new String[] {"MANAGER", "quality", "approve", "ORGANIZATION"},
+            new String[] {"MANAGER", "quality", "manage", "ORGANIZATION"},
             new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
             new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
             new String[] {"SUPERVISOR", "colors", "write", "ORGANIZATION"},

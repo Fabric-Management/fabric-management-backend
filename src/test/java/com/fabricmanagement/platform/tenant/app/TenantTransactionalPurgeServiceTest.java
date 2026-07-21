@@ -84,6 +84,8 @@ class TenantTransactionalPurgeServiceTest {
             "production.prod_product",
             "production.production_execution_batch_color_archive",
             "production.stock_unit_soft_hold",
+            "production.quality_decision_unit",
+            "production.quality_decision",
             "iwm.warehouse_location",
             "finance.finance_invoice",
             "flowboard.task",
@@ -108,6 +110,13 @@ class TenantTransactionalPurgeServiceTest {
         .update(
             contains("DELETE FROM production.stock_unit_soft_hold WHERE tenant_id = ?"),
             eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM production.quality_decision_unit WHERE tenant_id = ?"),
+            eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM production.quality_decision WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains(
@@ -293,6 +302,18 @@ class TenantTransactionalPurgeServiceTest {
 
     assertThat(tables.indexOf("production.production_execution_batch_color_archive"))
         .isLessThan(tables.indexOf("production.production_execution_batch_attribute"));
+  }
+
+  @Test
+  void shouldDeleteQualityDecisionLedgerInFkSafeOrder() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("production.quality_decision_unit"))
+        .isLessThan(tables.indexOf("production.quality_decision"));
+    assertThat(tables.indexOf("production.quality_decision"))
+        .isLessThan(tables.indexOf("production.stock_unit"));
+    assertThat(tables.indexOf("production.quality_decision"))
+        .isLessThan(tables.indexOf("production.production_execution_batch"));
   }
 
   @Test

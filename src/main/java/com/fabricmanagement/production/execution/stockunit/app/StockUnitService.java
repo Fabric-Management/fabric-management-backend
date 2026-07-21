@@ -8,8 +8,11 @@ import com.fabricmanagement.production.execution.batch.domain.WasteCategory;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchAdjustedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchConsumedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchWasteRecordedEvent;
+import com.fabricmanagement.production.execution.batch.domain.port.QcLocationValidationResult;
+import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitAuditLog;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
@@ -20,6 +23,7 @@ import com.fabricmanagement.production.execution.stockunit.domain.event.StockUni
 import com.fabricmanagement.production.execution.stockunit.domain.event.StockUnitDisposedEvent;
 import com.fabricmanagement.production.execution.stockunit.domain.event.StockUnitGradeChangedEvent;
 import com.fabricmanagement.production.execution.stockunit.domain.event.StockUnitTransferredEvent;
+import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRelocationException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitAuditLogRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
@@ -78,6 +82,7 @@ public class StockUnitService {
   private final QualityGradeService qualityGradeService;
   private final StockUnitAuditLogRepository auditLogRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final WarehouseLocationPort warehouseLocationPort;
 
   // ── Creation ─────────────────────────────────────────────────────────────
 
@@ -105,26 +110,28 @@ public class StockUnitService {
 
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
-    if (batchId != null) {
-      validateBatchExists(batchId, tenantId);
-    }
+    Batch batch = batchId == null ? null : loadBatch(batchId, tenantId);
 
-    return internalCreate(
-        tenantId,
-        batchId,
-        productType,
-        barcode,
-        serialNumber,
-        packageType,
-        initialWeight,
-        grossWeight,
-        unit,
-        length,
-        lengthUnit,
-        locationId,
-        sourceType,
-        sourceId,
-        actorId);
+    StockUnit created =
+        internalCreate(
+            tenantId,
+            batchId,
+            productType,
+            barcode,
+            serialNumber,
+            packageType,
+            initialWeight,
+            grossWeight,
+            unit,
+            length,
+            lengthUnit,
+            locationId,
+            sourceType,
+            sourceId,
+            QualityDisposition.PENDING_INSPECTION,
+            actorId);
+    projectQualityAfterBirth(batch, tenantId);
+    return created;
   }
 
   private StockUnit internalCreate(
@@ -142,6 +149,7 @@ public class StockUnitService {
       UUID locationId,
       StockUnitSourceType sourceType,
       UUID sourceId,
+      QualityDisposition initialQualityDisposition,
       UUID actorId) {
 
     StockUnit stockUnit =
@@ -157,7 +165,8 @@ public class StockUnitService {
             unit,
             locationId,
             sourceType,
-            sourceId);
+            sourceId,
+            initialQualityDisposition);
     if (length != null || lengthUnit != null) {
       stockUnit.recordLength(length, lengthUnit);
     }
@@ -204,8 +213,8 @@ public class StockUnitService {
   /**
    * Consumes weight from an AVAILABLE or PARTIAL StockUnit.
    *
-   * <p>Checks the parent Batch status as a gate — consumption is blocked if the Batch is ON_HOLD,
-   * QUARANTINE, QC_REJECTED, RETURNED, or DESTROYED.
+   * <p>The unit must be quality-released. Parent batch QC projection statuses do not block this
+   * identified-unit path; true operational and terminal batch states still do.
    *
    * @param stockUnitId the unit to consume from
    * @param amount weight to consume (must be positive and ≤ currentWeight)
@@ -217,15 +226,13 @@ public class StockUnitService {
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
-    assertBatchAllowsConsumption(batch);
-
     BigDecimal prevWeight = unit.getCurrentWeight();
     StockUnitStatus prevStatus = unit.getStatus();
 
     unit.consume(amount);
     unit = stockUnitRepository.save(unit);
 
-    batch.consumeFromAvailable(amount);
+    batch.consumeReleasedUnitFromAvailable(amount);
     batchRepository.save(batch);
 
     writeAuditLog(
@@ -294,8 +301,7 @@ public class StockUnitService {
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
-    assertBatchAllowsConsumption(batch);
-
+    unit.assertQualityReleased();
     if (unit.getStatus() != StockUnitStatus.RESERVED) {
       throw new StockUnitDomainException(
           String.format(
@@ -310,7 +316,7 @@ public class StockUnitService {
     unit.consume(amount);
     unit = stockUnitRepository.save(unit);
 
-    batch.consumeFromReservation(amount);
+    batch.consumeReleasedUnitFromReservation(amount);
     batchRepository.save(batch);
 
     writeAuditLog(
@@ -442,6 +448,59 @@ public class StockUnitService {
         unit.getBarcode(),
         fromLocation,
         targetLocationId);
+    return unit;
+  }
+
+  /**
+   * Relocates unreleased stock into an approved QC custody area without changing operational status
+   * or quality disposition.
+   */
+  @Transactional
+  public StockUnit relocateForQuality(UUID stockUnitId, UUID targetLocationId, String reason) {
+    UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
+    StockUnit unit = loadUnit(stockUnitId, tenantId);
+
+    if (reason == null || reason.isBlank()) {
+      throw QcRelocationException.reasonRequired();
+    }
+    unit.assertAllowsQualityRelocation();
+    if (targetLocationId == null) {
+      throw QcRelocationException.targetInvalid(null);
+    }
+    if (targetLocationId.equals(unit.getLocationId())) {
+      throw QcRelocationException.sameLocation(targetLocationId);
+    }
+
+    QcLocationValidationResult target = warehouseLocationPort.validateQcLocation(targetLocationId);
+    if (!target.validQcLocation()) {
+      throw QcRelocationException.targetInvalid(targetLocationId);
+    }
+
+    UUID fromLocation = unit.getLocationId();
+    StockUnitStatus previousStatus = unit.getStatus();
+    QualityDisposition previousDisposition = unit.getQualityDisposition();
+    unit.relocateForQuality(targetLocationId);
+    unit = stockUnitRepository.save(unit);
+
+    writeAuditLog(
+        tenantId,
+        stockUnitId,
+        StockUnitAuditLog.OP_QC_RELOCATE,
+        "locationId",
+        fromLocation != null ? fromLocation.toString() : null,
+        targetLocationId.toString(),
+        actorId,
+        1,
+        reason.trim());
+
+    log.info(
+        "QC relocation completed: stockUnitId={}, from={}, to={}, status={}, disposition={}",
+        stockUnitId,
+        fromLocation,
+        targetLocationId,
+        previousStatus,
+        previousDisposition);
     return unit;
   }
 
@@ -768,30 +827,34 @@ public class StockUnitService {
   public List<StockUnit> createBulk(
       UUID batchId, List<CreateStockUnitRequest> requests, UUID actorId) {
     UUID tenantId = TenantContext.requireTenantId();
-    if (batchId != null) {
-      validateBatchExists(batchId, tenantId);
-    }
+    Batch batch = batchId == null ? null : loadBatch(batchId, tenantId);
 
-    return requests.stream()
-        .map(
-            r ->
-                internalCreate(
-                    tenantId,
-                    batchId,
-                    r.productType(),
-                    r.barcode(),
-                    r.serialNumber(),
-                    r.packageType(),
-                    r.initialWeight(),
-                    r.grossWeight(),
-                    r.unit(),
-                    r.length(),
-                    r.lengthUnit(),
-                    r.locationId(),
-                    r.sourceType(),
-                    r.sourceId(),
-                    actorId))
-        .toList();
+    List<StockUnit> created =
+        requests.stream()
+            .map(
+                r ->
+                    internalCreate(
+                        tenantId,
+                        batchId,
+                        r.productType(),
+                        r.barcode(),
+                        r.serialNumber(),
+                        r.packageType(),
+                        r.initialWeight(),
+                        r.grossWeight(),
+                        r.unit(),
+                        r.length(),
+                        r.lengthUnit(),
+                        r.locationId(),
+                        r.sourceType(),
+                        r.sourceId(),
+                        QualityDisposition.PENDING_INSPECTION,
+                        actorId))
+            .toList();
+    if (!created.isEmpty()) {
+      projectQualityAfterBirth(batch, tenantId);
+    }
+    return created;
   }
 
   /** Immutable command record for bulk creation — avoids long parameter lists. */
@@ -824,23 +887,27 @@ public class StockUnitService {
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
   }
 
-  private void validateBatchExists(UUID batchId, UUID tenantId) {
-    batchRepository
+  private Batch loadBatch(UUID batchId, UUID tenantId) {
+    return batchRepository
         .findByIdAndTenantId(batchId, tenantId)
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
   }
 
-  /**
-   * Batch status gate — blocks consumption/transfer if the parent batch is in a non-operational
-   * state. StockUnit statuses are NOT cascaded; the batch acts as a gate only.
-   */
-  private void assertBatchAllowsConsumption(Batch batch) {
-    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(batch.getStatus())) {
-      throw new StockUnitDomainException(
-          String.format(
-              "Batch %s is in status %s — consumption and transfer are blocked.",
-              batch.getBatchCode(), batch.getStatus()));
+  private void projectQualityAfterBirth(Batch batch, UUID tenantId) {
+    if (batch == null) {
+      return;
     }
+    var counts = stockUnitRepository.countQualityDispositions(tenantId, batch.getId());
+    long total =
+        counts.stream().mapToLong(StockUnitRepository.QualityDispositionCount::getUnitCount).sum();
+    BatchStatus target = BatchStatus.QUARANTINE;
+    if (counts.size() == 1
+        && total > 0
+        && counts.getFirst().getDisposition() == QualityDisposition.PENDING_INSPECTION) {
+      target = BatchStatus.PENDING_QC;
+    }
+    batch.applyQualityProjection(target);
+    batchRepository.save(batch);
   }
 
   private void writeAuditLog(

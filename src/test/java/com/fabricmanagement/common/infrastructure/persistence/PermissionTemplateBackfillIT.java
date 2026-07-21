@@ -100,6 +100,12 @@ class PermissionTemplateBackfillIT {
     assertThat(countOf(crippled, "colors", "approve")).isGreaterThan(0);
     assertThat(countOf(crippled, "colors", "manage")).isGreaterThan(0);
 
+    // QC-RELEASE-1a: the canonical template/backfill path carries the complete quality matrix.
+    assertThat(countOf(crippled, "quality", "read")).isGreaterThan(0);
+    assertThat(countOf(crippled, "quality", "write")).isGreaterThan(0);
+    assertThat(countOf(crippled, "quality", "approve")).isGreaterThan(0);
+    assertThat(countOf(crippled, "quality", "manage")).isGreaterThan(0);
+
     // A tenant that never existed before the fix still gets the full set.
     assertThat(countOf(healthy, "sales", "read")).isGreaterThan(0);
 

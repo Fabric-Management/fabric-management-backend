@@ -123,6 +123,37 @@ class PermissionTemplateSeederTest {
   }
 
   @Test
+  @DisplayName("seeds least-privilege quality permissions for the QUALITY department")
+  void seedsQualityPermissionMatrix() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    List<Tuple> grants =
+        saved.stream()
+            .filter(t -> "quality".equals(t.getResource()))
+            .map(
+                t ->
+                    Tuple.tuple(
+                        t.getRoleCode(), t.getDepartmentCode(), t.getAction(), t.getDataScope()))
+            .toList();
+
+    assertThat(grants)
+        .contains(
+            Tuple.tuple("WORKER", "QUALITY", "read", DataScope.ORGANIZATION),
+            Tuple.tuple("WORKER", "QUALITY", "write", DataScope.ORGANIZATION),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "read", DataScope.ORGANIZATION),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "write", DataScope.ORGANIZATION),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "approve", DataScope.ORGANIZATION),
+            Tuple.tuple("MANAGER", "QUALITY", "manage", DataScope.ORGANIZATION),
+            Tuple.tuple("ADMIN", null, "approve", DataScope.GLOBAL),
+            Tuple.tuple("PLATFORM_ADMIN", null, "manage", DataScope.GLOBAL))
+        .doesNotContain(
+            Tuple.tuple("WORKER", "QUALITY", "approve", DataScope.ORGANIZATION),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "manage", DataScope.ORGANIZATION),
+            Tuple.tuple("MANAGER", "PROCUREMENT", "approve", DataScope.ORGANIZATION));
+  }
+
+  @Test
   @DisplayName("owns the sales:approve rows that migration V20260706120000 used to write")
   void catalogueOwnsWildcardSalesApprove() {
     List<PermissionTemplate> saved = new ArrayList<>();

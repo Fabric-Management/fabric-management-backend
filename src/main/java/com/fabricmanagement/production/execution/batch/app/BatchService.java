@@ -22,6 +22,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStand
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,6 +54,7 @@ public class BatchService {
   private final ColorQueryService colorQueryService;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final BatchPrimaryMeasureService primaryMeasureService;
+  private final QualityDecisionService qualityDecisionService;
 
   @Value("${batch.certification.enforce-on-reserve:true}")
   private boolean certEnforceOnReserve;
@@ -261,23 +263,17 @@ public class BatchService {
 
   // ── QC release ─────────────────────────────────────────────────────────────
 
-  /**
-   * Releases a batch from QC by applying the PENDING_QC → AVAILABLE transition.
-   *
-   * <p>Exists because there is no QC-approval service API yet: the only production path that
-   * releases a batch is the async {@link BatchQcEventListener} reacting to {@code
-   * FiberTestResultApproved}. This method mirrors that listener's APPROVED → AVAILABLE mapping so
-   * in-process callers (e.g. demo seeders) can make freshly created batches saleable without
-   * reaching into the batch infra layer.
-   */
+  /** Releases a piece-backed batch through the immutable quality-decision ledger. */
   @Transactional
   public BatchDto releaseFromQc(UUID batchId) {
     UUID tenantId = TenantContext.requireTenantId();
     log.debug("Releasing batch from QC: tenantId={}, batchId={}", tenantId, batchId);
 
-    Batch batch = loadBatchWithLock(batchId, tenantId);
-    batch.transitionStatus(BatchStatus.AVAILABLE, TenantContext.getCurrentUserId());
-    Batch saved = batchRepository.save(batch);
+    qualityDecisionService.releaseFromQc(batchId);
+    Batch saved =
+        batchRepository
+            .findByIdAndTenantId(batchId, tenantId)
+            .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
     log.info("Batch released from QC: id={}, batchCode={}", saved.getId(), saved.getBatchCode());
 

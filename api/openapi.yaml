@@ -88,6 +88,8 @@ tags:
   name: WhatsApp Webhooks
 - description: User performance leaderboard
   name: FlowBoard — Performance
+- description: Immutable stock quality disposition decisions
+  name: Quality Decisions
 - description: Tenant go-real transition operations
   name: Tenant Go Real
 - description: Subcontract Order operations
@@ -22470,6 +22472,12 @@ paths:
   /api/v1/iwm/locations:
     get:
       operationId: getAll_2
+      parameters:
+      - in: query
+        name: qualityArea
+        required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -28500,8 +28508,8 @@ paths:
       - Batch
   /api/v1/production/batches/{id}/override-status:
     patch:
-      description: "Overrides batch status (e.g., QC_REJECTED to AVAILABLE). Requires\
-        \ reason. Admin/Manager only."
+      description: Records a superseding RELEASED quality decision. Requires quality
+        approval permission and a reason.
       operationId: overrideStatus
       parameters:
       - in: path
@@ -34360,6 +34368,276 @@ paths:
       summary: Update a quality grade (code and productType are immutable)
       tags:
       - QualityGrade
+  /api/v1/production/quality/batches/{batchId}/decisions:
+    get:
+      operationId: listQualityDecisionHistory
+      parameters:
+      - in: path
+        name: batchId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseQualityDecisionDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List batch decision history
+      tags:
+      - Quality Decisions
+    post:
+      operationId: recordQualityDecision
+      parameters:
+      - in: path
+        name: batchId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordQualityDecisionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQualityDecisionDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Record a quality decision
+      tags:
+      - Quality Decisions
+  /api/v1/production/quality/batches/{batchId}/units:
+    get:
+      operationId: listQualityDecisionUnits
+      parameters:
+      - in: path
+        name: batchId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "barcode,ASC"
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseQualityDecisionUnitDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List batch units for QC
+      tags:
+      - Quality Decisions
   /api/v1/production/quality/fiber-tests:
     get:
       operationId: getAllTestResults
@@ -34851,6 +35129,96 @@ paths:
           description: Internal Server Error
       tags:
       - Fiber Test Result
+  /api/v1/production/quality/queue:
+    get:
+      operationId: listPendingQualityQueue
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseQualityQueueItemDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List batches awaiting QC
+      tags:
+      - Quality Decisions
   /api/v1/production/recipes:
     post:
       operationId: createRecipe
@@ -35800,6 +36168,85 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Put StockUnit on hold
+      tags:
+      - StockUnit
+  /api/v1/production/stock-units/{id}/qc-relocate:
+    post:
+      description: Changes only the physical location. Operational status and quality
+        disposition remain unchanged.
+      operationId: relocateForQuality
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockUnitQcRelocateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseStockUnitDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Relocate unreleased stock into an approved QC custody area
       tags:
       - StockUnit
   /api/v1/production/stock-units/{id}/quarantine:
@@ -47656,6 +48103,60 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponseQualityDecisionDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseQualityDecisionDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseQualityDecisionUnitDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseQualityDecisionUnitDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseQualityQueueItemDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseQualityQueueItemDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponseQuoteResponse:
       type: object
       properties:
@@ -48201,6 +48702,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PurchaseOrderResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseQualityDecisionDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QualityDecisionDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -52839,6 +53358,8 @@ components:
         parentId:
           type: string
           format: uuid
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -56040,6 +56561,75 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponseQualityDecisionDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityDecisionDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseQualityDecisionUnitDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityDecisionUnitDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseQualityQueueItemDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityQueueItemDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponseQuoteResponse:
       type: object
       properties:
@@ -57893,6 +58483,113 @@ components:
           type: string
       required:
       - specType
+    QualityDecisionDto:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        origin:
+          type: string
+          enum:
+          - MANUAL
+          - SYSTEM_RELEASE
+          - SYSTEM_QC_EVENT
+          - MIGRATION_BACKFILL
+        outcome:
+          type: string
+          enum:
+          - RELEASED
+          - QUARANTINED
+          - NONCONFORMING
+        reasonCode:
+          type: string
+          enum:
+          - SUSPECTED_DAMAGE
+          - AWAITING_LAB
+          - SUPPLIER_DISPUTE
+          - SHADE_CHECK
+          - DAMAGE
+          - STAIN
+          - SHADE_VARIATION
+          - SHORT_LENGTH
+          - MEASURE_MISMATCH
+          - OTHER
+          - SYSTEM_QC_PASSED
+          - SYSTEM_QC_REJECTED
+          - MIGRATION_BASELINE
+        remarks:
+          type: string
+        scope:
+          type: string
+          enum:
+          - FULL_LOT
+          - SELECTED_UNITS
+        sequence:
+          type: integer
+          format: int64
+        sourceEventId:
+          type: string
+          format: uuid
+        supersedesDecisionId:
+          type: string
+          format: uuid
+    QualityDecisionUnitDto:
+      type: object
+      properties:
+        barcode:
+          type: string
+        currentWeight:
+          type: number
+        id:
+          type: string
+          format: uuid
+        length:
+          type: number
+        lengthUnit:
+          type: string
+        packageType:
+          type: string
+          enum:
+          - BALE
+          - ROLL
+          - BOBBIN
+          - SACK
+          - CARTON
+          - DRUM
+          - BAG
+          - PALLET
+          - CONE
+          - HANK
+        qualityDisposition:
+          type: string
+          enum:
+          - PENDING_INSPECTION
+          - RELEASED
+          - QUARANTINED
+          - NONCONFORMING
+        status:
+          type: string
+          enum:
+          - AVAILABLE
+          - PARTIAL
+          - RESERVED
+          - IN_TRANSIT
+          - ON_HOLD
+          - QUARANTINE
+          - DEPLETED
+          - DISPOSED
+        unit:
+          type: string
     QualityGradeDto:
       type: object
       properties:
@@ -57926,6 +58623,33 @@ components:
           type: boolean
         saleable:
           type: boolean
+    QualityQueueItemDto:
+      type: object
+      properties:
+        batchCode:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+        pendingUnitCount:
+          type: integer
+          format: int64
+        productId:
+          type: string
+          format: uuid
+        productType:
+          type: string
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
+        receivedAt:
+          type: string
+          format: date-time
+        supplierBatchCode:
+          type: string
     QuickCreateCustomerContactRequest:
       type: object
       properties:
@@ -58680,6 +59404,52 @@ components:
           format: uuid
       required:
       - stockUnitId
+    RecordQualityDecisionRequest:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - RELEASED
+          - QUARANTINED
+          - NONCONFORMING
+        reasonCode:
+          type: string
+          enum:
+          - SUSPECTED_DAMAGE
+          - AWAITING_LAB
+          - SUPPLIER_DISPUTE
+          - SHADE_CHECK
+          - DAMAGE
+          - STAIN
+          - SHADE_VARIATION
+          - SHORT_LENGTH
+          - MEASURE_MISMATCH
+          - OTHER
+          - SYSTEM_QC_PASSED
+          - SYSTEM_QC_REJECTED
+          - MIGRATION_BASELINE
+        remarks:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        scope:
+          type: string
+          enum:
+          - FULL_LOT
+          - SELECTED_UNITS
+        stockUnitIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          uniqueItems: true
+        supersedesDecisionId:
+          type: string
+          format: uuid
+      required:
+      - outcome
+      - scope
     RecordWasteRequest:
       type: object
       properties:
@@ -59971,6 +60741,13 @@ components:
           - FABRIC
           - CHEMICAL
           - CONSUMABLE
+        qualityDisposition:
+          type: string
+          enum:
+          - PENDING_INSPECTION
+          - RELEASED
+          - QUARANTINED
+          - NONCONFORMING
         qualityGradeId:
           type: string
           format: uuid
@@ -60005,6 +60782,21 @@ components:
         updatedAt:
           type: string
           format: date-time
+    StockUnitQcRelocateRequest:
+      type: object
+      description: Privileged custody relocation of unreleased stock into a QC storage
+        area
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+        targetLocationId:
+          type: string
+          format: uuid
+      required:
+      - reason
+      - targetLocationId
     SubcontractOrderResponse:
       type: object
       properties:
@@ -62168,6 +62960,8 @@ components:
           type: string
           maxLength: 255
           minLength: 0
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -62690,11 +63484,15 @@ components:
           type: number
         name:
           type: string
+        operational:
+          type: boolean
         parentId:
           type: string
           format: uuid
         path:
           type: string
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -62714,6 +63512,8 @@ components:
           - HUMIDITY_CONTROLLED
           - HAZARDOUS
           - CLEAN_ROOM
+        storageLocation:
+          type: boolean
         type:
           type: string
           enum:
@@ -62775,11 +63575,15 @@ components:
           type: number
         name:
           type: string
+        operational:
+          type: boolean
         parentId:
           type: string
           format: uuid
         path:
           type: string
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -62799,6 +63603,8 @@ components:
           - HUMIDITY_CONTROLLED
           - HAZARDOUS
           - CLEAN_ROOM
+        storageLocation:
+          type: boolean
         type:
           type: string
           enum:

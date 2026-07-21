@@ -3,7 +3,9 @@ package com.fabricmanagement.production.execution.stockunit.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InsufficientWeightException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InvalidPackageTypeException;
+import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRelocationException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
+import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitNotReleasedException;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +15,8 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -75,6 +79,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class StockUnit extends BaseEntity {
+
+  private static final Set<StockUnitStatus> QC_RELOCATION_STATUSES =
+      Set.of(
+          StockUnitStatus.AVAILABLE,
+          StockUnitStatus.PARTIAL,
+          StockUnitStatus.ON_HOLD,
+          StockUnitStatus.QUARANTINE);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -170,6 +181,11 @@ public class StockUnit extends BaseEntity {
   @Column(name = "quality_grade_id")
   private UUID qualityGradeId;
 
+  /** Quality acceptance axis; independent from operational status and commercial grade. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "quality_disposition", nullable = false, length = 30)
+  private QualityDisposition qualityDisposition;
+
   /** Previous grade ID — populated on grade change for audit trail. */
   @Column(name = "previous_grade_id")
   private UUID previousGradeId;
@@ -240,7 +256,8 @@ public class StockUnit extends BaseEntity {
    * @param locationId initial warehouse location
    * @param sourceType origin type
    * @param sourceId origin record ID
-   * @return new StockUnit in AVAILABLE status
+   * @param initialQualityDisposition trusted server-owned quality disposition at birth
+   * @return new StockUnit in operational AVAILABLE status with the supplied quality disposition
    */
   public static StockUnit create(
       UUID tenantId,
@@ -254,7 +271,8 @@ public class StockUnit extends BaseEntity {
       String unit,
       UUID locationId,
       StockUnitSourceType sourceType,
-      UUID sourceId) {
+      UUID sourceId,
+      QualityDisposition initialQualityDisposition) {
 
     if (productType == null) {
       throw new StockUnitDomainException("productType must not be null");
@@ -271,6 +289,9 @@ public class StockUnit extends BaseEntity {
     if (!packageType.isCompatibleWith(productType)) {
       throw new InvalidPackageTypeException(packageType, productType);
     }
+    if (initialQualityDisposition == null) {
+      throw new StockUnitDomainException("initialQualityDisposition must not be null");
+    }
 
     StockUnit stockUnit =
         StockUnit.builder()
@@ -285,6 +306,7 @@ public class StockUnit extends BaseEntity {
             .unit(unit)
             .locationId(locationId)
             .qualityGradeId(null)
+            .qualityDisposition(initialQualityDisposition)
             .previousGradeId(null)
             .previousLocationId(null)
             .status(StockUnitStatus.AVAILABLE)
@@ -323,6 +345,7 @@ public class StockUnit extends BaseEntity {
    * @throws InsufficientWeightException if amount exceeds currentWeight
    */
   public void consume(BigDecimal amount) {
+    assertQualityReleased();
     validatePositive(amount, "Consumption amount");
     if (!status.isConsumable()) {
       throw new StockUnitDomainException(
@@ -390,6 +413,7 @@ public class StockUnit extends BaseEntity {
    * @throws StockUnitDomainException if unit is in a status that blocks transfers
    */
   public void startTransfer(UUID targetLocationId) {
+    assertQualityReleased();
     if (!status.canTransitionTo(StockUnitStatus.IN_TRANSIT)) {
       throw new StockUnitDomainException(
           String.format("StockUnit %s cannot transition to IN_TRANSIT from %s.", barcode, status));
@@ -398,6 +422,33 @@ public class StockUnit extends BaseEntity {
     this.locationId = targetLocationId;
     this.status = StockUnitStatus.IN_TRANSIT;
     onUpdate();
+  }
+
+  /**
+   * Atomically moves unreleased stock into an approved QC custody location without changing either
+   * operational status or quality disposition.
+   */
+  public void relocateForQuality(UUID targetLocationId) {
+    assertAllowsQualityRelocation();
+    if (targetLocationId == null) {
+      throw QcRelocationException.targetInvalid(null);
+    }
+    if (Objects.equals(locationId, targetLocationId)) {
+      throw QcRelocationException.sameLocation(targetLocationId);
+    }
+    this.previousLocationId = this.locationId;
+    this.locationId = targetLocationId;
+    onUpdate();
+  }
+
+  /** Validates the source side before resolving an external IWM target. */
+  public void assertAllowsQualityRelocation() {
+    if (qualityDisposition == QualityDisposition.RELEASED) {
+      throw QcRelocationException.releasedUnit(barcode);
+    }
+    if (!QC_RELOCATION_STATUSES.contains(status)) {
+      throw QcRelocationException.sourceInvalid(barcode, status, qualityDisposition);
+    }
   }
 
   /**
@@ -502,7 +553,15 @@ public class StockUnit extends BaseEntity {
    * @throws StockUnitDomainException if current status does not allow reservation
    */
   public void reserve() {
+    assertQualityReleased();
     transitionStatus(StockUnitStatus.RESERVED);
+  }
+
+  /** Enforces the quality acceptance invariant independently from operational status. */
+  public void assertQualityReleased() {
+    if (qualityDisposition != QualityDisposition.RELEASED) {
+      throw new StockUnitNotReleasedException(barcode, qualityDisposition);
+    }
   }
 
   /**

@@ -150,6 +150,8 @@ public class StockAvailabilityQueryService {
       return Map.of();
     }
     List<UUID> batchIds = batches.stream().map(Batch::getId).toList();
+    Set<UUID> pieceBackedBatchIds =
+        stockUnitRepository.findBatchIdsWithActiveStockUnits(tenantId, batchIds);
     Map<UUID, List<StockUnitRepository.AvailabilityVectorRow>> vectorRows =
         stockUnitRepository.findAvailabilityVectorRows(tenantId, batchIds).stream()
             .collect(Collectors.groupingBy(StockUnitRepository.AvailabilityVectorRow::getBatchId));
@@ -198,6 +200,7 @@ public class StockAvailabilityQueryService {
                     computeLot(
                         tenantId,
                         batch,
+                        pieceBackedBatchIds.contains(batch.getId()),
                         filter,
                         vectorRows.getOrDefault(batch.getId(), List.of()),
                         pieceRows.getOrDefault(batch.getId(), List.of()),
@@ -212,6 +215,7 @@ public class StockAvailabilityQueryService {
   private LotComputation computeLot(
       UUID tenantId,
       Batch batch,
+      boolean pieceBacked,
       Filter filter,
       List<StockUnitRepository.AvailabilityVectorRow> vectorRows,
       List<StockUnitRepository.AvailabilityPieceBreakdownRow> pieceRows,
@@ -220,7 +224,7 @@ public class StockAvailabilityQueryService {
       BatchCommitmentQuantityService.Summary commitments,
       StockAvailabilityDtos.Colour colour) {
     var resolution = primaryMeasureService.resolve(batch);
-    boolean hasPieces = !vectorRows.isEmpty();
+    boolean hasPieces = pieceBacked || !vectorRows.isEmpty();
     List<StockUnitRepository.AvailabilityVectorRow> selectableRows =
         vectorRows.stream()
             .filter(row -> SELECTABLE_PIECE_STATUSES.contains(row.getStatus()))

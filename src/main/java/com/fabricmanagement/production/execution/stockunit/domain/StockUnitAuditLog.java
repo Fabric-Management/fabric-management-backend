@@ -27,6 +27,7 @@ import lombok.NoArgsConstructor;
  *   <li>REVERSAL — mandatory explanation for undoing a consumption
  *   <li>DISPOSAL — admin must document why the unit is destroyed
  *   <li>QUARANTINE_RELEASE — QC manager must confirm clearance
+ *   <li>QC_RELOCATE — custodian must document the physical move
  * </ul>
  *
  * <p>For other operations (CONSUME, TRANSFER, RESERVE) {@code reason} is optional.
@@ -84,6 +85,7 @@ public class StockUnitAuditLog extends BaseEntity {
   public static final String OP_CONSUME = "CONSUME";
   public static final String OP_REVERSAL = "REVERSAL";
   public static final String OP_TRANSFER = "TRANSFER";
+  public static final String OP_QC_RELOCATE = "QC_RELOCATE";
   public static final String OP_GRADE_CHANGE = "GRADE_CHANGE";
   public static final String OP_HOLD = "HOLD";
   public static final String OP_HOLD_RELEASE = "HOLD_RELEASE";

@@ -3,6 +3,8 @@ package com.fabricmanagement.production.execution.output.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.output.domain.ProductionOutputItem;
 import com.fabricmanagement.production.execution.output.domain.ProductionOutputRecord;
 import com.fabricmanagement.production.execution.output.domain.ProductionOutputStatus;
@@ -29,6 +31,7 @@ public class ProductionOutputService {
   private final ProductionOutputItemRepository itemRepo;
   private final DomainEventPublisher eventPublisher;
   private final ProductFacade productFacade;
+  private final BatchRepository batchRepository;
 
   @Transactional
   public ProductionOutputRecord create(CreateProductionOutputRequest request) {
@@ -125,6 +128,17 @@ public class ProductionOutputService {
 
       item.setBarcode(barcode);
       currentSeq++;
+    }
+
+    if (record.getBatchId() != null) {
+      var batch =
+          batchRepository
+              .findByIdAndTenantIdForUpdate(record.getBatchId(), tenantId)
+              .orElseThrow(() -> new ProductionDomainException("Output batch not found"));
+      // Confirmation fixes quantity/identity, not usability. Hide the lot synchronously; the
+      // listener then creates PENDING_INSPECTION units and derives the final fail-closed summary.
+      batch.applyQualityProjection(BatchStatus.PENDING_QC);
+      batchRepository.save(batch);
     }
 
     ProductionOutputConfirmedEvent event = record.confirm(userId);

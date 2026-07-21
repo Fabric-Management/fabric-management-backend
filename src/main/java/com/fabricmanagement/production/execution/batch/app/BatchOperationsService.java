@@ -17,6 +17,7 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchRep
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,6 +62,7 @@ public class BatchOperationsService {
   private final StockUnitRepository stockUnitRepository;
   private final WarehouseLocationPort warehouseLocationPort;
   private final ApplicationEventPublisher applicationEventPublisher;
+  private final QualityDecisionService qualityDecisionService;
 
   // ── Blend ─────────────────────────────────────────────────────────────────
 
@@ -449,9 +451,7 @@ public class BatchOperationsService {
 
   // ── Override ───────────────────────────────────────────────────────────────
 
-  /**
-   * Override batch status (QC_REJECTED or QUARANTINE → AVAILABLE). Logs to override_log for audit.
-   */
+  /** Records a superseding RELEASED decision and retains the legacy override audit projection. */
   @Transactional
   public BatchDto overrideStatus(UUID batchId, OverrideStatusRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -466,8 +466,7 @@ public class BatchOperationsService {
     }
 
     BatchStatus fromStatus = batch.getStatus();
-    batch.transitionStatus(BatchStatus.AVAILABLE, actorId);
-    batchRepository.save(batch);
+    qualityDecisionService.overrideToReleased(batchId, request.getReason());
 
     BatchOverrideLog logEntry =
         BatchOverrideLog.create(

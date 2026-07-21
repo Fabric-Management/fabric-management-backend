@@ -2,6 +2,7 @@ package com.fabricmanagement.production.execution.batch.infra.repository;
 
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
@@ -106,7 +107,6 @@ public class StockAvailabilityBatchRepositoryImpl implements StockAvailabilityBa
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(cb.equal(batch.get("tenantId"), tenantId));
     predicates.add(cb.isTrue(batch.get("isActive")));
-    predicates.add(batch.get("status").in(SALEABLE_BATCH_STATUSES));
     predicates.add(batch.get("productType").in(AVAILABILITY_PRODUCT_TYPES));
     if (filter.colorId() != null) {
       predicates.add(cb.equal(batch.get("colorId"), filter.colorId()));
@@ -122,23 +122,48 @@ public class StockAvailabilityBatchRepositoryImpl implements StockAvailabilityBa
     if (productIds != null) {
       predicates.add(batch.get("productId").in(productIds));
     }
-    if (filter.qualityGradeId() != null || filter.qualityUnassigned()) {
-      Subquery<Integer> pieceExists = query.subquery(Integer.class);
-      Root<StockUnit> piece = pieceExists.from(StockUnit.class);
-      List<Predicate> piecePredicates = new ArrayList<>();
-      piecePredicates.add(cb.equal(piece.get("tenantId"), tenantId));
-      piecePredicates.add(cb.equal(piece.get("batchId"), batch.get("id")));
-      piecePredicates.add(cb.isTrue(piece.get("isActive")));
-      piecePredicates.add(piece.get("status").in(SELECTABLE_PIECE_STATUSES));
-      if (filter.qualityGradeId() != null) {
-        piecePredicates.add(cb.equal(piece.get("qualityGradeId"), filter.qualityGradeId()));
-      } else {
-        piecePredicates.add(cb.isNull(piece.get("qualityGradeId")));
-      }
-      pieceExists.select(cb.literal(1)).where(piecePredicates.toArray(Predicate[]::new));
-      predicates.add(cb.exists(pieceExists));
-    }
+    predicates.add(availabilityPopulation(cb, query, batch, tenantId, filter));
     return predicates.toArray(Predicate[]::new);
+  }
+
+  private Predicate availabilityPopulation(
+      CriteriaBuilder cb, CriteriaQuery<?> query, Root<Batch> batch, UUID tenantId, Filter filter) {
+    Subquery<Integer> anyActivePiece = query.subquery(Integer.class);
+    Root<StockUnit> anyPiece = anyActivePiece.from(StockUnit.class);
+    anyActivePiece
+        .select(cb.literal(1))
+        .where(
+            cb.equal(anyPiece.get("tenantId"), tenantId),
+            cb.equal(anyPiece.get("batchId"), batch.get("id")),
+            cb.isTrue(anyPiece.get("isActive")));
+
+    Subquery<Integer> releasedSelectablePiece = query.subquery(Integer.class);
+    Root<StockUnit> releasedPiece = releasedSelectablePiece.from(StockUnit.class);
+    List<Predicate> releasedPredicates = new ArrayList<>();
+    releasedPredicates.add(cb.equal(releasedPiece.get("tenantId"), tenantId));
+    releasedPredicates.add(cb.equal(releasedPiece.get("batchId"), batch.get("id")));
+    releasedPredicates.add(cb.isTrue(releasedPiece.get("isActive")));
+    releasedPredicates.add(releasedPiece.get("status").in(SELECTABLE_PIECE_STATUSES));
+    releasedPredicates.add(
+        cb.equal(releasedPiece.get("qualityDisposition"), QualityDisposition.RELEASED));
+    if (filter.qualityGradeId() != null) {
+      releasedPredicates.add(
+          cb.equal(releasedPiece.get("qualityGradeId"), filter.qualityGradeId()));
+    } else if (filter.qualityUnassigned()) {
+      releasedPredicates.add(cb.isNull(releasedPiece.get("qualityGradeId")));
+    }
+    releasedSelectablePiece
+        .select(cb.literal(1))
+        .where(releasedPredicates.toArray(Predicate[]::new));
+
+    Predicate scalarLegacy =
+        cb.and(
+            cb.not(cb.exists(anyActivePiece)),
+            batch.get("status").in(SALEABLE_BATCH_STATUSES),
+            filter.qualityGradeId() == null && !filter.qualityUnassigned()
+                ? cb.conjunction()
+                : cb.disjunction());
+    return cb.or(cb.exists(releasedSelectablePiece), scalarLegacy);
   }
 
   private <T> TypedQuery<T> page(TypedQuery<T> query, Pageable pageable) {

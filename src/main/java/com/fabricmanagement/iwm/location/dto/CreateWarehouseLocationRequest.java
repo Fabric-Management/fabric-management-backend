@@ -55,4 +55,7 @@ public class CreateWarehouseLocationRequest {
   private Integer sortOrder;
 
   private UUID linkedMachineId;
+
+  /** Marks this storage location as an approved QC/quarantine destination. */
+  private boolean qualityArea;
 }
