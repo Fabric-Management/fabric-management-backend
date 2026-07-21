@@ -3,8 +3,10 @@ package com.fabricmanagement.production.execution.stockunit.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
+import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import java.math.BigDecimal;
@@ -27,7 +29,9 @@ import org.springframework.stereotype.Service;
  * </pre>
  *
  * Both sides represent "total weight that has entered the system and has not yet been written off"
- * — reserved weight is still physically present and must be counted on both sides.
+ * — reserved weight is still physically present and must be counted on both sides. Length-based and
+ * unsupported primary measures are skipped because {@code currentWeight} is always a weight-axis
+ * value.
  */
 @Slf4j
 @Service
@@ -37,6 +41,7 @@ public class StockUnitReconciliationService {
   private final TenantQueryPort tenantQueryPort;
   private final BatchRepository batchRepository;
   private final StockUnitRepository stockUnitRepository;
+  private final BatchPrimaryMeasureService primaryMeasureService;
 
   @Value("${application.stockunit.reconciliation-auto-fix:false}")
   private boolean autoFix;
@@ -73,8 +78,14 @@ public class StockUnitReconciliationService {
     }
 
     int discrepancyCount = 0;
+    int measureSkipCount = 0;
 
     for (Batch batch : activeBatches) {
+      if (!isWeightBased(batch)) {
+        measureSkipCount++;
+        continue;
+      }
+
       BigDecimal physicalSum =
           stockUnitRepository.sumCurrentWeightByBatchId(
               tenantId,
@@ -126,11 +137,38 @@ public class StockUnitReconciliationService {
 
     if (discrepancyCount > 0) {
       log.warn(
-          "Reconciliation completed for tenant {} with {} discrepancies found.",
+          "Reconciliation completed for tenant {} with {} discrepancies and {} measure skips.",
           tenantId,
-          discrepancyCount);
+          discrepancyCount,
+          measureSkipCount);
+    } else if (measureSkipCount > 0) {
+      log.info(
+          "Reconciliation completed for tenant {} with no discrepancies and {} measure skips.",
+          tenantId,
+          measureSkipCount);
     } else {
       log.debug("Reconciliation matched perfectly for tenant {}", tenantId);
+    }
+  }
+
+  private boolean isWeightBased(Batch batch) {
+    try {
+      PrimaryMeasure primaryMeasure = primaryMeasureService.primaryMeasure(batch.getProductType());
+      if (primaryMeasure == PrimaryMeasure.WEIGHT) {
+        return true;
+      }
+      log.info(
+          "Reconciliation skipped (dimension mismatch): batch={}, unit={} vs stock-unit weight KG",
+          batch.getBatchCode(),
+          batch.getUnit());
+      return false;
+    } catch (IllegalArgumentException exception) {
+      log.info(
+          "Reconciliation skipped (unsupported primary measure): batch={}, productType={}, reason={}",
+          batch.getBatchCode(),
+          batch.getProductType(),
+          exception.getMessage());
+      return false;
     }
   }
 }

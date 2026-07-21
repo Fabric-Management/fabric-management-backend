@@ -16,6 +16,7 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchOve
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class BatchOperationsService {
   private final BatchOverrideLogRepository overrideLogRepository;
   private final BatchCodeGenerator batchCodeGenerator;
   private final BatchLineageService batchLineageService;
+  private final StockUnitRepository stockUnitRepository;
   private final WarehouseLocationPort warehouseLocationPort;
   private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -248,6 +250,7 @@ public class BatchOperationsService {
           "Split only allowed for PENDING_QC, QUARANTINE, or QC_REJECTED. Current: "
               + sourceBatch.getStatus());
     }
+    assertScalarSplitAllowed(tenantId, sourceBatch);
 
     BatchStatus rejectedStatus =
         request.getRejectedStatus() != null ? request.getRejectedStatus() : BatchStatus.RETURNED;
@@ -351,6 +354,7 @@ public class BatchOperationsService {
           "Partial acceptance split only allowed for PENDING_QC, QUARANTINE, or QC_REJECTED. Current: "
               + sourceBatch.getStatus());
     }
+    assertScalarSplitAllowed(tenantId, sourceBatch);
 
     BatchStatus rejectedStatus =
         request.getRejectedStatus() != null ? request.getRejectedStatus() : BatchStatus.QC_REJECTED;
@@ -580,5 +584,16 @@ public class BatchOperationsService {
     return batchRepository
         .findByIdAndTenantId(id, tenantId)
         .orElseThrow(() -> new NotFoundException("Batch not found: " + id));
+  }
+
+  private void assertScalarSplitAllowed(UUID tenantId, Batch batch) {
+    if (stockUnitRepository.existsByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batch.getId())) {
+      throw new BatchDomainException(
+          "Piece-backed batch "
+              + batch.getBatchCode()
+              + " cannot be split by quantity; select the physical stock units to accept",
+          "BATCH_SPLIT_PIECE_BACKED",
+          422);
+    }
   }
 }
