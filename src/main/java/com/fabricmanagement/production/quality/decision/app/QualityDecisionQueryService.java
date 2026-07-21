@@ -46,10 +46,14 @@ public class QualityDecisionQueryService {
                     row.getBatchId(),
                     row.getBatchCode(),
                     row.getProductId(),
+                    row.getProductUid(),
                     ProductType.valueOf(row.getProductType()),
+                    row.getProductDisplayName(),
+                    row.getColorId(),
+                    row.getColorName(),
                     row.getSupplierBatchCode(),
                     row.getPendingUnitCount(),
-                    row.getCreatedAt()));
+                    row.getBatchCreatedAt()));
   }
 
   public Page<QualityDecision> getHistory(UUID batchId, Pageable pageable) {

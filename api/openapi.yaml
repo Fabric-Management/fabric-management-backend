@@ -58628,28 +58628,63 @@ components:
       properties:
         batchCode:
           type: string
+          description: Internal batch or lot code
+        batchCreatedAt:
+          type: string
+          format: date-time
+          description: Batch creation timestamp
         batchId:
           type: string
           format: uuid
+          description: Batch identifier
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Assigned tenant color-card identifier
+        colorName:
+          type:
+          - string
+          - "null"
+          description: Assigned tenant color-card name
         pendingUnitCount:
           type: integer
           format: int64
+          description: Number of active stock units awaiting inspection
+        productDisplayName:
+          type: string
+          description: Human-readable product name with the canonical UID as fallback
         productId:
           type: string
           format: uuid
+          description: Product identifier
         productType:
           type: string
+          description: Product type
           enum:
           - FIBER
           - YARN
           - FABRIC
           - CHEMICAL
           - CONSUMABLE
-        receivedAt:
+        productUid:
           type: string
-          format: date-time
+          description: Canonical product UID
         supplierBatchCode:
-          type: string
+          type:
+          - string
+          - "null"
+          description: Supplier batch or lot code
+      required:
+      - batchCode
+      - batchCreatedAt
+      - batchId
+      - pendingUnitCount
+      - productDisplayName
+      - productId
+      - productType
+      - productUid
     QuickCreateCustomerContactRequest:
       type: object
       properties:

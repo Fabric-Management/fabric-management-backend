@@ -69,19 +69,29 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
           SELECT b.id AS batchId,
                  b.batch_code AS batchCode,
                  b.product_id AS productId,
+                 p.uid AS productUid,
                  b.product_type AS productType,
+                 COALESCE(f.fiber_name, p.uid) AS productDisplayName,
+                 c.id AS colorId,
+                 c.name AS colorName,
                  b.supplier_batch_code AS supplierBatchCode,
                  COUNT(s.id) AS pendingUnitCount,
-                 b.created_at AS createdAt
+                 b.created_at AS batchCreatedAt
           FROM production.stock_unit s
           JOIN production.production_execution_batch b
             ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+          JOIN production.prod_product p
+            ON p.id = b.product_id
+          LEFT JOIN production.prod_fiber f
+            ON f.product_id = p.id
+          LEFT JOIN production.color c
+            ON c.id = b.color_id AND c.tenant_id = b.tenant_id
           WHERE s.tenant_id = :tenantId
             AND s.is_active = TRUE
             AND b.is_active = TRUE
             AND s.quality_disposition = 'PENDING_INSPECTION'
-          GROUP BY b.id, b.batch_code, b.product_id, b.product_type,
-                   b.supplier_batch_code, b.created_at
+          GROUP BY b.id, b.batch_code, b.product_id, p.uid, b.product_type,
+                   f.fiber_name, c.id, c.name, b.supplier_batch_code, b.created_at
           ORDER BY b.created_at ASC, b.id ASC
           """,
       countQuery =
@@ -326,12 +336,20 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
     UUID getProductId();
 
+    String getProductUid();
+
     String getProductType();
+
+    String getProductDisplayName();
+
+    UUID getColorId();
+
+    String getColorName();
 
     String getSupplierBatchCode();
 
     long getPendingUnitCount();
 
-    java.time.Instant getCreatedAt();
+    java.time.Instant getBatchCreatedAt();
   }
 }
