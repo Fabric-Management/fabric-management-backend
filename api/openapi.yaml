@@ -22472,6 +22472,12 @@ paths:
   /api/v1/iwm/locations:
     get:
       operationId: getAll_2
+      parameters:
+      - in: query
+        name: qualityArea
+        required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -36162,6 +36168,85 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Put StockUnit on hold
+      tags:
+      - StockUnit
+  /api/v1/production/stock-units/{id}/qc-relocate:
+    post:
+      description: Changes only the physical location. Operational status and quality
+        disposition remain unchanged.
+      operationId: relocateForQuality
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockUnitQcRelocateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseStockUnitDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Relocate unreleased stock into an approved QC custody area
       tags:
       - StockUnit
   /api/v1/production/stock-units/{id}/quarantine:
@@ -53273,6 +53358,8 @@ components:
         parentId:
           type: string
           format: uuid
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -60695,6 +60782,21 @@ components:
         updatedAt:
           type: string
           format: date-time
+    StockUnitQcRelocateRequest:
+      type: object
+      description: Privileged custody relocation of unreleased stock into a QC storage
+        area
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+        targetLocationId:
+          type: string
+          format: uuid
+      required:
+      - reason
+      - targetLocationId
     SubcontractOrderResponse:
       type: object
       properties:
@@ -62858,6 +62960,8 @@ components:
           type: string
           maxLength: 255
           minLength: 0
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -63380,11 +63484,15 @@ components:
           type: number
         name:
           type: string
+        operational:
+          type: boolean
         parentId:
           type: string
           format: uuid
         path:
           type: string
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -63404,6 +63512,8 @@ components:
           - HUMIDITY_CONTROLLED
           - HAZARDOUS
           - CLEAN_ROOM
+        storageLocation:
+          type: boolean
         type:
           type: string
           enum:
@@ -63465,11 +63575,15 @@ components:
           type: number
         name:
           type: string
+        operational:
+          type: boolean
         parentId:
           type: string
           format: uuid
         path:
           type: string
+        qualityArea:
+          type: boolean
         sortOrder:
           type: integer
           format: int32
@@ -63489,6 +63603,8 @@ components:
           - HUMIDITY_CONTROLLED
           - HAZARDOUS
           - CLEAN_ROOM
+        storageLocation:
+          type: boolean
         type:
           type: string
           enum:

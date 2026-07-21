@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchNotConsumableException;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -386,6 +387,37 @@ public class Batch extends BaseEntity {
     onUpdate();
   }
 
+  /**
+   * Updates lot counters for consumption of a specifically identified RELEASED StockUnit.
+   *
+   * <p>Unlike scalar batch consumption, QC compatibility projection statuses do not block this
+   * operation. The caller has already enforced the unit disposition invariant.
+   */
+  public void consumeReleasedUnitFromAvailable(BigDecimal qty) {
+    validateReleasedUnitConsumptionPreconditions(qty);
+    if (getAvailableQuantity().compareTo(qty) < 0) {
+      throw new InsufficientStockException(getId(), batchCode, qty, getAvailableQuantity(), unit);
+    }
+    this.consumedQuantity = this.consumedQuantity.add(qty);
+    transitionAfterConsumption();
+    onUpdate();
+  }
+
+  /** Updates lot counters for a specifically identified RELEASED reserved StockUnit. */
+  public void consumeReleasedUnitFromReservation(BigDecimal qty) {
+    validateReleasedUnitConsumptionPreconditions(qty);
+    if (this.reservedQuantity.compareTo(qty) < 0) {
+      throw new BatchDomainException(
+          String.format(
+              "Cannot consume %.3f %s from reservations of batch %s: only %.3f %s is reserved.",
+              qty, unit, batchCode, reservedQuantity, unit));
+    }
+    this.reservedQuantity = this.reservedQuantity.subtract(qty);
+    this.consumedQuantity = this.consumedQuantity.add(qty);
+    transitionAfterConsumption();
+    onUpdate();
+  }
+
   private void validateConsumptionPreconditions(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new BatchDomainException("Consumption amount must be positive for batch " + batchCode);
@@ -395,6 +427,15 @@ public class Batch extends BaseEntity {
     }
     if (this.status == BatchStatus.DEPLETED) {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "IN_PROGRESS");
+    }
+  }
+
+  private void validateReleasedUnitConsumptionPreconditions(BigDecimal qty) {
+    if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new BatchDomainException("Consumption amount must be positive for batch " + batchCode);
+    }
+    if (BatchStatus.BLOCKED_FOR_RELEASED_UNIT_CONSUMPTION.contains(this.status)) {
+      throw new BatchNotConsumableException(batchCode, status);
     }
   }
 

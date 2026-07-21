@@ -129,6 +129,19 @@ public class StockUnitController {
     return ResponseEntity.ok(ApiResponse.success(StockUnitDto.from(unit)));
   }
 
+  @PostMapping("/{id}/qc-relocate")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
+  @Operation(
+      summary = "Relocate unreleased stock into an approved QC custody area",
+      description =
+          "Changes only the physical location. Operational status and quality disposition remain unchanged.")
+  public ResponseEntity<ApiResponse<StockUnitDto>> relocateForQuality(
+      @PathVariable UUID id, @Valid @RequestBody QcRelocateRequest request) {
+    var unit =
+        stockUnitService.relocateForQuality(id, request.targetLocationId(), request.reason());
+    return ResponseEntity.ok(ApiResponse.success(StockUnitDto.from(unit)));
+  }
+
   @PostMapping("/{id}/transfer/complete")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Complete a transfer — StockUnit arrives at destination")

@@ -116,6 +116,13 @@ public enum BatchStatus {
       Set.of(PENDING_QC, QUARANTINE, ON_HOLD, QC_REJECTED, RETURNED, DESTROYED);
 
   /**
+   * True operational blockers for consumption of a specific RELEASED StockUnit. QC projection
+   * statuses are deliberately absent because unit disposition is authoritative on that path.
+   */
+  public static final Set<BatchStatus> BLOCKED_FOR_RELEASED_UNIT_CONSUMPTION =
+      Set.of(ON_HOLD, DEPLETED, RETURNED, DESTROYED);
+
+  /**
    * State machine transition rules for {@link
    * com.fabricmanagement.production.execution.batch.domain.Batch#transitionStatus}.
    *

@@ -23,4 +23,13 @@ public interface WarehouseLocationPort {
    *     not found
    */
   LocationValidationResult validateProductionLocation(UUID locationId);
+
+  /**
+   * Validate that a location is an active, operational storage location designated for QC or
+   * quarantine custody.
+   *
+   * @param locationId the warehouse location ID
+   * @return minimal validation result translated from the IWM bounded context
+   */
+  QcLocationValidationResult validateQcLocation(UUID locationId);
 }

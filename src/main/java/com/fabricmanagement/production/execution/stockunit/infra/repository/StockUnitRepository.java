@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +45,17 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
   boolean existsByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
 
   List<StockUnit> findByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
+
+  @Query(
+      """
+      SELECT DISTINCT s.batchId
+      FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId IN :batchIds
+        AND s.isActive = true
+      """)
+  Set<UUID> findBatchIdsWithActiveStockUnits(
+      @Param("tenantId") UUID tenantId, @Param("batchIds") Collection<UUID> batchIds);
 
   Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrue(
       UUID tenantId, UUID batchId, Pageable pageable);
@@ -167,6 +179,7 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
       WHERE s.tenantId = :tenantId
         AND s.batchId IN :batchIds
         AND s.isActive = true
+        AND s.qualityDisposition = com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED
       GROUP BY s.batchId, s.status, s.qualityGradeId,
                UPPER(TRIM(s.unit)), UPPER(TRIM(s.lengthUnit))
       """)
@@ -187,6 +200,7 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
         AND s.batchId IN :batchIds
         AND s.isActive = true
         AND s.status IN :statuses
+        AND s.qualityDisposition = com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED
         AND (:qualityGradeId IS NULL OR s.qualityGradeId = :qualityGradeId)
         AND (:qualityUnassigned = false OR s.qualityGradeId IS NULL)
       GROUP BY s.batchId, s.packageType,
@@ -213,6 +227,7 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
         AND s.batchId IN :batchIds
         AND s.isActive = true
         AND s.status IN :statuses
+        AND s.qualityDisposition = com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED
         AND (:qualityGradeId IS NULL OR s.qualityGradeId = :qualityGradeId)
         AND (:qualityUnassigned = false OR s.qualityGradeId IS NULL)
       GROUP BY s.batchId, s.qualityGradeId,

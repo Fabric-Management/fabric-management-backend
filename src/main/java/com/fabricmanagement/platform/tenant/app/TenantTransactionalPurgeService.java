@@ -25,6 +25,7 @@ public class TenantTransactionalPurgeService {
 
   private static final String TENANT_DEMOMODE_CACHE = "tenant-demomode";
   private static final String TENANT_EMAIL_SANDBOX_CACHE = "tenant-emailsandbox";
+  private static final String QUALITY_DECISION_PURGE_SETTING = "app.quality_decision_purge_tenant";
 
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
@@ -98,6 +99,8 @@ public class TenantTransactionalPurgeService {
           "production.production_output_record",
           "production.work_order_output",
           "production.work_order_consumption",
+          "production.quality_decision_unit",
+          "production.quality_decision",
           "production.stock_unit_audit_log",
           "production.stock_unit_soft_hold",
           "production.stock_unit",
@@ -238,10 +241,23 @@ public class TenantTransactionalPurgeService {
 
   private void deleteTransactionalRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
+    authorizeQualityDecisionPurge(jdbc, tenantId);
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
       delete(jdbc, rows, table, "DELETE FROM " + table + " WHERE tenant_id = ?", tenantId);
     }
+  }
+
+  /**
+   * Opens the append-only ledger's narrowly scoped DELETE path for this system transaction only.
+   * The database trigger also verifies the executing role and matches every deleted row's tenant.
+   */
+  private void authorizeQualityDecisionPurge(JdbcTemplate jdbc, UUID tenantId) {
+    jdbc.queryForObject(
+        "SELECT set_config(?, ?, true)",
+        String.class,
+        QUALITY_DECISION_PURGE_SETTING,
+        tenantId.toString());
   }
 
   private void deleteChildRowsWithoutTenantId(

@@ -38,6 +38,9 @@ public class WarehouseLocationDto {
   private BigDecimal currentVolumeM3;
   private double utilizationPercent;
   private UUID linkedMachineId;
+  private boolean qualityArea;
+  private boolean storageLocation;
+  private boolean operational;
   private boolean isActive;
   private Long version;
   private Instant createdAt;
@@ -65,6 +68,9 @@ public class WarehouseLocationDto {
         .currentVolumeM3(entity.getCurrentVolumeM3())
         .utilizationPercent(entity.getUtilizationPercent())
         .linkedMachineId(entity.getLinkedMachineId())
+        .qualityArea(entity.isQualityArea())
+        .storageLocation(entity.isStorageLocation())
+        .operational(entity.isOperational())
         .isActive(entity.getIsActive())
         .version(entity.getVersion())
         .createdAt(entity.getCreatedAt())

@@ -189,6 +189,85 @@ class QualityDecisionServiceTest {
   }
 
   @Test
+  void selectedDecisionCanInspectUntouchedUnitAfterEarlierConsumptionAndSkipsProjection() {
+    Batch batch = batch(BatchStatus.IN_PROGRESS);
+    batch.setConsumedQuantity(new BigDecimal("5.000"));
+    StockUnit selected = unit("ROLL-AFTER-CONSUMPTION");
+    UUID selectedId = selected.getId();
+    when(batchRepository.findByIdAndTenantIdForUpdate(BATCH_ID, TENANT_ID))
+        .thenReturn(Optional.of(batch));
+    when(stockUnitRepository.lockSelectedDecisionPopulation(
+            eq(TENANT_ID), eq(BATCH_ID), eq(Set.of(selectedId)), anyCollection()))
+        .thenReturn(List.of(selected));
+    when(decisionRepository.findMaxSeq(TENANT_ID, BATCH_ID)).thenReturn(2L);
+    when(stockUnitRepository.applyQualityDisposition(
+            eq(TENANT_ID),
+            eq(BATCH_ID),
+            eq(List.of(selectedId)),
+            anyCollection(),
+            eq(QualityDisposition.RELEASED)))
+        .thenReturn(1);
+
+    QualityDecision decision =
+        service.recordDecision(
+            TrustedDecisionContext.manual(ACTOR_ID),
+            new QualityDecisionCommand(
+                BATCH_ID,
+                QualityDecisionScope.SELECTED_UNITS,
+                QualityDecisionOutcome.RELEASED,
+                null,
+                "Remaining roll passed inspection",
+                Set.of(selectedId),
+                null));
+
+    assertThat(decision.getSeq()).isEqualTo(3);
+    assertThat(batch.getStatus()).isEqualTo(BatchStatus.IN_PROGRESS);
+    verify(stockUnitRepository, never()).countQualityDispositions(any(), any());
+    verify(batchRepository, never()).save(batch);
+  }
+
+  @Test
+  void unresolvedBatchReservationStillBlocksSelectedUnitDecision() {
+    Batch batch = batch(BatchStatus.AVAILABLE);
+    batch.setReservedQuantity(BigDecimal.ONE);
+    UUID selectedId = UUID.randomUUID();
+    when(batchRepository.findByIdAndTenantIdForUpdate(BATCH_ID, TENANT_ID))
+        .thenReturn(Optional.of(batch));
+
+    assertThatThrownBy(
+            () ->
+                service.recordDecision(
+                    TrustedDecisionContext.manual(ACTOR_ID),
+                    new QualityDecisionCommand(
+                        BATCH_ID,
+                        QualityDecisionScope.SELECTED_UNITS,
+                        QualityDecisionOutcome.RELEASED,
+                        null,
+                        null,
+                        Set.of(selectedId),
+                        null)))
+        .isInstanceOf(QualityDecisionException.class)
+        .hasMessageContaining("AVAILABLE");
+
+    verify(stockUnitRepository, never())
+        .lockSelectedDecisionPopulation(any(), any(), anyCollection(), anyCollection());
+  }
+
+  @Test
+  void fullLotDecisionRemainsBlockedAfterConsumption() {
+    Batch batch = batch(BatchStatus.QUARANTINE);
+    batch.setConsumedQuantity(BigDecimal.ONE);
+    when(batchRepository.findByIdAndTenantIdForUpdate(BATCH_ID, TENANT_ID))
+        .thenReturn(Optional.of(batch));
+
+    assertThatThrownBy(() -> service.releaseFromQc(BATCH_ID))
+        .isInstanceOf(QualityDecisionException.class)
+        .hasMessageContaining("QUARANTINE");
+
+    verify(stockUnitRepository, never()).lockDecisionPopulation(any(), any(), anyCollection());
+  }
+
+  @Test
   void liveReservationBlocksDecisionEvenWhenLegacyBatchStatusStillAvailable() {
     Batch batch = batch(BatchStatus.AVAILABLE);
     batch.setReservedQuantity(BigDecimal.ONE);

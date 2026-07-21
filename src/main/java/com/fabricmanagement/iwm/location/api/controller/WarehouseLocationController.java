@@ -68,8 +68,9 @@ public class WarehouseLocationController {
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getAll() {
-    List<WarehouseLocationDto> locations = service.getAll();
+  public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getAll(
+      @RequestParam(required = false) Boolean qualityArea) {
+    List<WarehouseLocationDto> locations = service.getAll(qualityArea);
     return ResponseEntity.ok(ApiResponse.success(locations));
   }
 

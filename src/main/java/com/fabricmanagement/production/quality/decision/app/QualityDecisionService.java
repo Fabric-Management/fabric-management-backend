@@ -41,7 +41,20 @@ public class QualityDecisionService {
           StockUnitStatus.QUARANTINE,
           StockUnitStatus.ON_HOLD);
 
-  private static final Set<BatchStatus> ACTIVE_OR_TERMINAL_BATCH_STATUSES =
+  private static final Set<BatchStatus> FULL_LOT_BLOCKED_BATCH_STATUSES =
+      EnumSet.of(
+          BatchStatus.RESERVED,
+          BatchStatus.IN_PROGRESS,
+          BatchStatus.ON_HOLD,
+          BatchStatus.DEPLETED,
+          BatchStatus.RETURNED,
+          BatchStatus.DESTROYED);
+
+  private static final Set<BatchStatus> SELECTED_UNITS_BLOCKED_BATCH_STATUSES =
+      EnumSet.of(
+          BatchStatus.RESERVED, BatchStatus.DEPLETED, BatchStatus.RETURNED, BatchStatus.DESTROYED);
+
+  private static final Set<BatchStatus> PROJECTION_BLOCKED_BATCH_STATUSES =
       EnumSet.of(
           BatchStatus.RESERVED,
           BatchStatus.IN_PROGRESS,
@@ -81,7 +94,7 @@ public class QualityDecisionService {
         return assertIdempotentEventMatchesCommand(concurrentWinner.get(), command);
       }
     }
-    assertBatchAllowsDecision(batch);
+    assertBatchAllowsDecision(batch, command.scope());
 
     List<StockUnit> population = lockPopulation(tenantId, command, batch);
     validateSupersedes(tenantId, command, batch);
@@ -120,8 +133,10 @@ public class QualityDecisionService {
       throw QualityDecisionException.populationDrift();
     }
 
-    applyBatchProjection(tenantId, batch);
-    batchRepository.save(batch);
+    if (allowsQualityProjection(batch)) {
+      applyBatchProjection(tenantId, batch);
+      batchRepository.save(batch);
+    }
     log.info(
         "Recorded quality decision: tenantId={}, batchId={}, decisionId={}, outcome={}, units={}",
         tenantId,
@@ -221,12 +236,23 @@ public class QualityDecisionService {
     return existing;
   }
 
-  private void assertBatchAllowsDecision(Batch batch) {
-    if (ACTIVE_OR_TERMINAL_BATCH_STATUSES.contains(batch.getStatus())
-        || batch.getReservedQuantity().compareTo(BigDecimal.ZERO) > 0
-        || batch.getConsumedQuantity().compareTo(BigDecimal.ZERO) > 0) {
+  private void assertBatchAllowsDecision(Batch batch, QualityDecisionScope scope) {
+    boolean blocked =
+        scope == QualityDecisionScope.FULL_LOT
+            ? FULL_LOT_BLOCKED_BATCH_STATUSES.contains(batch.getStatus())
+                || batch.getReservedQuantity().compareTo(BigDecimal.ZERO) > 0
+                || batch.getConsumedQuantity().compareTo(BigDecimal.ZERO) > 0
+            : SELECTED_UNITS_BLOCKED_BATCH_STATUSES.contains(batch.getStatus())
+                || batch.getReservedQuantity().compareTo(BigDecimal.ZERO) > 0;
+    if (blocked) {
       throw QualityDecisionException.batchActive(batch.getStatus().name());
     }
+  }
+
+  private boolean allowsQualityProjection(Batch batch) {
+    return !PROJECTION_BLOCKED_BATCH_STATUSES.contains(batch.getStatus())
+        && batch.getReservedQuantity().compareTo(BigDecimal.ZERO) == 0
+        && batch.getConsumedQuantity().compareTo(BigDecimal.ZERO) == 0;
   }
 
   private void applyBatchProjection(UUID tenantId, Batch batch) {

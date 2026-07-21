@@ -82,7 +82,8 @@ public class WarehouseLocationService {
             request.getMaxWeightKg(),
             request.getMaxVolumeM3(),
             request.getSortOrder(),
-            request.getLinkedMachineId());
+            request.getLinkedMachineId(),
+            request.isQualityArea());
     location.setTenantId(tenantId);
 
     String path = buildPath(parent, request.getCode());
@@ -122,7 +123,8 @@ public class WarehouseLocationService {
         request.getMaxWeightKg(),
         request.getMaxVolumeM3(),
         request.getSortOrder(),
-        request.getLinkedMachineId());
+        request.getLinkedMachineId(),
+        request.getQualityArea() != null ? request.getQualityArea() : location.isQualityArea());
 
     location = repository.save(location);
     log.info("Updated warehouse location: id={}, code={}", location.getId(), location.getCode());
@@ -192,6 +194,19 @@ public class WarehouseLocationService {
 
   @Transactional(readOnly = true)
   public List<WarehouseLocationDto> getAll() {
+    return getAll(null);
+  }
+
+  @Transactional(readOnly = true)
+  public List<WarehouseLocationDto> getAll(Boolean qualityArea) {
+    if (qualityArea != null) {
+      return repository
+          .findByQualityAreaAndIsActiveTrueOrderBySortOrderAscNameAsc(qualityArea)
+          .stream()
+          .filter(location -> !qualityArea || location.isOperational())
+          .map(WarehouseLocationDto::from)
+          .toList();
+    }
     return repository.findByIsActiveTrueOrderBySortOrderAscNameAsc().stream()
         .map(WarehouseLocationDto::from)
         .toList();

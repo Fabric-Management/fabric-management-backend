@@ -140,6 +140,50 @@ class QualityDecisionMigrationIT {
     assertAppendOnly("DELETE FROM production.quality_decision_unit");
   }
 
+  @Test
+  void tenantPurgeGuardAllowsOnlyMatchingScopedDeletesAndRollsBackCleanly() throws SQLException {
+    migrateTo("20260721125000");
+
+    assertAppendOnly("DELETE FROM production.quality_decision_unit");
+    assertAppendOnlyWithPurgeTenant(
+        "DELETE FROM production.quality_decision_unit", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    assertAppendOnlyWithPurgeTenant(
+        "UPDATE production.quality_decision SET remarks = 'mutated'",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+    try (Connection connection = ownerConnection();
+        Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+      statement.execute(
+          "SELECT set_config('app.quality_decision_purge_tenant', "
+              + "'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', true)");
+      assertThat(statement.executeUpdate("DELETE FROM production.quality_decision_unit"))
+          .isEqualTo(4);
+      assertThat(statement.executeUpdate("DELETE FROM production.quality_decision")).isEqualTo(4);
+      connection.rollback();
+    }
+
+    assertThat(count("SELECT count(*) FROM production.quality_decision_unit")).isEqualTo(4);
+    assertThat(count("SELECT count(*) FROM production.quality_decision")).isEqualTo(4);
+  }
+
+  private static void assertAppendOnlyWithPurgeTenant(String sql, String purgeTenant) {
+    assertThatThrownBy(
+            () -> {
+              try (Connection connection = ownerConnection();
+                  Statement statement = connection.createStatement()) {
+                connection.setAutoCommit(false);
+                statement.execute(
+                    "SELECT set_config('app.quality_decision_purge_tenant', '"
+                        + purgeTenant
+                        + "', true)");
+                statement.execute(sql);
+              }
+            })
+        .isInstanceOf(SQLException.class)
+        .hasMessageContaining("append-only");
+  }
+
   private static void assertAppendOnly(String sql) {
     assertThatThrownBy(
             () -> {

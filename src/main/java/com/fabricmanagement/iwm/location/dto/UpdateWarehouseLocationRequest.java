@@ -44,4 +44,7 @@ public class UpdateWarehouseLocationRequest {
   private Integer sortOrder;
 
   private UUID linkedMachineId;
+
+  /** Nullable for backward-compatible updates; omitted values preserve the current designation. */
+  private Boolean qualityArea;
 }

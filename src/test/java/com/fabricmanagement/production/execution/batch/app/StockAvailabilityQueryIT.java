@@ -3,16 +3,22 @@ package com.fabricmanagement.production.execution.batch.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
+import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
+import com.fabricmanagement.iwm.location.dto.CreateWarehouseLocationRequest;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitAuditLogRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
@@ -47,6 +53,9 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
   @Autowired private TenantRepository tenantRepository;
   @Autowired private QualityDecisionService qualityDecisionService;
   @Autowired private QualityDecisionUnitRepository decisionUnitRepository;
+  @Autowired private StockUnitService stockUnitService;
+  @Autowired private StockUnitAuditLogRepository stockUnitAuditLogRepository;
+  @Autowired private WarehouseLocationService warehouseLocationService;
   @Autowired private EntityManager entityManager;
 
   private UUID tenantId;
@@ -55,6 +64,7 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
   void setUpTenant() {
     tenantId = tenant("primary");
     TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(UUID.randomUUID());
   }
 
   @AfterEach
@@ -168,10 +178,165 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
     assertThat(decisionUnitRepository.countByTenantIdAndDecisionId(tenantId, decision.getId()))
         .isEqualTo(1);
 
+    assertThat(stockUnitService.reserve(received.getId()).getStatus())
+        .isEqualTo(StockUnitStatus.RESERVED);
+    stockUnitService.releaseReservation(received.getId());
+    stockUnitService.consume(received.getId(), BigDecimal.ONE);
+    entityManager.flush();
+    entityManager.clear();
+
     var visible =
         service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20));
     assertThat(visible).hasSize(1);
     assertThat(visible.getContent().getFirst().lotNo()).isEqualTo("LOT-RECEIPT-QC");
+  }
+
+  @Test
+  void stockUnitLessLegacyBatchRetainsScalarAvailabilityFallback() {
+    Product product = product(ProductType.FABRIC, "M", tenantId);
+    batch(product, "LOT-LEGACY-SCALAR", BatchStatus.AVAILABLE, tenantId);
+
+    var visible =
+        service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20));
+
+    assertThat(visible).hasSize(1);
+    assertThat(visible.getContent().getFirst().lotNo()).isEqualTo("LOT-LEGACY-SCALAR");
+    assertThat(visible.getContent().getFirst().physical().pieceCount()).isZero();
+  }
+
+  @Test
+  void quarantinedUnitRelocatesToPersistedQualityAreaWithoutChangingItsGates() {
+    Product product = product(ProductType.FABRIC, "M", tenantId);
+    Batch batch = batch(product, "LOT-QC-RELOCATE", BatchStatus.QUARANTINE, tenantId);
+    UUID sourceLocationId = UUID.randomUUID();
+    StockUnit quarantined =
+        StockUnit.create(
+            tenantId,
+            batch.getId(),
+            ProductType.FABRIC,
+            "ROLL-QC-RELOCATE-" + UUID.randomUUID().toString().substring(0, 8),
+            null,
+            PackageType.ROLL,
+            BigDecimal.TEN,
+            null,
+            "KG",
+            sourceLocationId,
+            StockUnitSourceType.GOODS_RECEIPT,
+            UUID.randomUUID(),
+            QualityDisposition.QUARANTINED);
+    quarantined.quarantine();
+    stockUnitRepository.saveAndFlush(quarantined);
+    var qualityArea =
+        warehouseLocationService.create(
+            CreateWarehouseLocationRequest.builder()
+                .code("QC-" + UUID.randomUUID().toString().substring(0, 8))
+                .name("QC Hold")
+                .type(WarehouseLocationType.WAREHOUSE)
+                .qualityArea(true)
+                .build());
+
+    stockUnitService.relocateForQuality(
+        quarantined.getId(), qualityArea.getId(), "Awaiting laboratory review");
+    entityManager.flush();
+    entityManager.clear();
+
+    StockUnit relocated = stockUnitRepository.findById(quarantined.getId()).orElseThrow();
+    assertThat(relocated.getPreviousLocationId()).isEqualTo(sourceLocationId);
+    assertThat(relocated.getLocationId()).isEqualTo(qualityArea.getId());
+    assertThat(relocated.getStatus()).isEqualTo(StockUnitStatus.QUARANTINE);
+    assertThat(relocated.getQualityDisposition()).isEqualTo(QualityDisposition.QUARANTINED);
+    assertThat(
+            stockUnitAuditLogRepository.findByTenantIdAndStockUnitIdOrderByCreatedAtAsc(
+                tenantId, quarantined.getId()))
+        .singleElement()
+        .satisfies(
+            audit -> {
+              assertThat(audit.getOperationType()).isEqualTo("QC_RELOCATE");
+              assertThat(audit.getReason()).isEqualTo("Awaiting laboratory review");
+            });
+  }
+
+  @Test
+  void mixedBatchExposesAndConsumesReleasedUnitsAndCanInspectRemainingUnitsLater() {
+    Product product = product(ProductType.FABRIC, "M", tenantId);
+    Batch pending = batch(product, "LOT-MIXED-QC", BatchStatus.PENDING_QC, tenantId);
+    StockUnit first =
+        StockUnit.create(
+            tenantId,
+            pending.getId(),
+            ProductType.FABRIC,
+            "ROLL-MIXED-1-" + UUID.randomUUID().toString().substring(0, 8),
+            null,
+            PackageType.ROLL,
+            new BigDecimal("10"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.GOODS_RECEIPT,
+            UUID.randomUUID(),
+            QualityDisposition.PENDING_INSPECTION);
+    first.recordLength(new BigDecimal("100"), "M");
+    StockUnit second =
+        StockUnit.create(
+            tenantId,
+            pending.getId(),
+            ProductType.FABRIC,
+            "ROLL-MIXED-2-" + UUID.randomUUID().toString().substring(0, 8),
+            null,
+            PackageType.ROLL,
+            new BigDecimal("10"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.GOODS_RECEIPT,
+            UUID.randomUUID(),
+            QualityDisposition.PENDING_INSPECTION);
+    second.recordLength(new BigDecimal("100"), "M");
+    stockUnitRepository.saveAllAndFlush(java.util.List.of(first, second));
+
+    qualityDecisionService.recordDecision(
+        TrustedDecisionContext.manual(UUID.randomUUID()),
+        new QualityDecisionCommand(
+            pending.getId(),
+            QualityDecisionScope.SELECTED_UNITS,
+            QualityDecisionOutcome.RELEASED,
+            null,
+            "First roll passed",
+            java.util.Set.of(first.getId()),
+            null));
+    entityManager.flush();
+    entityManager.clear();
+
+    Batch mixed = batchRepository.findById(pending.getId()).orElseThrow();
+    assertThat(mixed.getStatus()).isEqualTo(BatchStatus.QUARANTINE);
+    var firstAvailability =
+        service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20));
+    assertThat(firstAvailability).hasSize(1);
+    assertThat(firstAvailability.getContent().getFirst().physical().pieceCount()).isEqualTo(1);
+
+    stockUnitService.consume(first.getId(), BigDecimal.ONE);
+    entityManager.flush();
+    entityManager.clear();
+
+    qualityDecisionService.recordDecision(
+        TrustedDecisionContext.manual(UUID.randomUUID()),
+        new QualityDecisionCommand(
+            pending.getId(),
+            QualityDecisionScope.SELECTED_UNITS,
+            QualityDecisionOutcome.RELEASED,
+            null,
+            "Remaining roll passed after production started",
+            java.util.Set.of(second.getId()),
+            null));
+    entityManager.flush();
+    entityManager.clear();
+
+    Batch operational = batchRepository.findById(pending.getId()).orElseThrow();
+    assertThat(operational.getConsumedQuantity()).isEqualByComparingTo("1");
+    assertThat(operational.getStatus()).isEqualTo(BatchStatus.QUARANTINE);
+    var allReleased =
+        service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20));
+    assertThat(allReleased.getContent().getFirst().physical().pieceCount()).isEqualTo(2);
   }
 
   private Product product(ProductType type, String unit, UUID ownerTenantId) {
