@@ -16,11 +16,15 @@ import com.fabricmanagement.production.execution.batch.dto.StockAvailabilityDtos
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
+import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
+import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionUnitRepository;
 import java.math.BigDecimal;
 import java.sql.DriverManager;
 import java.time.Duration;
@@ -82,6 +86,8 @@ class PurchaseOrderReceiptMaterializationIT {
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private BatchService batchService;
   @Autowired private StockAvailabilityQueryService availabilityQueryService;
+  @Autowired private QualityDecisionRepository qualityDecisionRepository;
+  @Autowired private QualityDecisionUnitRepository qualityDecisionUnitRepository;
 
   @MockBean private PurchaseOrderQueryService purchaseOrderQueryService;
 
@@ -168,6 +174,8 @@ class PurchaseOrderReceiptMaterializationIT {
                         assertThat(unit.getUnit()).isEqualTo("KG");
                         assertThat(unit.getLengthUnit()).isEqualTo("M");
                         assertThat(unit.getQualityGradeId()).isNull();
+                        assertThat(unit.getQualityDisposition())
+                            .isEqualTo(QualityDisposition.PENDING_INSPECTION);
                         assertThat(unit.getStatus()).isEqualTo(StockUnitStatus.AVAILABLE);
                       });
             });
@@ -179,6 +187,28 @@ class PurchaseOrderReceiptMaterializationIT {
         .isEmpty();
 
     batchService.releaseFromQc(batch.getId());
+
+    var decisions =
+        qualityDecisionRepository
+            .findByTenantIdAndBatchIdOrderByDecidedAtDescSeqDesc(
+                TENANT_ID, batch.getId(), PageRequest.of(0, 20))
+            .getContent();
+    assertThat(decisions)
+        .singleElement()
+        .satisfies(
+            decision -> {
+              assertThat(decision.getActorId()).isEqualTo(TenantContext.SYSTEM_ACTOR_ID);
+              assertThat(decision.getOrigin()).isEqualTo(QualityDecisionOrigin.SYSTEM_RELEASE);
+              assertThat(
+                      qualityDecisionUnitRepository.countByTenantIdAndDecisionId(
+                          TENANT_ID, decision.getId()))
+                  .isEqualTo(2);
+            });
+    assertThat(
+            stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(
+                TENANT_ID, List.of(batch.getId())))
+        .extracting(unit -> unit.getQualityDisposition())
+        .containsOnly(QualityDisposition.RELEASED);
 
     var lots =
         availabilityQueryService.lots(

@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.stockunit.dto;
 
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
@@ -30,6 +31,7 @@ public record StockUnitDto(
     UUID locationId,
     UUID previousLocationId,
     UUID qualityGradeId,
+    QualityDisposition qualityDisposition,
     UUID previousGradeId,
     StockUnitStatus status,
     StockUnitSourceType sourceType,
@@ -63,6 +65,7 @@ public record StockUnitDto(
         entity.getLocationId(),
         entity.getPreviousLocationId(),
         entity.getQualityGradeId(),
+        entity.getQualityDisposition(),
         entity.getPreviousGradeId(),
         entity.getStatus(),
         entity.getSourceType(),

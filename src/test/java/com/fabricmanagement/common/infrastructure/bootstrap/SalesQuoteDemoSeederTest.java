@@ -169,11 +169,12 @@ class SalesQuoteDemoSeederTest {
     verify(productFacade, times(3)).createProduct(any(CreateProductRequest.class));
     verify(salesProductService, times(3)).createEntry(any());
 
-    // 6 scenario lots + 1 waste-grade negative-test lot; all released from QC via the service.
+    // Six piece-backed lots are released through an explicit immutable QC decision. The raw-cotton
+    // scalar lot has no physical units and remains pending.
     ArgumentCaptor<CreateBatchRequest> batchCaptor =
         ArgumentCaptor.forClass(CreateBatchRequest.class);
     verify(batchService, times(7)).create(batchCaptor.capture());
-    verify(batchService, times(7)).releaseFromQc(any(UUID.class));
+    verify(batchService, times(6)).releaseFromQc(any(UUID.class));
     // Regression guard: production_execution_batch.chk_batch_unit admits canonical batch units;
     // demo lots currently remain weight-based, while FABRIC purchase lots may use M.
     assertThat(batchCaptor.getAllValues())
@@ -190,12 +191,12 @@ class SalesQuoteDemoSeederTest {
         .extracting(CreateBatchRequest::getColorId)
         .isNull();
 
-    // 16 + 24 + 3 rolls, 48 yarn cartons, 2 waste rolls — each graded through the service.
-    verify(stockUnitService, times(93))
+    // 16 + 24 + 3 + 18 rolls, 48 yarn cartons, 2 waste rolls — all born pending, then graded.
+    verify(stockUnitService, times(111))
         .create(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             any());
-    verify(stockUnitService, times(93)).changeGrade(any(), any(), any(), any());
+    verify(stockUnitService, times(111)).changeGrade(any(), any(), any(), any());
 
     // Emma's open quote + the demo user's draft quote.
     ArgumentCaptor<QuoteCreateRequest> quoteCaptor =

@@ -12,8 +12,8 @@ import lombok.Getter;
  * Published when a fiber test result receives an approval decision (APPROVED, REJECTED,
  * CONDITIONAL_ACCEPT).
  *
- * <p>Listeners (e.g. BatchStatusUpdateListener) use this to transition the associated batch from
- * PENDING_QC to AVAILABLE (on APPROVED/CONDITIONAL_ACCEPT) or QC_REJECTED (on REJECTED).
+ * <p>The QC decision listener records APPROVED/REJECTED as immutable quality decisions.
+ * CONDITIONAL_ACCEPT remains pending and requests a separate concession review.
  */
 @Getter
 public class FiberTestResultApprovedEvent extends DomainEvent {

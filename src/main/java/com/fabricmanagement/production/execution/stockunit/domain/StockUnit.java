@@ -170,6 +170,11 @@ public class StockUnit extends BaseEntity {
   @Column(name = "quality_grade_id")
   private UUID qualityGradeId;
 
+  /** Quality acceptance axis; independent from operational status and commercial grade. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "quality_disposition", nullable = false, length = 30)
+  private QualityDisposition qualityDisposition;
+
   /** Previous grade ID — populated on grade change for audit trail. */
   @Column(name = "previous_grade_id")
   private UUID previousGradeId;
@@ -240,7 +245,8 @@ public class StockUnit extends BaseEntity {
    * @param locationId initial warehouse location
    * @param sourceType origin type
    * @param sourceId origin record ID
-   * @return new StockUnit in AVAILABLE status
+   * @param initialQualityDisposition trusted server-owned quality disposition at birth
+   * @return new StockUnit in operational AVAILABLE status with the supplied quality disposition
    */
   public static StockUnit create(
       UUID tenantId,
@@ -254,7 +260,8 @@ public class StockUnit extends BaseEntity {
       String unit,
       UUID locationId,
       StockUnitSourceType sourceType,
-      UUID sourceId) {
+      UUID sourceId,
+      QualityDisposition initialQualityDisposition) {
 
     if (productType == null) {
       throw new StockUnitDomainException("productType must not be null");
@@ -271,6 +278,9 @@ public class StockUnit extends BaseEntity {
     if (!packageType.isCompatibleWith(productType)) {
       throw new InvalidPackageTypeException(packageType, productType);
     }
+    if (initialQualityDisposition == null) {
+      throw new StockUnitDomainException("initialQualityDisposition must not be null");
+    }
 
     StockUnit stockUnit =
         StockUnit.builder()
@@ -285,6 +295,7 @@ public class StockUnit extends BaseEntity {
             .unit(unit)
             .locationId(locationId)
             .qualityGradeId(null)
+            .qualityDisposition(initialQualityDisposition)
             .previousGradeId(null)
             .previousLocationId(null)
             .status(StockUnitStatus.AVAILABLE)

@@ -24,6 +24,7 @@ import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryServ
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +52,7 @@ class BatchServiceTest {
   @Mock private ColorQueryService colorQueryService;
   @Mock private ApplicationEventPublisher applicationEventPublisher;
   @Spy private BatchPrimaryMeasureService primaryMeasureService = new BatchPrimaryMeasureService();
+  @Mock private QualityDecisionService qualityDecisionService;
 
   @InjectMocks private BatchService batchService;
 
@@ -67,14 +69,20 @@ class BatchServiceTest {
   @Test
   void releaseFromQc_transitionsPendingQcBatchToAvailable() {
     Batch batch = pendingQcBatch();
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              batch.applyQualityProjection(BatchStatus.AVAILABLE);
+              return null;
+            })
+        .when(qualityDecisionService)
+        .releaseFromQc(BATCH_ID);
     when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
-    when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
 
     BatchDto result = batchService.releaseFromQc(BATCH_ID);
 
     assertThat(batch.getStatus()).isEqualTo(BatchStatus.AVAILABLE);
     assertThat(result.getStatus()).isEqualTo(BatchStatus.AVAILABLE);
-    verify(batchRepository).save(batch);
+    verify(qualityDecisionService).releaseFromQc(BATCH_ID);
   }
 
   @Test
@@ -84,7 +92,7 @@ class BatchServiceTest {
     assertThatThrownBy(() -> batchService.releaseFromQc(BATCH_ID))
         .isInstanceOf(NotFoundException.class)
         .hasMessageContaining(BATCH_ID.toString());
-    verify(batchRepository, never()).save(any());
+    verify(qualityDecisionService).releaseFromQc(BATCH_ID);
   }
 
   @Test

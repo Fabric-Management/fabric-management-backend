@@ -179,7 +179,7 @@ public class SalesQuoteDemoSeeder {
       // detail lives on the rolls (StockUnit.lengthUnit = "M"), which is also what the lot picker
       // surfaces for piece-backed length lots.
       BatchDto lot24011 =
-          saleableBatch(
+          pendingBatch(
               gabardine,
               "LOT-24011",
               "2000",
@@ -187,9 +187,10 @@ public class SalesQuoteDemoSeeder {
               navy.getId(),
               "Main Navy dye lot, spring run");
       addRolls(lot24011.getId(), "24011", 16, "125", "36.800", fabricGrades.first().getId());
+      releasePieceBackedBatch(lot24011.getId());
 
       BatchDto lot24012 =
-          saleableBatch(
+          pendingBatch(
               gabardine,
               "LOT-24012",
               "3000",
@@ -197,9 +198,10 @@ public class SalesQuoteDemoSeeder {
               navy.getId(),
               "Second Navy dye lot — shade may vary");
       addRolls(lot24012.getId(), "24012", 24, "125", "36.800", fabricGrades.first().getId());
+      releasePieceBackedBatch(lot24012.getId());
 
       BatchDto lot23087 =
-          saleableBatch(
+          pendingBatch(
               gabardine,
               "LOT-23087",
               "290",
@@ -209,18 +211,21 @@ public class SalesQuoteDemoSeeder {
       addRoll(lot23087.getId(), "23087", 1, "100", "29.500", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 2, "95", "28.000", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 3, "95", "28.000", fabricGrades.first().getId());
+      releasePieceBackedBatch(lot23087.getId());
 
       BatchDto lot24020 =
-          saleableBatch(
+          pendingBatch(
               gabardine,
               "LOT-24020",
               "450",
               BATCH_UNIT_METRES,
               ecru.getId(),
-              "Second Quality Ecru — bulk, no pieces");
+              "Second Quality Ecru — piece-backed demo lot");
+      addRolls(lot24020.getId(), "24020", 18, "25", "25.000", fabricGrades.second().getId());
+      releasePieceBackedBatch(lot24020.getId());
 
       BatchDto lot24031 =
-          saleableBatch(
+          pendingBatch(
               combedYarn,
               "LOT-24031",
               "1200",
@@ -228,13 +233,14 @@ public class SalesQuoteDemoSeeder {
               pfd.getId(),
               "Combed yarn, prepared for dyeing");
       addCartons(lot24031.getId(), "24031", 48, "25.000", yarnGrades.first().getId());
+      releasePieceBackedBatch(lot24031.getId());
 
       // Raw cotton skips the colour axis entirely — fibre cascade has no Colour step.
-      saleableBatch(rawCotton, "LOT-24040", "5000", "KG", null, "Raw cotton, bulk store");
+      pendingBatch(rawCotton, "LOT-24040", "5000", "KG", null, "Raw cotton, bulk store");
 
       // Waste-grade stock exists but must stay invisible to the picker (negative test).
       BatchDto lot23050 =
-          saleableBatch(
+          pendingBatch(
               gabardine,
               "LOT-23050",
               "120",
@@ -243,6 +249,7 @@ public class SalesQuoteDemoSeeder {
               "Waste grade — not saleable");
       addRoll(lot23050.getId(), "23050", 1, "60", "17.700", fabricGrades.waste().getId());
       addRoll(lot23050.getId(), "23050", 2, "60", "17.700", fabricGrades.waste().getId());
+      releasePieceBackedBatch(lot23050.getId());
 
       // ── Actors ──
       TradingPartnerDto albion = createAlbionCustomer(tenantId);
@@ -391,7 +398,7 @@ public class SalesQuoteDemoSeeder {
 
   // ── Lot helpers ─────────────────────────────────────────────────────────────
 
-  private BatchDto saleableBatch(
+  private BatchDto pendingBatch(
       ProductDto product,
       String batchCode,
       String quantity,
@@ -410,9 +417,12 @@ public class SalesQuoteDemoSeeder {
                 .sourceType(BatchSourceType.INITIAL_STOCK)
                 .remarks(remarks)
                 .build());
-    // New batches start in PENDING_QC; the picker only lists AVAILABLE/RESERVED lots.
-    batchService.releaseFromQc(batch.getId());
     return batch;
+  }
+
+  private void releasePieceBackedBatch(UUID batchId) {
+    // Demo stock follows the same immutable QC release path as operational stock.
+    batchService.releaseFromQc(batchId);
   }
 
   private void addRolls(

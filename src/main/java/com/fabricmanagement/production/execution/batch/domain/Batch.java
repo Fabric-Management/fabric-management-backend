@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -248,6 +249,39 @@ public class Batch extends BaseEntity {
     }
     if (!this.status.canTransitionTo(target)) {
       throw new InvalidStatusTransitionException("Batch", this.status.name(), target.name());
+    }
+    this.status = target;
+    onUpdate();
+  }
+
+  /**
+   * Applies the temporary QC compatibility projection derived from StockUnit dispositions.
+   *
+   * <p>This is deliberately separate from the business transition state machine. It may only run
+   * while the batch has no operational commitment and can never revive a terminal batch.
+   */
+  public void applyQualityProjection(BatchStatus target) {
+    if (!Set.of(
+            BatchStatus.AVAILABLE,
+            BatchStatus.PENDING_QC,
+            BatchStatus.QUARANTINE,
+            BatchStatus.QC_REJECTED)
+        .contains(target)) {
+      throw new BatchDomainException("Invalid quality projection target: " + target);
+    }
+    if (Set.of(
+            BatchStatus.RESERVED,
+            BatchStatus.IN_PROGRESS,
+            BatchStatus.ON_HOLD,
+            BatchStatus.DEPLETED,
+            BatchStatus.RETURNED,
+            BatchStatus.DESTROYED)
+        .contains(status)) {
+      throw new BatchDomainException("Quality projection cannot overwrite batch status " + status);
+    }
+    if (reservedQuantity.compareTo(BigDecimal.ZERO) > 0
+        || consumedQuantity.compareTo(BigDecimal.ZERO) > 0) {
+      throw new BatchDomainException("Quality projection cannot overwrite committed batch state");
     }
     this.status = target;
     onUpdate();

@@ -10,6 +10,7 @@ import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
@@ -18,7 +19,14 @@ import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.production.masterdata.qualitygrade.infra.repository.QualityGradeRepository;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionCommand;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
+import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
+import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionUnitRepository;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +45,9 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
   @Autowired private StockUnitRepository stockUnitRepository;
   @Autowired private QualityGradeRepository qualityGradeRepository;
   @Autowired private TenantRepository tenantRepository;
+  @Autowired private QualityDecisionService qualityDecisionService;
+  @Autowired private QualityDecisionUnitRepository decisionUnitRepository;
+  @Autowired private EntityManager entityManager;
 
   private UUID tenantId;
 
@@ -109,6 +120,60 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
         .isEmpty();
   }
 
+  @Test
+  void pendingReceiptStockBecomesVisibleOnlyAfterImmutableFullLotRelease() {
+    Product product = product(ProductType.FABRIC, "M", tenantId);
+    Batch pending = batch(product, "LOT-RECEIPT-QC", BatchStatus.PENDING_QC, tenantId);
+    UUID actorId = UUID.randomUUID();
+    StockUnit received =
+        StockUnit.create(
+            tenantId,
+            pending.getId(),
+            ProductType.FABRIC,
+            "GR-ROLL-" + UUID.randomUUID().toString().substring(0, 8),
+            null,
+            PackageType.ROLL,
+            new BigDecimal("10"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.GOODS_RECEIPT,
+            UUID.randomUUID(),
+            QualityDisposition.PENDING_INSPECTION);
+    received.recordLength(new BigDecimal("100"), "M");
+    stockUnitRepository.saveAndFlush(received);
+
+    assertThat(service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20)))
+        .isEmpty();
+
+    var decision =
+        qualityDecisionService.recordDecision(
+            TrustedDecisionContext.manual(actorId),
+            new QualityDecisionCommand(
+                pending.getId(),
+                QualityDecisionScope.FULL_LOT,
+                QualityDecisionOutcome.RELEASED,
+                null,
+                "Goods receipt inspection passed",
+                java.util.Set.of(),
+                null));
+    entityManager.flush();
+    entityManager.clear();
+
+    StockUnit released = stockUnitRepository.findById(received.getId()).orElseThrow();
+    Batch projected = batchRepository.findById(pending.getId()).orElseThrow();
+    assertThat(released.getQualityDisposition()).isEqualTo(QualityDisposition.RELEASED);
+    assertThat(projected.getStatus()).isEqualTo(BatchStatus.AVAILABLE);
+    assertThat(decision.getActorId()).isEqualTo(actorId);
+    assertThat(decisionUnitRepository.countByTenantIdAndDecisionId(tenantId, decision.getId()))
+        .isEqualTo(1);
+
+    var visible =
+        service.lots(null, null, product.getId(), null, null, null, PageRequest.of(0, 20));
+    assertThat(visible).hasSize(1);
+    assertThat(visible.getContent().getFirst().lotNo()).isEqualTo("LOT-RECEIPT-QC");
+  }
+
   private Product product(ProductType type, String unit, UUID ownerTenantId) {
     Product product = Product.create(type, unit);
     product.setTenantId(ownerTenantId);
@@ -171,7 +236,8 @@ class StockAvailabilityQueryIT extends AbstractIntegrationTest {
             "KG",
             null,
             StockUnitSourceType.PRODUCTION,
-            UUID.randomUUID());
+            UUID.randomUUID(),
+            QualityDisposition.RELEASED);
     piece.recordLength(new BigDecimal(metres), "M");
     return piece;
   }

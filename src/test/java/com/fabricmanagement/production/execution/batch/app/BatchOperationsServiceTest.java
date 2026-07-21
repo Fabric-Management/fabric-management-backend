@@ -14,6 +14,7 @@ import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
+import com.fabricmanagement.production.execution.batch.dto.OverrideStatusRequest;
 import com.fabricmanagement.production.execution.batch.dto.PartialAcceptanceSplitRequest;
 import com.fabricmanagement.production.execution.batch.dto.SplitBatchRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchOverrideLogRepository;
@@ -21,6 +22,7 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchRep
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,7 @@ class BatchOperationsServiceTest {
   @Mock private StockUnitRepository stockUnitRepository;
   @Mock private WarehouseLocationPort warehouseLocationPort;
   @Mock private ApplicationEventPublisher applicationEventPublisher;
+  @Mock private QualityDecisionService qualityDecisionService;
 
   private BatchOperationsService service;
 
@@ -64,7 +67,8 @@ class BatchOperationsServiceTest {
             batchLineageService,
             stockUnitRepository,
             warehouseLocationPort,
-            applicationEventPublisher);
+            applicationEventPublisher,
+            qualityDecisionService);
   }
 
   @AfterEach
@@ -110,6 +114,34 @@ class BatchOperationsServiceTest {
             .build());
 
     assertThat(savedChild().getColorId()).isEqualTo(COLOR_ID);
+  }
+
+  @Test
+  void overrideStatusDelegatesReleaseToImmutableQualityDecisionPath() {
+    Batch source = sourceBatch();
+    source.setStatus(BatchStatus.QC_REJECTED);
+    when(batchRepository.findByIdAndTenantId(SOURCE_ID, TENANT_ID)).thenReturn(Optional.of(source));
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              source.applyQualityProjection(BatchStatus.AVAILABLE);
+              return null;
+            })
+        .when(qualityDecisionService)
+        .overrideToReleased(SOURCE_ID, "Quality manager accepted after review");
+    when(batchService.toBatchDto(source))
+        .thenReturn(BatchDto.builder().status(BatchStatus.AVAILABLE).build());
+
+    BatchDto result =
+        service.overrideStatus(
+            SOURCE_ID,
+            OverrideStatusRequest.builder()
+                .reason("Quality manager accepted after review")
+                .build());
+
+    verify(qualityDecisionService)
+        .overrideToReleased(SOURCE_ID, "Quality manager accepted after review");
+    verify(overrideLogRepository).save(any());
+    assertThat(result.getStatus()).isEqualTo(BatchStatus.AVAILABLE);
   }
 
   @Test

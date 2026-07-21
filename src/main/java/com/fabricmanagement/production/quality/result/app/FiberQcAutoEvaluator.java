@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>If standard exists: compares all values to min/target/max:
  *       <ul>
  *         <li>All within min-max, all at target → APPROVED → AVAILABLE
- *         <li>All within min-max, one+ outside target → CONDITIONAL_ACCEPT → QUARANTINE
+ *         <li>All within min-max, one+ outside target → CONDITIONAL_ACCEPT → concession review
  *         <li>One+ outside min or max → REJECTED → QC_REJECTED
  *       </ul>
  * </ul>

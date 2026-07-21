@@ -1,47 +1,34 @@
 package com.fabricmanagement.production.execution.batch.app;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
-import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionCommand;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
+import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
+import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Listens to {@link FiberTestResultApprovedEvent} and updates the associated batch status.
- *
- * <p>Mapping:
- *
- * <ul>
- *   <li>APPROVED → AVAILABLE (automatic release)
- *   <li>CONDITIONAL_ACCEPT → QUARANTINE (user decides next step)
- *   <li>REJECTED → QC_REJECTED (automatic block)
- *   <li>PENDING → no change
- * </ul>
- */
+/** Converts fiber-test approvals into immutable quality decisions. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class BatchQcEventListener {
 
-  private static final Set<BatchStatus> QC_AWAITING_STATUSES =
-      Set.of(BatchStatus.PENDING_QC, BatchStatus.QUARANTINE);
-
-  private final BatchRepository batchRepository;
-  private final StockUnitRepository stockUnitRepository;
+  private final QualityDecisionService qualityDecisionService;
   private final InAppNotificationService notificationService;
-  private final com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
-      idempotentHandler;
+  private final IdempotentEventHandler idempotentHandler;
 
   @ApplicationModuleListener
   public void onFiberTestResultApproved(FiberTestResultApprovedEvent event) {
@@ -49,118 +36,53 @@ public class BatchQcEventListener {
         event.getEventId(),
         this.getClass(),
         "onFiberTestResultApproved",
-        () -> {
-          if (event.getApprovalStatus() == TestApprovalStatus.PENDING) {
-            return;
-          }
-
-          if (event.getStockUnitId() != null) {
-            handleStockUnitQcResult(event);
-          } else {
-            handleBatchQcResult(event);
-          }
-        });
+        () ->
+            TenantContext.executeInTenantContext(
+                event.getTenantId(),
+                () -> {
+                  handleQcResult(event);
+                  return null;
+                }));
   }
 
-  private void handleStockUnitQcResult(FiberTestResultApprovedEvent event) {
-    StockUnit su =
-        stockUnitRepository
-            .findByIdAndTenantIdAndIsActiveTrue(event.getStockUnitId(), event.getTenantId())
-            .orElse(null);
-
-    if (su == null) {
-      log.warn(
-          "StockUnit not found for QC event: stockUnitId={}, tenantId={}",
-          event.getStockUnitId(),
-          event.getTenantId());
+  private void handleQcResult(FiberTestResultApprovedEvent event) {
+    if (event.getApprovalStatus() == TestApprovalStatus.PENDING) {
+      return;
+    }
+    if (event.getApprovalStatus() == TestApprovalStatus.CONDITIONAL_ACCEPT) {
+      notifyConcessionReview(event);
       return;
     }
 
-    switch (event.getApprovalStatus()) {
-      case APPROVED -> {
-        if (su.getStatus() == StockUnitStatus.QUARANTINE) {
-          su.releaseQuarantine();
-        } else if (su.getStatus() == StockUnitStatus.ON_HOLD) {
-          su.releaseHold();
-        }
-      }
-      case REJECTED -> {
-        if (su.getStatus().canTransitionTo(StockUnitStatus.QUARANTINE)) {
-          su.quarantine();
-        }
-      }
-      case CONDITIONAL_ACCEPT -> {
-        if (su.getStatus().canTransitionTo(StockUnitStatus.ON_HOLD)) {
-          su.hold();
-        }
-      }
-      case PENDING -> {}
-    }
+    boolean approved = event.getApprovalStatus() == TestApprovalStatus.APPROVED;
+    QualityDecisionScope scope =
+        event.getStockUnitId() == null
+            ? QualityDecisionScope.FULL_LOT
+            : QualityDecisionScope.SELECTED_UNITS;
+    Set<UUID> unitIds = event.getStockUnitId() == null ? Set.of() : Set.of(event.getStockUnitId());
 
-    stockUnitRepository.save(su);
-    log.info(
-        "StockUnit status updated by QC: stockUnitId={}, approval={}",
-        event.getStockUnitId(),
-        event.getApprovalStatus());
+    qualityDecisionService.recordDecision(
+        TrustedDecisionContext.qcEvent(event.getActorId(), event.getEventId()),
+        new QualityDecisionCommand(
+            event.getBatchId(),
+            scope,
+            approved ? QualityDecisionOutcome.RELEASED : QualityDecisionOutcome.NONCONFORMING,
+            approved ? QualityReasonCode.SYSTEM_QC_PASSED : QualityReasonCode.SYSTEM_QC_REJECTED,
+            null,
+            unitIds,
+            null));
   }
 
-  private void handleBatchQcResult(FiberTestResultApprovedEvent event) {
-    BatchStatus targetStatus = mapApprovalToBatchStatus(event.getApprovalStatus());
-    if (targetStatus == null) {
-      return;
-    }
-
-    Batch batch =
-        batchRepository.findByIdAndTenantId(event.getBatchId(), event.getTenantId()).orElse(null);
-
-    if (batch == null) {
-      log.warn(
-          "Batch not found for QC event: batchId={}, tenantId={}",
-          event.getBatchId(),
-          event.getTenantId());
-      return;
-    }
-
-    if (!QC_AWAITING_STATUSES.contains(batch.getStatus())) {
-      log.debug(
-          "Batch {} already in {} — skipping QC status update (approval={})",
-          batch.getBatchCode(),
-          batch.getStatus(),
-          event.getApprovalStatus());
-      return;
-    }
-
-    BatchStatus fromStatus = batch.getStatus();
-    batch.transitionStatus(targetStatus, event.getActorId());
-    batchRepository.save(batch);
-
-    log.info(
-        "Batch status updated by QC: batchId={}, {} → {} (approval={})",
+  private void notifyConcessionReview(FiberTestResultApprovedEvent event) {
+    notificationService.sendToTenantRoles(
+        event.getTenantId(),
+        InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
+        NotificationType.BATCH_QUARANTINE,
+        "Concession review required",
+        "Conditional QC acceptance requires a scoped concession review",
         event.getBatchId(),
-        fromStatus,
-        targetStatus,
-        event.getApprovalStatus());
-
-    if (targetStatus == BatchStatus.QUARANTINE) {
-      notificationService.sendToTenantRoles(
-          event.getTenantId(),
-          InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
-          NotificationType.BATCH_QUARANTINE,
-          "Batch Quarantined",
-          batch.getBatchCode() + " moved to quarantine — requires review",
-          event.getBatchId(),
-          "BATCH",
-          NotificationDeliveryChannel.IN_APP);
-      log.debug("BATCH_QUARANTINE notification sent: batchId={}", event.getBatchId());
-    }
-  }
-
-  private static BatchStatus mapApprovalToBatchStatus(TestApprovalStatus approval) {
-    return switch (approval) {
-      case APPROVED -> BatchStatus.AVAILABLE;
-      case CONDITIONAL_ACCEPT -> BatchStatus.QUARANTINE;
-      case REJECTED -> BatchStatus.QC_REJECTED;
-      case PENDING -> null;
-    };
+        "BATCH",
+        NotificationDeliveryChannel.IN_APP);
+    log.info("Conditional QC result left pending: batchId={}", event.getBatchId());
   }
 }

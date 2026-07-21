@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.stockunit.infra.repository;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
@@ -11,6 +12,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,6 +44,114 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
   boolean existsByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
 
   List<StockUnit> findByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
+
+  Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrue(
+      UUID tenantId, UUID batchId, Pageable pageable);
+
+  Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
+      UUID tenantId, UUID batchId, Collection<StockUnitStatus> statuses, Pageable pageable);
+
+  @Query(
+      value =
+          """
+          SELECT b.id AS batchId,
+                 b.batch_code AS batchCode,
+                 b.product_id AS productId,
+                 b.product_type AS productType,
+                 b.supplier_batch_code AS supplierBatchCode,
+                 COUNT(s.id) AS pendingUnitCount,
+                 b.created_at AS createdAt
+          FROM production.stock_unit s
+          JOIN production.production_execution_batch b
+            ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+          WHERE s.tenant_id = :tenantId
+            AND s.is_active = TRUE
+            AND b.is_active = TRUE
+            AND s.quality_disposition = 'PENDING_INSPECTION'
+          GROUP BY b.id, b.batch_code, b.product_id, b.product_type,
+                   b.supplier_batch_code, b.created_at
+          ORDER BY b.created_at ASC, b.id ASC
+          """,
+      countQuery =
+          """
+          SELECT COUNT(DISTINCT s.batch_id)
+          FROM production.stock_unit s
+          JOIN production.production_execution_batch b
+            ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+          WHERE s.tenant_id = :tenantId
+            AND s.is_active = TRUE
+            AND b.is_active = TRUE
+            AND s.quality_disposition = 'PENDING_INSPECTION'
+          """,
+      nativeQuery = true)
+  Page<QualityQueueRow> findQualityQueue(@Param("tenantId") UUID tenantId, Pageable pageable);
+
+  long countByTenantIdAndBatchIdAndIsActiveTrue(UUID tenantId, UUID batchId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      SELECT s FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId = :batchId
+        AND s.isActive = true
+        AND s.status IN :statuses
+      ORDER BY s.id
+      """)
+  List<StockUnit> lockDecisionPopulation(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchId") UUID batchId,
+      @Param("statuses") Collection<StockUnitStatus> statuses);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      SELECT s FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId = :batchId
+        AND s.id IN :ids
+        AND s.isActive = true
+        AND s.status IN :statuses
+      ORDER BY s.id
+      """)
+  List<StockUnit> lockSelectedDecisionPopulation(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchId") UUID batchId,
+      @Param("ids") Collection<UUID> ids,
+      @Param("statuses") Collection<StockUnitStatus> statuses);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      UPDATE StockUnit s
+      SET s.qualityDisposition = :disposition,
+          s.version = s.version + 1
+      WHERE s.tenantId = :tenantId
+        AND s.batchId = :batchId
+        AND s.id IN :ids
+        AND s.isActive = true
+        AND s.status IN :statuses
+      """)
+  int applyQualityDisposition(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchId") UUID batchId,
+      @Param("ids") Collection<UUID> ids,
+      @Param("statuses") Collection<StockUnitStatus> statuses,
+      @Param("disposition")
+          com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition
+              disposition);
+
+  @Query(
+      """
+      SELECT s.qualityDisposition AS disposition, COUNT(s.id) AS unitCount
+      FROM StockUnit s
+      WHERE s.tenantId = :tenantId
+        AND s.batchId = :batchId
+        AND s.isActive = true
+      GROUP BY s.qualityDisposition
+      """)
+  List<QualityDispositionCount> countQualityDispositions(
+      @Param("tenantId") UUID tenantId, @Param("batchId") UUID batchId);
 
   @Query(
       """
@@ -185,5 +296,27 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
     BigDecimal getLengthQuantity();
 
     long getPieceCount();
+  }
+
+  interface QualityDispositionCount {
+    com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition getDisposition();
+
+    long getUnitCount();
+  }
+
+  interface QualityQueueRow {
+    UUID getBatchId();
+
+    String getBatchCode();
+
+    UUID getProductId();
+
+    String getProductType();
+
+    String getSupplierBatchCode();
+
+    long getPendingUnitCount();
+
+    java.time.Instant getCreatedAt();
   }
 }

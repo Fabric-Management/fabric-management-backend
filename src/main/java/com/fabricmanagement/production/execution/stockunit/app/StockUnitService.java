@@ -10,6 +10,7 @@ import com.fabricmanagement.production.execution.batch.domain.event.BatchConsume
 import com.fabricmanagement.production.execution.batch.domain.event.BatchWasteRecordedEvent;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
+import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitAuditLog;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
@@ -105,26 +106,28 @@ public class StockUnitService {
 
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
-    if (batchId != null) {
-      validateBatchExists(batchId, tenantId);
-    }
+    Batch batch = batchId == null ? null : loadBatch(batchId, tenantId);
 
-    return internalCreate(
-        tenantId,
-        batchId,
-        productType,
-        barcode,
-        serialNumber,
-        packageType,
-        initialWeight,
-        grossWeight,
-        unit,
-        length,
-        lengthUnit,
-        locationId,
-        sourceType,
-        sourceId,
-        actorId);
+    StockUnit created =
+        internalCreate(
+            tenantId,
+            batchId,
+            productType,
+            barcode,
+            serialNumber,
+            packageType,
+            initialWeight,
+            grossWeight,
+            unit,
+            length,
+            lengthUnit,
+            locationId,
+            sourceType,
+            sourceId,
+            QualityDisposition.PENDING_INSPECTION,
+            actorId);
+    projectQualityAfterBirth(batch, tenantId);
+    return created;
   }
 
   private StockUnit internalCreate(
@@ -142,6 +145,7 @@ public class StockUnitService {
       UUID locationId,
       StockUnitSourceType sourceType,
       UUID sourceId,
+      QualityDisposition initialQualityDisposition,
       UUID actorId) {
 
     StockUnit stockUnit =
@@ -157,7 +161,8 @@ public class StockUnitService {
             unit,
             locationId,
             sourceType,
-            sourceId);
+            sourceId,
+            initialQualityDisposition);
     if (length != null || lengthUnit != null) {
       stockUnit.recordLength(length, lengthUnit);
     }
@@ -768,30 +773,34 @@ public class StockUnitService {
   public List<StockUnit> createBulk(
       UUID batchId, List<CreateStockUnitRequest> requests, UUID actorId) {
     UUID tenantId = TenantContext.requireTenantId();
-    if (batchId != null) {
-      validateBatchExists(batchId, tenantId);
-    }
+    Batch batch = batchId == null ? null : loadBatch(batchId, tenantId);
 
-    return requests.stream()
-        .map(
-            r ->
-                internalCreate(
-                    tenantId,
-                    batchId,
-                    r.productType(),
-                    r.barcode(),
-                    r.serialNumber(),
-                    r.packageType(),
-                    r.initialWeight(),
-                    r.grossWeight(),
-                    r.unit(),
-                    r.length(),
-                    r.lengthUnit(),
-                    r.locationId(),
-                    r.sourceType(),
-                    r.sourceId(),
-                    actorId))
-        .toList();
+    List<StockUnit> created =
+        requests.stream()
+            .map(
+                r ->
+                    internalCreate(
+                        tenantId,
+                        batchId,
+                        r.productType(),
+                        r.barcode(),
+                        r.serialNumber(),
+                        r.packageType(),
+                        r.initialWeight(),
+                        r.grossWeight(),
+                        r.unit(),
+                        r.length(),
+                        r.lengthUnit(),
+                        r.locationId(),
+                        r.sourceType(),
+                        r.sourceId(),
+                        QualityDisposition.PENDING_INSPECTION,
+                        actorId))
+            .toList();
+    if (!created.isEmpty()) {
+      projectQualityAfterBirth(batch, tenantId);
+    }
+    return created;
   }
 
   /** Immutable command record for bulk creation — avoids long parameter lists. */
@@ -824,10 +833,27 @@ public class StockUnitService {
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
   }
 
-  private void validateBatchExists(UUID batchId, UUID tenantId) {
-    batchRepository
+  private Batch loadBatch(UUID batchId, UUID tenantId) {
+    return batchRepository
         .findByIdAndTenantId(batchId, tenantId)
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
+  }
+
+  private void projectQualityAfterBirth(Batch batch, UUID tenantId) {
+    if (batch == null) {
+      return;
+    }
+    var counts = stockUnitRepository.countQualityDispositions(tenantId, batch.getId());
+    long total =
+        counts.stream().mapToLong(StockUnitRepository.QualityDispositionCount::getUnitCount).sum();
+    BatchStatus target = BatchStatus.QUARANTINE;
+    if (counts.size() == 1
+        && total > 0
+        && counts.getFirst().getDisposition() == QualityDisposition.PENDING_INSPECTION) {
+      target = BatchStatus.PENDING_QC;
+    }
+    batch.applyQualityProjection(target);
+    batchRepository.save(batch);
   }
 
   /**

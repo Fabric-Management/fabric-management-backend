@@ -82,7 +82,7 @@ public class FiberTestResultController {
   }
 
   @PatchMapping("/{id}/approval")
-  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'approve')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> updateApproval(
       @PathVariable UUID id, @Valid @RequestBody UpdateApprovalRequest request) {
     log.info("Updating test approval: id={}, status={}", id, request.getApprovalStatus());

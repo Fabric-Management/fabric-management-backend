@@ -43,6 +43,7 @@ class StockUnitTest {
         "KG",
         UUID.randomUUID(),
         StockUnitSourceType.PRODUCTION,
-        UUID.randomUUID());
+        UUID.randomUUID(),
+        QualityDisposition.PENDING_INSPECTION);
   }
 }

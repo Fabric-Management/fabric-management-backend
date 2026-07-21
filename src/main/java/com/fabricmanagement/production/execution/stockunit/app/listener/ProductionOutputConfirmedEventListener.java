@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.stockunit.app.listener;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.output.domain.event.ProductionOutputConfirmedEvent;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
@@ -24,8 +25,7 @@ public class ProductionOutputConfirmedEventListener {
 
   private final StockUnitService stockUnitService;
   private final StockUnitRepository stockUnitRepository;
-  private final com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
-      idempotentHandler;
+  private final IdempotentEventHandler idempotentHandler;
 
   @ApplicationModuleListener
   public void onProductionOutputConfirmed(ProductionOutputConfirmedEvent event) {
@@ -42,57 +42,49 @@ public class ProductionOutputConfirmedEventListener {
 
           UUID tenantId = event.getTenantId();
 
-          try {
-            TenantContext.executeInTenantContext(
-                tenantId,
-                () -> {
-                  ProductionOutputConfirmedEvent.OutputItemData firstItem = event.getItems().get(0);
-                  boolean alreadyProcessed =
-                      stockUnitRepository.existsByTenantIdAndSourceTypeAndSourceId(
-                          tenantId, StockUnitSourceType.PRODUCTION, firstItem.itemId());
+          TenantContext.executeInTenantContext(
+              tenantId,
+              () -> {
+                ProductionOutputConfirmedEvent.OutputItemData firstItem = event.getItems().get(0);
+                boolean alreadyProcessed =
+                    stockUnitRepository.existsByTenantIdAndSourceTypeAndSourceId(
+                        tenantId, StockUnitSourceType.PRODUCTION, firstItem.itemId());
 
-                  if (alreadyProcessed) {
-                    log.info(
-                        "ProductionOutputConfirmedEvent already processed. Skipping record: {}",
-                        event.getRecordId());
-                    return null;
-                  }
-
-                  List<StockUnitService.CreateStockUnitRequest> requests =
-                      event.getItems().stream()
-                          .map(
-                              item ->
-                                  new StockUnitService.CreateStockUnitRequest(
-                                      event.getOutputProductType(),
-                                      item.barcode(),
-                                      null, // serial number
-                                      item.packageType(),
-                                      item.netWeight(),
-                                      item.grossWeight(),
-                                      event.getUnit(),
-                                      null,
-                                      null,
-                                      item.locationId(),
-                                      StockUnitSourceType.PRODUCTION,
-                                      item.itemId()))
-                          .toList();
-
-                  stockUnitService.createBulk(
-                      event.getBatchId(), requests, TenantContext.SYSTEM_ACTOR_ID);
-
+                if (alreadyProcessed) {
                   log.info(
-                      "Auto-created {} StockUnits for Production Output {}",
-                      requests.size(),
+                      "ProductionOutputConfirmedEvent already processed. Skipping record: {}",
                       event.getRecordId());
                   return null;
-                });
-          } catch (Exception e) {
-            log.error(
-                "Failed to auto-create StockUnits for Production Output {}: {}",
-                event.getRecordId(),
-                e.getMessage(),
-                e);
-          }
+                }
+
+                List<StockUnitService.CreateStockUnitRequest> requests =
+                    event.getItems().stream()
+                        .map(
+                            item ->
+                                new StockUnitService.CreateStockUnitRequest(
+                                    event.getOutputProductType(),
+                                    item.barcode(),
+                                    null, // serial number
+                                    item.packageType(),
+                                    item.netWeight(),
+                                    item.grossWeight(),
+                                    event.getUnit(),
+                                    null,
+                                    null,
+                                    item.locationId(),
+                                    StockUnitSourceType.PRODUCTION,
+                                    item.itemId()))
+                        .toList();
+
+                stockUnitService.createBulk(
+                    event.getBatchId(), requests, TenantContext.SYSTEM_ACTOR_ID);
+
+                log.info(
+                    "Auto-created {} StockUnits for Production Output {}",
+                    requests.size(),
+                    event.getRecordId());
+                return null;
+              });
         });
   }
 }
