@@ -60,7 +60,7 @@
         <!-- Observability -->
 
         <!-- Hibernate Types for JSONB -->
-        <hibernate-types.version>3.7.2</hibernate-types.version>
+        <hibernate-types.version>3.14.1</hibernate-types.version>
 
         <!-- Plugin Versions -->
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
