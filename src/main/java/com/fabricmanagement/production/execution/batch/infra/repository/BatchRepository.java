@@ -45,6 +45,33 @@ public interface BatchRepository
 
   Optional<Batch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 
+  @Query(
+      value =
+          """
+          SELECT b.id AS batchId,
+                 b.batch_code AS batchCode,
+                 b.product_id AS productId,
+                 p.uid AS productUid,
+                 COALESCE(f.fiber_name, p.uid) AS productDisplayName,
+                 b.product_type AS productType,
+                 c.id AS colorId,
+                 c.name AS colorName,
+                 b.created_at AS batchCreatedAt
+          FROM production.production_execution_batch b
+          JOIN production.prod_product p
+            ON p.id = b.product_id
+          LEFT JOIN production.prod_fiber f
+            ON f.product_id = p.id
+          LEFT JOIN production.color c
+            ON c.id = b.color_id AND c.tenant_id = b.tenant_id
+          WHERE b.id = :batchId
+            AND b.tenant_id = :tenantId
+            AND b.is_active = TRUE
+          """,
+      nativeQuery = true)
+  Optional<QualityBatchSummaryRow> findQualityBatchSummary(
+      @Param("tenantId") UUID tenantId, @Param("batchId") UUID batchId);
+
   boolean existsByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 
   /**
@@ -135,5 +162,25 @@ public interface BatchRepository
     String getColorName();
 
     String getColorHex();
+  }
+
+  interface QualityBatchSummaryRow {
+    UUID getBatchId();
+
+    String getBatchCode();
+
+    UUID getProductId();
+
+    String getProductUid();
+
+    String getProductDisplayName();
+
+    String getProductType();
+
+    UUID getColorId();
+
+    String getColorName();
+
+    java.time.Instant getBatchCreatedAt();
   }
 }
