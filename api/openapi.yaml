@@ -34540,9 +34540,80 @@ paths:
       summary: Record a quality decision
       tags:
       - Quality Decisions
+  /api/v1/production/quality/batches/{batchId}/summary:
+    get:
+      operationId: getQualityBatchSummary
+      parameters:
+      - in: path
+        name: batchId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQualityBatchSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a QC batch summary
+      tags:
+      - Quality Decisions
   /api/v1/production/quality/batches/{batchId}/units:
     get:
-      operationId: listQualityDecisionUnits
+      operationId: listActiveQualityBatchUnits
       parameters:
       - in: path
         name: batchId
@@ -34635,7 +34706,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: List batch units for QC
+      summary: List all active batch units for QC
       tags:
       - Quality Decisions
   /api/v1/production/quality/fiber-tests:
@@ -48715,6 +48786,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseQualityBatchSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QualityBatchSummaryDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseQualityDecisionDto:
       type: object
       properties:
@@ -58483,6 +58572,83 @@ components:
           type: string
       required:
       - specType
+    QualityBatchSummaryDto:
+      type: object
+      properties:
+        batchCode:
+          type: string
+          description: Internal batch or lot code
+        batchCreatedAt:
+          type: string
+          format: date-time
+          description: Batch creation timestamp
+        batchId:
+          type: string
+          format: uuid
+          description: Batch identifier
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Assigned tenant color-card identifier
+        colorName:
+          type:
+          - string
+          - "null"
+          description: Assigned tenant color-card name
+        nonconformingCount:
+          type: integer
+          format: int64
+          description: Active nonconforming units
+        pendingInspectionCount:
+          type: integer
+          format: int64
+          description: Active units awaiting inspection
+        productDisplayName:
+          type: string
+          description: Human-readable product name with the canonical UID as fallback
+        productId:
+          type: string
+          format: uuid
+          description: Product identifier
+        productType:
+          type: string
+          description: Product type
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
+        productUid:
+          type: string
+          description: Canonical product UID
+        quarantinedCount:
+          type: integer
+          format: int64
+          description: Active quarantined units
+        releasedCount:
+          type: integer
+          format: int64
+          description: Active released units
+        totalCount:
+          type: integer
+          format: int64
+          description: Total active units
+      required:
+      - batchCode
+      - batchCreatedAt
+      - batchId
+      - nonconformingCount
+      - pendingInspectionCount
+      - productDisplayName
+      - productId
+      - productType
+      - productUid
+      - quarantinedCount
+      - releasedCount
+      - totalCount
     QualityDecisionDto:
       type: object
       properties:
@@ -58590,6 +58756,11 @@ components:
           - DISPOSED
         unit:
           type: string
+        unitStatusEligible:
+          type: boolean
+          description: Whether the unit status is eligible for a quality decision
+      required:
+      - unitStatusEligible
     QualityGradeDto:
       type: object
       properties:
@@ -58628,28 +58799,63 @@ components:
       properties:
         batchCode:
           type: string
+          description: Internal batch or lot code
+        batchCreatedAt:
+          type: string
+          format: date-time
+          description: Batch creation timestamp
         batchId:
           type: string
           format: uuid
+          description: Batch identifier
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Assigned tenant color-card identifier
+        colorName:
+          type:
+          - string
+          - "null"
+          description: Assigned tenant color-card name
         pendingUnitCount:
           type: integer
           format: int64
+          description: Number of active stock units awaiting inspection
+        productDisplayName:
+          type: string
+          description: Human-readable product name with the canonical UID as fallback
         productId:
           type: string
           format: uuid
+          description: Product identifier
         productType:
           type: string
+          description: Product type
           enum:
           - FIBER
           - YARN
           - FABRIC
           - CHEMICAL
           - CONSUMABLE
-        receivedAt:
+        productUid:
           type: string
-          format: date-time
+          description: Canonical product UID
         supplierBatchCode:
-          type: string
+          type:
+          - string
+          - "null"
+          description: Supplier batch or lot code
+      required:
+      - batchCode
+      - batchCreatedAt
+      - batchId
+      - pendingUnitCount
+      - productDisplayName
+      - productId
+      - productType
+      - productUid
     QuickCreateCustomerContactRequest:
       type: object
       properties:

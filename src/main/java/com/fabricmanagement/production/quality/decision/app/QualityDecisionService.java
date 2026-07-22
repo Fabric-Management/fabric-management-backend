@@ -10,6 +10,7 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEligibility;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
@@ -35,11 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class QualityDecisionService {
 
   private static final Set<StockUnitStatus> DECISION_ELIGIBLE_STATUSES =
-      EnumSet.of(
-          StockUnitStatus.AVAILABLE,
-          StockUnitStatus.PARTIAL,
-          StockUnitStatus.QUARANTINE,
-          StockUnitStatus.ON_HOLD);
+      QualityDecisionEligibility.unitStatusEligibleStatuses();
 
   private static final Set<BatchStatus> FULL_LOT_BLOCKED_BATCH_STATUSES =
       EnumSet.of(

@@ -11,12 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionQueryService;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
+import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
 import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMapper;
 import java.time.Instant;
@@ -149,5 +151,34 @@ class QualityDecisionControllerSecurityTest {
         .perform(get("/api/v1/production/quality/queue"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content").isArray());
+  }
+
+  @Test
+  @WithMockUser
+  void qualityReadAllowsBatchSummary() throws Exception {
+    when(authEvaluator.can(any(Authentication.class), eq("quality"), eq("read"))).thenReturn(true);
+    when(queryService.getSummary(BATCH_ID))
+        .thenReturn(
+            new QualityBatchSummaryDto(
+                BATCH_ID,
+                "LOT-QC-001",
+                UUID.randomUUID(),
+                "SYS-MAT-000001",
+                "Cotton (100%)",
+                ProductType.FIBER,
+                null,
+                null,
+                Instant.parse("2026-07-21T08:00:00Z"),
+                2,
+                1,
+                0,
+                0,
+                3));
+
+    mockMvc
+        .perform(get("/api/v1/production/quality/batches/{batchId}/summary", BATCH_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.batchCode").value("LOT-QC-001"))
+        .andExpect(jsonPath("$.data.totalCount").value(3));
   }
 }

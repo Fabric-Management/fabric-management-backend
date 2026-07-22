@@ -6,6 +6,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionQueryService;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
+import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityQueueItemDto;
@@ -71,14 +72,23 @@ public class QualityDecisionController {
             PagedResponse.from(queryService.getHistory(batchId, pageable), mapper::toDto)));
   }
 
+  @GetMapping("/batches/{batchId}/summary")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
+  @Operation(operationId = "getQualityBatchSummary", summary = "Get a QC batch summary")
+  public ResponseEntity<ApiResponse<QualityBatchSummaryDto>> summary(@PathVariable UUID batchId) {
+    return ResponseEntity.ok(ApiResponse.success(queryService.getSummary(batchId)));
+  }
+
   @GetMapping("/batches/{batchId}/units")
   @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
-  @Operation(operationId = "listQualityDecisionUnits", summary = "List batch units for QC")
+  @Operation(
+      operationId = "listActiveQualityBatchUnits",
+      summary = "List all active batch units for QC")
   public ResponseEntity<ApiResponse<PagedResponse<QualityDecisionUnitDto>>> units(
       @PathVariable UUID batchId,
       @ParameterObject @PageableDefault(size = 20, sort = "barcode") Pageable pageable) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            PagedResponse.from(queryService.getUnits(batchId, pageable), mapper::toUnitDto)));
+            PagedResponse.from(queryService.getActiveUnits(batchId, pageable), mapper::toUnitDto)));
   }
 }
