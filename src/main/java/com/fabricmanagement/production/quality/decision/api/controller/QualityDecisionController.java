@@ -8,6 +8,7 @@ import com.fabricmanagement.production.quality.decision.app.QualityDecisionServi
 import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
 import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityQueueItemDto;
 import com.fabricmanagement.production.quality.decision.dto.RecordQualityDecisionRequest;
@@ -60,6 +61,15 @@ public class QualityDecisionController {
       @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
         ApiResponse.success(PagedResponse.from(queryService.getQueue(pageable))));
+  }
+
+  @GetMapping("/decision-options")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
+  @Operation(
+      operationId = "getQualityDecisionOptions",
+      summary = "Get manual quality decision options")
+  public ResponseEntity<ApiResponse<QualityDecisionOptionsDto>> decisionOptions() {
+    return ResponseEntity.ok(ApiResponse.success(queryService.getDecisionOptions()));
   }
 
   @GetMapping("/batches/{batchId}/decisions")

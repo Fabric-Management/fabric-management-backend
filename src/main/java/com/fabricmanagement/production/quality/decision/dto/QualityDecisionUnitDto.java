@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record QualityDecisionUnitDto(
-    UUID id,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
     String barcode,
     PackageType packageType,
     BigDecimal currentWeight,

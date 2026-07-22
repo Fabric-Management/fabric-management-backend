@@ -110,6 +110,9 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
   long countByTenantIdAndBatchIdAndIsActiveTrue(UUID tenantId, UUID batchId);
 
+  long countByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
+      UUID tenantId, UUID batchId, Collection<StockUnitStatus> statuses);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """

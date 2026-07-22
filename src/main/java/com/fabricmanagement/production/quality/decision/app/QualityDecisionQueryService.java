@@ -2,13 +2,21 @@ package com.fabricmanagement.production.quality.decision.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEligibility;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionReasonPolicy;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
 import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOutcomeOptionDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionReasonOptionDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityQueueItemDto;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
 import java.util.Map;
@@ -74,6 +82,29 @@ public class QualityDecisionQueryService {
                     StockUnitRepository.QualityDispositionCount::getDisposition,
                     StockUnitRepository.QualityDispositionCount::getUnitCount));
     long totalCount = counts.values().stream().mapToLong(Long::longValue).sum();
+    long activeUnitCount =
+        stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batchId);
+    long statusEligibleUnitCount =
+        stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
+            tenantId, batchId, QualityDecisionEligibility.unitStatusEligibleStatuses());
+    var fullLotCapability =
+        QualityDecisionEligibility.combine(
+            QualityDecisionEligibility.evaluateBatch(
+                QualityDecisionScope.FULL_LOT,
+                BatchStatus.valueOf(row.getStatus()),
+                row.getReservedQuantity(),
+                row.getConsumedQuantity()),
+            QualityDecisionEligibility.evaluatePopulation(
+                QualityDecisionScope.FULL_LOT, activeUnitCount, statusEligibleUnitCount));
+    var selectedUnitsCapability =
+        QualityDecisionEligibility.combine(
+            QualityDecisionEligibility.evaluateBatch(
+                QualityDecisionScope.SELECTED_UNITS,
+                BatchStatus.valueOf(row.getStatus()),
+                row.getReservedQuantity(),
+                row.getConsumedQuantity()),
+            QualityDecisionEligibility.evaluatePopulation(
+                QualityDecisionScope.SELECTED_UNITS, activeUnitCount, statusEligibleUnitCount));
 
     return new QualityBatchSummaryDto(
         row.getBatchId(),
@@ -89,7 +120,29 @@ public class QualityDecisionQueryService {
         counts.getOrDefault(QualityDisposition.RELEASED, 0L),
         counts.getOrDefault(QualityDisposition.QUARANTINED, 0L),
         counts.getOrDefault(QualityDisposition.NONCONFORMING, 0L),
-        totalCount);
+        totalCount,
+        fullLotCapability.allowed(),
+        fullLotCapability.blockedReason(),
+        selectedUnitsCapability.allowed(),
+        selectedUnitsCapability.blockedReason());
+  }
+
+  public QualityDecisionOptionsDto getDecisionOptions() {
+    return new QualityDecisionOptionsDto(
+        java.util.Arrays.stream(QualityDecisionOutcome.values())
+            .map(
+                outcome ->
+                    new QualityDecisionOutcomeOptionDto(
+                        outcome,
+                        QualityDecisionReasonPolicy.manualReasonRequired(outcome),
+                        QualityDecisionReasonPolicy.manualReasons(outcome).stream()
+                            .map(
+                                reason ->
+                                    new QualityDecisionReasonOptionDto(
+                                        reason,
+                                        QualityDecisionReasonPolicy.remarksRequired(reason)))
+                            .toList()))
+            .toList());
   }
 
   public Page<StockUnit> getActiveUnits(UUID batchId, Pageable pageable) {

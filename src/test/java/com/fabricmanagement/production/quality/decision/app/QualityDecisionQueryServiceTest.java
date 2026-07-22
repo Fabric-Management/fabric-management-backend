@@ -2,18 +2,26 @@ package com.fabricmanagement.production.quality.decision.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.quality.decision.domain.ManualQualityReasonCode;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
+import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -109,6 +117,9 @@ class QualityDecisionQueryServiceTest {
     when(row.getColorId()).thenReturn(colorId);
     when(row.getColorName()).thenReturn("Navy");
     when(row.getBatchCreatedAt()).thenReturn(createdAt);
+    when(row.getStatus()).thenReturn(BatchStatus.PENDING_QC.name());
+    when(row.getReservedQuantity()).thenReturn(BigDecimal.ZERO);
+    when(row.getConsumedQuantity()).thenReturn(BigDecimal.ZERO);
     when(batchRepository.findQualityBatchSummary(TENANT_ID, batchId)).thenReturn(Optional.of(row));
     var dispositionCounts =
         List.of(
@@ -118,6 +129,11 @@ class QualityDecisionQueryServiceTest {
             dispositionCount(QualityDisposition.NONCONFORMING, 4));
     when(stockUnitRepository.countQualityDispositions(TENANT_ID, batchId))
         .thenReturn(dispositionCounts);
+    when(stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrue(TENANT_ID, batchId))
+        .thenReturn(10L);
+    when(stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
+            eq(TENANT_ID), eq(batchId), anyCollection()))
+        .thenReturn(10L);
 
     var result = service.getSummary(batchId);
 
@@ -130,6 +146,65 @@ class QualityDecisionQueryServiceTest {
     assertThat(result.quarantinedCount()).isEqualTo(1);
     assertThat(result.nonconformingCount()).isEqualTo(4);
     assertThat(result.totalCount()).isEqualTo(10);
+    assertThat(result.fullLotDecisionAllowed()).isTrue();
+    assertThat(result.fullLotBlockedReason()).isNull();
+    assertThat(result.selectedUnitsDecisionAllowed()).isTrue();
+    assertThat(result.selectedUnitsBlockedReason()).isNull();
+  }
+
+  @Test
+  void summaryExposesTheBatchReasonBeforeThePopulationReason() {
+    var batchId = UUID.randomUUID();
+    var row = mock(BatchRepository.QualityBatchSummaryRow.class);
+    when(row.getProductType()).thenReturn(ProductType.FIBER.name());
+    when(row.getStatus()).thenReturn(BatchStatus.IN_PROGRESS.name());
+    when(row.getReservedQuantity()).thenReturn(BigDecimal.ZERO);
+    when(row.getConsumedQuantity()).thenReturn(BigDecimal.ONE);
+    when(batchRepository.findQualityBatchSummary(TENANT_ID, batchId)).thenReturn(Optional.of(row));
+    when(stockUnitRepository.countQualityDispositions(TENANT_ID, batchId)).thenReturn(List.of());
+    when(stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrue(TENANT_ID, batchId))
+        .thenReturn(0L);
+    when(stockUnitRepository.countByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
+            eq(TENANT_ID), eq(batchId), anyCollection()))
+        .thenReturn(0L);
+
+    var result = service.getSummary(batchId);
+
+    assertThat(result.fullLotDecisionAllowed()).isFalse();
+    assertThat(result.fullLotBlockedReason())
+        .isEqualTo(QualityDecisionBlockedReason.BATCH_CONSUMED);
+    assertThat(result.selectedUnitsDecisionAllowed()).isFalse();
+    assertThat(result.selectedUnitsBlockedReason())
+        .isEqualTo(QualityDecisionBlockedReason.NO_ELIGIBLE_UNITS);
+  }
+
+  @Test
+  void returnsDeterministicManualDecisionOptions() {
+    var options = service.getDecisionOptions().options();
+
+    assertThat(options)
+        .extracting(option -> option.outcome())
+        .containsExactly(
+            QualityDecisionOutcome.RELEASED,
+            QualityDecisionOutcome.QUARANTINED,
+            QualityDecisionOutcome.NONCONFORMING);
+    assertThat(options.getFirst().reasonRequired()).isFalse();
+    assertThat(options.getFirst().reasons()).isEmpty();
+    assertThat(options.get(1).reasons())
+        .extracting(reason -> reason.code())
+        .containsExactly(
+            ManualQualityReasonCode.SUSPECTED_DAMAGE,
+            ManualQualityReasonCode.AWAITING_LAB,
+            ManualQualityReasonCode.SUPPLIER_DISPUTE,
+            ManualQualityReasonCode.SHADE_CHECK,
+            ManualQualityReasonCode.OTHER);
+    assertThat(options.getLast().reasons().getLast().remarksRequired()).isTrue();
+    assertThat(options.stream().flatMap(option -> option.reasons().stream()))
+        .extracting(reason -> reason.code().name())
+        .doesNotContain(
+            QualityReasonCode.SYSTEM_QC_PASSED.name(),
+            QualityReasonCode.SYSTEM_QC_REJECTED.name(),
+            QualityReasonCode.MIGRATION_BASELINE.name());
   }
 
   @Test

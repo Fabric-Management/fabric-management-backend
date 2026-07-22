@@ -15,13 +15,17 @@ import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionQueryService;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
 import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOutcomeOptionDto;
 import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMapper;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -173,12 +177,34 @@ class QualityDecisionControllerSecurityTest {
                 1,
                 0,
                 0,
-                3));
+                3,
+                false,
+                QualityDecisionBlockedReason.INELIGIBLE_ACTIVE_UNITS,
+                true,
+                null));
 
     mockMvc
         .perform(get("/api/v1/production/quality/batches/{batchId}/summary", BATCH_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.batchCode").value("LOT-QC-001"))
         .andExpect(jsonPath("$.data.totalCount").value(3));
+  }
+
+  @Test
+  @WithMockUser
+  void qualityReadAllowsManualDecisionOptions() throws Exception {
+    when(authEvaluator.can(any(Authentication.class), eq("quality"), eq("read"))).thenReturn(true);
+    when(queryService.getDecisionOptions())
+        .thenReturn(
+            new QualityDecisionOptionsDto(
+                List.of(
+                    new QualityDecisionOutcomeOptionDto(
+                        QualityDecisionOutcome.RELEASED, false, List.of()))));
+
+    mockMvc
+        .perform(get("/api/v1/production/quality/decision-options"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.options[0].outcome").value("RELEASED"))
+        .andExpect(jsonPath("$.data.options[0].reasons").isArray());
   }
 }

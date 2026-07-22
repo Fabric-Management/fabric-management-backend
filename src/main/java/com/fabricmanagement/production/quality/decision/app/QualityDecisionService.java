@@ -10,9 +10,11 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEligibility;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionReasonPolicy;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionUnit;
 import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
@@ -37,19 +39,6 @@ public class QualityDecisionService {
 
   private static final Set<StockUnitStatus> DECISION_ELIGIBLE_STATUSES =
       QualityDecisionEligibility.unitStatusEligibleStatuses();
-
-  private static final Set<BatchStatus> FULL_LOT_BLOCKED_BATCH_STATUSES =
-      EnumSet.of(
-          BatchStatus.RESERVED,
-          BatchStatus.IN_PROGRESS,
-          BatchStatus.ON_HOLD,
-          BatchStatus.DEPLETED,
-          BatchStatus.RETURNED,
-          BatchStatus.DESTROYED);
-
-  private static final Set<BatchStatus> SELECTED_UNITS_BLOCKED_BATCH_STATUSES =
-      EnumSet.of(
-          BatchStatus.RESERVED, BatchStatus.DEPLETED, BatchStatus.RETURNED, BatchStatus.DESTROYED);
 
   private static final Set<BatchStatus> PROJECTION_BLOCKED_BATCH_STATUSES =
       EnumSet.of(
@@ -190,10 +179,14 @@ public class QualityDecisionService {
       List<StockUnit> population =
           stockUnitRepository.lockDecisionPopulation(
               tenantId, batch.getId(), DECISION_ELIGIBLE_STATUSES);
-      if (population.isEmpty()) {
-        throw QualityDecisionException.noUnits();
-      }
-      if (population.size() != activeCount) {
+      var populationCapability =
+          QualityDecisionEligibility.evaluatePopulation(
+              command.scope(), activeCount, population.size());
+      if (!populationCapability.allowed()) {
+        if (populationCapability.blockedReason()
+            == QualityDecisionBlockedReason.NO_ELIGIBLE_UNITS) {
+          throw QualityDecisionException.noUnits();
+        }
         throw QualityDecisionException.populationDrift();
       }
       return population;
@@ -203,7 +196,10 @@ public class QualityDecisionService {
     List<StockUnit> population =
         stockUnitRepository.lockSelectedDecisionPopulation(
             tenantId, batch.getId(), requestedIds, DECISION_ELIGIBLE_STATUSES);
-    if (population.size() != requestedIds.size()) {
+    var populationCapability =
+        QualityDecisionEligibility.evaluatePopulation(
+            command.scope(), requestedIds.size(), population.size());
+    if (!populationCapability.allowed() || population.size() != requestedIds.size()) {
       throw QualityDecisionException.unitMismatch();
     }
     return population;
@@ -234,14 +230,10 @@ public class QualityDecisionService {
   }
 
   private void assertBatchAllowsDecision(Batch batch, QualityDecisionScope scope) {
-    boolean blocked =
-        scope == QualityDecisionScope.FULL_LOT
-            ? FULL_LOT_BLOCKED_BATCH_STATUSES.contains(batch.getStatus())
-                || batch.getReservedQuantity().compareTo(BigDecimal.ZERO) > 0
-                || batch.getConsumedQuantity().compareTo(BigDecimal.ZERO) > 0
-            : SELECTED_UNITS_BLOCKED_BATCH_STATUSES.contains(batch.getStatus())
-                || batch.getReservedQuantity().compareTo(BigDecimal.ZERO) > 0;
-    if (blocked) {
+    var capability =
+        QualityDecisionEligibility.evaluateBatch(
+            scope, batch.getStatus(), batch.getReservedQuantity(), batch.getConsumedQuantity());
+    if (!capability.allowed()) {
       throw QualityDecisionException.batchActive(batch.getStatus().name());
     }
   }
@@ -305,48 +297,10 @@ public class QualityDecisionService {
         && normalizedRemarks(command.remarks()) == null) {
       throw QualityDecisionException.remarksRequired();
     }
-    if (!reasonAllowed(context.origin(), command.outcome(), command.reasonCode())) {
+    if (!QualityDecisionReasonPolicy.reasonAllowed(
+        context.origin(), command.outcome(), command.reasonCode())) {
       throw QualityDecisionException.reasonInvalid();
     }
-  }
-
-  private boolean reasonAllowed(
-      QualityDecisionOrigin origin, QualityDecisionOutcome outcome, QualityReasonCode reasonCode) {
-    if (origin == QualityDecisionOrigin.SYSTEM_RELEASE) {
-      return outcome == QualityDecisionOutcome.RELEASED
-          && reasonCode == QualityReasonCode.SYSTEM_QC_PASSED;
-    }
-    if (origin == QualityDecisionOrigin.SYSTEM_QC_EVENT) {
-      return (outcome == QualityDecisionOutcome.RELEASED
-              && reasonCode == QualityReasonCode.SYSTEM_QC_PASSED)
-          || (outcome == QualityDecisionOutcome.NONCONFORMING
-              && reasonCode == QualityReasonCode.SYSTEM_QC_REJECTED);
-    }
-    if (origin != QualityDecisionOrigin.MANUAL) {
-      return false;
-    }
-    return switch (outcome) {
-      case RELEASED -> reasonCode == null;
-      case QUARANTINED ->
-          reasonCode != null
-              && Set.of(
-                      QualityReasonCode.SUSPECTED_DAMAGE,
-                      QualityReasonCode.AWAITING_LAB,
-                      QualityReasonCode.SUPPLIER_DISPUTE,
-                      QualityReasonCode.SHADE_CHECK,
-                      QualityReasonCode.OTHER)
-                  .contains(reasonCode);
-      case NONCONFORMING ->
-          reasonCode != null
-              && Set.of(
-                      QualityReasonCode.DAMAGE,
-                      QualityReasonCode.STAIN,
-                      QualityReasonCode.SHADE_VARIATION,
-                      QualityReasonCode.SHORT_LENGTH,
-                      QualityReasonCode.MEASURE_MISMATCH,
-                      QualityReasonCode.OTHER)
-                  .contains(reasonCode);
-    };
   }
 
   private String normalizedRemarks(String remarks) {
