@@ -446,9 +446,15 @@ public class StockUnit extends BaseEntity {
     if (qualityDisposition == QualityDisposition.RELEASED) {
       throw QcRelocationException.releasedUnit(barcode);
     }
-    if (!QC_RELOCATION_STATUSES.contains(status)) {
+    if (!isQualityRelocationAllowed()) {
       throw QcRelocationException.sourceInvalid(barcode, status, qualityDisposition);
     }
+  }
+
+  /** Read-side capability backed by the same source predicate as relocation enforcement. */
+  public boolean isQualityRelocationAllowed() {
+    return qualityDisposition != QualityDisposition.RELEASED
+        && QC_RELOCATION_STATUSES.contains(status);
   }
 
   /**

@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.quality.decision.dto;
 
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
@@ -35,4 +36,16 @@ public record QualityBatchSummaryDto(
     @Schema(description = "Active nonconforming units", requiredMode = Schema.RequiredMode.REQUIRED)
         long nonconformingCount,
     @Schema(description = "Total active units", requiredMode = Schema.RequiredMode.REQUIRED)
-        long totalCount) {}
+        long totalCount,
+    @Schema(
+            description = "Whether a full-lot quality decision is currently allowed",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean fullLotDecisionAllowed,
+    @Schema(description = "Reason a full-lot quality decision is blocked", nullable = true)
+        QualityDecisionBlockedReason fullLotBlockedReason,
+    @Schema(
+            description = "Whether a selected-units quality decision is currently allowed",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean selectedUnitsDecisionAllowed,
+    @Schema(description = "Reason a selected-units quality decision is blocked", nullable = true)
+        QualityDecisionBlockedReason selectedUnitsBlockedReason) {}

@@ -23,6 +23,8 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRe
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -173,6 +175,8 @@ class QualityQueueReadModelIT extends AbstractIntegrationTest {
     assertThat(summary.quarantinedCount()).isEqualTo(1);
     assertThat(summary.nonconformingCount()).isEqualTo(1);
     assertThat(summary.totalCount()).isEqualTo(5);
+    assertThat(summary.fullLotDecisionAllowed()).isTrue();
+    assertThat(summary.selectedUnitsDecisionAllowed()).isTrue();
 
     Batch colourless =
         saveBatch(
@@ -185,6 +189,10 @@ class QualityQueueReadModelIT extends AbstractIntegrationTest {
     assertThat(colourlessSummary.colorId()).isNull();
     assertThat(colourlessSummary.colorName()).isNull();
     assertThat(colourlessSummary.totalCount()).isZero();
+    assertThat(colourlessSummary.fullLotDecisionAllowed()).isFalse();
+    assertThat(colourlessSummary.fullLotBlockedReason())
+        .isEqualTo(QualityDecisionBlockedReason.NO_ELIGIBLE_UNITS);
+    assertThat(colourlessSummary.selectedUnitsDecisionAllowed()).isFalse();
 
     TenantContext.setCurrentTenantId(otherTenantId);
     assertThatThrownBy(() -> service.getSummary(batch.getId()))
@@ -214,10 +222,10 @@ class QualityQueueReadModelIT extends AbstractIntegrationTest {
 
     assertThat(units).hasSize(StockUnitStatus.values().length);
     assertThat(units.getContent())
-        .extracting(StockUnit::getStatus)
+        .extracting(QualityDecisionUnitDto::status)
         .containsExactlyInAnyOrder(StockUnitStatus.values());
     assertThat(units.getContent())
-        .extracting(StockUnit::getBarcode)
+        .extracting(QualityDecisionUnitDto::barcode)
         .doesNotContain(inactiveBarcode);
   }
 

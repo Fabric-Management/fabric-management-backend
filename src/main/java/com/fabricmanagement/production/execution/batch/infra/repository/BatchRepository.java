@@ -56,7 +56,10 @@ public interface BatchRepository
                  b.product_type AS productType,
                  c.id AS colorId,
                  c.name AS colorName,
-                 b.created_at AS batchCreatedAt
+                 b.created_at AS batchCreatedAt,
+                 b.status AS status,
+                 b.reserved_quantity AS reservedQuantity,
+                 b.consumed_quantity AS consumedQuantity
           FROM production.production_execution_batch b
           JOIN production.prod_product p
             ON p.id = b.product_id
@@ -182,5 +185,11 @@ public interface BatchRepository
     String getColorName();
 
     java.time.Instant getBatchCreatedAt();
+
+    String getStatus();
+
+    java.math.BigDecimal getReservedQuantity();
+
+    java.math.BigDecimal getConsumedQuantity();
   }
 }

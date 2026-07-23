@@ -1,11 +1,16 @@
 package com.fabricmanagement.iwm.location.app.adapter;
 
+import com.fabricmanagement.iwm.location.app.QcRelocationTargetPolicy;
 import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
 import com.fabricmanagement.iwm.location.dto.WarehouseLocationDto;
 import com.fabricmanagement.production.execution.batch.domain.port.LocationValidationResult;
 import com.fabricmanagement.production.execution.batch.domain.port.QcLocationValidationResult;
+import com.fabricmanagement.production.execution.batch.domain.port.QualityRelocationTarget;
 import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
+import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationRef;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -38,11 +43,26 @@ public class ProductionLocationAdapter implements WarehouseLocationPort {
   @Override
   public QcLocationValidationResult validateQcLocation(UUID locationId) {
     WarehouseLocationDto location = warehouseLocationService.getById(locationId);
-    boolean validQcLocation =
-        location.isActive()
-            && location.isOperational()
-            && location.isStorageLocation()
-            && location.isQualityArea();
+    boolean validQcLocation = QcRelocationTargetPolicy.isEligible(location);
     return new QcLocationValidationResult(locationId, location.getCode(), validQcLocation);
+  }
+
+  @Override
+  public List<QualityRelocationTarget> findQualityRelocationTargets(UUID tenantId) {
+    return warehouseLocationService.findQcRelocationTargets(tenantId).stream()
+        .map(
+            location ->
+                new QualityRelocationTarget(
+                    location.getId(), location.getCode(), location.getName(), location.getPath()))
+        .toList();
+  }
+
+  @Override
+  public List<WarehouseLocationRef> findLocationRefs(UUID tenantId, Collection<UUID> locationIds) {
+    return warehouseLocationService.findByIds(tenantId, locationIds).stream()
+        .map(
+            location ->
+                new WarehouseLocationRef(location.getId(), location.getCode(), location.getName()))
+        .toList();
   }
 }

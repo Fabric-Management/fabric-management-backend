@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record QualityDecisionUnitDto(
-    UUID id,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
     String barcode,
     PackageType packageType,
     BigDecimal currentWeight,
@@ -17,7 +17,14 @@ public record QualityDecisionUnitDto(
     String lengthUnit,
     StockUnitStatus status,
     QualityDisposition qualityDisposition,
+    @Schema(nullable = true) UUID locationId,
+    @Schema(nullable = true) String locationCode,
+    @Schema(nullable = true) String locationName,
     @Schema(
             description = "Whether the unit status is eligible for a quality decision",
             requiredMode = Schema.RequiredMode.REQUIRED)
-        boolean unitStatusEligible) {}
+        boolean unitStatusEligible,
+    @Schema(
+            description = "Whether the unit can currently be relocated into QC custody",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean qualityRelocationAllowed) {}
