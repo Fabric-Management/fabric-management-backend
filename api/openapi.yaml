@@ -35354,6 +35354,70 @@ paths:
       summary: List batches awaiting QC
       tags:
       - Quality Decisions
+  /api/v1/production/quality/relocation-targets:
+    get:
+      operationId: listQualityRelocationTargets
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListQualityRelocationTargetDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List eligible QC relocation targets
+      tags:
+      - Quality Decisions
   /api/v1/production/recipes:
     post:
       operationId: createRecipe
@@ -47165,6 +47229,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListQualityRelocationTargetDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityRelocationTargetDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListRecurringTaskTemplateDto:
       type: object
       properties:
@@ -58690,7 +58774,6 @@ components:
           - BATCH_STATUS_BLOCKED
           - NO_ELIGIBLE_UNITS
           - INELIGIBLE_ACTIVE_UNITS
-          - null
         fullLotDecisionAllowed:
           type: boolean
           description: Whether a full-lot quality decision is currently allowed
@@ -58740,7 +58823,6 @@ components:
           - BATCH_STATUS_BLOCKED
           - NO_ELIGIBLE_UNITS
           - INELIGIBLE_ACTIVE_UNITS
-          - null
         selectedUnitsDecisionAllowed:
           type: boolean
           description: Whether a selected-units quality decision is currently allowed
@@ -58886,6 +58968,19 @@ components:
           type: number
         lengthUnit:
           type: string
+        locationCode:
+          type:
+          - string
+          - "null"
+        locationId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        locationName:
+          type:
+          - string
+          - "null"
         packageType:
           type: string
           enum:
@@ -58906,6 +59001,9 @@ components:
           - RELEASED
           - QUARANTINED
           - NONCONFORMING
+        qualityRelocationAllowed:
+          type: boolean
+          description: Whether the unit can currently be relocated into QC custody
         status:
           type: string
           enum:
@@ -58924,6 +59022,7 @@ components:
           description: Whether the unit status is eligible for a quality decision
       required:
       - id
+      - qualityRelocationAllowed
       - unitStatusEligible
     QualityGradeDto:
       type: object
@@ -59020,6 +59119,23 @@ components:
       - productId
       - productType
       - productUid
+    QualityRelocationTargetDto:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        path:
+          type: string
+      required:
+      - code
+      - id
+      - name
+      - path
     QuickCreateCustomerContactRequest:
       type: object
       properties:

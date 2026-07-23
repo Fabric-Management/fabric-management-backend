@@ -23,6 +23,7 @@ import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryD
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOutcomeOptionDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityRelocationTargetDto;
 import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMapper;
 import java.time.Instant;
 import java.util.List;
@@ -206,5 +207,32 @@ class QualityDecisionControllerSecurityTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.options[0].outcome").value("RELEASED"))
         .andExpect(jsonPath("$.data.options[0].reasons").isArray());
+  }
+
+  @Test
+  @WithMockUser
+  void qualityReadAllowsRelocationTargetsWithoutApprove() throws Exception {
+    when(authEvaluator.can(any(Authentication.class), eq("quality"), eq("read"))).thenReturn(true);
+    UUID locationId = UUID.randomUUID();
+    when(queryService.getRelocationTargets())
+        .thenReturn(
+            List.of(
+                new QualityRelocationTargetDto(locationId, "QC-HOLD", "QC Hold", "MAIN/QC-HOLD")));
+
+    mockMvc
+        .perform(get("/api/v1/production/quality/relocation-targets"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].id").value(locationId.toString()))
+        .andExpect(jsonPath("$.data[0].path").value("MAIN/QC-HOLD"));
+  }
+
+  @Test
+  @WithMockUser
+  void roleWithoutQualityReadCannotListRelocationTargets() throws Exception {
+    when(authEvaluator.can(any(Authentication.class), eq("quality"), eq("read"))).thenReturn(false);
+
+    mockMvc
+        .perform(get("/api/v1/production/quality/relocation-targets"))
+        .andExpect(status().isForbidden());
   }
 }

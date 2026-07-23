@@ -3,6 +3,8 @@ package com.fabricmanagement.production.quality.decision.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
+import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationRef;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
@@ -17,9 +19,14 @@ import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryD
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOutcomeOptionDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionReasonOptionDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityQueueItemDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityRelocationTargetDto;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
+import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMapper;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -34,14 +41,20 @@ public class QualityDecisionQueryService {
   private final QualityDecisionRepository decisionRepository;
   private final StockUnitRepository stockUnitRepository;
   private final BatchRepository batchRepository;
+  private final WarehouseLocationPort warehouseLocationPort;
+  private final QualityDecisionMapper mapper;
 
   public QualityDecisionQueryService(
       QualityDecisionRepository decisionRepository,
       StockUnitRepository stockUnitRepository,
-      BatchRepository batchRepository) {
+      BatchRepository batchRepository,
+      WarehouseLocationPort warehouseLocationPort,
+      QualityDecisionMapper mapper) {
     this.decisionRepository = decisionRepository;
     this.stockUnitRepository = stockUnitRepository;
     this.batchRepository = batchRepository;
+    this.warehouseLocationPort = warehouseLocationPort;
+    this.mapper = mapper;
   }
 
   public Page<QualityQueueItemDto> getQueue(Pageable pageable) {
@@ -145,8 +158,29 @@ public class QualityDecisionQueryService {
             .toList());
   }
 
-  public Page<StockUnit> getActiveUnits(UUID batchId, Pageable pageable) {
-    return stockUnitRepository.findByTenantIdAndBatchIdAndIsActiveTrue(
-        TenantContext.requireTenantId(), batchId, pageable);
+  public Page<QualityDecisionUnitDto> getActiveUnits(UUID batchId, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Page<StockUnit> units =
+        stockUnitRepository.findByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batchId, pageable);
+    var locationIds =
+        units.getContent().stream()
+            .map(StockUnit::getLocationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<UUID, WarehouseLocationRef> locations =
+        warehouseLocationPort.findLocationRefs(tenantId, locationIds).stream()
+            .collect(Collectors.toMap(WarehouseLocationRef::id, location -> location));
+    return units.map(unit -> mapper.toUnitDto(unit, locations.get(unit.getLocationId())));
+  }
+
+  public List<QualityRelocationTargetDto> getRelocationTargets() {
+    return warehouseLocationPort
+        .findQualityRelocationTargets(TenantContext.requireTenantId())
+        .stream()
+        .map(
+            target ->
+                new QualityRelocationTargetDto(
+                    target.id(), target.code(), target.name(), target.path()))
+        .toList();
   }
 }

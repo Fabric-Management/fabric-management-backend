@@ -11,11 +11,13 @@ import com.fabricmanagement.production.quality.decision.dto.QualityDecisionDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityQueueItemDto;
+import com.fabricmanagement.production.quality.decision.dto.QualityRelocationTargetDto;
 import com.fabricmanagement.production.quality.decision.dto.RecordQualityDecisionRequest;
 import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -72,6 +74,15 @@ public class QualityDecisionController {
     return ResponseEntity.ok(ApiResponse.success(queryService.getDecisionOptions()));
   }
 
+  @GetMapping("/relocation-targets")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
+  @Operation(
+      operationId = "listQualityRelocationTargets",
+      summary = "List eligible QC relocation targets")
+  public ResponseEntity<ApiResponse<List<QualityRelocationTargetDto>>> relocationTargets() {
+    return ResponseEntity.ok(ApiResponse.success(queryService.getRelocationTargets()));
+  }
+
   @GetMapping("/batches/{batchId}/decisions")
   @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   @Operation(operationId = "listQualityDecisionHistory", summary = "List batch decision history")
@@ -98,7 +109,6 @@ public class QualityDecisionController {
       @PathVariable UUID batchId,
       @ParameterObject @PageableDefault(size = 20, sort = "barcode") Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(
-            PagedResponse.from(queryService.getActiveUnits(batchId, pageable), mapper::toUnitDto)));
+        ApiResponse.success(PagedResponse.from(queryService.getActiveUnits(batchId, pageable))));
   }
 }

@@ -1,11 +1,13 @@
 package com.fabricmanagement.iwm.location.app.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
 import com.fabricmanagement.iwm.location.dto.WarehouseLocationDto;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +63,42 @@ class ProductionLocationAdapterTest {
 
     assertThat(adapter.validateQcLocation(inactiveId).validQcLocation()).isFalse();
     assertThat(adapter.validateQcLocation(blockedId).validQcLocation()).isFalse();
+  }
+
+  @Test
+  void mapsTenantScopedTargetsAndLocationRefsWithoutLeakingIwmDtos() {
+    UUID tenantId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    WarehouseLocationDto location =
+        WarehouseLocationDto.builder()
+            .id(locationId)
+            .code("QC-HOLD")
+            .name("QC Hold")
+            .path("MAIN/QC-HOLD")
+            .build();
+    when(warehouseLocationService.findQcRelocationTargets(tenantId)).thenReturn(List.of(location));
+    when(warehouseLocationService.findByIds(tenantId, List.of(locationId)))
+        .thenReturn(List.of(location));
+
+    assertThat(adapter.findQualityRelocationTargets(tenantId))
+        .singleElement()
+        .satisfies(
+            target -> {
+              assertThat(target.id()).isEqualTo(locationId);
+              assertThat(target.code()).isEqualTo("QC-HOLD");
+              assertThat(target.name()).isEqualTo("QC Hold");
+              assertThat(target.path()).isEqualTo("MAIN/QC-HOLD");
+            });
+    assertThat(adapter.findLocationRefs(tenantId, List.of(locationId)))
+        .singleElement()
+        .satisfies(
+            ref -> {
+              assertThat(ref.id()).isEqualTo(locationId);
+              assertThat(ref.code()).isEqualTo("QC-HOLD");
+              assertThat(ref.name()).isEqualTo("QC Hold");
+            });
+    verify(warehouseLocationService).findQcRelocationTargets(tenantId);
+    verify(warehouseLocationService).findByIds(tenantId, List.of(locationId));
   }
 
   private WarehouseLocationDto location(

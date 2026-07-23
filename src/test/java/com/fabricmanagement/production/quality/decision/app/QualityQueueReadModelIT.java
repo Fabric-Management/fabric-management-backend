@@ -24,6 +24,7 @@ import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
+import com.fabricmanagement.production.quality.decision.dto.QualityDecisionUnitDto;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -221,10 +222,10 @@ class QualityQueueReadModelIT extends AbstractIntegrationTest {
 
     assertThat(units).hasSize(StockUnitStatus.values().length);
     assertThat(units.getContent())
-        .extracting(StockUnit::getStatus)
+        .extracting(QualityDecisionUnitDto::status)
         .containsExactlyInAnyOrder(StockUnitStatus.values());
     assertThat(units.getContent())
-        .extracting(StockUnit::getBarcode)
+        .extracting(QualityDecisionUnitDto::barcode)
         .doesNotContain(inactiveBarcode);
   }
 

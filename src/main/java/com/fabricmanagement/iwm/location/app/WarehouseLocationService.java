@@ -16,6 +16,7 @@ import com.fabricmanagement.iwm.location.dto.WarehouseLocationTreeDto;
 import com.fabricmanagement.iwm.location.infra.repository.WarehouseLocationRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -215,6 +216,24 @@ public class WarehouseLocationService {
   @Transactional(readOnly = true)
   public WarehouseLocationDto getById(UUID id) {
     return WarehouseLocationDto.from(findEntityById(id));
+  }
+
+  @Transactional(readOnly = true)
+  public List<WarehouseLocationDto> findQcRelocationTargets(UUID tenantId) {
+    return repository.findByTenantIdAndQualityAreaTrueOrderByPathAscCodeAsc(tenantId).stream()
+        .map(WarehouseLocationDto::from)
+        .filter(QcRelocationTargetPolicy::isEligible)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<WarehouseLocationDto> findByIds(UUID tenantId, Collection<UUID> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return List.of();
+    }
+    return repository.findByTenantIdAndIdIn(tenantId, ids).stream()
+        .map(WarehouseLocationDto::from)
+        .toList();
   }
 
   @Transactional(readOnly = true)

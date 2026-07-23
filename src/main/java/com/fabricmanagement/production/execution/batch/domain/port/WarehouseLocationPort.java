@@ -1,5 +1,7 @@
 package com.fabricmanagement.production.execution.batch.domain.port;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,4 +34,10 @@ public interface WarehouseLocationPort {
    * @return minimal validation result translated from the IWM bounded context
    */
   QcLocationValidationResult validateQcLocation(UUID locationId);
+
+  /** Lists the active operational storage locations designated for QC custody. */
+  List<QualityRelocationTarget> findQualityRelocationTargets(UUID tenantId);
+
+  /** Resolves minimal location labels in one tenant-scoped bulk read. */
+  List<WarehouseLocationRef> findLocationRefs(UUID tenantId, Collection<UUID> locationIds);
 }

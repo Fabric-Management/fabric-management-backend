@@ -3,6 +3,7 @@ package com.fabricmanagement.iwm.location.infra.repository;
 import com.fabricmanagement.iwm.location.domain.LocationStatus;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocation;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +27,10 @@ public interface WarehouseLocationRepository extends JpaRepository<WarehouseLoca
 
   List<WarehouseLocation> findByQualityAreaAndIsActiveTrueOrderBySortOrderAscNameAsc(
       boolean qualityArea);
+
+  List<WarehouseLocation> findByTenantIdAndQualityAreaTrueOrderByPathAscCodeAsc(UUID tenantId);
+
+  List<WarehouseLocation> findByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
   List<WarehouseLocation> findByTypeAndIsActiveTrue(WarehouseLocationType type);
 
