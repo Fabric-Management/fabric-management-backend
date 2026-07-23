@@ -20,6 +20,7 @@ import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredExcepti
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrder;
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderLine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
 import com.fabricmanagement.procurement.purchaseorder.dto.PurchaseOrderResponse;
@@ -53,12 +54,16 @@ class PurchaseOrderServiceFxTotalTest {
   @Mock private DataScopeGuard scopeGuard;
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  @Mock private PoReceiveStatusService receiveStatusService;
 
   private PurchaseOrderService service;
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
+    org.mockito.Mockito.lenient()
+        .when(receiveStatusService.getLineCoverage(any(), any(), any()))
+        .thenReturn(java.util.Map.of());
     service =
         new PurchaseOrderService(
             poRepository,
@@ -68,7 +73,8 @@ class PurchaseOrderServiceFxTotalTest {
             documentNumberGenerator,
             scopeGuard,
             exchangeRateService,
-            tenantReportingCurrencyPort);
+            tenantReportingCurrencyPort,
+            receiveStatusService);
     when(documentNumberGenerator.generate(
             eq(TENANT_ID), eq("PURCHASE_ORDER"), eq("PO"), any(), eq(5)))
         .thenReturn("PO-20260630-00001");
@@ -77,12 +83,23 @@ class PurchaseOrderServiceFxTotalTest {
             invocation -> {
               PurchaseOrder po = invocation.getArgument(0);
               po.setId(PO_ID);
+              po.setTenantId(TENANT_ID);
               if (po.getCreatedAt() == null) {
                 po.setCreatedAt(DOC_INSTANT);
               }
               return po;
             });
-    when(lineRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(lineRepository.saveAll(any()))
+        .thenAnswer(
+            invocation -> {
+              List<PurchaseOrderLine> lines = invocation.getArgument(0);
+              lines.forEach(
+                  line -> {
+                    line.setId(UUID.randomUUID());
+                    line.setTenantId(TENANT_ID);
+                  });
+              return lines;
+            });
   }
 
   @AfterEach

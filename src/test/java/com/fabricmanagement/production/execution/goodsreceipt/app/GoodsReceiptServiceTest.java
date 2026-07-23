@@ -16,6 +16,7 @@ import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceip
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptStatus;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.exception.GoodsReceiptDomainException;
+import com.fabricmanagement.production.execution.goodsreceipt.domain.port.PoReceivabilityPort;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsReceiptRequest;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptItemRepository;
@@ -49,6 +50,7 @@ class GoodsReceiptServiceTest {
   @Mock private PurchaseOrderQueryService purchaseOrderQueryService;
   @Mock private SubcontractOrderQueryService subcontractOrderQueryService;
   @Mock private ProductFacade productFacade;
+  @Mock private PoReceivabilityPort poReceivabilityPort;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private GoodsReceiptService service;
@@ -56,6 +58,9 @@ class GoodsReceiptServiceTest {
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
+    org.mockito.Mockito.lenient()
+        .when(poReceivabilityPort.isReceivable(TENANT_ID, PO_ID))
+        .thenReturn(true);
     service =
         new GoodsReceiptService(
             receiptRepository,
@@ -65,6 +70,7 @@ class GoodsReceiptServiceTest {
             subcontractOrderQueryService,
             productFacade,
             new BatchPrimaryMeasureService(),
+            poReceivabilityPort,
             eventPublisher);
   }
 
@@ -78,6 +84,38 @@ class GoodsReceiptServiceTest {
     CreateGoodsReceiptRequest request = purchaseRequest(null, item(null, null));
 
     assertCoded422(() -> service.createGoodsReceipt(request), "GR_SOURCE_LINE_REQUIRED");
+  }
+
+  @Test
+  void purchaseReceiptCreateRejectsNonReceivablePurchaseOrder() {
+    when(poReceivabilityPort.isReceivable(TENANT_ID, PO_ID)).thenReturn(false);
+
+    assertCoded422(
+        () -> service.createGoodsReceipt(purchaseRequest(LINE_ID, item(null, null))),
+        "GR_PO_NOT_RECEIVABLE");
+  }
+
+  @Test
+  void purchaseReceiptConfirmRechecksReceivability() {
+    GoodsReceipt draft =
+        GoodsReceipt.builder()
+            .receiptNumber("GR-STATUS-GUARD")
+            .sourceType(GoodsReceiptSourceType.PURCHASE_ORDER)
+            .sourceId(PO_ID)
+            .sourceLineId(LINE_ID)
+            .status(GoodsReceiptStatus.DRAFT)
+            .build();
+    when(receiptRepository.findById(any())).thenReturn(Optional.of(draft));
+    when(itemRepository.findByGoodsReceiptIdAndIsActiveTrueOrderBySequenceNoAsc(any()))
+        .thenReturn(
+            List.of(
+                GoodsReceiptItem.builder()
+                    .barcode("STATUS-001")
+                    .netWeight(BigDecimal.TEN)
+                    .build()));
+    when(poReceivabilityPort.isReceivable(TENANT_ID, PO_ID)).thenReturn(false);
+
+    assertCoded422(() -> service.confirmGoodsReceipt(UUID.randomUUID()), "GR_PO_NOT_RECEIVABLE");
   }
 
   @Test

@@ -58654,12 +58654,21 @@ components:
           format: uuid
         qty:
           type: number
+        receiveMismatch:
+          type: boolean
+          description: Whether one or more receipt items could not be counted due to unit mismatch
+        receivedQty:
+          type: number
+          description: Cumulative confirmed receipt quantity expressed in this line's unit
         totalPrice:
           type: number
         unit:
           type: string
         unitPrice:
           type: number
+      required:
+      - receiveMismatch
+      - receivedQty
     PurchaseOrderResponse:
       type: object
       properties:

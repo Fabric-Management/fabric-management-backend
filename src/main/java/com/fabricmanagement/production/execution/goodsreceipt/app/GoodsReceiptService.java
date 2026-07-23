@@ -12,6 +12,7 @@ import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceip
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptStatus;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.exception.GoodsReceiptDomainException;
+import com.fabricmanagement.production.execution.goodsreceipt.domain.port.PoReceivabilityPort;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsReceiptRequest;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptItemRepository;
@@ -45,6 +46,7 @@ public class GoodsReceiptService {
   private final SubcontractOrderQueryService scQueryService;
   private final ProductFacade productFacade;
   private final BatchPrimaryMeasureService primaryMeasureService;
+  private final PoReceivabilityPort poReceivabilityPort;
   private final ApplicationEventPublisher eventPublisher;
 
   /** Retrieves a GoodsReceipt with its items by ID. */
@@ -139,9 +141,8 @@ public class GoodsReceiptService {
   /**
    * Confirms a GoodsReceipt — transitions from DRAFT → CONFIRMED.
    *
-   * <p>Post-confirmation side effects (IWM stock entry, source order update) are handled via the
-   * GoodsReceiptConfirmed domain event in a future phase. For Phase 3.1 the transition itself is
-   * implemented here synchronously.
+   * <p>Post-confirmation side effects, including stock entry and purchase-order receipt-status
+   * derivation, are handled by idempotent listeners on the GoodsReceiptConfirmed domain event.
    */
   @Transactional
   public GoodsReceiptResponse confirmGoodsReceipt(UUID id) {
@@ -265,6 +266,10 @@ public class GoodsReceiptService {
     }
 
     UUID tenantId = TenantContext.requireTenantId();
+    if (!poReceivabilityPort.isReceivable(tenantId, sourceId)) {
+      throw unprocessable("Purchase order is not in a receivable status", "GR_PO_NOT_RECEIVABLE");
+    }
+
     PurchaseOrderQueryService.PurchaseOrderLineInfo lineInfo;
     try {
       lineInfo = poQueryService.getPurchaseOrderLineInfo(tenantId, sourceId, sourceLineId);

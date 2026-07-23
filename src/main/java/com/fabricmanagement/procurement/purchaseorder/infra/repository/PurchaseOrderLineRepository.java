@@ -11,6 +11,9 @@ public interface PurchaseOrderLineRepository extends JpaRepository<PurchaseOrder
   List<PurchaseOrderLine> findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
       UUID purchaseOrderId);
 
+  List<PurchaseOrderLine> findByTenantIdAndPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
+      UUID tenantId, UUID purchaseOrderId);
+
   Optional<PurchaseOrderLine> findByIdAndTenantIdAndPurchaseOrderIdAndIsActiveTrue(
       UUID id, UUID tenantId, UUID purchaseOrderId);
 }

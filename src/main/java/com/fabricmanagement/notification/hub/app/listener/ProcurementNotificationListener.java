@@ -195,8 +195,8 @@ public class ProcurementNotificationListener {
                 NotificationEventType.PO_PARTIALLY_RECEIVED,
                 Map.of(
                     "poNumber", event.getPoNumber() != null ? event.getPoNumber() : "",
-                    "received", String.valueOf(event.getReceivedItemCount()),
-                    "total", String.valueOf(event.getTotalItemCount())),
+                    "receivedItemCount", String.valueOf(event.getReceivedItemCount()),
+                    "totalItemCount", String.valueOf(event.getTotalItemCount())),
                 event.getPurchaseOrderId(),
                 "PO");
           } else {
