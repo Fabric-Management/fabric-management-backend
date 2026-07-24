@@ -45143,6 +45143,17 @@ components:
           - TO_BE_CONFIRMED
           - FROM_PRODUCTION
           - STOCK_OVERRIDE
+        fulfillmentMode:
+          type:
+          - string
+          - "null"
+          description: Manual line-level fulfilment mode; omission or null clears
+            it to pending
+          enum:
+          - STOCK
+          - MAKE_TO_ORDER
+          - PURCHASE_TO_ORDER
+          - STOCK_AND_PRODUCTION
         offeredPrice:
           type: number
           minimum: 0.0001
@@ -59380,6 +59391,33 @@ components:
           - STOCK_OVERRIDE
         discountRate:
           type: number
+        fulfillmentDeterminationMethod:
+          type:
+          - string
+          - "null"
+          description: How the current fulfilment mode was determined
+          enum:
+          - AUTOMATIC
+          - MANUAL
+          - POLICY_BASED
+        fulfillmentDeterminationStatus:
+          type: string
+          description: Current fulfilment determination status
+          enum:
+          - PENDING
+          - PROPOSED
+          - CONFIRMED
+          - OVERRIDDEN
+        fulfillmentMode:
+          type:
+          - string
+          - "null"
+          description: Line-level fulfilment mode
+          enum:
+          - STOCK
+          - MAKE_TO_ORDER
+          - PURCHASE_TO_ORDER
+          - STOCK_AND_PRODUCTION
         id:
           type: string
           format: uuid
@@ -59451,6 +59489,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/QuoteLineResponse"
+        mixedFulfillment:
+          type: boolean
         moduleType:
           type: string
         notes:
@@ -62996,6 +63036,17 @@ components:
           - TO_BE_CONFIRMED
           - FROM_PRODUCTION
           - STOCK_OVERRIDE
+        fulfillmentMode:
+          type:
+          - string
+          - "null"
+          description: Manual line-level fulfilment mode; omission or null clears
+            it to pending
+          enum:
+          - STOCK
+          - MAKE_TO_ORDER
+          - PURCHASE_TO_ORDER
+          - STOCK_AND_PRODUCTION
         offeredPrice:
           type: number
           minimum: 0.0001

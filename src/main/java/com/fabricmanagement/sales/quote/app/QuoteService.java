@@ -238,6 +238,7 @@ public class QuoteService {
     applyColorSnapshot(line, colorSnapshot);
     applyLotSnapshots(line, lotSnapshots);
     line.applyDelivery(delivery.status(), delivery.date(), delivery.covered());
+    line.applyManualFulfillmentMode(req.getFulfillmentMode());
     line.setDiscountRate(pricing.getDiscountRate());
     line.setProfitMargin(pricing.getProfitMargin());
     line.setPriceZone(pricing.getPriceZone());
@@ -299,6 +300,7 @@ public class QuoteService {
     applyColorSnapshot(line, colorSnapshot);
     applyLotSnapshots(line, lotSnapshots);
     line.applyDelivery(delivery.status(), delivery.date(), delivery.covered());
+    line.applyManualFulfillmentMode(req.getFulfillmentMode());
     line.applyPricing(pricing.getDiscountRate(), pricing.getProfitMargin(), pricing.getPriceZone());
     recomputeTotals(quote);
     Quote saved = quoteRepository.save(quote);
@@ -498,6 +500,7 @@ public class QuoteService {
       newLine.applyLotSnapshot(oldLine.getLotSnapshot());
       newLine.applyDelivery(
           oldLine.getDeliveryStatus(), oldLine.getDeliveryDate(), oldLine.getDeliveryCovered());
+      newLine.copyFulfillmentDeterminationFrom(oldLine);
       newLine.setDiscountRate(oldLine.getDiscountRate());
       newLine.setProfitMargin(oldLine.getProfitMargin());
       newLine.setPriceZone(oldLine.getPriceZone());

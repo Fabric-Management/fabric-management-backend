@@ -1,10 +1,14 @@
 package com.fabricmanagement.sales.quote.infra.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.fabricmanagement.common.infrastructure.persistence.LikePattern;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationMethod;
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationStatus;
+import com.fabricmanagement.sales.quote.domain.FulfillmentMode;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -156,6 +161,30 @@ class QuoteRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     assertThat(counts).containsEntry(QuoteStatus.DRAFT, 1L).containsEntry(QuoteStatus.EXPIRED, 1L);
     assertThat(counts).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("fulfillment mode and status combination is protected by a database constraint")
+  void fulfillmentModeStatusCombination_isProtectedByDatabaseConstraint() {
+    Quote invalid = quoteWithLine();
+    QuoteLine line = invalid.getLines().get(0);
+    line.setFulfillmentMode(FulfillmentMode.STOCK);
+    line.setFulfillmentDeterminationStatus(FulfillmentDeterminationStatus.PENDING);
+    line.setFulfillmentDeterminationMethod(FulfillmentDeterminationMethod.MANUAL);
+
+    assertThatThrownBy(() -> persist(invalid)).isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("fulfillment mode and method combination is protected by a database constraint")
+  void fulfillmentModeMethodCombination_isProtectedByDatabaseConstraint() {
+    Quote invalid = quoteWithLine();
+    QuoteLine line = invalid.getLines().get(0);
+    line.setFulfillmentMode(FulfillmentMode.STOCK);
+    line.setFulfillmentDeterminationStatus(FulfillmentDeterminationStatus.CONFIRMED);
+    line.setFulfillmentDeterminationMethod(null);
+
+    assertThatThrownBy(() -> persist(invalid)).isInstanceOf(DataIntegrityViolationException.class);
   }
 
   private UUID persistQuoteWithLine() {
