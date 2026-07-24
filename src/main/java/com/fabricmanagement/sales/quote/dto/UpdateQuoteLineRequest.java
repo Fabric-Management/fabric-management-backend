@@ -1,6 +1,8 @@
 package com.fabricmanagement.sales.quote.dto;
 
+import com.fabricmanagement.sales.quote.domain.FulfillmentMode;
 import com.fabricmanagement.sales.quote.domain.QuoteLineDeliveryStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -24,6 +26,11 @@ public class UpdateQuoteLineRequest {
   private QuoteLineDeliveryStatus deliveryStatus;
 
   private LocalDate deliveryDate;
+
+  @Schema(
+      description = "Manual line-level fulfilment mode; omission or null clears it to pending",
+      nullable = true)
+  private FulfillmentMode fulfillmentMode;
 
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Requested quantity must be greater than zero")

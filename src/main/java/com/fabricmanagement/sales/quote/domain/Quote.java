@@ -132,6 +132,16 @@ public class Quote extends BaseEntity {
     return this.lines.stream().filter(line -> Objects.equals(line.getId(), lineId)).findFirst();
   }
 
+  public boolean isMixedFulfillment() {
+    return this.lines.stream()
+            .map(QuoteLine::getFulfillmentMode)
+            .filter(Objects::nonNull)
+            .distinct()
+            .limit(2)
+            .count()
+        > 1;
+  }
+
   /**
    * @deprecated the {@code leadTimeDays} parameter is superseded by per-line {@code
    *     QuoteLine.deliveryStatus}/{@code deliveryDate} (QLINE-ATP-1); retained for historical data,

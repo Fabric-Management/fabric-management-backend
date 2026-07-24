@@ -77,6 +77,17 @@ public class TradingPartnerService {
    */
   @Transactional
   public TradingPartnerDto createPartner(CreateTradingPartnerRequest request) {
+    return createPartner(request, null);
+  }
+
+  /**
+   * Internal creation gate with an explicit acquisition initiator.
+   *
+   * <p>Public controllers supply the acting user. Seeders supply an explicit demo persona or null.
+   * The service never infers the value from the security context.
+   */
+  @Transactional
+  public TradingPartnerDto createPartner(CreateTradingPartnerRequest request, UUID acquiredById) {
     UUID tenantId = TenantContext.requireTenantId();
     String country =
         request.getCountry() != null ? request.getCountry().toUpperCase() : DEFAULT_COUNTRY;
@@ -95,12 +106,16 @@ public class TradingPartnerService {
       if (partner.getPartnerType() != request.getPartnerType()
           && partner.getPartnerType() != PartnerType.BOTH) {
         partner.upgradeToMultiType(request.getPartnerType());
+        stampAcquirerIfCustomer(partner, acquiredById);
         TradingPartner updated = partnerRepository.save(partner);
         log.info(
             "Partner upgraded to BOTH: uid={}, registry={}", updated.getUid(), registry.getUid());
         return TradingPartnerDto.from(updated);
       }
       // Already exists with same or BOTH type
+      if (stampAcquirerIfCustomer(partner, acquiredById)) {
+        partner = partnerRepository.save(partner);
+      }
       log.debug(
           "Partner already exists: uid={}, type={}", partner.getUid(), partner.getPartnerType());
       return TradingPartnerDto.from(partner);
@@ -114,6 +129,7 @@ public class TradingPartnerService {
       partner.setRelationshipMeta(request.getRelationshipMeta());
     }
 
+    stampAcquirerIfCustomer(partner, acquiredById);
     TradingPartner saved = partnerRepository.save(partner);
 
     // Auto-create partner Organization for user management
@@ -146,6 +162,13 @@ public class TradingPartnerService {
 
   @Transactional
   public TradingPartnerDto quickCreateCustomer(QuickCreateCustomerRequest request) {
+    return quickCreateCustomer(request, null);
+  }
+
+  /** Internal quick-create gate; see {@link #createPartner(CreateTradingPartnerRequest, UUID)}. */
+  @Transactional
+  public TradingPartnerDto quickCreateCustomer(
+      QuickCreateCustomerRequest request, UUID acquiredById) {
     UUID tenantId = TenantContext.requireTenantId();
     TradingPartnerRegistry registry =
         registryService.findOrCreate(
@@ -167,6 +190,7 @@ public class TradingPartnerService {
     partner.setPendingAccountingReview(true);
     partner.setRelationshipMeta(
         quickCustomerRelationshipMeta(request, partner.getRelationshipMeta()));
+    stampAcquirerIfCustomer(partner, acquiredById);
     TradingPartner saved = partnerRepository.save(partner);
 
     if (saved.getOrganizationId() == null) {
@@ -193,6 +217,10 @@ public class TradingPartnerService {
     return toCustomerDto(tenantId, saved);
   }
 
+  private boolean stampAcquirerIfCustomer(TradingPartner partner, UUID acquiredById) {
+    return partner.recordAcquirer(acquiredById);
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // UPDATE
   // ═══════════════════════════════════════════════════════════════════════════
@@ -209,8 +237,19 @@ public class TradingPartnerService {
    */
   @Transactional
   public TradingPartnerDto updatePartner(UUID partnerId, UpdateTradingPartnerRequest request) {
+    return updatePartner(partnerId, request, null);
+  }
+
+  /**
+   * Internal update gate with an explicit initiator for a relationship that becomes
+   * customer-facing.
+   */
+  @Transactional
+  public TradingPartnerDto updatePartner(
+      UUID partnerId, UpdateTradingPartnerRequest request, UUID acquiredById) {
     UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    boolean wasCustomer = partner.getPartnerType().isCustomer();
 
     if (request.getCustomName() != null) {
       partner.setCustomName(
@@ -225,6 +264,9 @@ public class TradingPartnerService {
       partner.setRelationshipMeta(request.getRelationshipMeta());
     }
 
+    if (!wasCustomer) {
+      stampAcquirerIfCustomer(partner, acquiredById);
+    }
     TradingPartner saved = partnerRepository.save(partner);
     log.info("Partner updated: uid={}, type={}", saved.getUid(), saved.getPartnerType());
     return TradingPartnerDto.from(saved);

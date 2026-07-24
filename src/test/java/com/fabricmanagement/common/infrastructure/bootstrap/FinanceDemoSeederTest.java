@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -107,7 +108,7 @@ class FinanceDemoSeederTest {
   void seedsReportingCurrencyFxInvoicesAndPayments() {
     // Idempotency anchor absent → proceed.
     when(tradingPartnerService.searchByName(eq(TENANT_ID), any())).thenReturn(List.of());
-    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class)))
+    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class), isNull()))
         .thenAnswer(i -> TradingPartnerDto.builder().id(UUID.randomUUID()).build());
 
     Organization rootOrg = org.mockito.Mockito.mock(Organization.class);

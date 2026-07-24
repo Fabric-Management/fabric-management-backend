@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.quote.api;
 
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import com.fabricmanagement.sales.quote.domain.Quote;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -29,7 +30,7 @@ public class QuoteCreateRequest {
   @NotNull(message = "Customer ID is required")
   private UUID customerId;
 
-  @NotNull(message = "Assigned salesperson ID is required")
+  @Schema(nullable = true)
   private UUID assignedToId;
 
   @NotBlank(message = "Module type is required")

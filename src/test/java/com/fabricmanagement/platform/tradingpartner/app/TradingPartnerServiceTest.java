@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerContactRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import java.util.List;
 import java.util.Optional;
@@ -172,6 +173,185 @@ class TradingPartnerServiceTest {
     }
 
     @Test
+    void stampsAcquirerWhenSupplierIsUpgradedToCustomerRelationship() {
+      UUID acquirerId = UUID.randomUUID();
+      CreateTradingPartnerRequest request =
+          CreateTradingPartnerRequest.builder()
+              .companyName("Akkaya Tekstil")
+              .taxId("1234567890")
+              .country("TUR")
+              .partnerType(PartnerType.CUSTOMER)
+              .build();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .taxId("1234567890")
+              .officialName("Akkaya Tekstil")
+              .country("TUR")
+              .build();
+      TradingPartner existing =
+          TradingPartner.builder()
+              .registry(registry)
+              .partnerType(PartnerType.SUPPLIER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      existing.setId(PARTNER_ID);
+      existing.setTenantId(TENANT_ID);
+
+      when(registryService.findOrCreate("1234567890", "Akkaya Tekstil", "TUR"))
+          .thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.of(existing));
+      when(partnerRepository.save(existing)).thenReturn(existing);
+
+      TradingPartnerDto result = service.createPartner(request, acquirerId);
+
+      assertThat(result.getPartnerType()).isEqualTo(PartnerType.BOTH);
+      assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+      assertThat(existing.getAcquiredById()).isEqualTo(acquirerId);
+    }
+
+    @Test
+    void stampsAcquirerWhenNewCustomerRelationshipIsCreated() {
+      UUID acquirerId = UUID.randomUUID();
+      CreateTradingPartnerRequest request =
+          CreateTradingPartnerRequest.builder()
+              .companyName("New Customer")
+              .country("GBR")
+              .partnerType(PartnerType.CUSTOMER)
+              .build();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("New Customer")
+              .country("GBR")
+              .build();
+
+      when(registryService.findOrCreate(null, "New Customer", "GBR")).thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.empty());
+      when(partnerRepository.save(any(TradingPartner.class)))
+          .thenAnswer(
+              invocation -> {
+                TradingPartner partner = invocation.getArgument(0);
+                partner.setId(PARTNER_ID);
+                partner.setTenantId(TENANT_ID);
+                return partner;
+              });
+      when(organizationFacade.createPartnerOrganization(any(), any(), any()))
+          .thenReturn(OrganizationDto.builder().id(UUID.randomUUID()).build());
+
+      TradingPartnerDto result = service.createPartner(request, acquirerId);
+
+      assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+    }
+
+    @Test
+    void stampsUnattributedExistingCustomerWhenExplicitInitiatorIsAvailable() {
+      UUID acquirerId = UUID.randomUUID();
+      CreateTradingPartnerRequest request =
+          CreateTradingPartnerRequest.builder()
+              .companyName("Unattributed Customer")
+              .country("GBR")
+              .partnerType(PartnerType.CUSTOMER)
+              .build();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("Unattributed Customer")
+              .country("GBR")
+              .build();
+      TradingPartner existing =
+          TradingPartner.builder()
+              .registry(registry)
+              .partnerType(PartnerType.CUSTOMER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      existing.setId(PARTNER_ID);
+      existing.setTenantId(TENANT_ID);
+
+      when(registryService.findOrCreate(null, "Unattributed Customer", "GBR")).thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.of(existing));
+      when(partnerRepository.save(existing)).thenReturn(existing);
+
+      TradingPartnerDto result = service.createPartner(request, acquirerId);
+
+      assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+      verify(partnerRepository).save(existing);
+    }
+
+    @Test
+    void neverStampsSupplierOnlyRelationship() {
+      UUID acquirerId = UUID.randomUUID();
+      CreateTradingPartnerRequest request =
+          CreateTradingPartnerRequest.builder()
+              .companyName("Supplier Ltd")
+              .country("GBR")
+              .partnerType(PartnerType.SUPPLIER)
+              .build();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("Supplier Ltd")
+              .country("GBR")
+              .build();
+
+      when(registryService.findOrCreate(null, "Supplier Ltd", "GBR")).thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.empty());
+      when(partnerRepository.save(any(TradingPartner.class)))
+          .thenAnswer(
+              invocation -> {
+                TradingPartner partner = invocation.getArgument(0);
+                partner.setId(PARTNER_ID);
+                partner.setTenantId(TENANT_ID);
+                return partner;
+              });
+      when(organizationFacade.createPartnerOrganization(any(), any(), any()))
+          .thenReturn(OrganizationDto.builder().id(UUID.randomUUID()).build());
+
+      TradingPartnerDto result = service.createPartner(request, acquirerId);
+
+      assertThat(result.getAcquiredById()).isNull();
+    }
+
+    @Test
+    void neverOverwritesExistingAcquirerWhenCustomerIsReadded() {
+      UUID originalAcquirerId = UUID.randomUUID();
+      CreateTradingPartnerRequest request =
+          CreateTradingPartnerRequest.builder()
+              .companyName("Existing Customer")
+              .country("GBR")
+              .partnerType(PartnerType.CUSTOMER)
+              .build();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("Existing Customer")
+              .country("GBR")
+              .build();
+      TradingPartner existing =
+          TradingPartner.builder()
+              .registry(registry)
+              .partnerType(PartnerType.CUSTOMER)
+              .status(PartnerStatus.ACTIVE)
+              .acquiredById(originalAcquirerId)
+              .build();
+      existing.setId(PARTNER_ID);
+      existing.setTenantId(TENANT_ID);
+
+      when(registryService.findOrCreate(null, "Existing Customer", "GBR")).thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.of(existing));
+
+      TradingPartnerDto result = service.createPartner(request, UUID.randomUUID());
+
+      assertThat(result.getAcquiredById()).isEqualTo(originalAcquirerId);
+      verify(partnerRepository, never()).save(any());
+    }
+
+    @Test
     void returnsExistingWhenSameRegistryAndSameType() {
       CreateTradingPartnerRequest request =
           CreateTradingPartnerRequest.builder()
@@ -210,6 +390,55 @@ class TradingPartnerServiceTest {
       assertThat(result.getPartnerType()).isEqualTo(PartnerType.SUPPLIER);
       verify(partnerRepository, never()).save(any());
       verify(eventPublisher, never()).publish(any(TradingPartnerCreatedEvent.class));
+    }
+  }
+
+  @Nested
+  @DisplayName("updatePartner")
+  class UpdatePartner {
+
+    @Test
+    void stampsAcquirerWhenUpdateTurnsSupplierIntoCustomer() {
+      UUID acquirerId = UUID.randomUUID();
+      TradingPartner partner =
+          TradingPartner.builder()
+              .registry(TradingPartnerRegistry.builder().id(REGISTRY_ID).build())
+              .partnerType(PartnerType.SUPPLIER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      partner.setId(PARTNER_ID);
+      partner.setTenantId(TENANT_ID);
+      UpdateTradingPartnerRequest request =
+          UpdateTradingPartnerRequest.builder().partnerType(PartnerType.CUSTOMER).build();
+      when(partnerRepository.findByTenantIdAndId(TENANT_ID, PARTNER_ID))
+          .thenReturn(Optional.of(partner));
+      when(partnerRepository.save(partner)).thenReturn(partner);
+
+      TradingPartnerDto result = service.updatePartner(PARTNER_ID, request, acquirerId);
+
+      assertThat(result.getPartnerType()).isEqualTo(PartnerType.CUSTOMER);
+      assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+    }
+
+    @Test
+    void doesNotAttributeLegacyCustomerDuringUnrelatedUpdate() {
+      TradingPartner partner =
+          TradingPartner.builder()
+              .registry(TradingPartnerRegistry.builder().id(REGISTRY_ID).build())
+              .partnerType(PartnerType.CUSTOMER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      partner.setId(PARTNER_ID);
+      partner.setTenantId(TENANT_ID);
+      UpdateTradingPartnerRequest request =
+          UpdateTradingPartnerRequest.builder().customName("Updated alias").build();
+      when(partnerRepository.findByTenantIdAndId(TENANT_ID, PARTNER_ID))
+          .thenReturn(Optional.of(partner));
+      when(partnerRepository.save(partner)).thenReturn(partner);
+
+      TradingPartnerDto result = service.updatePartner(PARTNER_ID, request, UUID.randomUUID());
+
+      assertThat(result.getAcquiredById()).isNull();
     }
   }
 
@@ -295,6 +524,44 @@ class TradingPartnerServiceTest {
               PartnerContactRole.FINANCE,
               false,
               false);
+    }
+
+    @Test
+    void stampsAcquirerWhenQuickCreateUpgradesSupplierToBoth() {
+      UUID acquirerId = UUID.randomUUID();
+      QuickCreateCustomerRequest request = new QuickCreateCustomerRequest();
+      request.setCompanyName("Existing Supplier Ltd");
+      request.setTaxNumber("TAX-UPGRADE");
+      request.setContacts(List.of());
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("Existing Supplier Ltd")
+              .taxId("TAX-UPGRADE")
+              .country("TUR")
+              .build();
+      TradingPartner existing =
+          TradingPartner.builder()
+              .registry(registry)
+              .partnerType(PartnerType.SUPPLIER)
+              .status(PartnerStatus.ACTIVE)
+              .organizationId(UUID.randomUUID())
+              .build();
+      existing.setId(PARTNER_ID);
+      existing.setTenantId(TENANT_ID);
+
+      when(registryService.findOrCreate("TAX-UPGRADE", "Existing Supplier Ltd", "TUR"))
+          .thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.of(existing));
+      when(partnerRepository.save(existing)).thenReturn(existing);
+      when(organizationFacade.findById(TENANT_ID, existing.getOrganizationId()))
+          .thenReturn(Optional.empty());
+
+      TradingPartnerDto result = service.quickCreateCustomer(request, acquirerId);
+
+      assertThat(result.getPartnerType()).isEqualTo(PartnerType.BOTH);
+      assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
     }
   }
 

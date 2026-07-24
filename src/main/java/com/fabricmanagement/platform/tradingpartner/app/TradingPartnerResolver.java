@@ -184,6 +184,22 @@ public class TradingPartnerResolver {
     return partnerRepository.findByTenantIdAndLegacyCompanyId(tenantId, partnerId);
   }
 
+  /**
+   * Resolve the tenant-scoped ownership facts needed by sales without exposing the platform domain
+   * entity across the bounded-context boundary.
+   */
+  public Optional<TradingPartnerOwnershipSnapshot> resolveOwnershipSnapshot(
+      UUID tenantId, UUID partnerId) {
+    return resolvePartner(tenantId, partnerId)
+        .map(
+            partner ->
+                new TradingPartnerOwnershipSnapshot(
+                    partner.getId(),
+                    partner.getAcquiredById(),
+                    partner.getPartnerType().isCustomer(),
+                    partner.getStatus().isTransactionAllowed()));
+  }
+
   public Map<UUID, String> resolveDisplayNames(UUID tenantId, List<UUID> partnerIds) {
     if (partnerIds == null || partnerIds.isEmpty()) {
       return Map.of();

@@ -19,6 +19,9 @@ import com.fabricmanagement.sales.color.app.SalesColorService;
 import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.app.SalesLotService;
+import com.fabricmanagement.sales.ownership.domain.DefaultOwnerPolicy;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolution;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionContext;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
@@ -88,6 +91,7 @@ public class QuoteService {
   private final SalesLotService salesLotService;
   private final StockUnitSoftHoldPort stockUnitSoftHoldPort;
   private final BatchLotQuantityIntentPort batchLotQuantityIntentPort;
+  private final DefaultOwnerPolicy defaultOwnerPolicy;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -170,8 +174,22 @@ public class QuoteService {
 
   @Transactional
   public Quote createQuote(QuoteCreateRequest req) {
+    UUID tenantId = TenantContext.requireTenantId();
+    OwnerResolution ownerResolution =
+        defaultOwnerPolicy.resolve(
+            new OwnerResolutionContext(tenantId, req.getCustomerId(), req.getAssignedToId()));
+    UUID ownerId = ownerResolution.ownerId();
+    if (ownerId == null) {
+      // TODO(RSF-3, ADR-0003 A3.2): replace creator fallback with sales triage + ops alert.
+      ownerId =
+          Objects.requireNonNull(
+              TenantContext.getCurrentUserId(),
+              "Current user is required while the RSF-3 creator fallback is active");
+    }
+
     Quote quote = req.toQuote();
-    quote.setTenantId(TenantContext.requireTenantId());
+    quote.setTenantId(tenantId);
+    quote.setAssignedToId(ownerId);
     quote.setStatus(QuoteStatus.DRAFT);
     quote.setRevisionNumber(1);
     return quoteRepository.save(quote);
@@ -238,6 +256,7 @@ public class QuoteService {
     applyColorSnapshot(line, colorSnapshot);
     applyLotSnapshots(line, lotSnapshots);
     line.applyDelivery(delivery.status(), delivery.date(), delivery.covered());
+    line.applyManualFulfillmentMode(req.getFulfillmentMode());
     line.setDiscountRate(pricing.getDiscountRate());
     line.setProfitMargin(pricing.getProfitMargin());
     line.setPriceZone(pricing.getPriceZone());
@@ -299,6 +318,7 @@ public class QuoteService {
     applyColorSnapshot(line, colorSnapshot);
     applyLotSnapshots(line, lotSnapshots);
     line.applyDelivery(delivery.status(), delivery.date(), delivery.covered());
+    line.applyManualFulfillmentMode(req.getFulfillmentMode());
     line.applyPricing(pricing.getDiscountRate(), pricing.getProfitMargin(), pricing.getPriceZone());
     recomputeTotals(quote);
     Quote saved = quoteRepository.save(quote);
@@ -498,6 +518,7 @@ public class QuoteService {
       newLine.applyLotSnapshot(oldLine.getLotSnapshot());
       newLine.applyDelivery(
           oldLine.getDeliveryStatus(), oldLine.getDeliveryDate(), oldLine.getDeliveryCovered());
+      newLine.copyFulfillmentDeterminationFrom(oldLine);
       newLine.setDiscountRate(oldLine.getDiscountRate());
       newLine.setProfitMargin(oldLine.getProfitMargin());
       newLine.setPriceZone(oldLine.getPriceZone());

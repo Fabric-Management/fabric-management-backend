@@ -50,6 +50,9 @@ public class TradingPartnerDto {
   private String preferredCurrency;
   private boolean pendingAccountingReview;
 
+  @Schema(nullable = true)
+  private UUID acquiredById;
+
   // Audit
   private Instant createdAt;
   private Boolean isActive;
@@ -83,6 +86,7 @@ public class TradingPartnerDto {
         .verifiedStatus(registry != null ? registry.getVerifiedStatus().name() : null)
         .organizationId(tp.getOrganizationId())
         .pendingAccountingReview(tp.isPendingAccountingReview())
+        .acquiredById(tp.getAcquiredById())
         .createdAt(tp.getCreatedAt())
         .isActive(tp.getIsActive())
         .legacyCompanyId(tp.getLegacyCompanyId())

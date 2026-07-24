@@ -35,6 +35,10 @@ import com.fabricmanagement.sales.color.app.SalesColorService;
 import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.app.SalesLotService;
+import com.fabricmanagement.sales.ownership.domain.DefaultOwnerPolicy;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolution;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionContext;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
@@ -42,6 +46,9 @@ import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
 import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeService;
 import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeSnapshot;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationMethod;
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationStatus;
+import com.fabricmanagement.sales.quote.domain.FulfillmentMode;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalStatus;
@@ -107,6 +114,7 @@ class QuoteServiceTest {
   @Mock private SalesLotService salesLotService;
   @Mock private StockUnitSoftHoldPort stockUnitSoftHoldPort;
   @Mock private BatchLotQuantityIntentPort batchLotQuantityIntentPort;
+  @Mock private DefaultOwnerPolicy defaultOwnerPolicy;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -141,12 +149,70 @@ class QuoteServiceTest {
     req.setCurrency("GBP");
     req.setValidUntil(LocalDate.now().plusDays(5));
 
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenReturn(
+            new OwnerResolution(req.getAssignedToId(), OwnerResolutionReason.EXPLICIT_OVERRIDE));
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Quote created = quoteService.createQuote(req);
 
     assertEquals("GBP", created.getCurrency());
     assertEquals(QuoteStatus.DRAFT, created.getStatus());
+  }
+
+  @Test
+  @DisplayName("Should use creator only for the temporary triage bridge")
+  void shouldUseCreatorForTemporaryTriageBridge() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-TRIAGE");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(new OwnerResolutionContext(tenantId, customerId, null)))
+        .thenReturn(new OwnerResolution(null, OwnerResolutionReason.TRIAGE_REQUIRED));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote created = quoteService.createQuote(req);
+
+    assertEquals(userId, created.getAssignedToId());
+    assertNotNull(created.getAssignedToId());
+  }
+
+  @Test
+  @DisplayName("Should not create quote when customer eligibility fails")
+  void shouldNotCreateQuoteWhenCustomerEligibilityFails() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-BAD-CUSTOMER");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenThrow(new NotFoundException("Customer not found: " + customerId));
+
+    assertThrows(NotFoundException.class, () -> quoteService.createQuote(req));
+
+    verify(quoteRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("Should not create quote for a non-customer or inactive partner")
+  void shouldNotCreateQuoteWhenCustomerIsNotEligible() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-INELIGIBLE-CUSTOMER");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenThrow(SalesDomainException.customerNotEligible(customerId.toString()));
+
+    SalesDomainException error =
+        assertThrows(SalesDomainException.class, () -> quoteService.createQuote(req));
+
+    assertEquals("SALES_020_CUSTOMER_NOT_ELIGIBLE", error.getErrorCode());
+    verify(quoteRepository, never()).save(any());
   }
 
   @Test
@@ -427,7 +493,39 @@ class QuoteServiceTest {
         quoteService.addQuoteLine(
             quoteId, productId, new BigDecimal("2.000"), "KG", new BigDecimal("12.00"));
 
-    assertEquals("USD", updated.getLines().get(0).getCurrency());
+    QuoteLine line = updated.getLines().get(0);
+    assertEquals("USD", line.getCurrency());
+    assertNull(line.getFulfillmentMode());
+    assertEquals(FulfillmentDeterminationStatus.PENDING, line.getFulfillmentDeterminationStatus());
+    assertNull(line.getFulfillmentDeterminationMethod());
+  }
+
+  @Test
+  @DisplayName("Should derive confirmed manual determination from submitted fulfillment mode")
+  void shouldDeriveConfirmedManualDeterminationFromSubmittedFulfillmentMode() {
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("2.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setFulfillmentMode(FulfillmentMode.STOCK);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    Quote updated = quoteService.addQuoteLine(quoteId, req);
+
+    QuoteLine line = updated.getLines().get(0);
+    assertEquals(FulfillmentMode.STOCK, line.getFulfillmentMode());
+    assertEquals(
+        FulfillmentDeterminationStatus.CONFIRMED, line.getFulfillmentDeterminationStatus());
+    assertEquals(FulfillmentDeterminationMethod.MANUAL, line.getFulfillmentDeterminationMethod());
   }
 
   @Test
@@ -711,6 +809,9 @@ class QuoteServiceTest {
     QuoteLine sourceLine = quoteLine("USD", "12.00", "2.000");
     sourceLine.applyQualityGrade(qualityGradeId, "A", "Grade A", new BigDecimal("1.125"));
     sourceLine.applyColor(colorId, "NAVY-01", "Navy", "#001F3F");
+    sourceLine.setFulfillmentMode(FulfillmentMode.MAKE_TO_ORDER);
+    sourceLine.setFulfillmentDeterminationStatus(FulfillmentDeterminationStatus.PROPOSED);
+    sourceLine.setFulfillmentDeterminationMethod(FulfillmentDeterminationMethod.AUTOMATIC);
     quote.addLine(sourceLine);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
@@ -738,6 +839,11 @@ class QuoteServiceTest {
     assertEquals("NAVY-01", revisedLine.getColorCode());
     assertEquals("Navy", revisedLine.getColorName());
     assertEquals("#001F3F", revisedLine.getColorHex());
+    assertEquals(FulfillmentMode.MAKE_TO_ORDER, revisedLine.getFulfillmentMode());
+    assertEquals(
+        FulfillmentDeterminationStatus.PROPOSED, revisedLine.getFulfillmentDeterminationStatus());
+    assertEquals(
+        FulfillmentDeterminationMethod.AUTOMATIC, revisedLine.getFulfillmentDeterminationMethod());
     assertNotNull(savedRevision.getTotalAmount());
     assertNotNull(savedRevision.getReportingTotal());
   }
@@ -1003,6 +1109,48 @@ class QuoteServiceTest {
     assertEquals(0, updated.getTotalAmount().getAmount().compareTo(new BigDecimal("240.00")));
     assertEquals(
         0, updated.getReportingTotal().getConvertedAmount().compareTo(new BigDecimal("240.00")));
+  }
+
+  @Test
+  @DisplayName("Should echo or clear fulfillment mode on full-state line update")
+  void shouldEchoOrClearFulfillmentModeOnFullStateLineUpdate() {
+    UUID lineId = UUID.randomUUID();
+    QuoteLine line = quoteLine("GBP", "100.00", "2.000");
+    line.setId(lineId);
+    line.applyManualFulfillmentMode(FulfillmentMode.MAKE_TO_ORDER);
+    quote.addLine(line);
+
+    UpdateQuoteLineRequest req = new UpdateQuoteLineRequest();
+    req.setRequestedQty(new BigDecimal("2.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("100.00"));
+    req.setFulfillmentMode(FulfillmentMode.MAKE_TO_ORDER);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote echoed = quoteService.updateQuoteLine(quoteId, lineId, req);
+
+    QuoteLine echoedLine = echoed.getLines().get(0);
+    assertEquals(FulfillmentMode.MAKE_TO_ORDER, echoedLine.getFulfillmentMode());
+    assertEquals(
+        FulfillmentDeterminationStatus.CONFIRMED, echoedLine.getFulfillmentDeterminationStatus());
+    assertEquals(
+        FulfillmentDeterminationMethod.MANUAL, echoedLine.getFulfillmentDeterminationMethod());
+
+    req.setFulfillmentMode(null);
+    Quote cleared = quoteService.updateQuoteLine(quoteId, lineId, req);
+
+    QuoteLine updatedLine = cleared.getLines().get(0);
+    assertNull(updatedLine.getFulfillmentMode());
+    assertEquals(
+        FulfillmentDeterminationStatus.PENDING, updatedLine.getFulfillmentDeterminationStatus());
+    assertNull(updatedLine.getFulfillmentDeterminationMethod());
   }
 
   @Test

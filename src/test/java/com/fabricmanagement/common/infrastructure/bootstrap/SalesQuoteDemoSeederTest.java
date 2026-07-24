@@ -43,6 +43,7 @@ import com.fabricmanagement.production.masterdata.product.dto.CreateProductReque
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
+import com.fabricmanagement.sales.ownership.app.CustomerAccountTeamService;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
 import com.fabricmanagement.sales.quote.app.QuoteService;
@@ -89,6 +90,7 @@ class SalesQuoteDemoSeederTest {
   @Mock private DiscountPolicyService discountPolicyService;
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private QuoteService quoteService;
+  @Mock private CustomerAccountTeamService customerAccountTeamService;
   @Mock private UserRepository userRepository;
   @Mock private UserCreationService userCreationService;
   @Mock private RoleService roleService;
@@ -115,6 +117,7 @@ class SalesQuoteDemoSeederTest {
             discountPolicyService,
             exchangeRateService,
             quoteService,
+            customerAccountTeamService,
             userRepository,
             userCreationService,
             roleService,
@@ -138,7 +141,7 @@ class SalesQuoteDemoSeederTest {
     // Idempotency: the second run must short-circuit on the demo-customer marker.
     ArgumentCaptor<CreateTradingPartnerRequest> partnerCaptor =
         ArgumentCaptor.forClass(CreateTradingPartnerRequest.class);
-    verify(tradingPartnerService, times(1)).createPartner(partnerCaptor.capture());
+    verify(tradingPartnerService, times(1)).createPartner(partnerCaptor.capture(), eq(EMMA_ID));
     assertThat(partnerCaptor.getValue().getPartnerType()).isEqualTo(PartnerType.CUSTOMER);
     assertThat(partnerCaptor.getValue().getCountry()).isEqualTo("GBR");
 
@@ -213,6 +216,7 @@ class SalesQuoteDemoSeederTest {
     assertThat(draftQuote.getQuoteNumber())
         .startsWith(SalesQuoteDemoSeeder.DRAFT_QUOTE_NUMBER_STEM);
     assertThat(draftQuote.getAssignedToId()).isEqualTo(SANDRA_ID);
+    verify(customerAccountTeamService).addMember(TENANT_ID, partners.get(0).getId(), SANDRA_ID);
 
     ArgumentCaptor<CreateInternalUserRequest> userCaptor =
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
@@ -267,7 +271,7 @@ class SalesQuoteDemoSeederTest {
     assertThatThrownBy(() -> seeder.seedFor(TENANT_ID))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("grades unavailable");
-    verify(tradingPartnerService, never()).createPartner(any());
+    verify(tradingPartnerService, never()).createPartner(any(), any());
     // The finally block must still restore the previous tenant context.
     assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
   }
@@ -286,7 +290,7 @@ class SalesQuoteDemoSeederTest {
   private void stubHappyPath() {
     when(tradingPartnerService.searchByName(TENANT_ID, SalesQuoteDemoSeeder.CUSTOMER_ALBION))
         .thenAnswer(invocation -> List.copyOf(partners));
-    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class)))
+    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class), eq(EMMA_ID)))
         .thenAnswer(
             invocation -> {
               CreateTradingPartnerRequest req = invocation.getArgument(0);

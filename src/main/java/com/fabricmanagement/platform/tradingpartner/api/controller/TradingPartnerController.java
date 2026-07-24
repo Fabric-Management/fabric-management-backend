@@ -77,7 +77,8 @@ public class TradingPartnerController {
         request.getCompanyName(),
         request.getPartnerType());
 
-    TradingPartnerDto created = tradingPartnerService.createPartner(request);
+    TradingPartnerDto created =
+        tradingPartnerService.createPartner(request, TenantContext.getCurrentUserId());
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(created, "Trading partner created successfully"));
@@ -88,7 +89,8 @@ public class TradingPartnerController {
   @Operation(summary = "Quick-create a customer for sales")
   public ResponseEntity<ApiResponse<TradingPartnerDto>> quickCreateCustomer(
       @Valid @RequestBody QuickCreateCustomerRequest request) {
-    TradingPartnerDto created = tradingPartnerService.quickCreateCustomer(request);
+    TradingPartnerDto created =
+        tradingPartnerService.quickCreateCustomer(request, TenantContext.getCurrentUserId());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(created, "Customer created successfully"));
   }
@@ -116,7 +118,8 @@ public class TradingPartnerController {
       @Parameter(description = "Partner ID") @PathVariable UUID id,
       @Valid @RequestBody UpdateTradingPartnerRequest request) {
     log.info("Updating trading partner: id={}", id);
-    TradingPartnerDto updated = tradingPartnerService.updatePartner(id, request);
+    TradingPartnerDto updated =
+        tradingPartnerService.updatePartner(id, request, TenantContext.getCurrentUserId());
     return ResponseEntity.ok(ApiResponse.success(updated, "Trading partner updated successfully"));
   }
 

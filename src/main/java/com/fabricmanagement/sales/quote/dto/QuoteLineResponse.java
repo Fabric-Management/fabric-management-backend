@@ -1,8 +1,12 @@
 package com.fabricmanagement.sales.quote.dto;
 
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationMethod;
+import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationStatus;
+import com.fabricmanagement.sales.quote.domain.FulfillmentMode;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuoteLineDeliveryStatus;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -27,6 +31,16 @@ public class QuoteLineResponse {
   private final QuoteLineDeliveryStatus deliveryStatus;
   private final LocalDate deliveryDate;
   private final Boolean deliveryCovered;
+
+  @Schema(description = "Line-level fulfilment mode", nullable = true)
+  private final FulfillmentMode fulfillmentMode;
+
+  @Schema(description = "Current fulfilment determination status")
+  private final FulfillmentDeterminationStatus fulfillmentDeterminationStatus;
+
+  @Schema(description = "How the current fulfilment mode was determined", nullable = true)
+  private final FulfillmentDeterminationMethod fulfillmentDeterminationMethod;
+
   private final BigDecimal requestedQty;
   private final String unit;
   private final BigDecimal listPrice;
@@ -53,6 +67,9 @@ public class QuoteLineResponse {
     this.deliveryStatus = line.getDeliveryStatus();
     this.deliveryDate = line.getDeliveryDate();
     this.deliveryCovered = line.getDeliveryCovered();
+    this.fulfillmentMode = line.getFulfillmentMode();
+    this.fulfillmentDeterminationStatus = line.getFulfillmentDeterminationStatus();
+    this.fulfillmentDeterminationMethod = line.getFulfillmentDeterminationMethod();
     this.requestedQty = line.getRequestedQty();
     this.unit = line.getUnit();
     this.listPrice = line.getListPrice();

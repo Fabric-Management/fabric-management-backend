@@ -68,6 +68,19 @@ public class QuoteLine extends BaseEntity {
   @Column(name = "delivery_covered")
   private Boolean deliveryCovered;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "fulfillment_mode", length = 32)
+  private FulfillmentMode fulfillmentMode;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "fulfillment_determination_status", nullable = false, length = 16)
+  private FulfillmentDeterminationStatus fulfillmentDeterminationStatus =
+      FulfillmentDeterminationStatus.PENDING;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "fulfillment_determination_method", length = 16)
+  private FulfillmentDeterminationMethod fulfillmentDeterminationMethod;
+
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
 
@@ -148,6 +161,22 @@ public class QuoteLine extends BaseEntity {
     this.deliveryStatus = deliveryStatus;
     this.deliveryDate = deliveryDate;
     this.deliveryCovered = deliveryCovered;
+  }
+
+  public void applyManualFulfillmentMode(FulfillmentMode fulfillmentMode) {
+    this.fulfillmentMode = fulfillmentMode;
+    this.fulfillmentDeterminationStatus =
+        fulfillmentMode == null
+            ? FulfillmentDeterminationStatus.PENDING
+            : FulfillmentDeterminationStatus.CONFIRMED;
+    this.fulfillmentDeterminationMethod =
+        fulfillmentMode == null ? null : FulfillmentDeterminationMethod.MANUAL;
+  }
+
+  public void copyFulfillmentDeterminationFrom(QuoteLine source) {
+    this.fulfillmentMode = source.getFulfillmentMode();
+    this.fulfillmentDeterminationStatus = source.getFulfillmentDeterminationStatus();
+    this.fulfillmentDeterminationMethod = source.getFulfillmentDeterminationMethod();
   }
 
   public void applyPricing(

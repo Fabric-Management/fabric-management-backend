@@ -45,6 +45,7 @@ public class QuoteResponse {
   private final UUID parentQuoteId;
   private final Instant createdAt;
   private final List<QuoteLineResponse> lines;
+  private final boolean mixedFulfillment;
 
   private QuoteResponse(Quote quote) {
     this(quote, null);
@@ -70,6 +71,7 @@ public class QuoteResponse {
     this.parentQuoteId = quote.getParentQuoteId();
     this.createdAt = quote.getCreatedAt();
     this.lines = quote.getLines().stream().map(QuoteLineResponse::from).toList();
+    this.mixedFulfillment = quote.isMixedFulfillment();
   }
 
   public static QuoteResponse from(Quote quote) {
