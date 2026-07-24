@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -127,7 +128,7 @@ class ProcurementDemoSeederTest {
                 partners.stream()
                     .filter(p -> ProcurementDemoSeeder.SUPPLIER_ANATOLIA.equals(p.getDisplayName()))
                     .toList());
-    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class)))
+    when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class), isNull()))
         .thenAnswer(
             invocation -> {
               CreateTradingPartnerRequest req = invocation.getArgument(0);
@@ -285,7 +286,7 @@ class ProcurementDemoSeederTest {
 
     ArgumentCaptor<CreateTradingPartnerRequest> partnerCaptor =
         ArgumentCaptor.forClass(CreateTradingPartnerRequest.class);
-    verify(tradingPartnerService, times(3)).createPartner(partnerCaptor.capture());
+    verify(tradingPartnerService, times(3)).createPartner(partnerCaptor.capture(), isNull());
     assertThat(partnerCaptor.getAllValues())
         .filteredOn(req -> req.getPartnerType() == PartnerType.SUPPLIER)
         .hasSizeGreaterThanOrEqualTo(1);

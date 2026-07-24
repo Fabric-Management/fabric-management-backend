@@ -165,6 +165,14 @@ class QuoteRequestValidationTest {
     return request;
   }
 
+  @Test
+  void assignedToIdIsAnOptionalOwnerOverride() {
+    QuoteCreateRequest request = validCreateRequest();
+    request.setAssignedToId(null);
+
+    assertThat(violatedFields(request)).doesNotContain("assignedToId");
+  }
+
   private static Set<String> violatedFields(Object request) {
     return validator.validate(request).stream()
         .map(violation -> violation.getPropertyPath().toString())

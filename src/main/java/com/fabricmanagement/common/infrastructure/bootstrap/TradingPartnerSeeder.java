@@ -118,7 +118,7 @@ public class TradingPartnerSeeder implements DataSeeder {
             .country("TR")
             .build();
 
-    tradingPartnerService.createPartner(req);
+    tradingPartnerService.createPartner(req, null);
     log.info("Created Trading Partner: {} - Type: {}", name, type);
   }
 

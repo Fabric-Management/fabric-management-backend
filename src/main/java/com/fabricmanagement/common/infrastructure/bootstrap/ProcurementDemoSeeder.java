@@ -253,7 +253,7 @@ public class ProcurementDemoSeeder {
     req.setPartnerType(type);
     req.setRelationshipMeta(
         Map.of("payment_terms", paymentTerms, "contact_email", contactEmail(name), "notes", notes));
-    return tradingPartnerService.createPartner(req);
+    return tradingPartnerService.createPartner(req, null);
   }
 
   private WorkOrderResponse approvedWorkOrder(

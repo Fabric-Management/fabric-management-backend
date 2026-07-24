@@ -35,6 +35,10 @@ import com.fabricmanagement.sales.color.app.SalesColorService;
 import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.app.SalesLotService;
+import com.fabricmanagement.sales.ownership.domain.DefaultOwnerPolicy;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolution;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionContext;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
@@ -110,6 +114,7 @@ class QuoteServiceTest {
   @Mock private SalesLotService salesLotService;
   @Mock private StockUnitSoftHoldPort stockUnitSoftHoldPort;
   @Mock private BatchLotQuantityIntentPort batchLotQuantityIntentPort;
+  @Mock private DefaultOwnerPolicy defaultOwnerPolicy;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -144,12 +149,70 @@ class QuoteServiceTest {
     req.setCurrency("GBP");
     req.setValidUntil(LocalDate.now().plusDays(5));
 
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenReturn(
+            new OwnerResolution(req.getAssignedToId(), OwnerResolutionReason.EXPLICIT_OVERRIDE));
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Quote created = quoteService.createQuote(req);
 
     assertEquals("GBP", created.getCurrency());
     assertEquals(QuoteStatus.DRAFT, created.getStatus());
+  }
+
+  @Test
+  @DisplayName("Should use creator only for the temporary triage bridge")
+  void shouldUseCreatorForTemporaryTriageBridge() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-TRIAGE");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(new OwnerResolutionContext(tenantId, customerId, null)))
+        .thenReturn(new OwnerResolution(null, OwnerResolutionReason.TRIAGE_REQUIRED));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote created = quoteService.createQuote(req);
+
+    assertEquals(userId, created.getAssignedToId());
+    assertNotNull(created.getAssignedToId());
+  }
+
+  @Test
+  @DisplayName("Should not create quote when customer eligibility fails")
+  void shouldNotCreateQuoteWhenCustomerEligibilityFails() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-BAD-CUSTOMER");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenThrow(new NotFoundException("Customer not found: " + customerId));
+
+    assertThrows(NotFoundException.class, () -> quoteService.createQuote(req));
+
+    verify(quoteRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("Should not create quote for a non-customer or inactive partner")
+  void shouldNotCreateQuoteWhenCustomerIsNotEligible() {
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-INELIGIBLE-CUSTOMER");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(any(OwnerResolutionContext.class)))
+        .thenThrow(SalesDomainException.customerNotEligible(customerId.toString()));
+
+    SalesDomainException error =
+        assertThrows(SalesDomainException.class, () -> quoteService.createQuote(req));
+
+    assertEquals("SALES_020_CUSTOMER_NOT_ELIGIBLE", error.getErrorCode());
+    verify(quoteRepository, never()).save(any());
   }
 
   @Test

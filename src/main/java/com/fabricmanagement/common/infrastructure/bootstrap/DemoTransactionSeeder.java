@@ -101,7 +101,7 @@ public class DemoTransactionSeeder {
       partnerReq.setTaxId("US-GFW-" + tenantId.toString().substring(0, 8));
       partnerReq.setPartnerType(PartnerType.CUSTOMER);
       partnerReq.setCountry("USA");
-      TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq);
+      TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq, null);
 
       // 2b. Finance dataset (DEMO-1): reporting currency (USD), FX rates, AR/AP invoices +
       // payments.

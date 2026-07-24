@@ -152,11 +152,30 @@ public class TradingPartner extends BaseEntity {
   @Builder.Default
   private boolean pendingAccountingReview = false;
 
+  /**
+   * Immutable acquisition fact for customer relationships.
+   *
+   * <p>Null for supplier-only relationships and legacy customers whose initiator is unknown. Once
+   * populated it is never overwritten by normal create or update flows.
+   */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "acquired_by_id")
+  private UUID acquiredById;
+
   @Embedded private OfflineMetadata offlineMetadata;
 
   @Override
   protected String getModuleCode() {
     return "TP";
+  }
+
+  /** Records the acquisition fact once; subsequent calls cannot overwrite it. */
+  public boolean recordAcquirer(UUID acquirerId) {
+    if (!partnerType.isCustomer() || acquiredById != null || acquirerId == null) {
+      return false;
+    }
+    acquiredById = acquirerId;
+    return true;
   }
 
   /**

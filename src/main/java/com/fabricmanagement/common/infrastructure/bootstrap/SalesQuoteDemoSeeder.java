@@ -39,6 +39,7 @@ import com.fabricmanagement.production.masterdata.product.dto.CreateProductReque
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
+import com.fabricmanagement.sales.ownership.app.CustomerAccountTeamService;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
@@ -121,6 +122,7 @@ public class SalesQuoteDemoSeeder {
   private final DiscountPolicyService discountPolicyService;
   private final ExchangeRateService exchangeRateService;
   private final QuoteService quoteService;
+  private final CustomerAccountTeamService customerAccountTeamService;
   private final UserRepository userRepository;
   private final UserCreationService userCreationService;
   private final RoleService roleService;
@@ -252,9 +254,12 @@ public class SalesQuoteDemoSeeder {
       releasePieceBackedBatch(lot23050.getId());
 
       // ── Actors ──
-      TradingPartnerDto albion = createAlbionCustomer(tenantId);
       UUID emmaId = ensureMarketer(tenantId);
+      TradingPartnerDto albion = createAlbionCustomer(tenantId, emmaId);
       UUID draftOwnerId = resolveDraftOwner(tenantId, emmaId);
+      if (!draftOwnerId.equals(emmaId)) {
+        customerAccountTeamService.addMember(tenantId, albion.getId(), draftOwnerId);
+      }
 
       // ── Emma's competing open quote: soft intents shrink Navy free stock ──
       Quote emmaQuote =
@@ -490,7 +495,7 @@ public class SalesQuoteDemoSeeder {
 
   // ── Actor helpers ───────────────────────────────────────────────────────────
 
-  private TradingPartnerDto createAlbionCustomer(UUID tenantId) {
+  private TradingPartnerDto createAlbionCustomer(UUID tenantId, UUID acquiredById) {
     CreateTradingPartnerRequest req = new CreateTradingPartnerRequest();
     req.setCompanyName(CUSTOMER_ALBION);
     req.setCustomName(CUSTOMER_ALBION);
@@ -502,7 +507,7 @@ public class SalesQuoteDemoSeeder {
             "payment_terms", "NET30",
             "contact_email", "buying@albionapparel.co.uk",
             "notes", "Demo customer for sales quotes"));
-    return tradingPartnerService.createPartner(req);
+    return tradingPartnerService.createPartner(req, acquiredById);
   }
 
   private UUID ensureMarketer(UUID tenantId) {

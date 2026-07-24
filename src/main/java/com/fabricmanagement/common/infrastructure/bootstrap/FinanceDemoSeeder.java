@@ -152,7 +152,7 @@ public class FinanceDemoSeeder {
     req.setTaxId(taxId);
     req.setPartnerType(type);
     req.setCountry(country);
-    return tradingPartnerService.createPartner(req).getId();
+    return tradingPartnerService.createPartner(req, null).getId();
   }
 
   /** Creates a no-line invoice (subtotal == total, no tax/discount), then issues and sends it. */

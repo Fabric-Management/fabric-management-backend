@@ -90,6 +90,8 @@ tags:
   name: FlowBoard — Performance
 - description: Immutable stock quality disposition decisions
   name: Quality Decisions
+- description: Commercial ownership for sales customers
+  name: Customer Account Team
 - description: Tenant go-real transition operations
   name: Tenant Go Real
 - description: Subcontract Order operations
@@ -38991,6 +38993,230 @@ paths:
       summary: List sales-readable color cards
       tags:
       - Sales Color
+  /api/v1/sales/customers/{customerId}/account-team:
+    get:
+      operationId: getAccountTeam
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerAccountTeamResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a customer's commercial account team
+      tags:
+      - Customer Account Team
+    post:
+      operationId: addMember
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCustomerAccountTeamMemberRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerAccountTeamMemberResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Add or reactivate a customer account-team member
+      tags:
+      - Customer Account Team
+  /api/v1/sales/customers/{customerId}/account-team/{userId}:
+    delete:
+      operationId: deactivateMember
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Deactivate a customer account-team member
+      tags:
+      - Customer Account Team
   /api/v1/sales/lots:
     get:
       operationId: listSalesLots
@@ -45081,6 +45307,14 @@ components:
           pattern: ^\S(?:.*\S)?$
       required:
       - externalCode
+    AddCustomerAccountTeamMemberRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+      required:
+      - userId
     AddOrganizationCertificationRequest:
       type: object
       properties:
@@ -45965,6 +46199,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/CurrentUserResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseCustomerAccountTeamMemberResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CustomerAccountTeamMemberResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseCustomerAccountTeamResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CustomerAccountTeamResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -53793,6 +54063,48 @@ components:
           format: int32
         workLocationLabel:
           type: string
+    CustomerAccountTeamMemberResponse:
+      type: object
+      properties:
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type:
+          - string
+          - "null"
+        userId:
+          type: string
+          format: uuid
+    CustomerAccountTeamResponse:
+      type: object
+      properties:
+        acquiredById:
+          type:
+          - string
+          - "null"
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        defaultOwnerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        defaultOwnerReason:
+          type: string
+          enum:
+          - EXPLICIT_OVERRIDE
+          - ACQUIRER
+          - ACCOUNT_TEAM
+          - TRIAGE_REQUIRED
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerAccountTeamMemberResponse"
     CustomerApprovalRequest:
       type: object
       properties:
@@ -59261,7 +59573,9 @@ components:
       type: object
       properties:
         assignedToId:
-          type: string
+          type:
+          - string
+          - "null"
           format: uuid
         currency:
           type: string
@@ -59307,7 +59621,6 @@ components:
           type: string
           format: date
       required:
-      - assignedToId
       - currency
       - customerId
       - moduleType
@@ -62344,6 +62657,11 @@ components:
     TradingPartnerDto:
       type: object
       properties:
+        acquiredById:
+          type:
+          - string
+          - "null"
+          format: uuid
         country:
           type: string
         createdAt:

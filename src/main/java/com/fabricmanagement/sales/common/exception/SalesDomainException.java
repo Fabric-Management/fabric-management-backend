@@ -110,4 +110,25 @@ public class SalesDomainException extends DomainException {
     return new SalesDomainException(
         message, "SALES_017_LOT_INTENT_QUANTITY_MISMATCH", HttpStatus.UNPROCESSABLE_ENTITY);
   }
+
+  public static SalesDomainException ownerNotSelectable(String ownerId) {
+    return new SalesDomainException(
+        "Requested owner is not selectable for this customer: " + ownerId,
+        "SALES_018_OWNER_NOT_SELECTABLE",
+        HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+
+  public static SalesDomainException accountTeamUserInactive(String userId) {
+    return new SalesDomainException(
+        "Inactive user cannot be added to a customer account team: " + userId,
+        "SALES_019_ACCOUNT_TEAM_USER_INACTIVE",
+        HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+
+  public static SalesDomainException customerNotEligible(String customerId) {
+    return new SalesDomainException(
+        "Trading partner is not an active customer: " + customerId,
+        "SALES_020_CUSTOMER_NOT_ELIGIBLE",
+        HttpStatus.UNPROCESSABLE_ENTITY);
+  }
 }
