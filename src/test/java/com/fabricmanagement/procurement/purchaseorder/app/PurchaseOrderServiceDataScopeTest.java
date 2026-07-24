@@ -16,8 +16,10 @@ import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrder;
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderLine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
@@ -53,6 +55,7 @@ class PurchaseOrderServiceDataScopeTest {
   @Mock private DataScopeGuard scopeGuard;
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  @Mock private PoReceiveStatusService receiveStatusService;
 
   @AfterEach
   void clearTenantContext() {
@@ -144,6 +147,26 @@ class PurchaseOrderServiceDataScopeTest {
   }
 
   @Test
+  void changeStatusRejectsDerivedReceiveTargetsWithCoded422() {
+    PurchaseOrder po = purchaseOrder(PurchaseOrderStatus.CONFIRMED);
+    PurchaseOrderService service = service();
+    when(poRepository.findById(PO_ID)).thenReturn(Optional.of(po));
+
+    for (PurchaseOrderStatus target :
+        List.of(PurchaseOrderStatus.PARTIALLY_RECEIVED, PurchaseOrderStatus.RECEIVED)) {
+      assertThatThrownBy(() -> service.changeStatus(PO_ID, target))
+          .isInstanceOfSatisfying(
+              ProcurementDomainException.class,
+              exception -> {
+                assertThat(exception.getErrorCode()).isEqualTo("PO_RECEIVE_STATUS_DERIVED");
+                assertThat(exception.getHttpStatus()).isEqualTo(422);
+              });
+    }
+
+    verify(poRepository, never()).save(any(PurchaseOrder.class));
+  }
+
+  @Test
   void createPurchaseOrderDoesNotApplyRowScopeGuardButReturnsCanEdit() {
     TenantContext.setCurrentTenantId(TENANT_ID);
     PurchaseOrderService service = service();
@@ -155,9 +178,20 @@ class PurchaseOrderServiceDataScopeTest {
             invocation -> {
               PurchaseOrder po = invocation.getArgument(0);
               po.setId(PO_ID);
+              po.setTenantId(TENANT_ID);
               return po;
             });
-    when(lineRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(lineRepository.saveAll(any()))
+        .thenAnswer(
+            invocation -> {
+              List<PurchaseOrderLine> lines = invocation.getArgument(0);
+              lines.forEach(
+                  line -> {
+                    line.setId(UUID.randomUUID());
+                    line.setTenantId(TENANT_ID);
+                  });
+              return lines;
+            });
     when(scopeGuard.canAccess(eq("procurement"), eq("write"), any(PurchaseOrder.class)))
         .thenReturn(true);
     when(tenantReportingCurrencyPort.getReportingCurrency(TENANT_ID)).thenReturn("USD");
@@ -170,6 +204,9 @@ class PurchaseOrderServiceDataScopeTest {
   }
 
   private PurchaseOrderService service() {
+    org.mockito.Mockito.lenient()
+        .when(receiveStatusService.getLineCoverage(any(), any(), any()))
+        .thenReturn(java.util.Map.of());
     return new PurchaseOrderService(
         poRepository,
         lineRepository,
@@ -178,7 +215,8 @@ class PurchaseOrderServiceDataScopeTest {
         documentNumberGenerator,
         scopeGuard,
         exchangeRateService,
-        tenantReportingCurrencyPort);
+        tenantReportingCurrencyPort,
+        receiveStatusService);
   }
 
   private PurchaseOrder purchaseOrder(PurchaseOrderStatus status) {
@@ -194,6 +232,7 @@ class PurchaseOrderServiceDataScopeTest {
             .moduleType(PurchaseOrderModuleType.GENERIC)
             .build();
     po.setId(PO_ID);
+    po.setTenantId(TENANT_ID);
     return po;
   }
 

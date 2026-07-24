@@ -4,6 +4,7 @@ import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -46,5 +47,15 @@ public class PurchaseOrderResponse {
     String currency;
     BigDecimal totalPrice;
     PurchaseOrderSpecs moduleSpecs;
+
+    @Schema(
+        description = "Cumulative confirmed receipt quantity expressed in this line's unit",
+        requiredMode = Schema.RequiredMode.REQUIRED)
+    BigDecimal receivedQty;
+
+    @Schema(
+        description = "Whether one or more receipt items could not be counted due to unit mismatch",
+        requiredMode = Schema.RequiredMode.REQUIRED)
+    boolean receiveMismatch;
   }
 }

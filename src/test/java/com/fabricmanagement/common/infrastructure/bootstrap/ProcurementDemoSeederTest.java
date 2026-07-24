@@ -400,6 +400,8 @@ class ProcurementDemoSeederTest {
         .productDesc("Demo cotton")
         .qty(BigDecimal.TEN)
         .unit("KG")
+        .receivedQty(BigDecimal.ZERO)
+        .receiveMismatch(false)
         .build();
   }
 

@@ -12,4 +12,8 @@ public class ProcurementDomainException extends DomainException {
   public ProcurementDomainException(String message, Throwable cause) {
     super(message, "PROCUREMENT_RULE_VIOLATION", 400, cause);
   }
+
+  public ProcurementDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
 }

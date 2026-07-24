@@ -53,6 +53,7 @@ public class PurchaseOrderService {
   private final DataScopeGuard scopeGuard;
   private final ExchangeRateService exchangeRateService;
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  private final PoReceiveStatusService receiveStatusService;
 
   public PurchaseOrderResponse getPurchaseOrder(UUID id) {
     PurchaseOrder po = findEntityById(id);
@@ -175,14 +176,22 @@ public class PurchaseOrderService {
    * Transitions the PurchaseOrder status. Validates against the state machine in
    * PurchaseOrderStatus.
    *
-   * <p>Special rule: CONFIRMED → PARTIALLY_RECEIVED / RECEIVED transitions are driven by
-   * GoodsReceipt confirmation (via event in Phase 3.2+). Manual status change here is for
-   * DRAFT→SENT, SENT→CONFIRMED, etc.
+   * <p>Special rule: CONFIRMED → PARTIALLY_RECEIVED / RECEIVED transitions are derived from
+   * confirmed GoodsReceipts by {@link PoReceiveStatusService}. Manual status change here is for
+   * DRAFT→SENT, SENT→CONFIRMED, etc.; derived receive targets are rejected.
    */
   @Transactional
   public PurchaseOrderResponse changeStatus(UUID id, PurchaseOrderStatus newStatus) {
     PurchaseOrder po = findEntityById(id);
     scopeGuard.assertCanAccess("procurement", "write", po);
+
+    if (newStatus == PurchaseOrderStatus.PARTIALLY_RECEIVED
+        || newStatus == PurchaseOrderStatus.RECEIVED) {
+      throw new ProcurementDomainException(
+          "PurchaseOrder receive status is derived from confirmed goods receipts",
+          "PO_RECEIVE_STATUS_DERIVED",
+          422);
+    }
 
     if (!po.getStatus().canTransitionTo(newStatus)) {
       throw new ProcurementDomainException(
@@ -268,21 +277,28 @@ public class PurchaseOrderService {
   }
 
   private PurchaseOrderResponse mapToResponse(PurchaseOrder po, List<PurchaseOrderLine> lines) {
+    var coverageByLine = receiveStatusService.getLineCoverage(po.getTenantId(), po.getId(), lines);
     List<PurchaseOrderResponse.PurchaseOrderLineResponse> lineResps =
         lines.stream()
             .map(
-                l ->
-                    PurchaseOrderResponse.PurchaseOrderLineResponse.builder()
-                        .id(l.getId())
-                        .productId(l.getProductId())
-                        .productDesc(l.getProductDesc())
-                        .qty(l.getQty())
-                        .unit(l.getUnit())
-                        .unitPrice(extractAmount(l.getUnitPrice()))
-                        .currency(extractCurrencyCode(l.getUnitPrice()))
-                        .totalPrice(l.getTotalPrice())
-                        .moduleSpecs(l.getModuleSpecs())
-                        .build())
+                line -> {
+                  var coverage =
+                      coverageByLine.getOrDefault(
+                          line.getId(), PoReceiveStatusService.LineCoverage.empty());
+                  return PurchaseOrderResponse.PurchaseOrderLineResponse.builder()
+                      .id(line.getId())
+                      .productId(line.getProductId())
+                      .productDesc(line.getProductDesc())
+                      .qty(line.getQty())
+                      .unit(line.getUnit())
+                      .unitPrice(extractAmount(line.getUnitPrice()))
+                      .currency(extractCurrencyCode(line.getUnitPrice()))
+                      .totalPrice(line.getTotalPrice())
+                      .moduleSpecs(line.getModuleSpecs())
+                      .receivedQty(coverage.receivedQty())
+                      .receiveMismatch(coverage.receiveMismatch())
+                      .build();
+                })
             .toList();
 
     return PurchaseOrderResponse.builder()
