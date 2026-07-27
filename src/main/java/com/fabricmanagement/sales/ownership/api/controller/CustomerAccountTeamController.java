@@ -4,11 +4,13 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.sales.ownership.app.CustomerAccountTeamService;
 import com.fabricmanagement.sales.ownership.dto.AddCustomerAccountTeamMemberRequest;
+import com.fabricmanagement.sales.ownership.dto.CustomerAccountTeamCandidateResponse;
 import com.fabricmanagement.sales.ownership.dto.CustomerAccountTeamMemberResponse;
 import com.fabricmanagement.sales.ownership.dto.CustomerAccountTeamResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +40,16 @@ public class CustomerAccountTeamController {
     return ResponseEntity.ok(
         ApiResponse.success(
             accountTeamService.getAccountTeam(TenantContext.requireTenantId(), customerId)));
+  }
+
+  @GetMapping("/candidates")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "List active users selectable for a customer's account team")
+  public ResponseEntity<ApiResponse<List<CustomerAccountTeamCandidateResponse>>> listCandidates(
+      @PathVariable UUID customerId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            accountTeamService.listCandidates(TenantContext.requireTenantId(), customerId)));
   }
 
   @PostMapping
