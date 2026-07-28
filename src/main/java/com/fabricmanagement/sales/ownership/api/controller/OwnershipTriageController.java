@@ -51,8 +51,7 @@ public class OwnershipTriageController {
   }
 
   @PostMapping("/{customerId}/resolve")
-  @PreAuthorize(
-      "@auth.can(authentication, 'sales', 'write')" + " and hasAnyRole('ADMIN', 'MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'assign-owner')")
   @Operation(summary = "Resolve a triage case by assigning its primary representative")
   public ResponseEntity<ApiResponse<CustomerCommercialAssignmentResponse>> resolve(
       @PathVariable UUID customerId,

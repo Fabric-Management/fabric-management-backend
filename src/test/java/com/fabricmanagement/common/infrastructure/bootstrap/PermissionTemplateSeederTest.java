@@ -173,6 +173,28 @@ class PermissionTemplateSeederTest {
   }
 
   @Test
+  @DisplayName("OWN-PERM-1: assigns ownership only to ADMIN and SALES MANAGER by default")
+  void seedsAssignOwnerWithLeastPrivilege() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    List<Tuple> grants =
+        saved.stream()
+            .filter(t -> "sales".equals(t.getResource()) && "assign-owner".equals(t.getAction()))
+            .map(t -> Tuple.tuple(t.getRoleCode(), t.getDepartmentCode(), t.getDataScope()))
+            .toList();
+
+    assertThat(grants)
+        .containsExactlyInAnyOrder(
+            Tuple.tuple("ADMIN", null, DataScope.GLOBAL),
+            Tuple.tuple("MANAGER", "SALES", DataScope.ORGANIZATION))
+        .doesNotContain(
+            Tuple.tuple("MANAGER", null, DataScope.ORGANIZATION),
+            Tuple.tuple("SUPERVISOR", "SALES", DataScope.ORGANIZATION),
+            Tuple.tuple("WORKER", "SALES", DataScope.ORGANIZATION));
+  }
+
+  @Test
   @DisplayName("COLOR-RBAC-1: colours matrix is ORGANIZATION-scoped with the right grants/absences")
   void seedsColourMatrix() {
     List<PermissionTemplate> saved = new ArrayList<>();

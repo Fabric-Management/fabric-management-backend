@@ -106,6 +106,12 @@ class PermissionTemplateBackfillIT {
     assertThat(countOf(crippled, "quality", "approve")).isGreaterThan(0);
     assertThat(countOf(crippled, "quality", "manage")).isGreaterThan(0);
 
+    // OWN-PERM-1: existing tenants receive both least-privilege ownership grants.
+    assertThat(countGrant(crippled, "ADMIN", null, "sales", "assign-owner")).isEqualTo(1);
+    assertThat(countGrant(crippled, "MANAGER", "SALES", "sales", "assign-owner")).isEqualTo(1);
+    assertThat(countGrant(crippled, "SUPERVISOR", "SALES", "sales", "assign-owner")).isZero();
+    assertThat(countGrant(crippled, "WORKER", "SALES", "sales", "assign-owner")).isZero();
+
     // A tenant that never existed before the fix still gets the full set.
     assertThat(countOf(healthy, "sales", "read")).isGreaterThan(0);
 
@@ -130,10 +136,30 @@ class PermissionTemplateBackfillIT {
 
   @Test
   void isIdempotentAcrossBoots() {
+    String existingTenant = "33333333-3333-3333-3333-333333333333";
+    systemTransactionExecutor.executeInTransaction(
+        jdbcTemplate -> {
+          jdbcTemplate.update(
+              """
+              INSERT INTO common_tenant.common_tenant (id, uid, slug, name, status)
+              VALUES (?::uuid, 'T-IDEMPOTENT', 'idempotent', 'Idempotent Mills', 'ACTIVE')
+              """,
+              existingTenant);
+          return null;
+        });
+
     backfillRunner.run();
+    assertThat(countGrant(existingTenant, "ADMIN", null, "sales", "assign-owner")).isEqualTo(1);
+    assertThat(countGrant(existingTenant, "MANAGER", "SALES", "sales", "assign-owner"))
+        .isEqualTo(1);
     Integer before = totalRows();
+
     backfillRunner.run();
+
     assertThat(totalRows()).withFailMessage("backfill must not duplicate rows").isEqualTo(before);
+    assertThat(countGrant(existingTenant, "ADMIN", null, "sales", "assign-owner")).isEqualTo(1);
+    assertThat(countGrant(existingTenant, "MANAGER", "SALES", "sales", "assign-owner"))
+        .isEqualTo(1);
   }
 
   private Integer countOf(String tenantId, String resource, String action) {
@@ -146,6 +172,28 @@ class PermissionTemplateBackfillIT {
                 """,
                 Integer.class,
                 tenantId,
+                resource,
+                action));
+  }
+
+  private Integer countGrant(
+      String tenantId, String roleCode, String departmentCode, String resource, String action) {
+    return systemTransactionExecutor.executeInTransaction(
+        jdbcTemplate ->
+            jdbcTemplate.queryForObject(
+                """
+                SELECT count(*) FROM common_user.permission_template
+                WHERE tenant_id = ?::uuid
+                  AND role_code = ?
+                  AND COALESCE(department_code, '__ALL__') =
+                      COALESCE(?::varchar, '__ALL__')
+                  AND resource = ?
+                  AND action = ?
+                """,
+                Integer.class,
+                tenantId,
+                roleCode,
+                departmentCode,
                 resource,
                 action));
   }

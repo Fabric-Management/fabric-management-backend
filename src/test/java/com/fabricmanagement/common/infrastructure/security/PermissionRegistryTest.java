@@ -21,6 +21,11 @@ class PermissionRegistryTest {
   }
 
   @Test
+  void assignOwnerIsAValidAction() {
+    assertThat(PermissionRegistry.isValidAction("assign-owner")).isTrue();
+  }
+
+  @Test
   void unknownResourceOrActionStaysRejected() {
     assertThat(PermissionRegistry.isValidResource("colours")).isFalse();
     assertThat(PermissionRegistry.isValidResource("color")).isFalse();
