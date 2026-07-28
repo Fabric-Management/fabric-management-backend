@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.ownership.infra.repository;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.sql.Timestamp;
@@ -119,6 +120,12 @@ public class OwnershipTriageCaseLogRepository {
   }
 
   private void bindTenant(UUID tenantId) {
+    UUID ambientTenantId = TenantContext.requireTenantId();
+    if (!ambientTenantId.equals(tenantId)) {
+      throw new IllegalStateException(
+          "Triage case-log tenant mismatch: ambient=%s requested=%s"
+              .formatted(ambientTenantId, tenantId));
+    }
     entityManager
         .createNativeQuery("SELECT set_config('app.current_tenant', :tenantId, true)")
         .setParameter("tenantId", tenantId.toString())

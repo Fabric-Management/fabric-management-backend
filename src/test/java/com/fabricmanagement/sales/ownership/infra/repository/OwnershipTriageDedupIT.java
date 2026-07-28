@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.ownership.app.OwnershipTriageAgingEmailAdapter;
 import com.fabricmanagement.sales.ownership.app.OwnershipTriageProcessor;
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,6 +32,11 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
   @Autowired private OwnershipTriageCaseLogRepository caseLogRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbc;
+
+  @AfterEach
+  void clearTenantContext() {
+    TenantContext.clear();
+  }
 
   @Test
   void concurrentInstancesHaveOneNotificationClaimAndOneAgingClaim() {
@@ -78,6 +85,7 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
     UUID tenantId = UUID.randomUUID();
     UUID customerId = UUID.randomUUID();
     Instant gapStartedAt = NOW.minusSeconds(172_800);
+    TenantContext.setCurrentTenantId(tenantId);
     transactionTemplate.executeWithoutResult(
         ignored ->
             caseLogRepository.tryRecordNotificationRequested(
@@ -126,6 +134,7 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
     UUID tenantId = UUID.randomUUID();
     UUID customerId = UUID.randomUUID();
     Instant gapStartedAt = NOW.minusSeconds(3_600);
+    TenantContext.setCurrentTenantId(tenantId);
     OwnershipTriageQueryRepository queryRepository = mock(OwnershipTriageQueryRepository.class);
     OwnershipTriageAgingEmailAdapter emailAdapter = mock(OwnershipTriageAgingEmailAdapter.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
@@ -165,18 +174,24 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
   }
 
   private boolean claimNotification(UUID tenantId, UUID customerId, Instant gapStartedAt) {
-    return Boolean.TRUE.equals(
-        transactionTemplate.execute(
-            ignored ->
-                caseLogRepository.tryRecordNotificationRequested(
-                    tenantId, customerId, gapStartedAt, NOW)));
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () ->
+            Boolean.TRUE.equals(
+                transactionTemplate.execute(
+                    ignored ->
+                        caseLogRepository.tryRecordNotificationRequested(
+                            tenantId, customerId, gapStartedAt, NOW))));
   }
 
   private boolean claimAging(UUID tenantId, UUID customerId, Instant gapStartedAt) {
-    return Boolean.TRUE.equals(
-        transactionTemplate.execute(
-            ignored ->
-                caseLogRepository.tryMarkAgingAlertQueued(
-                    tenantId, customerId, gapStartedAt, NOW)));
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () ->
+            Boolean.TRUE.equals(
+                transactionTemplate.execute(
+                    ignored ->
+                        caseLogRepository.tryMarkAgingAlertQueued(
+                            tenantId, customerId, gapStartedAt, NOW))));
   }
 }
