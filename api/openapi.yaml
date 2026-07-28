@@ -120,6 +120,8 @@ tags:
   name: Role
 - description: User operations
   name: User
+- description: Derived queue of customers requiring a commercial representative
+  name: Sales Ownership Triage
 - description: Supplier Quote Management API
   name: Supplier Quote
 - description: FX Exposure summary operations
@@ -195,6 +197,8 @@ tags:
   name: Batch
 - description: Hr Policy Pack operations
   name: Hr Policy Pack
+- description: Effective-dated primary commercial representative history
+  name: Customer Commercial Assignments
 - description: Whisper operations
   name: Whisper
 - description: Endpoints for PLG Simulation Playground
@@ -5302,7 +5306,7 @@ paths:
       - Department
   /api/v1/common/notifications:
     get:
-      operationId: list_6
+      operationId: list_7
       parameters:
       - in: query
         name: pageRequest
@@ -24270,7 +24274,7 @@ paths:
       - Notifications
   /api/v1/platform/fiber-requests:
     get:
-      operationId: list_5
+      operationId: list_6
       parameters:
       - in: query
         name: status
@@ -24560,7 +24564,7 @@ paths:
       - Fiber Request Platform
   /api/v1/platform/notifications:
     get:
-      operationId: list_4
+      operationId: list_5
       parameters:
       - in: query
         name: pageRequest
@@ -39288,6 +39292,225 @@ paths:
       summary: Deactivate a customer account-team member
       tags:
       - Customer Account Team
+  /api/v1/sales/customers/{customerId}/commercial-assignments:
+    post:
+      operationId: assignPrimary
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignPrimaryRepresentativeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerCommercialAssignmentResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Assign the primary commercial representative
+      tags:
+      - Customer Commercial Assignments
+  /api/v1/sales/customers/{customerId}/commercial-assignments/current:
+    get:
+      operationId: getCurrent
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerCommercialAssignmentResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get the current commercial assignment
+      tags:
+      - Customer Commercial Assignments
+  /api/v1/sales/customers/{customerId}/commercial-assignments/history:
+    get:
+      operationId: getHistory
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListCustomerCommercialAssignmentResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get effective-dated commercial assignment history
+      tags:
+      - Customer Commercial Assignments
   /api/v1/sales/lots:
     get:
       operationId: listSalesLots
@@ -40645,6 +40868,173 @@ paths:
       summary: Ship an order
       tags:
       - Sales Orders
+  /api/v1/sales/ownership/triage:
+    get:
+      operationId: list_4
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseOwnershipTriageCaseResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List current sales ownership triage cases
+      tags:
+      - Sales Ownership Triage
+  /api/v1/sales/ownership/triage/{customerId}/resolve:
+    post:
+      operationId: resolve
+      parameters:
+      - in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignPrimaryRepresentativeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerCommercialAssignmentResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Resolve a triage case by assigning its primary representative
+      tags:
+      - Sales Ownership Triage
   /api/v1/sales/products:
     get:
       operationId: listCatalog
@@ -46319,6 +46709,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseCustomerCommercialAssignmentResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CustomerCommercialAssignmentResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDashboardConfigDto:
       type: object
       properties:
@@ -46949,6 +47357,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CustomerAccountTeamCandidateResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListCustomerCommercialAssignmentResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerCommercialAssignmentResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -48591,6 +49019,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseNotificationLogResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseOwnershipTriageCaseResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseOwnershipTriageCaseResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -50382,6 +50828,14 @@ components:
           type: boolean
       required:
       - departmentId
+    AssignPrimaryRepresentativeRequest:
+      type: object
+      properties:
+        representativeId:
+          type: string
+          format: uuid
+      required:
+      - representativeId
     AssignWorkLocationRequest:
       type: object
       properties:
@@ -54209,6 +54663,11 @@ components:
           type: string
           enum:
           - EXPLICIT_OVERRIDE
+          - PRIMARY_ASSIGNMENT
+          - CREATOR_FALLBACK
+          - OPTIONAL_UNASSIGNED
+          - OWNERSHIP_EXEMPT
+          - LEGACY_UNKNOWN
           - ACQUIRER
           - ACCOUNT_TEAM
           - TRIAGE_REQUIRED
@@ -54236,6 +54695,79 @@ components:
           minLength: 0
       required:
       - token
+    CustomerCommercialAssignmentResponse:
+      type: object
+      properties:
+        closedBySystemCode:
+          type:
+          - string
+          - "null"
+        closedByType:
+          type:
+          - string
+          - "null"
+          enum:
+          - USER
+          - SYSTEM
+        closedByUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        closureReason:
+          type:
+          - string
+          - "null"
+          enum:
+          - SUPERSEDED
+          - REPRESENTATIVE_DEACTIVATED
+        customerId:
+          type: string
+          format: uuid
+        decidedBySystemCode:
+          type:
+          - string
+          - "null"
+        decidedByType:
+          type: string
+          enum:
+          - USER
+          - SYSTEM
+        decidedByUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        policyVersion:
+          type: string
+        representativeId:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum:
+          - ACQUISITION
+          - MANUAL
+          - TRIAGE_RESOLUTION
+          - BACKFILL_ACQUIRER
+          - BACKFILL_SOLE_TEAM_MEMBER
+          - SYSTEM_POLICY
+        supersedesAssignmentId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type:
+          - string
+          - "null"
+          format: date-time
     CustomerMarginDto:
       type: object
       properties:
@@ -56823,6 +57355,40 @@ components:
           minLength: 10
       required:
       - reason
+    OwnershipTriageCaseResponse:
+      type: object
+      description: A customer currently requiring a commercial ownership assignment
+      properties:
+        ageHours:
+          type: integer
+          format: int64
+        customerId:
+          type: string
+          format: uuid
+        customerName:
+          type: string
+        gapStartedAt:
+          type: string
+          format: date-time
+        oldestUnassignedQuoteAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        unassignedOpenQuoteCount:
+          type: integer
+          format: int64
+        workAgeHours:
+          type:
+          - integer
+          - "null"
+          format: int64
+      required:
+      - ageHours
+      - customerId
+      - customerName
+      - gapStartedAt
+      - unassignedOpenQuoteCount
     PagePaymentDto:
       type: object
       properties:
@@ -57119,6 +57685,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NotificationLogResponse"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseOwnershipTriageCaseResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnershipTriageCaseResponse"
         first:
           type: boolean
         last:
@@ -59885,7 +60474,9 @@ components:
       type: object
       properties:
         assignedToId:
-          type: string
+          type:
+          - string
+          - "null"
           format: uuid
         createdAt:
           type: string
@@ -59919,6 +60510,18 @@ components:
           type: string
         notes:
           type: string
+        ownerResolutionReason:
+          type: string
+          enum:
+          - EXPLICIT_OVERRIDE
+          - PRIMARY_ASSIGNMENT
+          - CREATOR_FALLBACK
+          - OPTIONAL_UNASSIGNED
+          - OWNERSHIP_EXEMPT
+          - LEGACY_UNKNOWN
+          - ACQUIRER
+          - ACCOUNT_TEAM
+          - TRIAGE_REQUIRED
         parentQuoteId:
           type: string
           format: uuid
@@ -62780,6 +63383,11 @@ components:
           format: date-time
         customName:
           type: string
+        customerRelationshipEstablishedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
         displayName:
           type: string
         id:

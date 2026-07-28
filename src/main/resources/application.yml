@@ -174,6 +174,10 @@ application:
   event-visibility:
     ops-email: ${EVENT_VISIBILITY_OPS_EMAIL:akkaya064@gmail.com}
 
+  sales:
+    triage:
+      ops-email: ${SALES_TRIAGE_OPS_EMAIL:}
+
   # Email Template Configuration
   # Note: Frontend pi email render endpoint removed - backend uses its own HTML templates
   email:
@@ -276,6 +280,9 @@ feature:
     # Legacy Company fallback - disabled after Faz 3 migration
     # All partner data now in TradingPartner table
     legacy-fallback: ${FEATURE_TRADING_PARTNER_LEGACY_FALLBACK:false}
+  sales:
+    # Global kill-switch: a tenant flag must also be enabled before the assignment ladder is used.
+    assignment-ladder-enabled: ${FEATURE_SALES_ASSIGNMENT_LADDER_ENABLED:false}
 
 # OpenAPI / Swagger
 springdoc:

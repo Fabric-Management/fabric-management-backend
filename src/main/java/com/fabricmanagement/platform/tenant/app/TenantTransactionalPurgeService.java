@@ -26,6 +26,8 @@ public class TenantTransactionalPurgeService {
   private static final String TENANT_DEMOMODE_CACHE = "tenant-demomode";
   private static final String TENANT_EMAIL_SANDBOX_CACHE = "tenant-emailsandbox";
   private static final String QUALITY_DECISION_PURGE_SETTING = "app.quality_decision_purge_tenant";
+  private static final String COMMERCIAL_ASSIGNMENT_PURGE_SETTING =
+      "app.customer_commercial_assignment_purge_tenant";
 
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
@@ -137,7 +139,9 @@ public class TenantTransactionalPurgeService {
           "sales_ord.sales_order",
           "sales.sample_delivery",
           "sales.sample_request",
+          "sales.ownership_triage_case_log",
           "sales.customer_account_team_member",
+          "sales.customer_commercial_assignment",
           "sales.quote_send_request",
           "sales.quote_approval_token",
           "sales.quote_line",
@@ -243,6 +247,7 @@ public class TenantTransactionalPurgeService {
   private void deleteTransactionalRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
     authorizeQualityDecisionPurge(jdbc, tenantId);
+    authorizeCommercialAssignmentPurge(jdbc, tenantId);
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
       delete(jdbc, rows, table, "DELETE FROM " + table + " WHERE tenant_id = ?", tenantId);
@@ -258,6 +263,14 @@ public class TenantTransactionalPurgeService {
         "SELECT set_config(?, ?, true)",
         String.class,
         QUALITY_DECISION_PURGE_SETTING,
+        tenantId.toString());
+  }
+
+  private void authorizeCommercialAssignmentPurge(JdbcTemplate jdbc, UUID tenantId) {
+    jdbc.queryForObject(
+        "SELECT set_config(?, ?, true)",
+        String.class,
+        COMMERCIAL_ASSIGNMENT_PURGE_SETTING,
         tenantId.toString());
   }
 

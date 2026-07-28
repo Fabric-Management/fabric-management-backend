@@ -223,6 +223,7 @@ public class TenantClonerService {
                   "uid, certification_code, certification_name, certifying_body, description, is_active",
                   goldenTemplateId,
                   targetTenantId);
+          tablesCloned += cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId);
 
           return tablesCloned;
         });
@@ -361,6 +362,7 @@ public class TenantClonerService {
               UUID goldenTemplateId = findTemplateTenantId(jdbc);
               if (goldenTemplateId != null) {
                 doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
+                cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, newTenantId);
               }
 
               // 3.4 User
@@ -550,6 +552,39 @@ public class TenantClonerService {
                 + "SELECT gen_random_uuid(), ?, %s, now(), now(), 0 FROM %s WHERE tenant_id = ?",
             tableName, columns, columns, tableName);
     jdbc.update(sql, newTenantId, templateId);
+  }
+
+  private int cloneOwnershipPolicyIfMissing(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    Integer existing =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM sales.ownership_policy WHERE tenant_id = ?",
+            Integer.class,
+            targetTenantId);
+    if (existing != null && existing > 0) {
+      return 0;
+    }
+    int inserted =
+        jdbc.update(
+            """
+            INSERT INTO sales.ownership_policy (
+                id, tenant_id, uid, default_mode, mode_effective_at,
+                assignment_ladder_enabled, triage_age_threshold_hours,
+                is_active, created_at, updated_at, version
+            )
+            SELECT
+                gen_random_uuid(), ?, gen_random_uuid()::VARCHAR, default_mode, now(),
+                FALSE, triage_age_threshold_hours, TRUE, now(), now(), 0
+            FROM sales.ownership_policy
+            WHERE tenant_id = ?
+            """,
+            targetTenantId,
+            sourceTenantId);
+    if (inserted == 0) {
+      throw new IllegalStateException(
+          "Template tenant has no sales ownership policy: " + sourceTenantId);
+    }
+    return 1;
   }
 
   private void cloneHrPolicyPacks(

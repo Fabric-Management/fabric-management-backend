@@ -30,7 +30,8 @@ class CustomerEligibilityServiceTest {
     UUID acquirerId = UUID.randomUUID();
     when(tradingPartnerResolver.resolveOwnershipSnapshot(tenantId, requestedId))
         .thenReturn(
-            Optional.of(new TradingPartnerOwnershipSnapshot(canonicalId, acquirerId, true, true)));
+            Optional.of(
+                new TradingPartnerOwnershipSnapshot(canonicalId, acquirerId, null, true, true)));
 
     CustomerEligibilityService.EligibleCustomer result =
         service.requireEligible(tenantId, requestedId);
@@ -56,7 +57,7 @@ class CustomerEligibilityServiceTest {
     UUID customerId = UUID.randomUUID();
     when(tradingPartnerResolver.resolveOwnershipSnapshot(tenantId, customerId))
         .thenReturn(
-            Optional.of(new TradingPartnerOwnershipSnapshot(customerId, null, false, true)));
+            Optional.of(new TradingPartnerOwnershipSnapshot(customerId, null, null, false, true)));
 
     assertThatThrownBy(() -> service.requireEligible(tenantId, customerId))
         .isInstanceOfSatisfying(
@@ -70,7 +71,7 @@ class CustomerEligibilityServiceTest {
     UUID customerId = UUID.randomUUID();
     when(tradingPartnerResolver.resolveOwnershipSnapshot(tenantId, customerId))
         .thenReturn(
-            Optional.of(new TradingPartnerOwnershipSnapshot(customerId, null, true, false)));
+            Optional.of(new TradingPartnerOwnershipSnapshot(customerId, null, null, true, false)));
 
     assertThatThrownBy(() -> service.requireEligible(tenantId, customerId))
         .isInstanceOfSatisfying(

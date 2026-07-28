@@ -8,6 +8,8 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import com.fabricmanagement.platform.tradingpartner.domain.event.CustomerRelationshipEstablishedEvent;
+import com.fabricmanagement.platform.tradingpartner.domain.event.CustomerRelationshipSourceGate;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerStatusChangedEvent;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
@@ -16,6 +18,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerReque
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,12 +105,17 @@ public class TradingPartnerService {
 
     if (existing.isPresent()) {
       TradingPartner partner = existing.get();
+      boolean wasCustomer = partner.getPartnerType().isCustomer();
       // Upgrade to BOTH if adding different type
       if (partner.getPartnerType() != request.getPartnerType()
           && partner.getPartnerType() != PartnerType.BOTH) {
         partner.upgradeToMultiType(request.getPartnerType());
         stampAcquirerIfCustomer(partner, acquiredById);
+        boolean relationshipEstablished =
+            recordRelationshipEstablishmentIfNewCustomer(partner, wasCustomer);
         TradingPartner updated = partnerRepository.save(partner);
+        publishRelationshipEstablishedIfNeeded(
+            tenantId, updated, relationshipEstablished, CustomerRelationshipSourceGate.CREATE);
         log.info(
             "Partner upgraded to BOTH: uid={}, registry={}", updated.getUid(), registry.getUid());
         return TradingPartnerDto.from(updated);
@@ -130,6 +138,7 @@ public class TradingPartnerService {
     }
 
     stampAcquirerIfCustomer(partner, acquiredById);
+    boolean relationshipEstablished = recordRelationshipEstablishmentIfNewCustomer(partner, false);
     TradingPartner saved = partnerRepository.save(partner);
 
     // Auto-create partner Organization for user management
@@ -138,6 +147,8 @@ public class TradingPartnerService {
             saved.getDisplayName(), registry.getTaxId(), saved.getUid());
     saved.setOrganizationId(partnerOrg.getId());
     saved = partnerRepository.save(saved);
+    publishRelationshipEstablishedIfNeeded(
+        tenantId, saved, relationshipEstablished, CustomerRelationshipSourceGate.CREATE);
 
     // Publish event
     eventPublisher.publish(
@@ -178,19 +189,24 @@ public class TradingPartnerService {
         partnerRepository.findByTenantIdAndRegistryId(tenantId, registry.getId());
     TradingPartner partner;
     boolean created = false;
+    boolean wasCustomer;
 
     if (existing.isPresent()) {
       partner = existing.get();
+      wasCustomer = partner.getPartnerType().isCustomer();
       partner.upgradeToMultiType(PartnerType.CUSTOMER);
     } else {
       partner = TradingPartner.create(registry, PartnerType.CUSTOMER, request.getCompanyName());
       created = true;
+      wasCustomer = false;
     }
 
     partner.setPendingAccountingReview(true);
     partner.setRelationshipMeta(
         quickCustomerRelationshipMeta(request, partner.getRelationshipMeta()));
     stampAcquirerIfCustomer(partner, acquiredById);
+    boolean relationshipEstablished =
+        recordRelationshipEstablishmentIfNewCustomer(partner, wasCustomer);
     TradingPartner saved = partnerRepository.save(partner);
 
     if (saved.getOrganizationId() == null) {
@@ -202,6 +218,8 @@ public class TradingPartnerService {
     }
 
     createQuickCustomerContacts(tenantId, saved, request.getContacts());
+    publishRelationshipEstablishedIfNeeded(
+        tenantId, saved, relationshipEstablished, CustomerRelationshipSourceGate.QUICK_CREATE);
 
     if (created) {
       eventPublisher.publish(
@@ -219,6 +237,28 @@ public class TradingPartnerService {
 
   private boolean stampAcquirerIfCustomer(TradingPartner partner, UUID acquiredById) {
     return partner.recordAcquirer(acquiredById);
+  }
+
+  private boolean recordRelationshipEstablishmentIfNewCustomer(
+      TradingPartner partner, boolean wasCustomer) {
+    return !wasCustomer && partner.recordCustomerRelationshipEstablishedAt(Instant.now());
+  }
+
+  private void publishRelationshipEstablishedIfNeeded(
+      UUID tenantId,
+      TradingPartner partner,
+      boolean relationshipEstablished,
+      CustomerRelationshipSourceGate sourceGate) {
+    if (!relationshipEstablished) {
+      return;
+    }
+    eventPublisher.publish(
+        new CustomerRelationshipEstablishedEvent(
+            tenantId,
+            partner.getId(),
+            partner.getAcquiredById(),
+            partner.getCustomerRelationshipEstablishedAt(),
+            sourceGate));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -267,7 +307,14 @@ public class TradingPartnerService {
     if (!wasCustomer) {
       stampAcquirerIfCustomer(partner, acquiredById);
     }
+    boolean relationshipEstablished =
+        recordRelationshipEstablishmentIfNewCustomer(partner, wasCustomer);
     TradingPartner saved = partnerRepository.save(partner);
+    publishRelationshipEstablishedIfNeeded(
+        tenantId,
+        saved,
+        relationshipEstablished,
+        CustomerRelationshipSourceGate.SUPPLIER_CONVERSION);
     log.info("Partner updated: uid={}, type={}", saved.getUid(), saved.getPartnerType());
     return TradingPartnerDto.from(saved);
   }

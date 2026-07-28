@@ -2,8 +2,7 @@ package com.fabricmanagement.sales.quote.app;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.web.LocalizationService;
-import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
-import com.fabricmanagement.platform.communication.app.NotificationService;
+import com.fabricmanagement.platform.communication.api.facade.CustomerEmailFacade;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
 import com.fabricmanagement.sales.quote.domain.event.QuoteApprovalTokenGeneratedEvent;
 import java.util.Locale;
@@ -20,8 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 public class QuoteApprovalEmailListener {
 
-  private final NotificationService notificationService;
-  private final EmailTemplateRenderer emailTemplateRenderer;
+  private final CustomerEmailFacade customerEmailFacade;
   private final LocalizationService localizationService;
   private final FrontendUrlProvider frontendUrlProvider;
 
@@ -44,10 +42,15 @@ public class QuoteApprovalEmailListener {
     String cta = localizationService.getMessage("email.quote.approval.cta", null, locale);
     String expires = localizationService.getMessage("email.quote.approval.expires", null, locale);
 
-    String message =
-        emailTemplateRenderer.renderQuoteApproval(heading, body, cta, expires, approvalUrl);
-    notificationService.sendNotificationSync(
-        event.getTenantId(), event.getCustomerEmail(), subject, message);
+    customerEmailFacade.sendQuoteApprovalEmail(
+        event.getTenantId(),
+        event.getCustomerEmail(),
+        subject,
+        heading,
+        body,
+        cta,
+        expires,
+        approvalUrl);
 
     log.info(
         "Quote approval email sent: quoteId={}, quoteNumber={}",

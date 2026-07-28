@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -162,6 +163,16 @@ public class TradingPartner extends BaseEntity {
   @Column(name = "acquired_by_id")
   private UUID acquiredById;
 
+  /**
+   * Immutable timestamp at which this tenant first gained a customer relationship.
+   *
+   * <p>Legacy customer rows deliberately remain null because their historical establishment time is
+   * unknown.
+   */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "customer_relationship_established_at")
+  private Instant customerRelationshipEstablishedAt;
+
   @Embedded private OfflineMetadata offlineMetadata;
 
   @Override
@@ -175,6 +186,16 @@ public class TradingPartner extends BaseEntity {
       return false;
     }
     acquiredById = acquirerId;
+    return true;
+  }
+
+  /** Records the customer relationship establishment fact exactly once. */
+  public boolean recordCustomerRelationshipEstablishedAt(Instant establishedAt) {
+    if (!partnerType.isCustomer() || customerRelationshipEstablishedAt != null) {
+      return false;
+    }
+    customerRelationshipEstablishedAt =
+        java.util.Objects.requireNonNull(establishedAt, "establishedAt must not be null");
     return true;
   }
 

@@ -131,4 +131,11 @@ public class SalesDomainException extends DomainException {
         "SALES_020_CUSTOMER_NOT_ELIGIBLE",
         HttpStatus.UNPROCESSABLE_ENTITY);
   }
+
+  public static SalesDomainException commercialAssignmentUserInactive(String userId) {
+    return new SalesDomainException(
+        "Inactive user cannot be assigned as a primary commercial representative: " + userId,
+        "SALES_021_COMMERCIAL_ASSIGNMENT_USER_INACTIVE",
+        HttpStatus.UNPROCESSABLE_ENTITY);
+  }
 }

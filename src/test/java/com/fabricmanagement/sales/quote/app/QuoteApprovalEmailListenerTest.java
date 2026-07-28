@@ -7,8 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.web.LocalizationService;
-import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
-import com.fabricmanagement.platform.communication.app.NotificationService;
+import com.fabricmanagement.platform.communication.api.facade.CustomerEmailFacade;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
 import com.fabricmanagement.sales.quote.domain.event.QuoteApprovalTokenGeneratedEvent;
 import java.util.Arrays;
@@ -22,8 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class QuoteApprovalEmailListenerTest {
 
-  @Mock private NotificationService notificationService;
-  @Mock private EmailTemplateRenderer emailTemplateRenderer;
+  @Mock private CustomerEmailFacade customerEmailFacade;
   @Mock private LocalizationService localizationService;
   @Mock private FrontendUrlProvider frontendUrlProvider;
 
@@ -31,7 +29,7 @@ class QuoteApprovalEmailListenerTest {
   void rendersApprovalLinkAndSendsEmailToCustomer() {
     QuoteApprovalEmailListener listener =
         new QuoteApprovalEmailListener(
-            notificationService, emailTemplateRenderer, localizationService, frontendUrlProvider);
+            customerEmailFacade, localizationService, frontendUrlProvider);
     QuoteApprovalTokenGeneratedEvent event =
         new QuoteApprovalTokenGeneratedEvent(
             UUID.randomUUID(),
@@ -60,28 +58,18 @@ class QuoteApprovalEmailListenerTest {
         .thenReturn("Review and approve quote");
     when(localizationService.getMessage("email.quote.approval.expires", null, Locale.ENGLISH))
         .thenReturn("This approval link will expire in 7 days.");
-    when(emailTemplateRenderer.renderQuoteApproval(
-            "Quote ready for approval",
-            "Quote Q-2026-001 is ready for your review and approval.",
-            "Review and approve quote",
-            "This approval link will expire in 7 days.",
-            "https://app.example.com/quotes/approve/token-123"))
-        .thenReturn("email body");
 
     listener.onQuoteApprovalTokenGenerated(event);
 
-    verify(emailTemplateRenderer)
-        .renderQuoteApproval(
+    verify(customerEmailFacade)
+        .sendQuoteApprovalEmail(
+            event.getTenantId(),
+            "buyer@example.com",
+            "Quote Q-2026-001 is ready for approval",
             "Quote ready for approval",
             "Quote Q-2026-001 is ready for your review and approval.",
             "Review and approve quote",
             "This approval link will expire in 7 days.",
             "https://app.example.com/quotes/approve/token-123");
-    verify(notificationService)
-        .sendNotificationSync(
-            event.getTenantId(),
-            "buyer@example.com",
-            "Quote Q-2026-001 is ready for approval",
-            "email body");
   }
 }

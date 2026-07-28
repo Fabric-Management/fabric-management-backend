@@ -16,6 +16,8 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import com.fabricmanagement.platform.tradingpartner.domain.event.CustomerRelationshipEstablishedEvent;
+import com.fabricmanagement.platform.tradingpartner.domain.event.CustomerRelationshipSourceGate;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerContactRequest;
@@ -209,6 +211,15 @@ class TradingPartnerServiceTest {
       assertThat(result.getPartnerType()).isEqualTo(PartnerType.BOTH);
       assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
       assertThat(existing.getAcquiredById()).isEqualTo(acquirerId);
+      assertThat(existing.getCustomerRelationshipEstablishedAt()).isNotNull();
+      ArgumentCaptor<CustomerRelationshipEstablishedEvent> eventCaptor =
+          ArgumentCaptor.forClass(CustomerRelationshipEstablishedEvent.class);
+      verify(eventPublisher).publish(eventCaptor.capture());
+      assertThat(eventCaptor.getValue().getSourceGate())
+          .isEqualTo(CustomerRelationshipSourceGate.CREATE);
+      assertThat(eventCaptor.getValue().getAcquiredById()).isEqualTo(acquirerId);
+      assertThat(eventCaptor.getValue().getEstablishedAt())
+          .isEqualTo(existing.getCustomerRelationshipEstablishedAt());
     }
 
     @Test
@@ -244,6 +255,7 @@ class TradingPartnerServiceTest {
       TradingPartnerDto result = service.createPartner(request, acquirerId);
 
       assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+      assertThat(result.getCustomerRelationshipEstablishedAt()).isNotNull();
     }
 
     @Test
@@ -418,6 +430,13 @@ class TradingPartnerServiceTest {
 
       assertThat(result.getPartnerType()).isEqualTo(PartnerType.CUSTOMER);
       assertThat(result.getAcquiredById()).isEqualTo(acquirerId);
+      ArgumentCaptor<CustomerRelationshipEstablishedEvent> eventCaptor =
+          ArgumentCaptor.forClass(CustomerRelationshipEstablishedEvent.class);
+      verify(eventPublisher).publish(eventCaptor.capture());
+      assertThat(eventCaptor.getValue().getSourceGate())
+          .isEqualTo(CustomerRelationshipSourceGate.SUPPLIER_CONVERSION);
+      assertThat(eventCaptor.getValue().getEstablishedAt())
+          .isEqualTo(partner.getCustomerRelationshipEstablishedAt());
     }
 
     @Test
@@ -494,6 +513,14 @@ class TradingPartnerServiceTest {
 
       assertThat(result.getPartnerType()).isEqualTo(PartnerType.CUSTOMER);
       assertThat(result.isPendingAccountingReview()).isTrue();
+      ArgumentCaptor<CustomerRelationshipEstablishedEvent> relationshipEventCaptor =
+          ArgumentCaptor.forClass(CustomerRelationshipEstablishedEvent.class);
+      verify(eventPublisher).publish(relationshipEventCaptor.capture());
+      assertThat(relationshipEventCaptor.getValue().getSourceGate())
+          .isEqualTo(CustomerRelationshipSourceGate.QUICK_CREATE);
+      assertThat(relationshipEventCaptor.getValue().getAcquiredById()).isNull();
+      assertThat(relationshipEventCaptor.getValue().getEstablishedAt())
+          .isEqualTo(result.getCustomerRelationshipEstablishedAt());
 
       ArgumentCaptor<TradingPartner> partnerCaptor = ArgumentCaptor.forClass(TradingPartner.class);
       verify(partnerRepository, org.mockito.Mockito.times(2)).save(partnerCaptor.capture());

@@ -203,6 +203,16 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
             pg.getId());
     assertThat(routingCount).as("Routing configs should be cloned").isGreaterThanOrEqualTo(0);
 
+    Integer ownershipPolicyCount =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM sales.ownership_policy WHERE tenant_id = ? "
+                + "AND default_mode = 'REQUIRED' AND assignment_ladder_enabled = FALSE",
+            Integer.class,
+            pg.getId());
+    assertThat(ownershipPolicyCount)
+        .as("A disabled default sales ownership policy should be cloned")
+        .isEqualTo(1);
+
     // Verify UIDs are fresh (not copied from template) — CR-5
     List<String> playgroundOrgUids =
         jdbc.queryForList(

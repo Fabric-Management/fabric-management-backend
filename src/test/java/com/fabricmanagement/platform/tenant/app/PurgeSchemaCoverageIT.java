@@ -178,6 +178,10 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "common_company.partner_trading_partner_certification",
         "Partner certifications are deleted by dedicated trading-partner cleanup.");
     tables.put("common_policy.common_policy", "Tenant policy configuration is retained.");
+    tables.put(
+        "sales.ownership_policy",
+        "Sales ownership configuration is retained across demo reset; only tenant hard-delete "
+            + "removes it.");
     tables.put("common_user.common_role", "Roles are retained.");
     tables.put(
         "common_user.common_user",

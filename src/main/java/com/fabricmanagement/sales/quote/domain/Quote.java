@@ -4,6 +4,7 @@ import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.AttributeOverrides;
@@ -41,8 +42,12 @@ public class Quote extends BaseEntity {
   @Column(name = "customer_id", nullable = false)
   private UUID customerId;
 
-  @Column(name = "assigned_to_id", nullable = false)
+  @Column(name = "assigned_to_id")
   private UUID assignedToId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "owner_resolution_reason", nullable = false, length = 30)
+  private OwnerResolutionReason ownerResolutionReason = OwnerResolutionReason.LEGACY_UNKNOWN;
 
   @Column(name = "module_type", nullable = false, length = 50)
   private String moduleType;
