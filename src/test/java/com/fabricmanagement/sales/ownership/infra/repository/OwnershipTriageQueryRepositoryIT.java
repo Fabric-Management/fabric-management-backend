@@ -2,12 +2,14 @@ package com.fabricmanagement.sales.ownership.infra.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,7 @@ class OwnershipTriageQueryRepositoryIT extends AbstractIntegrationTest {
   void setUp() {
     tenantId = UUID.randomUUID();
     organizationId = UUID.randomUUID();
+    TenantContext.setCurrentTenantId(tenantId);
     jdbc.update(
         """
         INSERT INTO common_tenant.common_tenant
@@ -58,6 +61,11 @@ class OwnershipTriageQueryRepositoryIT extends AbstractIntegrationTest {
         """,
         tenantId,
         Timestamp.from(MODE_EFFECTIVE_AT));
+  }
+
+  @AfterEach
+  void clearTenantContext() {
+    TenantContext.clear();
   }
 
   @Test

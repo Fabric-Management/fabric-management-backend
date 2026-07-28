@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.ownership.infra.repository;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -146,6 +147,12 @@ public class OwnershipTriageQueryRepository {
   }
 
   private void bindTenant(UUID tenantId) {
+    UUID ambientTenantId = TenantContext.requireTenantId();
+    if (!ambientTenantId.equals(tenantId)) {
+      throw new IllegalStateException(
+          "Triage query tenant mismatch: ambient=%s requested=%s"
+              .formatted(ambientTenantId, tenantId));
+    }
     jdbc.queryForObject(
         "SELECT set_config('app.current_tenant', :tenantId, true)",
         Map.of("tenantId", tenantId.toString()),

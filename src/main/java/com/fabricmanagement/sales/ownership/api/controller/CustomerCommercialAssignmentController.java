@@ -57,8 +57,7 @@ public class CustomerCommercialAssignmentController {
   }
 
   @PostMapping
-  @PreAuthorize(
-      "@auth.can(authentication, 'sales', 'write')" + " and hasAnyRole('ADMIN', 'MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'assign-owner')")
   @Operation(summary = "Assign the primary commercial representative")
   public ResponseEntity<ApiResponse<CustomerCommercialAssignmentResponse>> assignPrimary(
       @PathVariable UUID customerId,

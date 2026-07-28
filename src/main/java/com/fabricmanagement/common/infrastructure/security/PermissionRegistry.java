@@ -33,8 +33,20 @@ public final class PermissionRegistry {
 
   public static final Set<String> VALID_ACTIONS =
       Set.of(
-          "view", "read", "write", "manage", "access", "delete", "approve", "export", "confirm",
-          "ship", "cancel", "prepare", "deliver");
+          "view",
+          "read",
+          "write",
+          "manage",
+          "access",
+          "delete",
+          "approve",
+          "export",
+          "confirm",
+          "ship",
+          "cancel",
+          "prepare",
+          "deliver",
+          "assign-owner");
 
   public static boolean isValidResource(String resource) {
     return resource != null && VALID_RESOURCES.contains(resource);

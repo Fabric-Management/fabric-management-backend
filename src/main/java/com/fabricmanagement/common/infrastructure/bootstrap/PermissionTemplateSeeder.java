@@ -156,6 +156,7 @@ public class PermissionTemplateSeeder {
             // writes the template tenant. ADMIN is listed for parity with that migration
             // even though PermissionEvaluator short-circuits ADMIN before consulting rows.
             new String[] {"ADMIN", "sales", "approve", "GLOBAL"},
+            new String[] {"ADMIN", "sales", "assign-owner", "GLOBAL"},
             new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
             new String[] {"SUPERVISOR", "sales", "approve", "ORGANIZATION"},
             new String[] {"ADMIN", "quality", "read", "GLOBAL"},
@@ -193,6 +194,7 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "sales", "ship", "ORGANIZATION"},
             new String[] {"MANAGER", "sales", "cancel", "ORGANIZATION"},
             new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
+            new String[] {"MANAGER", "sales", "assign-owner", "ORGANIZATION"},
             new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
             new String[] {"MANAGER", "flowboard", "view", "ORGANIZATION"},
