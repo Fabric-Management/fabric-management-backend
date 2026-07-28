@@ -14,6 +14,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
 import com.fabricmanagement.sales.ownership.app.CustomerAccountTeamService;
 import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
+import com.fabricmanagement.sales.ownership.dto.CustomerAccountTeamCandidateResponse;
 import com.fabricmanagement.sales.ownership.dto.CustomerAccountTeamResponse;
 import java.util.List;
 import java.util.UUID;
@@ -64,7 +65,13 @@ class CustomerAccountTeamControllerTest {
     when(accountTeamService.getAccountTeam(tenantId, customerId))
         .thenReturn(
             new CustomerAccountTeamResponse(
-                customerId, null, null, OwnerResolutionReason.TRIAGE_REQUIRED, List.of()));
+                customerId,
+                null,
+                null,
+                null,
+                null,
+                OwnerResolutionReason.TRIAGE_REQUIRED,
+                List.of()));
 
     mockMvc
         .perform(get("/api/v1/sales/customers/{customerId}/account-team", customerId))
@@ -91,5 +98,35 @@ class CustomerAccountTeamControllerTest {
         .andExpect(jsonPath("$.errors.userId").value("User ID is required"));
 
     verifyNoInteractions(accountTeamService);
+  }
+
+  @Test
+  @WithMockUser
+  void candidatesRejectsSalesReadWithoutSalesWrite() throws Exception {
+    UUID customerId = UUID.randomUUID();
+    when(authEvaluator.can(any(Authentication.class), eq("sales"), eq("read"))).thenReturn(true);
+    when(authEvaluator.can(any(Authentication.class), eq("sales"), eq("write"))).thenReturn(false);
+
+    mockMvc
+        .perform(get("/api/v1/sales/customers/{customerId}/account-team/candidates", customerId))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(accountTeamService);
+  }
+
+  @Test
+  @WithMockUser
+  void candidatesReturnsThinProjectionWithSalesWrite() throws Exception {
+    UUID customerId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(authEvaluator.can(any(Authentication.class), eq("sales"), eq("write"))).thenReturn(true);
+    when(accountTeamService.listCandidates(tenantId, customerId))
+        .thenReturn(List.of(new CustomerAccountTeamCandidateResponse(userId, "Emma Clarke")));
+
+    mockMvc
+        .perform(get("/api/v1/sales/customers/{customerId}/account-team/candidates", customerId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].userId").value(userId.toString()))
+        .andExpect(jsonPath("$.data[0].displayName").value("Emma Clarke"));
   }
 }

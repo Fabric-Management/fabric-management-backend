@@ -8,6 +8,8 @@ import java.util.UUID;
 public record CustomerAccountTeamResponse(
     UUID customerId,
     @Schema(nullable = true) UUID acquiredById,
+    @Schema(nullable = true) String acquiredByDisplayName,
     @Schema(nullable = true) UUID defaultOwnerId,
+    @Schema(nullable = true) String defaultOwnerDisplayName,
     OwnerResolutionReason defaultOwnerReason,
     List<CustomerAccountTeamMemberResponse> members) {}

@@ -78,7 +78,7 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
             UUID.class,
             organizationName);
     UUID ownerId = findUserIdByContact(ownerEmail);
-    UUID realUserId = insertRealUser(tenantId);
+    UUID realUserId = insertRealUser(tenantId, ownerId);
     Timestamp trialStartedAt = tenantTimestamp(tenantId, "trial_started_at");
     Timestamp trialEndsAt = tenantTimestamp(tenantId, "trial_ends_at");
     UUID mutatedSeedUserId =
@@ -118,12 +118,17 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
         contactValue);
   }
 
-  private UUID insertRealUser(UUID tenantId) {
+  private UUID insertRealUser(UUID tenantId, UUID ownerId) {
     UUID organizationId =
         jdbc.queryForObject(
-            "SELECT id FROM common_company.common_organization WHERE tenant_id = ? LIMIT 1",
+            """
+            SELECT organization_id
+            FROM common_user.common_user
+            WHERE tenant_id = ? AND id = ?
+            """,
             UUID.class,
-            tenantId);
+            tenantId,
+            ownerId);
     UUID roleId =
         jdbc.queryForObject(
             "SELECT id FROM common_user.common_role WHERE tenant_id = ? AND role_code = 'WORKER' LIMIT 1",
