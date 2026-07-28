@@ -214,6 +214,27 @@ class QuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should keep null owners safe in list and detail read paths")
+  void shouldKeepNullOwnersSafeAcrossReadPaths() {
+    quote.setAssignedToId(null);
+    quote.setOwnerResolutionReason(OwnerResolutionReason.TRIAGE_REQUIRED);
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable))
+        .thenReturn(new PageImpl<>(List.of(quote), pageable, 1));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(customerId)))
+        .thenReturn(Map.of(customerId, "Acme Textiles"));
+
+    QuoteResponse listItem = quoteService.findAllResponses(pageable).getContent().getFirst();
+    QuoteResponse detail = quoteService.findResponseById(quoteId).orElseThrow();
+
+    assertNull(listItem.getAssignedToId());
+    assertNull(detail.getAssignedToId());
+    assertEquals(OwnerResolutionReason.TRIAGE_REQUIRED, detail.getOwnerResolutionReason());
+  }
+
+  @Test
   @DisplayName("Should not create quote when customer eligibility fails")
   void shouldNotCreateQuoteWhenCustomerEligibilityFails() {
     QuoteCreateRequest req = new QuoteCreateRequest();

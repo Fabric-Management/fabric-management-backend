@@ -139,6 +139,7 @@ public class TenantTransactionalPurgeService {
           "sales_ord.sales_order",
           "sales.sample_delivery",
           "sales.sample_request",
+          "sales.ownership_triage_case_log",
           "sales.customer_account_team_member",
           "sales.customer_commercial_assignment",
           "sales.quote_send_request",

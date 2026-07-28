@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.fabricmanagement.common.infrastructure.persistence.LikePattern;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationMethod;
 import com.fabricmanagement.sales.quote.domain.FulfillmentDeterminationStatus;
 import com.fabricmanagement.sales.quote.domain.FulfillmentMode;
@@ -164,6 +165,63 @@ class QuoteRepositoryIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("triage resolution backfills only unassigned actionable quotes")
+  void backfillUnassignedActionableQuotes_preservesOwnedAndTerminalQuotes() {
+    UUID triageCustomerId = UUID.randomUUID();
+    UUID newRepresentativeId = UUID.randomUUID();
+    Quote draft =
+        quote(
+            tenantId,
+            "QT-TRIAGE-D-" + UUID.randomUUID(),
+            triageCustomerId,
+            QuoteStatus.DRAFT,
+            true);
+    draft.setAssignedToId(null);
+    Quote approved =
+        quote(
+            tenantId,
+            "QT-TRIAGE-A-" + UUID.randomUUID(),
+            triageCustomerId,
+            QuoteStatus.APPROVED,
+            true);
+    approved.setAssignedToId(null);
+    Quote rejected =
+        quote(
+            tenantId,
+            "QT-TRIAGE-R-" + UUID.randomUUID(),
+            triageCustomerId,
+            QuoteStatus.REJECTED,
+            true);
+    rejected.setAssignedToId(null);
+    Quote owned =
+        quote(
+            tenantId,
+            "QT-TRIAGE-O-" + UUID.randomUUID(),
+            triageCustomerId,
+            QuoteStatus.DRAFT,
+            true);
+    UUID existingOwnerId = owned.getAssignedToId();
+    UUID draftId = persist(draft);
+    UUID approvedId = persist(approved);
+    UUID rejectedId = persist(rejected);
+    UUID ownedId = persist(owned);
+
+    int updated =
+        transactionTemplate.execute(
+            status ->
+                quoteRepository.backfillUnassignedActionableQuotes(
+                    tenantId, triageCustomerId, newRepresentativeId));
+
+    assertThat(updated).isEqualTo(2);
+    assertThat(load(draftId).getAssignedToId()).isEqualTo(newRepresentativeId);
+    assertThat(load(draftId).getOwnerResolutionReason())
+        .isEqualTo(OwnerResolutionReason.PRIMARY_ASSIGNMENT);
+    assertThat(load(approvedId).getAssignedToId()).isEqualTo(newRepresentativeId);
+    assertThat(load(rejectedId).getAssignedToId()).isNull();
+    assertThat(load(ownedId).getAssignedToId()).isEqualTo(existingOwnerId);
+  }
+
+  @Test
   @DisplayName("fulfillment mode and status combination is protected by a database constraint")
   void fulfillmentModeStatusCombination_isProtectedByDatabaseConstraint() {
     Quote invalid = quoteWithLine();
@@ -197,6 +255,12 @@ class QuoteRepositoryIntegrationTest extends AbstractIntegrationTest {
 
   private UUID persist(Quote quote) {
     return transactionTemplate.execute(status -> quoteRepository.saveAndFlush(quote).getId());
+  }
+
+  private Quote load(UUID quoteId) {
+    return transactionTemplate.execute(
+        status ->
+            quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId).orElseThrow());
   }
 
   private Quote quote(

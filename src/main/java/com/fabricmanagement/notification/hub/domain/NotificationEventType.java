@@ -30,6 +30,7 @@ public final class NotificationEventType {
   public static final String INVOICE_OVERDUE = "INVOICE_OVERDUE";
   public static final String INVOICE_DISPUTED = "INVOICE_DISPUTED";
   public static final String COST_VARIANCE_DETECTED = "COST_VARIANCE_DETECTED";
+  public static final String CUSTOMER_OWNERSHIP_TRIAGE_OPENED = "CUSTOMER_OWNERSHIP_TRIAGE_OPENED";
 
   // ---- NORMAL ----
   public static final String WORK_ORDER_APPROVED = "WORK_ORDER_APPROVED";

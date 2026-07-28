@@ -16,6 +16,7 @@ import com.fabricmanagement.sales.ownership.domain.AssignmentActorType;
 import com.fabricmanagement.sales.ownership.domain.AssignmentClosureReason;
 import com.fabricmanagement.sales.ownership.domain.AssignmentSource;
 import com.fabricmanagement.sales.ownership.domain.CustomerCommercialAssignment;
+import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipResolvedEvent;
 import com.fabricmanagement.sales.ownership.infra.repository.CustomerCommercialAssignmentRepository;
 import java.time.Instant;
 import java.util.List;
@@ -24,9 +25,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class CustomerCommercialAssignmentServiceTest {
@@ -34,6 +37,7 @@ class CustomerCommercialAssignmentServiceTest {
   @Mock private CustomerCommercialAssignmentRepository repository;
   @Mock private CustomerEligibilityService customerEligibilityService;
   @Mock private UserQueryService userQueryService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private CustomerCommercialAssignmentService service;
 
   private UUID tenantId;
@@ -100,6 +104,30 @@ class CustomerCommercialAssignmentServiceTest {
     assertThat(replacement.getRepresentativeId()).isEqualTo(replacementId);
     assertThat(replacement.getSupersedesAssignmentId()).isEqualTo(current.getId());
     verify(repository).flush();
+  }
+
+  @Test
+  void triageResolutionPublishesTheResolutionEvent() {
+    when(userQueryService.findById(tenantId, representativeId))
+        .thenReturn(Optional.of(UserDto.builder().id(representativeId).isActive(true).build()));
+    when(repository.findByTenantIdAndCustomerIdAndValidToIsNull(tenantId, customerId))
+        .thenReturn(Optional.empty());
+    when(repository.save(any(CustomerCommercialAssignment.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.assignPrimary(
+        tenantId,
+        customerId,
+        representativeId,
+        AssignmentSource.TRIAGE_RESOLUTION,
+        ActorRef.user(UUID.randomUUID()));
+
+    ArgumentCaptor<CustomerOwnershipResolvedEvent> eventCaptor =
+        ArgumentCaptor.forClass(CustomerOwnershipResolvedEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().getTenantId()).isEqualTo(tenantId);
+    assertThat(eventCaptor.getValue().getCustomerId()).isEqualTo(customerId);
+    assertThat(eventCaptor.getValue().getRepresentativeId()).isEqualTo(representativeId);
   }
 
   @Test

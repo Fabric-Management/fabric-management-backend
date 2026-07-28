@@ -900,4 +900,11 @@ public class QuoteService {
     Instant dateSource = quote.getCreatedAt();
     return dateSource != null ? dateSource.atZone(ZoneOffset.UTC).toLocalDate() : LocalDate.now();
   }
+
+  @Transactional
+  public int backfillUnassignedActionableQuotes(
+      UUID tenantId, UUID customerId, UUID representativeId) {
+    return quoteRepository.backfillUnassignedActionableQuotes(
+        tenantId, customerId, representativeId);
+  }
 }

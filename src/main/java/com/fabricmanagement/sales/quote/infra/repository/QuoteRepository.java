@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -80,6 +81,32 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
   }
 
   List<Quote> findAllByTenantIdAndCustomerIdAndIsActiveTrue(UUID tenantId, UUID customerId);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      UPDATE Quote q
+      SET q.assignedToId = :representativeId,
+          q.ownerResolutionReason =
+              com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason.PRIMARY_ASSIGNMENT,
+          q.updatedAt = CURRENT_TIMESTAMP,
+          q.version = q.version + 1
+      WHERE q.tenantId = :tenantId
+        AND q.customerId = :customerId
+        AND q.assignedToId IS NULL
+        AND q.status IN (
+            com.fabricmanagement.sales.quote.domain.QuoteStatus.DRAFT,
+            com.fabricmanagement.sales.quote.domain.QuoteStatus.EVALUATION,
+            com.fabricmanagement.sales.quote.domain.QuoteStatus.PENDING_APPROVAL,
+            com.fabricmanagement.sales.quote.domain.QuoteStatus.APPROVED
+        )
+        AND q.isActive = TRUE
+        AND q.deletedAt IS NULL
+      """)
+  int backfillUnassignedActionableQuotes(
+      @Param("tenantId") UUID tenantId,
+      @Param("customerId") UUID customerId,
+      @Param("representativeId") UUID representativeId);
 
   @Query(
       """

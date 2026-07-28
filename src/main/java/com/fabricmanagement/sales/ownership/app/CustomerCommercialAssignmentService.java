@@ -8,6 +8,7 @@ import com.fabricmanagement.sales.ownership.domain.ActorRef;
 import com.fabricmanagement.sales.ownership.domain.AssignmentClosureReason;
 import com.fabricmanagement.sales.ownership.domain.AssignmentSource;
 import com.fabricmanagement.sales.ownership.domain.CustomerCommercialAssignment;
+import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipResolvedEvent;
 import com.fabricmanagement.sales.ownership.dto.CustomerCommercialAssignmentResponse;
 import com.fabricmanagement.sales.ownership.infra.repository.CustomerCommercialAssignmentRepository;
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class CustomerCommercialAssignmentService {
   private final CustomerCommercialAssignmentRepository repository;
   private final CustomerEligibilityService customerEligibilityService;
   private final UserQueryService userQueryService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(readOnly = true)
   public Optional<CustomerCommercialAssignment> findCurrent(UUID tenantId, UUID customerId) {
@@ -87,7 +90,12 @@ public class CustomerCommercialAssignmentService {
             POLICY_VERSION_V1,
             supersedesId);
     assignment.setTenantId(tenantId);
-    return repository.save(assignment);
+    CustomerCommercialAssignment saved = repository.save(assignment);
+    if (source == AssignmentSource.TRIAGE_RESOLUTION) {
+      eventPublisher.publishEvent(
+          new CustomerOwnershipResolvedEvent(tenantId, customerId, representativeId, effectiveAt));
+    }
+    return saved;
   }
 
   @Transactional
