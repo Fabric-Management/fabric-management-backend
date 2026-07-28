@@ -80,6 +80,7 @@ class TenantTransactionalPurgeServiceTest {
         .containsKeys(
             "sales.quote_send_request",
             "sales.quote",
+            "sales.customer_commercial_assignment",
             "procurement.purchase_order",
             "production.prod_product",
             "production.production_execution_batch_color_archive",
@@ -98,6 +99,10 @@ class TenantTransactionalPurgeServiceTest {
             "human.human_employee_number_sequence",
             "common_user.common_user(seed-demo-users)");
     verify(jdbc).update(contains("DELETE FROM sales.quote WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM sales.customer_commercial_assignment WHERE tenant_id = ?"),
+            eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains("DELETE FROM sales.quote_send_request WHERE tenant_id = ?"), eq(TENANT_ID));

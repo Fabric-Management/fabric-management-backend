@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.quote.dto;
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.common.dto.MoneyDto;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,7 +24,10 @@ public class QuoteResponse {
   @Schema(description = "Customer display name resolved from trading partner data", nullable = true)
   private final String customerName;
 
+  @Schema(nullable = true)
   private final UUID assignedToId;
+
+  private final OwnerResolutionReason ownerResolutionReason;
   private final String moduleType;
   private final QuoteStatus status;
   private final BigDecimal estimatedUnitCost;
@@ -57,6 +61,7 @@ public class QuoteResponse {
     this.customerId = quote.getCustomerId();
     this.customerName = customerName;
     this.assignedToId = quote.getAssignedToId();
+    this.ownerResolutionReason = quote.getOwnerResolutionReason();
     this.moduleType = quote.getModuleType();
     this.status = quote.getStatus();
     this.estimatedUnitCost = quote.getEstimatedUnitCost();

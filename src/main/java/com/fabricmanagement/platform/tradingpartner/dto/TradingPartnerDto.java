@@ -53,6 +53,9 @@ public class TradingPartnerDto {
   @Schema(nullable = true)
   private UUID acquiredById;
 
+  @Schema(nullable = true)
+  private Instant customerRelationshipEstablishedAt;
+
   // Audit
   private Instant createdAt;
   private Boolean isActive;
@@ -87,6 +90,7 @@ public class TradingPartnerDto {
         .organizationId(tp.getOrganizationId())
         .pendingAccountingReview(tp.isPendingAccountingReview())
         .acquiredById(tp.getAcquiredById())
+        .customerRelationshipEstablishedAt(tp.getCustomerRelationshipEstablishedAt())
         .createdAt(tp.getCreatedAt())
         .isActive(tp.getIsActive())
         .legacyCompanyId(tp.getLegacyCompanyId())

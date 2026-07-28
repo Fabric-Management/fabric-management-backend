@@ -276,6 +276,9 @@ feature:
     # Legacy Company fallback - disabled after Faz 3 migration
     # All partner data now in TradingPartner table
     legacy-fallback: ${FEATURE_TRADING_PARTNER_LEGACY_FALLBACK:false}
+  sales:
+    # Global kill-switch: a tenant flag must also be enabled before the assignment ladder is used.
+    assignment-ladder-enabled: ${FEATURE_SALES_ASSIGNMENT_LADDER_ENABLED:false}
 
 # OpenAPI / Swagger
 springdoc:

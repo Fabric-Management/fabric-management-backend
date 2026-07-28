@@ -850,6 +850,8 @@ class ConstitutionArchTest {
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
+      //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
+      // reconciliation
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -883,6 +885,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("QuoteRetentionPurgeJob")
               .and()
               .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
+              .and()
+              .doNotHaveSimpleName("OwnershipAssignmentReconciliationMonitor")
               .and()
               // The outbox worker is a @Scheduled job with no ambient tenant. Under RLS its
               // tenant-scoped query matched nothing, so 80 emails sat PENDING while the worker

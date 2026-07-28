@@ -158,6 +158,7 @@ class QuoteServiceTest {
 
     assertEquals("GBP", created.getCurrency());
     assertEquals(QuoteStatus.DRAFT, created.getStatus());
+    assertEquals(OwnerResolutionReason.EXPLICIT_OVERRIDE, created.getOwnerResolutionReason());
   }
 
   @Test
@@ -177,6 +178,39 @@ class QuoteServiceTest {
 
     assertEquals(userId, created.getAssignedToId());
     assertNotNull(created.getAssignedToId());
+    assertEquals(OwnerResolutionReason.CREATOR_FALLBACK, created.getOwnerResolutionReason());
+  }
+
+  @Test
+  @DisplayName("Should persist the policy reason while the legacy ladder remains active")
+  void shouldPersistLegacyPolicyReason() {
+    UUID acquirerId = UUID.randomUUID();
+    QuoteCreateRequest req = new QuoteCreateRequest();
+    req.setCustomerId(customerId);
+    req.setModuleType("FABRIC");
+    req.setQuoteNumber("Q-2026-ACQUIRER");
+    req.setCurrency("GBP");
+    req.setValidUntil(LocalDate.now().plusDays(5));
+    when(defaultOwnerPolicy.resolve(new OwnerResolutionContext(tenantId, customerId, null)))
+        .thenReturn(new OwnerResolution(acquirerId, OwnerResolutionReason.ACQUIRER));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote created = quoteService.createQuote(req);
+
+    assertEquals(acquirerId, created.getAssignedToId());
+    assertEquals(OwnerResolutionReason.ACQUIRER, created.getOwnerResolutionReason());
+  }
+
+  @Test
+  @DisplayName("Should safely map a legacy quote without an assigned owner")
+  void shouldMapQuoteWithoutAssignedOwner() {
+    quote.setAssignedToId(null);
+    quote.setOwnerResolutionReason(OwnerResolutionReason.LEGACY_UNKNOWN);
+
+    QuoteResponse response = QuoteResponse.from(quote);
+
+    assertNull(response.getAssignedToId());
+    assertEquals(OwnerResolutionReason.LEGACY_UNKNOWN, response.getOwnerResolutionReason());
   }
 
   @Test

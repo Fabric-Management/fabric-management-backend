@@ -196,6 +196,7 @@ public class TradingPartnerResolver {
                 new TradingPartnerOwnershipSnapshot(
                     partner.getId(),
                     partner.getAcquiredById(),
+                    partner.getCustomerRelationshipEstablishedAt(),
                     partner.getPartnerType().isCustomer(),
                     partner.getStatus().isTransactionAllowed()));
   }

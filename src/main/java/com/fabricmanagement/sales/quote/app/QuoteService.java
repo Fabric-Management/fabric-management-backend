@@ -22,6 +22,7 @@ import com.fabricmanagement.sales.lot.app.SalesLotService;
 import com.fabricmanagement.sales.ownership.domain.DefaultOwnerPolicy;
 import com.fabricmanagement.sales.ownership.domain.OwnerResolution;
 import com.fabricmanagement.sales.ownership.domain.OwnerResolutionContext;
+import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
@@ -179,17 +180,20 @@ public class QuoteService {
         defaultOwnerPolicy.resolve(
             new OwnerResolutionContext(tenantId, req.getCustomerId(), req.getAssignedToId()));
     UUID ownerId = ownerResolution.ownerId();
+    OwnerResolutionReason persistedReason = ownerResolution.reason();
     if (ownerId == null) {
       // TODO(RSF-3, ADR-0003 A3.2): replace creator fallback with sales triage + ops alert.
       ownerId =
           Objects.requireNonNull(
               TenantContext.getCurrentUserId(),
               "Current user is required while the RSF-3 creator fallback is active");
+      persistedReason = OwnerResolutionReason.CREATOR_FALLBACK;
     }
 
     Quote quote = req.toQuote();
     quote.setTenantId(tenantId);
     quote.setAssignedToId(ownerId);
+    quote.setOwnerResolutionReason(persistedReason);
     quote.setStatus(QuoteStatus.DRAFT);
     quote.setRevisionNumber(1);
     return quoteRepository.save(quote);
@@ -483,6 +487,7 @@ public class QuoteService {
 
     newQuote.setCustomerId(oldQuote.getCustomerId());
     newQuote.setAssignedToId(oldQuote.getAssignedToId());
+    newQuote.setOwnerResolutionReason(oldQuote.getOwnerResolutionReason());
     newQuote.setModuleType(oldQuote.getModuleType());
     newQuote.setEstimatedUnitCost(oldQuote.getEstimatedUnitCost());
     newQuote.setCurrency(oldQuote.getCurrency());

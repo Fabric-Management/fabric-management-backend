@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tradingpartner.app;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -8,4 +9,8 @@ import java.util.UUID;
  * <p>This record deliberately carries no platform domain types.
  */
 public record TradingPartnerOwnershipSnapshot(
-    UUID customerId, UUID acquiredById, boolean customer, boolean transactionAllowed) {}
+    UUID customerId,
+    UUID acquiredById,
+    Instant customerRelationshipEstablishedAt,
+    boolean customer,
+    boolean transactionAllowed) {}

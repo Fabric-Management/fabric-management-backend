@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseJunctionEntity;
 import com.fabricmanagement.sales.ownership.domain.CustomerAccountTeamMember;
+import com.fabricmanagement.sales.ownership.infra.repository.CustomerCommercialAssignmentRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.repository.CrudRepository;
 
 class SalesOwnershipArchTest {
 
@@ -28,6 +30,8 @@ class SalesOwnershipArchTest {
     noClasses()
         .that()
         .resideInAPackage("com.fabricmanagement.sales.ownership..")
+        .and()
+        .haveSimpleNameNotEndingWith("Listener")
         .should()
         .dependOnClassesThat()
         .resideInAPackage("com.fabricmanagement.platform..domain..")
@@ -37,5 +41,15 @@ class SalesOwnershipArchTest {
   @Test
   void accountTeamMemberReusesJunctionAuditAndSoftDeleteContract() {
     assertThat(CustomerAccountTeamMember.class.getSuperclass()).isEqualTo(BaseJunctionEntity.class);
+  }
+
+  @Test
+  void commercialAssignmentRepositoryExposesNoRowDeleteSurface() {
+    assertThat(CrudRepository.class.isAssignableFrom(CustomerCommercialAssignmentRepository.class))
+        .isFalse();
+    assertThat(CustomerCommercialAssignmentRepository.class.getMethods())
+        .noneMatch(
+            method ->
+                method.getName().startsWith("delete") || method.getName().startsWith("remove"));
   }
 }
