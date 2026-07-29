@@ -138,7 +138,8 @@ class TenantTransactionalPurgeServiceTest {
     verify(jdbc)
         .update(
             contains(
-                "DELETE FROM common_user.common_user WHERE tenant_id = ? AND demo_seed = true"),
+                "DELETE FROM common_user.common_user u WHERE u.tenant_id = ? AND "
+                    + "(\n  u.demo_seed = true"),
             eq(TENANT_ID));
     verify(jdbc)
         .update(

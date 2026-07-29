@@ -29,6 +29,25 @@ public class TenantTransactionalPurgeService {
   private static final String COMMERCIAL_ASSIGNMENT_PURGE_SETTING =
       "app.customer_commercial_assignment_purge_tenant";
 
+  /**
+   * Users removed by a demo purge: template-seeded users, plus users anchored to an
+   * EXTERNAL_PARTNER organisation. The latter are partner-side accounts created through services
+   * during seeding, so they never carry demo_seed = true, and fk_user_organization is RESTRICT —
+   * they must go before their organisation does.
+   */
+  private static final String PURGEABLE_USER_PREDICATE =
+      """
+      (
+        %1$s.demo_seed = true
+        OR %1$s.organization_id IN (
+          SELECT o.id
+          FROM common_company.common_organization o
+          WHERE o.tenant_id = %1$s.tenant_id
+            AND o.organization_type = 'EXTERNAL_PARTNER'
+        )
+      )
+      """;
+
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
           "flowboard.task_attachment",
@@ -528,7 +547,7 @@ public class TenantTransactionalPurgeService {
           SELECT uc.contact_id
           FROM common_user.common_user_contact uc
           JOIN common_user.common_user u ON u.id = uc.user_id
-          WHERE u.tenant_id = ? AND u.demo_seed = true
+          WHERE u.tenant_id = ? AND %s
         )
         DELETE FROM common_communication.common_contact c
         USING seed_contacts sc
@@ -540,14 +559,15 @@ public class TenantTransactionalPurgeService {
             JOIN common_user.common_user u2 ON u2.id = uc2.user_id
             WHERE uc2.contact_id = c.id
               AND u2.tenant_id = ?
-              AND u2.demo_seed = false
+              AND NOT %s
           )
           AND NOT EXISTS (
             SELECT 1
             FROM common_company.common_organization_contact oc
             WHERE oc.contact_id = c.id
           )
-        """,
+        """
+            .formatted(purgeable("u"), purgeable("u2")),
         tenantId,
         tenantId,
         tenantId);
@@ -560,7 +580,7 @@ public class TenantTransactionalPurgeService {
           SELECT ua.address_id
           FROM common_user.common_user_address ua
           JOIN common_user.common_user u ON u.id = ua.user_id
-          WHERE u.tenant_id = ? AND u.demo_seed = true
+          WHERE u.tenant_id = ? AND %s
         )
         DELETE FROM common_communication.common_address a
         USING seed_addresses sa
@@ -572,14 +592,15 @@ public class TenantTransactionalPurgeService {
             JOIN common_user.common_user u2 ON u2.id = ua2.user_id
             WHERE ua2.address_id = a.id
               AND u2.tenant_id = ?
-              AND u2.demo_seed = false
+              AND NOT %s
           )
           AND NOT EXISTS (
             SELECT 1
             FROM common_company.common_organization_address oa
             WHERE oa.address_id = a.id
           )
-        """,
+        """
+            .formatted(purgeable("u"), purgeable("u2")),
         tenantId,
         tenantId,
         tenantId);
@@ -600,8 +621,12 @@ public class TenantTransactionalPurgeService {
         jdbc,
         rows,
         "common_user.common_user(seed-demo-users)",
-        "DELETE FROM common_user.common_user WHERE tenant_id = ? AND demo_seed = true",
+        "DELETE FROM common_user.common_user u WHERE u.tenant_id = ? AND " + purgeable("u"),
         tenantId);
+  }
+
+  private static String purgeable(String alias) {
+    return PURGEABLE_USER_PREDICATE.formatted(alias);
   }
 
   private void deleteSeedUserOwnedRows(
@@ -618,7 +643,9 @@ public class TenantTransactionalPurgeService {
             + table
             + " WHERE tenant_id = ? AND "
             + userColumn
-            + " IN (SELECT id FROM common_user.common_user WHERE tenant_id = ? AND demo_seed = true)",
+            + " IN (SELECT u.id FROM common_user.common_user u WHERE u.tenant_id = ? AND "
+            + purgeable("u")
+            + ")",
         tenantId,
         tenantId);
   }

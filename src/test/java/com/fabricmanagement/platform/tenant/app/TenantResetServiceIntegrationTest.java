@@ -79,6 +79,7 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
             organizationName);
     UUID ownerId = findUserIdByContact(ownerEmail);
     UUID realUserId = insertRealUser(tenantId, ownerId);
+    UUID partnerUserId = insertPartnerUser(tenantId);
     Timestamp trialStartedAt = tenantTimestamp(tenantId, "trial_started_at");
     Timestamp trialEndsAt = tenantTimestamp(tenantId, "trial_ends_at");
     UUID mutatedSeedUserId =
@@ -98,6 +99,7 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
     assertThat(tenantTimestamp(tenantId, "trial_ends_at")).isEqualTo(trialEndsAt);
     assertThat(userExists(ownerId)).isTrue();
     assertThat(userExists(realUserId)).isTrue();
+    assertThat(userExists(partnerUserId)).isFalse();
     assertThat(countSeedUsers(tenantId)).isGreaterThan(0);
     assertThat(countUsersByFirstName(tenantId, "MutatedSeed")).isZero();
     assertThat(countAliasUsers(ownerAliasPattern, true)).isGreaterThan(0);
@@ -147,6 +149,32 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
         "REAL-" + UUID.randomUUID(),
         organizationId,
         roleId);
+    return userId;
+  }
+
+  private UUID insertPartnerUser(UUID tenantId) {
+    UUID organizationId =
+        jdbc.queryForObject(
+            """
+            SELECT id
+            FROM common_company.common_organization
+            WHERE tenant_id = ? AND organization_type = 'EXTERNAL_PARTNER'
+            LIMIT 1
+            """,
+            UUID.class,
+            tenantId);
+    UUID userId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO common_user.common_user
+          (id, tenant_id, uid, organization_id, first_name, last_name, user_type,
+           is_active, demo_seed, created_at, updated_at, version)
+        VALUES (?, ?, ?, ?, 'Partner', 'User', 'EXTERNAL', true, false, now(), now(), 0)
+        """,
+        userId,
+        tenantId,
+        "PARTNER-" + UUID.randomUUID(),
+        organizationId);
     return userId;
   }
 
