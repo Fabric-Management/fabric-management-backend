@@ -48,11 +48,11 @@
 
         <!-- Testing Versions -->
         <testcontainers.version>1.21.4</testcontainers.version>
-        <archunit.version>1.4.2</archunit.version>
+        <archunit.version>1.5.0</archunit.version>
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
-        <springdoc-openapi.version>2.8.17</springdoc-openapi.version>
+        <springdoc-openapi.version>2.9.0</springdoc-openapi.version>
 
         <!-- Cache Versions -->
         <caffeine.version>3.2.4</caffeine.version>
@@ -427,7 +427,7 @@
             <dependency>
                 <groupId>org.webjars</groupId>
                 <artifactId>swagger-ui</artifactId>
-                <version>5.32.8</version>
+                <version>5.32.13</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
