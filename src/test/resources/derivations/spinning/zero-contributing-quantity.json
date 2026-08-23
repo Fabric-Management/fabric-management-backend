@@ -1,0 +1,13 @@
+{
+  "description": "weighted targets are absent when contributing quantity totals zero",
+  "parents": [
+    {
+      "attributes": {
+        "fiber_micronaire": 4.0,
+        "fiber_staple_length": 30.0
+      },
+      "quantity": 0
+    }
+  ],
+  "expected": {}
+}

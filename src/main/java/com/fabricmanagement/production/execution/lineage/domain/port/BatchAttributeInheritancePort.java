@@ -20,7 +20,12 @@ import java.util.Map;
  *
  * @see com.fabricmanagement.production.execution.lineage.domain.BatchLineage
  * @see com.fabricmanagement.production.execution.lineage.domain.rule.BatchAttributes
+ * @deprecated Retired by YARN-ARCHITECTURE Y8 / LOT-SPECS Amendment 1. Knowledge captured in
+ *     docs/production/derivations/SPINNING-DERIVATION-SPEC.md +
+ *     src/test/resources/derivations/spinning. Runtime replacement: SpinningLotDerivation (YARN-3).
+ *     Physical removal: YARN-3B.
  */
+@Deprecated(since = "YARN-0B", forRemoval = true)
 public interface BatchAttributeInheritancePort {
 
   /**

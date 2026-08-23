@@ -27,7 +27,13 @@ import org.springframework.stereotype.Service;
  * inheritance rules (WEIGHTED_AVERAGE, MIN, MAX, COLLECT_TO_ARRAY, REQUIRE_EQUAL, DROP,
  * PASS_THROUGH) to resolve the child batch's JSONB attributes from consumed parent attribute
  * snapshots and quantities.
+ *
+ * @deprecated Retired by YARN-ARCHITECTURE Y8 / LOT-SPECS Amendment 1. Knowledge captured in
+ *     docs/production/derivations/SPINNING-DERIVATION-SPEC.md +
+ *     src/test/resources/derivations/spinning. Runtime replacement: SpinningLotDerivation (YARN-3).
+ *     Physical removal: YARN-3B.
  */
+@Deprecated(since = "YARN-0B", forRemoval = true)
 @Service
 public class BatchAttributeInheritanceEngine implements BatchAttributeInheritancePort {
 

@@ -40,7 +40,13 @@ import org.springframework.stereotype.Component;
  * {@code inheritance_rule_schema} database table for tenant-specific rule overrides via the
  * repository. If no tenant-specific rule exists, it gracefully falls back to the in-memory
  * classpath defaults.
+ *
+ * @deprecated Retired by YARN-ARCHITECTURE Y8 / LOT-SPECS Amendment 1. Knowledge captured in
+ *     docs/production/derivations/SPINNING-DERIVATION-SPEC.md +
+ *     src/test/resources/derivations/spinning. Runtime replacement: SpinningLotDerivation (YARN-3).
+ *     Physical removal: YARN-3B.
  */
+@Deprecated(since = "YARN-0B", forRemoval = true)
 @Component
 public class AttributeInheritanceSchemaLoader {
 

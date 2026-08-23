@@ -1,0 +1,18 @@
+{
+  "description": "conflicting non-null fiber shades are rejected",
+  "parents": [
+    {
+      "attributes": {
+        "fiber_shade": "CREAM"
+      },
+      "quantity": 1
+    },
+    {
+      "attributes": {
+        "fiber_shade": "WHITE"
+      },
+      "quantity": 1
+    }
+  ],
+  "expectError": true
+}
