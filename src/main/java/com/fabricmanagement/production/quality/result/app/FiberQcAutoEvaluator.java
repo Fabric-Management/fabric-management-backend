@@ -197,6 +197,20 @@ public class FiberQcAutoEvaluator {
       anyConditional = true;
     }
 
+    if (checkRejected(
+        result.getUniformityIndex(),
+        standard.getUniformityIndexMin(),
+        standard.getUniformityIndexTarget(),
+        standard.getUniformityIndexMax())) {
+      anyRejected = true;
+    } else if (checkConditional(
+        result.getUniformityIndex(),
+        standard.getUniformityIndexMin(),
+        standard.getUniformityIndexTarget(),
+        standard.getUniformityIndexMax())) {
+      anyConditional = true;
+    }
+
     if (anyRejected) {
       return TestApprovalStatus.REJECTED;
     }

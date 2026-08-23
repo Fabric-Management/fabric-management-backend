@@ -82,6 +82,9 @@ public class FiberQualityStandardService {
             .trashContentPctMin(request.getTrashContentPctMin())
             .trashContentPctTarget(request.getTrashContentPctTarget())
             .trashContentPctMax(request.getTrashContentPctMax())
+            .uniformityIndexMin(request.getUniformityIndexMin())
+            .uniformityIndexTarget(request.getUniformityIndexTarget())
+            .uniformityIndexMax(request.getUniformityIndexMax())
             .build();
 
     FiberQualityStandard saved = standardRepository.save(standard);
@@ -204,6 +207,9 @@ public class FiberQualityStandardService {
     standard.setTrashContentPctMin(request.getTrashContentPctMin());
     standard.setTrashContentPctTarget(request.getTrashContentPctTarget());
     standard.setTrashContentPctMax(request.getTrashContentPctMax());
+    standard.setUniformityIndexMin(request.getUniformityIndexMin());
+    standard.setUniformityIndexTarget(request.getUniformityIndexTarget());
+    standard.setUniformityIndexMax(request.getUniformityIndexMax());
 
     FiberQualityStandard saved = standardRepository.save(standard);
     log.info(
@@ -295,6 +301,11 @@ public class FiberQualityStandardService {
         req.getTrashContentPctMin(),
         req.getTrashContentPctTarget(),
         req.getTrashContentPctMax());
+    validateRange(
+        "Uniformity index",
+        req.getUniformityIndexMin(),
+        req.getUniformityIndexTarget(),
+        req.getUniformityIndexMax());
   }
 
   private void validateToleranceRanges(UpdateFiberQualityStandardRequest req) {
@@ -317,6 +328,11 @@ public class FiberQualityStandardService {
         req.getTrashContentPctMin(),
         req.getTrashContentPctTarget(),
         req.getTrashContentPctMax());
+    validateRange(
+        "Uniformity index",
+        req.getUniformityIndexMin(),
+        req.getUniformityIndexTarget(),
+        req.getUniformityIndexMax());
   }
 
   private void validateRange(String param, Double min, Double target, Double max) {

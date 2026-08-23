@@ -49,6 +49,9 @@ public class CreateFiberTestResultRequest {
   @Range(min = 0, max = 100, message = "Trash content % must be between 0 and 100")
   private Double trashContentPercent;
 
+  @Range(min = 0, max = 100, message = "Uniformity index % must be between 0 and 100")
+  private Double uniformityIndex;
+
   // Metadata
   private String testLab;
   private String testStandard;

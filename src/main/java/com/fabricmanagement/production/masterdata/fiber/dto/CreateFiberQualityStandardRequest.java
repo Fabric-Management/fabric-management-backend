@@ -87,4 +87,14 @@ public class CreateFiberQualityStandardRequest {
 
   @Range(min = 0, max = 100, message = "Trash content max must be between 0 and 100")
   private Double trashContentPctMax;
+
+  // Uniformity index (%)
+  @Range(min = 0, max = 100, message = "Uniformity index min must be between 0 and 100")
+  private Double uniformityIndexMin;
+
+  @Range(min = 0, max = 100, message = "Uniformity index target must be between 0 and 100")
+  private Double uniformityIndexTarget;
+
+  @Range(min = 0, max = 100, message = "Uniformity index max must be between 0 and 100")
+  private Double uniformityIndexMax;
 }

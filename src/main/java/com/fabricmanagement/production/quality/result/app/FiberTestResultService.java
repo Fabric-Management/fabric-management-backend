@@ -74,6 +74,7 @@ public class FiberTestResultService {
             .elongationPercent(request.getElongationPercent())
             .moisturePercent(request.getMoisturePercent())
             .trashContentPercent(request.getTrashContentPercent())
+            .uniformityIndex(request.getUniformityIndex())
             .approvalStatus(TestApprovalStatus.PENDING)
             .testLab(request.getTestLab())
             .testStandard(request.getTestStandard())

@@ -76,6 +76,10 @@ public class FiberTestResult extends BaseEntity {
   @Column(name = "trash_content_percent")
   private Double trashContentPercent;
 
+  /** Length uniformity index measured by HVI. */
+  @Column(name = "uniformity_index")
+  private Double uniformityIndex;
+
   // ── Quality gate ──────────────────────────────────────────────────────────
 
   /** Quality engineer's approval decision. Defaults to PENDING until reviewed. */

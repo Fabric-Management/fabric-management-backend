@@ -53091,6 +53091,15 @@ components:
         trashContentPctTarget:
           type: number
           format: double
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
+          type: number
+          format: double
         version:
           type: integer
           format: int64
@@ -53184,6 +53193,9 @@ components:
         testType:
           type: string
         trashContentPercent:
+          type: number
+          format: double
+        uniformityIndex:
           type: number
           format: double
         version:
@@ -55665,6 +55677,15 @@ components:
           format: double
         uid:
           type: string
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
+          type: number
+          format: double
         updatedAt:
           type: string
           format: date-time
@@ -55822,6 +55843,9 @@ components:
           format: double
         uid:
           type: string
+        uniformityIndex:
+          type: number
+          format: double
         updatedAt:
           type: string
           format: date-time
@@ -63839,6 +63863,15 @@ components:
           type: number
           format: double
         trashContentPctTarget:
+          type: number
+          format: double
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
           type: number
           format: double
         version:

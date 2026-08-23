@@ -119,6 +119,17 @@ public class FiberQualityStandard extends BaseEntity {
   @Column(name = "trash_content_pct_max")
   private Double trashContentPctMax;
 
+  // ── Uniformity index (%) ──────────────────────────────────────────────────
+
+  @Column(name = "uniformity_index_min")
+  private Double uniformityIndexMin;
+
+  @Column(name = "uniformity_index_target")
+  private Double uniformityIndexTarget;
+
+  @Column(name = "uniformity_index_max")
+  private Double uniformityIndexMax;
+
   @Override
   protected String getModuleCode() {
     return "FQST";

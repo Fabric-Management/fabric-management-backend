@@ -45,6 +45,10 @@ public class FiberQualityStandardDto {
   private Double trashContentPctTarget;
   private Double trashContentPctMax;
 
+  private Double uniformityIndexMin;
+  private Double uniformityIndexTarget;
+  private Double uniformityIndexMax;
+
   private Boolean isActive;
   private Long version;
   private Instant createdAt;
@@ -76,6 +80,9 @@ public class FiberQualityStandardDto {
         .trashContentPctMin(entity.getTrashContentPctMin())
         .trashContentPctTarget(entity.getTrashContentPctTarget())
         .trashContentPctMax(entity.getTrashContentPctMax())
+        .uniformityIndexMin(entity.getUniformityIndexMin())
+        .uniformityIndexTarget(entity.getUniformityIndexTarget())
+        .uniformityIndexMax(entity.getUniformityIndexMax())
         .version(entity.getVersion())
         .isActive(entity.getIsActive())
         .createdAt(entity.getCreatedAt())
