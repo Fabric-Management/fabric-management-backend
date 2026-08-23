@@ -45804,6 +45804,7 @@ components:
           format: uuid
         netWeight:
           type: number
+          minimum: 0
         notes:
           type: string
         packageType:
@@ -51437,6 +51438,7 @@ components:
       properties:
         consumedQuantity:
           type: number
+          minimum: 0
         consumptionPercentage:
           type: number
           maximum: 100
@@ -52162,6 +52164,7 @@ components:
       properties:
         actualQuantityKg:
           type: number
+          minimum: 0
         batchId:
           type: string
           format: uuid
@@ -52193,6 +52196,7 @@ components:
           format: uuid
         totalQuantityKg:
           type: number
+          minimum: 0
         tradingPartnerId:
           type: string
           format: uuid
@@ -52209,6 +52213,7 @@ components:
           minLength: 1
         plannedQuantityKg:
           type: number
+          minimum: 0
         productId:
           type: string
           format: uuid
@@ -52228,6 +52233,7 @@ components:
       properties:
         amount:
           type: number
+          minimum: 0
         stockUnitId:
           type: string
           format: uuid
@@ -52239,6 +52245,7 @@ components:
       properties:
         amount:
           type: number
+          minimum: 0
         workOrderId:
           type: string
           format: uuid
@@ -52781,6 +52788,7 @@ components:
           description: Optional partner-specific Delta-E tolerance override; must
             be positive
           maximum: 99.99
+          minimum: 0
         initialPrimaryCode:
           $ref: "#/components/schemas/ColorPartnerCodeInput"
           description: "Required first code, created as the sole active primary"
@@ -52850,6 +52858,7 @@ components:
           type: number
           description: Maximum accepted Delta-E; requires a target and a formula
           maximum: 99.99
+          minimum: 0
         name:
           type: string
           description: Human-readable color-card name; stored trimmed
@@ -52941,6 +52950,7 @@ components:
       properties:
         amount:
           type: number
+          minimum: 0
         targetInvoiceId:
           type: string
           format: uuid
@@ -53006,6 +53016,7 @@ components:
           minLength: 0
         department:
           type: string
+          deprecated: true
         firstName:
           type: string
           maxLength: 100
@@ -53031,21 +53042,30 @@ components:
         elongationPctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         elongationPctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         elongationPctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         finenessMax:
           type: number
           format: double
+          minimum: 0
         finenessMin:
           type: number
           format: double
+          minimum: 0
         finenessTarget:
           type: number
           format: double
+          minimum: 0
         isDefault:
           type: boolean
         isoCodeId:
@@ -53054,21 +53074,30 @@ components:
         lengthMmMax:
           type: number
           format: double
+          minimum: 0
         lengthMmMin:
           type: number
           format: double
+          minimum: 0
         lengthMmTarget:
           type: number
           format: double
+          minimum: 0
         moisturePctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         moisturePctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         moisturePctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         standardName:
           type: string
           maxLength: 100
@@ -53076,21 +53105,30 @@ components:
         strengthCndTexMax:
           type: number
           format: double
+          minimum: 0
         strengthCndTexMin:
           type: number
           format: double
+          minimum: 0
         strengthCndTexTarget:
           type: number
           format: double
+          minimum: 0
         trashContentPctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         trashContentPctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         trashContentPctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         version:
           type: integer
           format: int64
@@ -53157,15 +53195,21 @@ components:
         elongationPercent:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         fineness:
           type: number
           format: double
+          minimum: 0
         lengthMm:
           type: number
           format: double
+          minimum: 0
         moisturePercent:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         remarks:
           type: string
         stockUnitId:
@@ -53174,6 +53218,7 @@ components:
         strengthCndTex:
           type: number
           format: double
+          minimum: 0
         testDate:
           type: string
           format: date-time
@@ -53186,6 +53231,8 @@ components:
         trashContentPercent:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         version:
           type: integer
           format: int64
@@ -53821,6 +53868,7 @@ components:
           format: uuid
         qtyReserved:
           type: number
+          minimum: 0
         salesOrderLineId:
           type: string
           format: uuid
@@ -53933,7 +53981,6 @@ components:
         leadTimeDays:
           type: integer
           format: int32
-          deprecated: true
         listPrice:
           type: number
           minimum: 0.0
@@ -54063,6 +54110,7 @@ components:
           type: number
         initialWeight:
           type: number
+          minimum: 0
         length:
           type: number
         lengthUnit:
@@ -54172,7 +54220,6 @@ components:
         leadTimeDays:
           type: integer
           format: int32
-          deprecated: true
           description: Lead time in days
         moduleType:
           type: string
@@ -54430,8 +54477,10 @@ components:
           format: uuid
         maxVolumeM3:
           type: number
+          minimum: 0
         maxWeightKg:
           type: number
+          minimum: 0
         name:
           type: string
           maxLength: 255
@@ -55252,6 +55301,7 @@ components:
           pattern: "^[A-Z]{3}$"
         rate:
           type: number
+          minimum: 0
         rateDate:
           type: string
           format: date
@@ -56126,6 +56176,7 @@ components:
         length:
           type: number
           description: Physical item length; required for FABRIC purchase receipts
+          minimum: 0
         lengthUnit:
           type: string
           description: "Metric length unit: M, CM, or MM"
@@ -61267,6 +61318,7 @@ components:
       properties:
         amount:
           type: number
+          minimum: 0
         reason:
           type: string
           minLength: 1
@@ -61531,7 +61583,6 @@ components:
           additionalProperties: true
         moduleType:
           type: string
-          deprecated: true
           enum:
           - FIBER
           - YARN
@@ -61624,7 +61675,6 @@ components:
           additionalProperties: true
         moduleType:
           type: string
-          deprecated: true
           enum:
           - FIBER
           - YARN
@@ -61670,7 +61720,6 @@ components:
           additionalProperties: true
         moduleType:
           type: string
-          deprecated: true
           enum:
           - FIBER
           - YARN
@@ -61710,7 +61759,6 @@ components:
         leadTimeDays:
           type: integer
           format: int32
-          deprecated: true
         listPrice:
           type: number
         moduleType:
@@ -62239,6 +62287,7 @@ components:
       properties:
         amount:
           type: number
+          minimum: 0
       required:
       - amount
     StockUnitDto:
@@ -62622,7 +62671,6 @@ components:
         leadTimeDays:
           type: integer
           format: int32
-          deprecated: true
           description: Lead Time in Days
         lines:
           type: array
@@ -63621,6 +63669,7 @@ components:
           description: Optional partner-specific Delta-E tolerance override; null
             clears it
           maximum: 99.99
+          minimum: 0
     UpdateColorRequest:
       type: object
       description: "Full replacement of mutable color-card state. Code and name are\
@@ -63690,6 +63739,7 @@ components:
           description: Maximum accepted Delta-E; omission or null clears both tolerance
             and formula
           maximum: 99.99
+          minimum: 0
         name:
           type: string
           description: Human-readable color-card name; stored trimmed
@@ -63781,21 +63831,30 @@ components:
         elongationPctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         elongationPctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         elongationPctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         finenessMax:
           type: number
           format: double
+          minimum: 0
         finenessMin:
           type: number
           format: double
+          minimum: 0
         finenessTarget:
           type: number
           format: double
+          minimum: 0
         isDefault:
           type: boolean
         isoCodeId:
@@ -63804,21 +63863,30 @@ components:
         lengthMmMax:
           type: number
           format: double
+          minimum: 0
         lengthMmMin:
           type: number
           format: double
+          minimum: 0
         lengthMmTarget:
           type: number
           format: double
+          minimum: 0
         moisturePctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         moisturePctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         moisturePctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         standardName:
           type: string
           maxLength: 100
@@ -63826,21 +63894,30 @@ components:
         strengthCndTexMax:
           type: number
           format: double
+          minimum: 0
         strengthCndTexMin:
           type: number
           format: double
+          minimum: 0
         strengthCndTexTarget:
           type: number
           format: double
+          minimum: 0
         trashContentPctMax:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         trashContentPctMin:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         trashContentPctTarget:
           type: number
           format: double
+          maximum: 9223372036854775807
+          minimum: 0
         version:
           type: integer
           format: int64
@@ -64144,7 +64221,6 @@ components:
           additionalProperties: true
         moduleType:
           type: string
-          deprecated: true
           enum:
           - FIBER
           - YARN
@@ -64539,8 +64615,10 @@ components:
           format: uuid
         maxVolumeM3:
           type: number
+          minimum: 0
         maxWeightKg:
           type: number
+          minimum: 0
         name:
           type: string
           maxLength: 255
