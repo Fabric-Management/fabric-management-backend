@@ -82,7 +82,8 @@
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <tomcat.version>10.1.57</tomcat.version>
         <spring-security.version>6.5.11</spring-security.version>
-        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <jackson-bom.version>2.21.5</jackson-bom.version>
+        <log4j2.version>2.25.5</log4j2.version>
         <kotlin.version>2.2.21</kotlin.version>
         <opentelemetry-semconv.version>1.41.1</opentelemetry-semconv.version>
     </properties>
@@ -423,11 +424,11 @@
                 <artifactId>opentelemetry-semconv</artifactId>
                 <version>${opentelemetry-semconv.version}</version>
             </dependency>
-            <!-- Override swagger-ui to fix DOMPurify GHSA-39q2-94rc-95cp -->
+            <!-- Override swagger-ui to consume patched DOMPurify 3.4.13 -->
             <dependency>
                 <groupId>org.webjars</groupId>
                 <artifactId>swagger-ui</artifactId>
-                <version>5.32.6</version>
+                <version>5.32.13</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
