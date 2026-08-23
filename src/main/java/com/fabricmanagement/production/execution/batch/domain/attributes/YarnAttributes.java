@@ -1,11 +1,12 @@
 package com.fabricmanagement.production.execution.batch.domain.attributes;
 
 import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.asString;
-import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.toDouble;
+import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.toBigDecimal;
 import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.toInteger;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,11 +33,12 @@ public record YarnAttributes(
     @Schema(description = "Yarn composition string", example = "100% Cotton")
         @JsonProperty("yarn_composition")
         String composition,
-    @Schema(description = "Turns per inch (TPI)", example = "18.5") @JsonProperty("yarn_tpi")
-        Double tpi,
+    @Schema(description = "Twist density in turns per metre (TPM)", example = "728.35")
+        @JsonProperty("yarn_twist_tpm")
+        BigDecimal turnsPerMeter,
     @Schema(description = "Count Strength Product (CSP)", example = "2800")
         @JsonProperty("yarn_csp")
-        Double csp) {
+        BigDecimal csp) {
 
   /**
    * Convert a raw attributes map to typed YarnAttributes.
@@ -48,14 +50,15 @@ public record YarnAttributes(
     if (attrs == null) {
       attrs = Map.of();
     }
+    BigDecimal turnsPerMeter = readTurnsPerMeter(attrs);
     return new YarnAttributes(
         asString(attrs.get("yarn_count")),
         asString(attrs.get("yarn_twist")),
         asString(attrs.get("yarn_construction")),
         toInteger(attrs.get("yarn_ply")),
         asString(attrs.get("yarn_composition")),
-        toDouble(attrs.get("yarn_tpi")),
-        toDouble(attrs.get("yarn_csp")));
+        turnsPerMeter,
+        toBigDecimal(attrs.get("yarn_csp")));
   }
 
   /**
@@ -80,12 +83,28 @@ public record YarnAttributes(
     if (composition != null) {
       m.put("yarn_composition", composition);
     }
-    if (tpi != null) {
-      m.put("yarn_tpi", tpi);
+    if (turnsPerMeter != null) {
+      m.put("yarn_twist_tpm", turnsPerMeter);
     }
     if (csp != null) {
       m.put("yarn_csp", csp);
     }
     return m;
+  }
+
+  private static BigDecimal readTurnsPerMeter(Map<String, Object> attrs) {
+    if (attrs.containsKey("yarn_twist_tpm")) {
+      return toBigDecimal(attrs.get("yarn_twist_tpm"));
+    }
+    return readLegacyTurnsPerMeter(attrs);
+  }
+
+  /**
+   * @deprecated Read-only {@code yarn_tpi} fallback. Remove in YARN-3B only after the migration is
+   *     applied in every environment, the production sunset guard is zero, and YARN-3 has shipped.
+   */
+  @Deprecated(since = "YARN-0C", forRemoval = true)
+  private static BigDecimal readLegacyTurnsPerMeter(Map<String, Object> attrs) {
+    return TwistConversion.tpiToTpm(toBigDecimal(attrs.get("yarn_tpi")));
   }
 }

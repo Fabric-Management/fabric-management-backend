@@ -1,5 +1,7 @@
 package com.fabricmanagement.production.execution.batch.domain.attributes;
 
+import java.math.BigDecimal;
+
 /**
  * Shared utility methods for safely converting raw JSONB attribute values ({@code Object}) into
  * strongly typed Java objects.
@@ -33,6 +35,36 @@ public final class AttributeConversions {
       try {
         return Double.parseDouble(s);
       } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Convert a raw attribute value to {@link BigDecimal}.
+   *
+   * <p>Handles {@link Number} and numeric {@link String} values. Returns {@code null} for {@code
+   * null} input or unparseable values.
+   */
+  public static BigDecimal toBigDecimal(Object o) {
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof BigDecimal decimal) {
+      return decimal;
+    }
+    if (o instanceof Number number) {
+      try {
+        return new BigDecimal(number.toString());
+      } catch (NumberFormatException exception) {
+        return null;
+      }
+    }
+    if (o instanceof String string) {
+      try {
+        return new BigDecimal(string);
+      } catch (NumberFormatException exception) {
         return null;
       }
     }

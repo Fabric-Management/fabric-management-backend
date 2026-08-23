@@ -65646,7 +65646,6 @@ components:
           example: 30/1
         yarn_csp:
           type: number
-          format: double
           description: Count Strength Product (CSP)
           example: 2800
         yarn_ply:
@@ -65654,15 +65653,14 @@ components:
           format: int32
           description: Number of plies
           example: 1
-        yarn_tpi:
-          type: number
-          format: double
-          description: Turns per inch (TPI)
-          example: 18.5
         yarn_twist:
           type: string
           description: Twist direction (Z or S)
           example: Z
+        yarn_twist_tpm:
+          type: number
+          description: Twist density in turns per metre (TPM)
+          example: 728.35
     YarnPurchaseSpecs:
       allOf:
       - $ref: "#/components/schemas/PurchaseOrderSpecs"
