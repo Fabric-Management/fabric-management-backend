@@ -4,6 +4,8 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.procurement.purchaseorder.api.query.PurchaseOrderQueryService;
 import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService;
+import com.fabricmanagement.product.core.api.facade.ProductFacade;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.api.query.BatchQueryService;
 import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
@@ -17,8 +19,6 @@ import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsRec
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptItemRepository;
 import com.fabricmanagement.production.execution.goodsreceipt.infra.repository.GoodsReceiptRepository;
-import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;

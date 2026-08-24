@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort.LotIntentRequest;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchLotQuantityIntent;
@@ -22,7 +23,6 @@ import com.fabricmanagement.production.execution.batch.domain.exception.LotInten
 import com.fabricmanagement.production.execution.batch.domain.exception.LotIntentUnitMismatchException;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

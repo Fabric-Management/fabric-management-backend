@@ -1,11 +1,11 @@
 package com.fabricmanagement.production.execution.batch.infra.repository;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;

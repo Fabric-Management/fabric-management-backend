@@ -49,7 +49,8 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | Modül | Sorumluluk |
 |-------|------------|
 | `platform` | Auth, User, Organization, Tenant, Communication, TradingPartner, Subscription, Policy, Audit, AI |
-| `production` | Masterdata (Fiber, Material, Recipe), Execution (Batch, WorkOrder, GoodsReceipt, Inventory, Lineage), Quality |
+| `product` | Product core, Fiber, Color, QualityGrade, Recipe (ürünün NE olduğu) |
+| `production` | Execution (Batch, WorkOrder, GoodsReceipt, Inventory, Lineage), Quality ve üretim süreçleri (NASIL) |
 | `sales` | SalesOrder, Quote, Catalog, Pricing, Sample |
 | `procurement` | PurchaseOrder, SubcontractOrder, SupplierRFQ, SupplierQuote |
 | `flowboard` | Board, Task, Generator, Automation, Dashboard |
@@ -63,7 +64,7 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | `approval` | ApprovalPolicy, ApprovalRequest, UserPromotion |
 | `offline` | Sync |
 
-- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `production` → `masterdata/fiber`, `execution/batch`, `quality/result`
+- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `product` → `core`, `fiber`, `recipe`; `production` → `execution/batch`, `quality/result`
 - **Platform vs Domain:** Platform modülleri (auth, user, tenant, subscription) uygulama altyapısıdır — domain modülleri platform'u kullanabilir, tersi yasak
 - **`common/infrastructure/`:** Yalnızca framework-level, domain-agnostic altyapı: `BaseEntity`, `SecurityConfig`, `TenantContext`, `GlobalExceptionHandler`. İş mantığı burada bulunmaz
 
@@ -180,10 +181,12 @@ Modül-spesifik iş hataları, modülün mevcut base exception'ını extend eder
 
 ```
 DomainException (abstract, common/infrastructure)
-├── ProductionDomainException
-│   ├── BatchDomainException
+├── ProductDomainException
 │   ├── FiberDomainException
-│   └── RecipeDomainException
+│   ├── RecipeDomainException
+│   └── QualityGradeDomainException
+├── ProductionDomainException
+│   └── BatchDomainException
 ├── SalesDomainException
 ├── ProcurementDomainException
 ├── IwmDomainException
@@ -345,8 +348,10 @@ com.fabricmanagement/
 │   ├── tradingpartner/             # TradingPartner, PartnerUser
 │   └── user/                       # User, Role, Profile
 │
+├── product/                        # ÜRÜN TANIMLARI (NE)
+│   └── {core,fiber,color,qualitygrade,recipe}/
+│
 ├── production/                     # ÜRETİM
-│   ├── masterdata/{fiber,material,recipe}/
 │   ├── execution/{batch,workorder,goodsreceipt,inventory,lineage}/
 │   └── quality/result/
 │

@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
+import com.fabricmanagement.product.core.domain.reference.ProductAttribute;
 import jakarta.persistence.*;
 import lombok.*;
 

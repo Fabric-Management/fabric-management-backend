@@ -2,6 +2,11 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.color.api.query.ColorQueryService;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
+import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.domain.BatchReservation;
@@ -16,12 +21,6 @@ import com.fabricmanagement.production.execution.batch.dto.*;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
-import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -49,8 +48,7 @@ public class BatchService {
   private final BatchRepository batchRepository;
   private final BatchReservationRepository reservationRepository;
   private final BatchCertificationRepository batchCertificationRepository;
-  private final FiberRepository fiberRepository;
-  private final FiberQualityStandardRepository qualityStandardRepository;
+  private final FiberQualityQueryService fiberQualityQueryService;
   private final ColorQueryService colorQueryService;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final BatchPrimaryMeasureService primaryMeasureService;
@@ -142,8 +140,8 @@ public class BatchService {
   private UUID resolveQualityStandardId(CreateBatchRequest request) {
     if (request.getQualityStandardId() != null) {
       UUID tenantId = TenantContext.requireTenantId();
-      if (qualityStandardRepository
-          .findByTenantIdAndId(tenantId, request.getQualityStandardId())
+      if (fiberQualityQueryService
+          .findQualityStandardById(tenantId, request.getQualityStandardId())
           .isEmpty()) {
         throw new BatchDomainException(
             "Quality standard not found: " + request.getQualityStandardId());
@@ -154,7 +152,7 @@ public class BatchService {
       return null;
     }
     UUID tenantId = TenantContext.requireTenantId();
-    Optional<Fiber> fiberOpt = fiberRepository.findByProductId(request.getProductId());
+    Optional<Fiber> fiberOpt = fiberQualityQueryService.findByProductId(request.getProductId());
     if (fiberOpt.isEmpty()) {
       return null;
     }
@@ -162,8 +160,8 @@ public class BatchService {
     if (isoCodeId == null) {
       return null;
     }
-    return qualityStandardRepository
-        .findByTenantIdAndIsoCode_IdAndIsDefaultTrueAndIsActiveTrue(tenantId, isoCodeId)
+    return fiberQualityQueryService
+        .findDefaultQualityStandard(tenantId, isoCodeId)
         .map(FiberQualityStandard::getId)
         .orElse(null);
   }
@@ -217,7 +215,7 @@ public class BatchService {
     }
     // batch.productId is a prod_product.id; a Fiber is reached through Fiber.productId
     // (BATCH-FK-1).
-    return fiberRepository
+    return fiberQualityQueryService
         .findByProductId(batch.getProductId())
         .map(Fiber::getComposition)
         .orElse(Map.of());

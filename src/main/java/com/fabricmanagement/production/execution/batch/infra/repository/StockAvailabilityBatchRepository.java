@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.batch.infra.repository;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;

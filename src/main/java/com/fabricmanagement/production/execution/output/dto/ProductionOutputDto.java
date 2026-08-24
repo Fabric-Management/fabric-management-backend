@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.output.dto;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.output.domain.ProductionOutputStatus;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

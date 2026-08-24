@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.approval.domain.event.ApprovalRejectedEvent
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
 import com.fabricmanagement.platform.tenant.domain.event.TenantCreatedEvent;
 import com.fabricmanagement.procurement.quote.domain.event.SupplierQuoteAcceptedEvent;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.output.domain.event.ProductionOutputConfirmedEvent;
@@ -29,7 +30,6 @@ import com.fabricmanagement.production.execution.stockunit.domain.event.StockUni
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;

@@ -1,8 +1,8 @@
 package com.fabricmanagement.production.execution.output.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;

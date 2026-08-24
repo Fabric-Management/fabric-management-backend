@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionQueryService;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;

@@ -9,13 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitQueryService;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

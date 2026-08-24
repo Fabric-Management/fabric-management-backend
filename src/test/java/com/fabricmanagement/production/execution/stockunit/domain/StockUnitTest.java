@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRelocationException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitNotReleasedException;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

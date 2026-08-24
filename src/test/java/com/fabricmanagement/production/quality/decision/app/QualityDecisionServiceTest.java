@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -18,7 +19,6 @@ import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposi
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;

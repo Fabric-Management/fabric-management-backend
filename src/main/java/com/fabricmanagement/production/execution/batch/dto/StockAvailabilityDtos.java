@@ -1,9 +1,9 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.BatchUnitMismatchSource;
 import com.fabricmanagement.production.execution.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;

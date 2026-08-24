@@ -2,6 +2,7 @@ package com.fabricmanagement.production.quality.decision.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
 import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationRef;
@@ -9,7 +10,6 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchRep
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEligibility;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;

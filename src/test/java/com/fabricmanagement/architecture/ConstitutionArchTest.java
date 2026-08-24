@@ -1,5 +1,7 @@
 package com.fabricmanagement.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -391,8 +393,7 @@ class ConstitutionArchTest {
       ArchRule rule =
           classes()
               .that()
-              .resideInAPackage(
-                  "com.fabricmanagement.production.masterdata.color.infra.repository..")
+              .resideInAPackage("com.fabricmanagement.product.color.infra.repository..")
               .and()
               .areAssignableTo(org.springframework.data.repository.Repository.class)
               .should()
@@ -566,11 +567,11 @@ class ConstitutionArchTest {
       //
       // [E4] platform.tradingpartner - TradingPartner entity embeds OfflineMetadata (offline
       //      sync capability). Certification services reference FiberCertification from
-      //      production masterdata via FiberCertificationQueryService (QueryService pattern -
+      //      product definitions via FiberCertificationQueryService (QueryService pattern -
       //      @ManyToOne already crosses module boundary at JPA level).
       //
       // [E5] platform.organization - OrganizationCertification references FiberCertification
-      //      from production masterdata for fiber standard validation (same @ManyToOne
+      //      from product definitions for fiber standard validation (same @ManyToOne
       //      coupling as tradingpartner; QueryService pattern applied in Grup B refactoring).
       //
       // [E6] platform.auth - Authentication context resolution may require domain-level
@@ -690,6 +691,44 @@ class ConstitutionArchTest {
   @Nested
   @DisplayName("Article 13 — Cross-Module Infrastructure Isolation")
   class CrossModuleInfrastructureIsolationTests {
+
+    @Test
+    @DisplayName("ADR-0012 D6: product only depends on product, common, and platform")
+    void productShouldOnlyDependOnAllowedFirstPartyModules() {
+      ArchRule rule =
+          classes()
+              .that()
+              .resideInAPackage("com.fabricmanagement.product..")
+              .should()
+              .onlyDependOnClassesThat(
+                  resideInAnyPackage(
+                          "com.fabricmanagement.product..",
+                          "com.fabricmanagement.common..",
+                          "com.fabricmanagement.platform..")
+                      .or(resideOutsideOfPackage("com.fabricmanagement..")))
+              .as(
+                  "ADR-0012 D6: product definitions may only depend on product, common, platform,"
+                      + " or third-party classes");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D6: product infrastructure is private to product")
+    void noModuleShouldAccessProductInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.product..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.product..infra..")
+              .as(
+                  "ADR-0012 D6: modules outside product must use product facades, query services,"
+                      + " or ports instead of product repositories");
+
+      rule.check(allClasses);
+    }
 
     @Test
     @DisplayName("Rule 13.1: No outside module may access platform's infra layer")

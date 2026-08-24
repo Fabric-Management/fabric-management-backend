@@ -1,11 +1,11 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchNotConsumableException;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

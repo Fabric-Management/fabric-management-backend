@@ -2,7 +2,7 @@ package com.fabricmanagement.procurement.subcontract.api.query;
 
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.subcontract.infra.repository.SubcontractOrderRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,9 +1,9 @@
 package com.fabricmanagement.production.execution.batch.infra.repository;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -145,9 +145,9 @@ public interface BatchRepository
   /**
    * Returns true if the given fiber has at least one batch in any of the given statuses.
    *
-   * <p>Used by {@code FiberService.deactivateFiber()} to block deactivation when {@code statuses =
-   * BatchStatus.PRODUCTION_ACTIVE} — i.e. the fiber still has batches in RESERVED or IN_PROGRESS
-   * state on the production floor.
+   * <p>Used by the batch-side fiber-usage adapter to block product-definition mutation when {@code
+   * statuses = BatchStatus.PRODUCTION_ACTIVE} — i.e. the fiber still has batches in RESERVED or
+   * IN_PROGRESS state on the production floor.
    *
    * <p>This query is index-friendly: {@code (tenant_id, product_id, status)} and returns as soon as
    * one matching row is found.

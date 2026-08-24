@@ -3,12 +3,11 @@ package com.fabricmanagement.production.quality.result.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
+import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
-import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import java.util.Optional;
@@ -28,8 +27,7 @@ class FiberQcAutoEvaluatorTest {
   private static final UUID PRODUCT_ID = UUID.randomUUID();
   private static final UUID STANDARD_ID = UUID.randomUUID();
 
-  @Mock private FiberRepository fiberRepository;
-  @Mock private FiberQualityStandardRepository qualityStandardRepository;
+  @Mock private FiberQualityQueryService fiberQualityQueryService;
   @Mock private Batch batch;
   @Mock private Fiber fiber;
 
@@ -40,7 +38,7 @@ class FiberQcAutoEvaluatorTest {
     when(batch.getProductType()).thenReturn(ProductType.FIBER);
     when(batch.getProductId()).thenReturn(PRODUCT_ID);
     when(batch.getQualityStandardId()).thenReturn(STANDARD_ID);
-    when(fiberRepository.findByProductId(PRODUCT_ID)).thenReturn(Optional.of(fiber));
+    when(fiberQualityQueryService.findByProductIdOrId(PRODUCT_ID)).thenReturn(Optional.of(fiber));
   }
 
   @ParameterizedTest
@@ -75,7 +73,7 @@ class FiberQcAutoEvaluatorTest {
   }
 
   private TestApprovalStatus evaluate(FiberTestResult result, FiberQualityStandard standard) {
-    when(qualityStandardRepository.findByTenantIdAndId(TENANT_ID, STANDARD_ID))
+    when(fiberQualityQueryService.findQualityStandardById(TENANT_ID, STANDARD_ID))
         .thenReturn(Optional.of(standard));
 
     return evaluator.evaluate(result, batch, TENANT_ID).approvalStatus();

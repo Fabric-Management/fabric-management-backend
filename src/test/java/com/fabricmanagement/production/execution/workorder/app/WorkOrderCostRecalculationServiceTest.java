@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
@@ -20,7 +21,6 @@ import com.fabricmanagement.production.execution.workorder.domain.exception.Work
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;

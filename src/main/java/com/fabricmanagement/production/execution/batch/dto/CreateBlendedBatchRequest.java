@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;

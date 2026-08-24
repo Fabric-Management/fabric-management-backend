@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.stockunit.domain.exception;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 
 /**
  * Thrown when a PackageType is not compatible with the given ProductType.

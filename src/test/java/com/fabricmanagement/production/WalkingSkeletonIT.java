@@ -16,6 +16,8 @@ import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
@@ -35,8 +37,6 @@ import com.fabricmanagement.production.execution.workorder.dto.OpenProductionLot
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;

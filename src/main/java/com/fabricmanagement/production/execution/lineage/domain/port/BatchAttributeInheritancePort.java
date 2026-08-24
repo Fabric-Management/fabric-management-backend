@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.lineage.domain.port;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.lineage.domain.rule.BatchAttributes;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.List;
 import java.util.Map;
 

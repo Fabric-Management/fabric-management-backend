@@ -1,10 +1,10 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.attributes.FiberAttributes;
 import com.fabricmanagement.production.execution.batch.domain.attributes.YarnAttributes;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;

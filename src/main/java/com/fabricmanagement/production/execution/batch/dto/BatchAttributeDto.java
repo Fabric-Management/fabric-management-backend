@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import com.fabricmanagement.product.core.dto.ProductAttributeDto;
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
-import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;

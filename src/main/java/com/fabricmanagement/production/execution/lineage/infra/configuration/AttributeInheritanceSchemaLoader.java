@@ -1,10 +1,10 @@
 package com.fabricmanagement.production.execution.lineage.infra.configuration;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.lineage.domain.rule.AttributeInheritanceSchema;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
 import com.fabricmanagement.production.execution.lineage.infra.persistence.AttributeInheritanceSchemaRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;

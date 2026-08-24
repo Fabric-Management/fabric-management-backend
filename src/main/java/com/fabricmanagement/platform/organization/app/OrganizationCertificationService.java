@@ -10,7 +10,7 @@ import com.fabricmanagement.platform.organization.dto.OrganizationCertificationD
 import com.fabricmanagement.platform.organization.dto.UpdateOrganizationCertificationRequest;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
+import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

@@ -1,0 +1,38 @@
+package com.fabricmanagement.product.qualitygrade.dto;
+
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.qualitygrade.domain.QualityGrade;
+import java.math.BigDecimal;
+import java.util.UUID;
+
+public record QualityGradeDto(
+    UUID id,
+    ProductType productType,
+    String code,
+    String name,
+    int rank,
+    BigDecimal priceFactor,
+    boolean saleable,
+    boolean requiresApproval,
+    String colorHex,
+    boolean isDefault,
+    boolean isActive) {
+
+  public static QualityGradeDto from(QualityGrade entity) {
+    if (entity == null) {
+      return null;
+    }
+    return new QualityGradeDto(
+        entity.getId(),
+        entity.getProductType(),
+        entity.getCode(),
+        entity.getName(),
+        entity.getRank(),
+        entity.getPriceFactor(),
+        entity.isSaleable(),
+        entity.isRequiresApproval(),
+        entity.getColorHex(),
+        entity.isDefault(),
+        entity.getIsActive());
+  }
+}

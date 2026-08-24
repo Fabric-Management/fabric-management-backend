@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
-import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
+import com.fabricmanagement.platform.organization.app.OrganizationCertificationQueryService;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationQueryService;
+import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
+import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
@@ -15,8 +17,6 @@ import com.fabricmanagement.production.execution.batch.domain.BatchCertification
 import com.fabricmanagement.production.execution.batch.dto.AddBatchCertificationRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +39,9 @@ class BatchCertificationServiceTest {
 
   @Mock private BatchCertificationRepository certificationRepository;
   @Mock private BatchRepository batchRepository;
-  @Mock private FiberCertificationRepository fiberCertificationRepository;
-  @Mock private TradingPartnerCertificationRepository partnerCertificationRepository;
-  @Mock private OrganizationCertificationRepository orgCertificationRepository;
+  @Mock private FiberCertificationQueryService fiberCertificationQueryService;
+  @Mock private TradingPartnerCertificationQueryService partnerCertificationQueryService;
+  @Mock private OrganizationCertificationQueryService orgCertificationQueryService;
 
   @InjectMocks private BatchCertificationService batchCertificationService;
 
@@ -60,8 +60,7 @@ class BatchCertificationServiceTest {
   void add_withInactiveCertification_throwsNotFoundException() {
     Batch batch = mock(Batch.class);
     when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
-    when(fiberCertificationRepository.findByIdAndIsActiveTrue(CERT_ID))
-        .thenReturn(Optional.empty());
+    when(fiberCertificationQueryService.findActiveEntityById(CERT_ID)).thenReturn(Optional.empty());
 
     AddBatchCertificationRequest request =
         AddBatchCertificationRequest.builder().certificationId(CERT_ID).build();
@@ -85,7 +84,7 @@ class BatchCertificationServiceTest {
     when(existing.getValidUntil()).thenReturn(null);
 
     when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
-    when(fiberCertificationRepository.findByIdAndIsActiveTrue(CERT_ID))
+    when(fiberCertificationQueryService.findActiveEntityById(CERT_ID))
         .thenReturn(Optional.of(cert));
     when(certificationRepository.findActiveByBatchAndCertAndScopeAndPartnerAndOrgExcludingId(
             BATCH_ID, CERT_ID, BatchCertificationScope.BATCH, null, null, null))

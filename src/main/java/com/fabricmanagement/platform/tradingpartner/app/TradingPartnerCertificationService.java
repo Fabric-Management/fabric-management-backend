@@ -9,7 +9,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerCertificat
 import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerCertificationRequest;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
-import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
+import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

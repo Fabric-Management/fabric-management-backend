@@ -6,6 +6,9 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.purchaseorder.api.query.PurchaseOrderQueryService;
+import com.fabricmanagement.product.core.domain.Product;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.app.StockAvailabilityQueryService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
@@ -19,9 +22,6 @@ import com.fabricmanagement.production.execution.goodsreceipt.domain.event.Goods
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.product.domain.Product;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionUnitRepository;

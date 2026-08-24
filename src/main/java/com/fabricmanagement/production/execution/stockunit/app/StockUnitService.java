@@ -2,6 +2,9 @@ package com.fabricmanagement.production.execution.stockunit.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.qualitygrade.app.QualityGradeService;
+import com.fabricmanagement.product.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.WasteCategory;
@@ -27,9 +30,6 @@ import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRe
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitAuditLogRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
-import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

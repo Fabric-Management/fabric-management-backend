@@ -1,0 +1,43 @@
+package com.fabricmanagement.product.fiber.dto;
+
+import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class FiberCategoryDto {
+  private UUID id;
+  private UUID tenantId;
+  private String uid;
+  private String categoryCode;
+  private String categoryName;
+  private String description;
+  private Integer displayOrder;
+  private Boolean isActive;
+  private Long version;
+  private Instant createdAt;
+  private Instant updatedAt;
+
+  public static FiberCategoryDto from(FiberCategory entity) {
+    return FiberCategoryDto.builder()
+        .id(entity.getId())
+        .tenantId(entity.getTenantId())
+        .uid(entity.getUid())
+        .categoryCode(entity.getCategoryCode())
+        .categoryName(entity.getCategoryName())
+        .description(entity.getDescription())
+        .displayOrder(entity.getDisplayOrder())
+        .version(entity.getVersion())
+        .isActive(entity.getIsActive())
+        .createdAt(entity.getCreatedAt())
+        .updatedAt(entity.getUpdatedAt())
+        .build();
+  }
+}

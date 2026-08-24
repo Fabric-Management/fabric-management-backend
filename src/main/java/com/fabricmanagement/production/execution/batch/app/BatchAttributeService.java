@@ -2,6 +2,8 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.core.app.ProductAttributeQueryService;
+import com.fabricmanagement.product.core.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
@@ -9,8 +11,6 @@ import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequ
 import com.fabricmanagement.production.execution.batch.dto.BatchAttributeDto;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -31,7 +31,7 @@ public class BatchAttributeService {
 
   private final BatchAttributeRepository attributeRepository;
   private final BatchRepository batchRepository;
-  private final ProductAttributeRepository productAttributeRepository;
+  private final ProductAttributeQueryService productAttributeQueryService;
 
   @Transactional(readOnly = true)
   public List<BatchAttributeDto> findByBatchId(UUID batchId) {
@@ -56,9 +56,8 @@ public class BatchAttributeService {
             .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
     ProductAttribute attribute =
-        productAttributeRepository
-            .findById(request.attributeId())
-            .filter(a -> tenantId.equals(a.getTenantId()))
+        productAttributeQueryService
+            .findByTenantAndId(tenantId, request.attributeId())
             .orElseThrow(
                 () -> new NotFoundException("Attribute not found: " + request.attributeId()));
 

@@ -1,11 +1,11 @@
 package com.fabricmanagement.production.execution.stockunit.dto;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;

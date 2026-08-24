@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;

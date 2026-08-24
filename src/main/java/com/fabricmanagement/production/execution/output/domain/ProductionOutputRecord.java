@@ -1,9 +1,9 @@
 package com.fabricmanagement.production.execution.output.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import com.fabricmanagement.production.execution.output.domain.event.ProductionOutputConfirmedEvent;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchLotQuantityIntentStatus;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
@@ -11,7 +12,6 @@ import com.fabricmanagement.production.execution.batch.domain.BatchUnitMismatchS
 import com.fabricmanagement.production.execution.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

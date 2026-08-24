@@ -1,12 +1,12 @@
 package com.fabricmanagement.production.execution.stockunit.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InsufficientWeightException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InvalidPackageTypeException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRelocationException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitNotReleasedException;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

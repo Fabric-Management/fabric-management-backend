@@ -8,13 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.lineage.domain.rule.AttributeInheritanceSchema;
 import com.fabricmanagement.production.execution.lineage.domain.rule.BatchAttributes;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceAction;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
 import com.fabricmanagement.production.execution.lineage.infra.configuration.AttributeInheritanceSchemaLoader;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

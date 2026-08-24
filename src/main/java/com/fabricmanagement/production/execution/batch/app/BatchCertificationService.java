@@ -6,6 +6,8 @@ import com.fabricmanagement.platform.organization.app.OrganizationCertificationQ
 import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationQueryService;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
+import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
+import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
@@ -19,8 +21,6 @@ import com.fabricmanagement.production.execution.batch.dto.BatchCertificationRes
 import com.fabricmanagement.production.execution.batch.dto.UpdateBatchCertificationRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +37,7 @@ public class BatchCertificationService {
 
   private final BatchCertificationRepository certificationRepository;
   private final BatchRepository batchRepository;
-  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberCertificationQueryService fiberCertificationQueryService;
   private final TradingPartnerCertificationQueryService partnerCertificationQueryService;
   private final OrganizationCertificationQueryService orgCertificationQueryService;
 
@@ -69,8 +69,8 @@ public class BatchCertificationService {
     Batch batch = getBatchOrThrow(batchId);
 
     FiberCertification certification =
-        fiberCertificationRepository
-            .findByIdAndIsActiveTrue(request.getCertificationId())
+        fiberCertificationQueryService
+            .findActiveEntityById(request.getCertificationId())
             .orElseThrow(() -> new NotFoundException("Certification type is not active"));
 
     TradingPartnerCertification partnerCert = null;
@@ -309,8 +309,8 @@ public class BatchCertificationService {
   private BatchCertificationAutoFillResponse buildAutoFillFromPartnerCert(
       TradingPartnerCertification partnerCert) {
     var cert =
-        fiberCertificationRepository
-            .findByIdAndIsActiveTrue(partnerCert.getCertificationId())
+        fiberCertificationQueryService
+            .findActiveEntityById(partnerCert.getCertificationId())
             .orElseThrow(() -> new NotFoundException("Certification not found"));
     return BatchCertificationAutoFillResponse.builder()
         .certificationId(cert.getId())
@@ -333,8 +333,8 @@ public class BatchCertificationService {
   private BatchCertificationAutoFillResponse buildAutoFillFromOrgCert(
       OrganizationCertification orgCert) {
     var cert =
-        fiberCertificationRepository
-            .findByIdAndIsActiveTrue(orgCert.getCertificationId())
+        fiberCertificationQueryService
+            .findActiveEntityById(orgCert.getCertificationId())
             .orElseThrow(() -> new NotFoundException("Certification not found"));
     return BatchCertificationAutoFillResponse.builder()
         .certificationId(cert.getId())

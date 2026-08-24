@@ -1,7 +1,7 @@
 package com.fabricmanagement.sales.qualitygrade.app;
 
-import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
-import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService.QualityGradeReference;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService.QualityGradeReference;
 import com.fabricmanagement.sales.common.app.SalesReferenceResolver;
 import com.fabricmanagement.sales.qualitygrade.dto.SalesQualityGradeDto;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;

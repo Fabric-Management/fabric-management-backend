@@ -8,14 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.app.ProductAttributeQueryService;
+import com.fabricmanagement.product.core.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -39,7 +39,7 @@ class BatchAttributeServiceTest {
 
   @Mock private BatchAttributeRepository attributeRepository;
   @Mock private BatchRepository batchRepository;
-  @Mock private ProductAttributeRepository productAttributeRepository;
+  @Mock private ProductAttributeQueryService productAttributeQueryService;
 
   private BatchAttributeService service;
   private Batch batch;
@@ -48,7 +48,8 @@ class BatchAttributeServiceTest {
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
     service =
-        new BatchAttributeService(attributeRepository, batchRepository, productAttributeRepository);
+        new BatchAttributeService(
+            attributeRepository, batchRepository, productAttributeQueryService);
     batch = Batch.builder().batchCode("LOT-1").build();
     batch.setId(BATCH_ID);
     batch.setTenantId(TENANT_ID);
@@ -64,7 +65,8 @@ class BatchAttributeServiceTest {
   @MethodSource("legacyCodes")
   void add_rejectsEveryLegacyColorCode(String attributeCode) {
     ProductAttribute attribute = attribute(attributeCode);
-    when(productAttributeRepository.findById(ATTRIBUTE_ID)).thenReturn(Optional.of(attribute));
+    when(productAttributeQueryService.findByTenantAndId(TENANT_ID, ATTRIBUTE_ID))
+        .thenReturn(Optional.of(attribute));
 
     assertLegacyWriteRejected(
         () -> service.add(BATCH_ID, new AddBatchAttributeRequest(ATTRIBUTE_ID, "value")));
@@ -95,7 +97,8 @@ class BatchAttributeServiceTest {
   @Test
   void add_allowsNonColorAttribute() {
     ProductAttribute attribute = attribute("ORGANIC");
-    when(productAttributeRepository.findById(ATTRIBUTE_ID)).thenReturn(Optional.of(attribute));
+    when(productAttributeQueryService.findByTenantAndId(TENANT_ID, ATTRIBUTE_ID))
+        .thenReturn(Optional.of(attribute));
     when(attributeRepository.findByBatch_IdAndAttribute_Id(BATCH_ID, ATTRIBUTE_ID))
         .thenReturn(Optional.empty());
     when(attributeRepository.save(any(BatchAttribute.class)))

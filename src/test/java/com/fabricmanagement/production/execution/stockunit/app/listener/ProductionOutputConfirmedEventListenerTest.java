@@ -10,12 +10,12 @@ import static org.mockito.Mockito.verify;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.output.domain.event.ProductionOutputConfirmedEvent;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

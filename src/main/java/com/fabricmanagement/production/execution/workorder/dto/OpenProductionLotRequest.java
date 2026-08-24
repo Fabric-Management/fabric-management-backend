@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 

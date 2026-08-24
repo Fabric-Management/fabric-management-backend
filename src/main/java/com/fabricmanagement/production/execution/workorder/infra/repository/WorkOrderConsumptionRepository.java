@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.infra.repository;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderConsumption;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

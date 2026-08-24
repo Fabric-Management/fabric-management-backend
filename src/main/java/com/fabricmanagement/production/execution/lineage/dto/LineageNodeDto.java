@@ -1,9 +1,9 @@
 package com.fabricmanagement.production.execution.lineage.dto;
 
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.lineage.domain.BatchLineage;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;

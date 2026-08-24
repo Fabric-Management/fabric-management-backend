@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.stockunit.domain;
 
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;

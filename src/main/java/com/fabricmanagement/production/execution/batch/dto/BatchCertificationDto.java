@@ -1,9 +1,9 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import com.fabricmanagement.product.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;

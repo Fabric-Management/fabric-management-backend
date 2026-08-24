@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.production.execution.batch.app.BatchCommitmentQuantityService;
 import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
@@ -18,8 +20,6 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchLot
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

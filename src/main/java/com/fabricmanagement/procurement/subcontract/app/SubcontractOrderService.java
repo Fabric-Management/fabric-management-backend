@@ -10,8 +10,8 @@ import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRe
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
 import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.infra.repository.SubcontractOrderRepository;
-import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
-import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
+import com.fabricmanagement.product.core.api.facade.ProductFacade;
+import com.fabricmanagement.product.core.dto.ProductDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;

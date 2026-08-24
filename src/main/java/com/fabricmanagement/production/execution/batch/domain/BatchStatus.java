@@ -106,8 +106,8 @@ public enum BatchStatus {
   /**
    * Statuses that indicate a fiber is committed to or actively used in production.
    *
-   * <p>Used by {@code FiberService.deactivateFiber()} to block deactivation of a fiber that still
-   * has live batches on the production floor.
+   * <p>Used by the batch-side fiber-usage adapter to block mutation of a fiber that still has live
+   * batches on the production floor.
    */
   public static final Set<BatchStatus> PRODUCTION_ACTIVE = Set.of(RESERVED, IN_PROGRESS);
 

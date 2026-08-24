@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.batch.api.query;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.production.execution.batch.app.BatchCommitmentQuantityService;
 import com.fabricmanagement.production.execution.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
@@ -12,7 +13,6 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
-import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;

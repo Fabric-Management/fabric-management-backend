@@ -2,6 +2,8 @@ package com.fabricmanagement.production.execution.output.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.core.api.facade.ProductFacade;
+import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -13,8 +15,6 @@ import com.fabricmanagement.production.execution.output.dto.AddOutputItemRequest
 import com.fabricmanagement.production.execution.output.dto.CreateProductionOutputRequest;
 import com.fabricmanagement.production.execution.output.infra.repository.ProductionOutputItemRepository;
 import com.fabricmanagement.production.execution.output.infra.repository.ProductionOutputRecordRepository;
-import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
-import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
