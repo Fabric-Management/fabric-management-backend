@@ -1,6 +1,6 @@
 package com.fabricmanagement.flowboard.generator.app.adapter;
 
-import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderApprovedEvent;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 

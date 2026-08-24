@@ -9,9 +9,9 @@ import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.qualitygrade.domain.exception.QualityGradeDomainException;
 import com.fabricmanagement.product.recipe.domain.exception.RecipeDomainException;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
-import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
-import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
-import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
+import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
+import com.fabricmanagement.production.core.stockunit.domain.exception.StockUnitDomainException;
+import com.fabricmanagement.production.core.workorder.domain.exception.WorkOrderDomainException;
 import org.junit.jupiter.api.Test;
 
 class ProductExceptionContractTest {

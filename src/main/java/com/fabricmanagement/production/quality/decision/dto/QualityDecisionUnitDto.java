@@ -1,8 +1,8 @@
 package com.fabricmanagement.production.quality.decision.dto;
 
-import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
+import com.fabricmanagement.production.core.stockunit.domain.QualityDisposition;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.UUID;

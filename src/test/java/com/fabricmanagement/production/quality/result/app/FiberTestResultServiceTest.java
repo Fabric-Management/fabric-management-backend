@@ -7,9 +7,9 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;

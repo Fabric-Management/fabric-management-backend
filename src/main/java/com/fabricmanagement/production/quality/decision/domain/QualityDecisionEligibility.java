@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.quality.decision.domain;
 
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
+import com.fabricmanagement.production.core.batch.domain.BatchStatus;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus;
 import java.math.BigDecimal;
 import java.util.Set;
 

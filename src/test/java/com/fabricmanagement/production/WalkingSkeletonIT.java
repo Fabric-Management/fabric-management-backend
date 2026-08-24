@@ -18,25 +18,25 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.execution.batch.domain.CreateBatchCommand;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
-import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.execution.workorder.app.ProductionLotService;
-import com.fabricmanagement.production.execution.workorder.app.ProductionRecordService;
-import com.fabricmanagement.production.execution.workorder.app.WorkOrderConsumptionService;
-import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
-import com.fabricmanagement.production.execution.workorder.dto.OpenProductionLotRequest;
-import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
-import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.core.batch.domain.BatchStatus;
+import com.fabricmanagement.production.core.batch.domain.CreateBatchCommand;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitSourceType;
+import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.core.workorder.app.ProductionLotService;
+import com.fabricmanagement.production.core.workorder.app.ProductionRecordService;
+import com.fabricmanagement.production.core.workorder.app.WorkOrderConsumptionService;
+import com.fabricmanagement.production.core.workorder.app.WorkOrderService;
+import com.fabricmanagement.production.core.workorder.domain.WorkOrder;
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderStatus;
+import com.fabricmanagement.production.core.workorder.dto.OpenProductionLotRequest;
+import com.fabricmanagement.production.core.workorder.dto.StartProductionRequest;
+import com.fabricmanagement.production.core.workorder.dto.WorkOrderResponse;
+import com.fabricmanagement.production.core.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
@@ -335,7 +335,7 @@ class WalkingSkeletonIT {
             null,
             StockUnitSourceType.GOODS_RECEIPT,
             rawBatch1.getId(),
-            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED);
+            com.fabricmanagement.production.core.stockunit.domain.QualityDisposition.RELEASED);
     su1 = stockUnitRepository.save(su1);
 
     Batch rawBatch2 =
@@ -374,7 +374,7 @@ class WalkingSkeletonIT {
             null,
             StockUnitSourceType.GOODS_RECEIPT,
             rawBatch2.getId(),
-            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition.RELEASED);
+            com.fabricmanagement.production.core.stockunit.domain.QualityDisposition.RELEASED);
     su2 = stockUnitRepository.save(su2);
 
     // ----------------------------------------------------------------------------------
@@ -418,7 +418,7 @@ class WalkingSkeletonIT {
             null,
             StockUnitSourceType.PRODUCTION,
             lotResponse.id(),
-            com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition
+            com.fabricmanagement.production.core.stockunit.domain.QualityDisposition
                 .PENDING_INSPECTION);
     outputSu = stockUnitRepository.save(outputSu);
 

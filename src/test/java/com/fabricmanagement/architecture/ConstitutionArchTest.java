@@ -58,7 +58,7 @@ class ConstitutionArchTest {
       //   - flowboard/automation/application/ → domain/port/out/
       //   - flowboard/generator/application/ → domain/port/out/
       //   - human/core/employee/application/ → app/
-      //   - production/execution/lineage/application/ → app/
+      //   - production/core/lineage/application/ → app/
 
       ArchRule rule =
           noClasses()
@@ -726,6 +726,20 @@ class ConstitutionArchTest {
               .as(
                   "ADR-0012 D6: modules outside product must use product facades, query services,"
                       + " or ports instead of product repositories");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D3: legacy production.execution package must not exist")
+    void legacyProductionExecutionPackageShouldNotExist() {
+      ArchRule rule =
+          noClasses()
+              .should()
+              .resideInAPackage("com.fabricmanagement.production.execution..")
+              .as(
+                  "ADR-0012 D3: the production execution engine belongs under production.core;"
+                      + " the legacy production.execution package must not be recreated");
 
       rule.check(allClasses);
     }

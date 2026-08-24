@@ -22,8 +22,8 @@ import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository
 import com.fabricmanagement.costing.infra.repository.PriceListItemRepository;
 import com.fabricmanagement.costing.infra.repository.PriceListRepository;
 import com.fabricmanagement.costing.integration.support.TestCostDataFactory;
-import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.app.port.ConsumptionCostInput;
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;

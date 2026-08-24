@@ -4,7 +4,7 @@ import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
 import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import java.util.Optional;

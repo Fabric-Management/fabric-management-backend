@@ -2,10 +2,10 @@ package com.fabricmanagement.costing.app.adapter;
 
 import com.fabricmanagement.costing.app.CostCalculationService;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
-import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
-import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
-import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.app.port.ComputedCostSnapshot;
+import com.fabricmanagement.production.core.workorder.app.port.ConsumptionCostInput;
+import com.fabricmanagement.production.core.workorder.app.port.WorkOrderCostEnginePort;
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

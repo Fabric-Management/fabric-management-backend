@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService.LotColourReference;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService.LotQualityReference;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotIntentReference;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotReference;
-import com.fabricmanagement.production.execution.batch.api.query.ProductionSalesLotQueryService.ProductionSalesPieceReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.LotColourReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.LotQualityReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotIntentReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesPieceReference;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.dto.SalesLotDto;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotPieceSnapshot;

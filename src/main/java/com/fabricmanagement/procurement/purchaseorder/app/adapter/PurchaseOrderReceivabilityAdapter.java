@@ -2,7 +2,7 @@ package com.fabricmanagement.procurement.purchaseorder.app.adapter;
 
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
-import com.fabricmanagement.production.execution.goodsreceipt.domain.port.PoReceivabilityPort;
+import com.fabricmanagement.production.core.goodsreceipt.domain.port.PoReceivabilityPort;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

@@ -64,7 +64,7 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | `approval` | ApprovalPolicy, ApprovalRequest, UserPromotion |
 | `offline` | Sync |
 
-- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `product` → `core`, `fiber`, `recipe`; `production` → `execution/batch`, `quality/result`
+- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `product` → `core`, `fiber`, `recipe`; `production` → `core/batch`, `quality/result`
 - **Platform vs Domain:** Platform modülleri (auth, user, tenant, subscription) uygulama altyapısıdır — domain modülleri platform'u kullanabilir, tersi yasak
 - **`common/infrastructure/`:** Yalnızca framework-level, domain-agnostic altyapı: `BaseEntity`, `SecurityConfig`, `TenantContext`, `GlobalExceptionHandler`. İş mantığı burada bulunmaz
 
@@ -352,7 +352,7 @@ com.fabricmanagement/
 │   └── {core,fiber,color,qualitygrade,recipe}/
 │
 ├── production/                     # ÜRETİM
-│   ├── execution/{batch,workorder,goodsreceipt,inventory,lineage}/
+│   ├── core/{batch,workorder,goodsreceipt,inventory,lineage,output,stockunit}/
 │   └── quality/result/
 │
 ├── sales/                          # SATIŞ

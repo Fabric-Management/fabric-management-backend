@@ -3,11 +3,11 @@ package com.fabricmanagement.production.quality.decision.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationRef;
-import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
-import com.fabricmanagement.production.execution.stockunit.domain.exception.QcRelocationException;
+import com.fabricmanagement.production.core.batch.domain.port.WarehouseLocationRef;
+import com.fabricmanagement.production.core.stockunit.domain.QualityDisposition;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus;
+import com.fabricmanagement.production.core.stockunit.domain.exception.QcRelocationException;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEligibility;
 import java.util.EnumSet;
 import java.util.UUID;

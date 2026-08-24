@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.quality.decision.domain;
 
-import com.fabricmanagement.production.execution.stockunit.domain.QualityDisposition;
+import com.fabricmanagement.production.core.stockunit.domain.QualityDisposition;
 
 public enum QualityDecisionOutcome {
   RELEASED,

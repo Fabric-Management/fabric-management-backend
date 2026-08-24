@@ -1,6 +1,6 @@
 package com.fabricmanagement.flowboard.generator.app.adapter;
 
-import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
+import com.fabricmanagement.production.core.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
