@@ -6,10 +6,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
+import com.fabricmanagement.production.core.workorder.app.ProcessSpecsContribution;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -742,6 +747,62 @@ class ConstitutionArchTest {
                       + " the legacy production.execution package must not be recreated");
 
       rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D10: production core must not depend on process plug-ins")
+    void productionCoreShouldNotDependOnProcessModules() {
+      Set<String> processPackages = productionProcessPackages();
+
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.production.core..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAnyPackage(processPackages.toArray(String[]::new))
+              .as(
+                  "ADR-0012 D10: production.core defines the plug-in contract and must not depend"
+                      + " on process implementations");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D10: production process plug-ins must not depend on each other")
+    void productionProcessModulesShouldNotDependOnEachOther() {
+      Set<String> processPackages = productionProcessPackages();
+
+      for (String processPackage : processPackages) {
+        String[] otherProcessPackages =
+            processPackages.stream()
+                .filter(candidate -> !candidate.equals(processPackage))
+                .toArray(String[]::new);
+        ArchRule rule =
+            noClasses()
+                .that()
+                .resideInAPackage(processPackage)
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(otherProcessPackages)
+                .as(
+                    "ADR-0012 D10: process plug-ins may depend on production.core but never on"
+                        + " another process plug-in");
+
+        rule.check(allClasses);
+      }
+    }
+
+    private Set<String> productionProcessPackages() {
+      String productionPrefix = "com.fabricmanagement.production.";
+      return allClasses.stream()
+          .filter(javaClass -> !javaClass.isInterface())
+          .filter(javaClass -> javaClass.isAssignableTo(ProcessSpecsContribution.class))
+          .map(JavaClass::getPackageName)
+          .map(packageName -> packageName.substring(productionPrefix.length()))
+          .map(relativePackage -> relativePackage.substring(0, relativePackage.indexOf('.')))
+          .map(processName -> productionPrefix + processName + "..")
+          .collect(Collectors.toCollection(TreeSet::new));
     }
 
     @Test

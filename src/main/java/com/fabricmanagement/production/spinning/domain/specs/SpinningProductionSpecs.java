@@ -1,5 +1,7 @@
-package com.fabricmanagement.production.core.workorder.domain.specs;
+package com.fabricmanagement.production.spinning.domain.specs;
 
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Production specifications for spinning (Fiber → Yarn). */
@@ -21,4 +23,10 @@ public record SpinningProductionSpecs(
         Double targetMoisturePercent,
     @Schema(description = "Quality target (e.g., '25%' Uster)", example = "25%")
         String qualityTarget)
-    implements WorkOrderProductionSpecs {}
+    implements WorkOrderProductionSpecs {
+
+  @Override
+  public WorkOrderModuleType specType() {
+    return WorkOrderModuleType.SPINNING;
+  }
+}

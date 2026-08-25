@@ -2,7 +2,6 @@ package com.fabricmanagement.production.core.workorder.app.validation;
 
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.core.workorder.domain.exception.WorkOrderDomainException;
-import com.fabricmanagement.production.core.workorder.domain.specs.*;
 import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
 import java.util.List;
 import java.util.Map;
@@ -73,13 +72,6 @@ public class WorkOrderProductionValidationEngine {
   }
 
   private boolean isSpecsMatchingType(WorkOrderModuleType type, WorkOrderProductionSpecs specs) {
-    return switch (type) {
-      case SPINNING -> specs instanceof SpinningProductionSpecs;
-      case WEAVING -> specs instanceof WeavingProductionSpecs;
-      case KNITTING -> specs instanceof KnittingProductionSpecs;
-      case DYEING -> specs instanceof DyeingProductionSpecs;
-      case FINISHING -> specs instanceof FinishingProductionSpecs;
-      case GENERIC -> specs instanceof GenericProductionSpecs;
-    };
+    return specs.specType() == type;
   }
 }

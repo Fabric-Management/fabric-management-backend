@@ -1,5 +1,7 @@
-package com.fabricmanagement.production.core.workorder.domain.specs;
+package com.fabricmanagement.production.knitting.domain.specs;
 
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Production specifications for knitting (Yarn → Knitted Fabric). */
@@ -18,4 +20,10 @@ public record KnittingProductionSpecs(
     @Schema(description = "Number of feeders", example = "96") Integer feederCount,
     @Schema(description = "Target fabric weight in GSM", example = "180") Integer targetGsm,
     @Schema(description = "Target tube width in cm", example = "90.0") Double targetWidth)
-    implements WorkOrderProductionSpecs {}
+    implements WorkOrderProductionSpecs {
+
+  @Override
+  public WorkOrderModuleType specType() {
+    return WorkOrderModuleType.KNITTING;
+  }
+}

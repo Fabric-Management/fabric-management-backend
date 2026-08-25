@@ -1,5 +1,7 @@
-package com.fabricmanagement.production.core.workorder.domain.specs;
+package com.fabricmanagement.production.finishing.domain.specs;
 
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -23,5 +25,10 @@ public record FinishingProductionSpecs(
   public FinishingProductionSpecs {
     chemicalApplications =
         chemicalApplications != null ? List.copyOf(chemicalApplications) : List.of();
+  }
+
+  @Override
+  public WorkOrderModuleType specType() {
+    return WorkOrderModuleType.FINISHING;
   }
 }

@@ -1,10 +1,11 @@
-package com.fabricmanagement.production.core.workorder.app.validation;
+package com.fabricmanagement.production.dyeing.app.validation;
 
 import static com.fabricmanagement.production.core.workorder.app.validation.ProductionValidationConstants.*;
 
+import com.fabricmanagement.production.core.workorder.app.validation.WorkOrderProductionValidator;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
-import com.fabricmanagement.production.core.workorder.domain.specs.DyeingProductionSpecs;
 import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
+import com.fabricmanagement.production.dyeing.domain.specs.DyeingProductionSpecs;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;

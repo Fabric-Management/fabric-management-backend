@@ -1,11 +1,12 @@
-package com.fabricmanagement.production.core.workorder.app.validation;
+package com.fabricmanagement.production.spinning.app.validation;
 
 import static com.fabricmanagement.production.core.workorder.app.validation.ProductionValidationConstants.MOISTURE_MAX;
 import static com.fabricmanagement.production.core.workorder.app.validation.ProductionValidationConstants.MOISTURE_MIN;
 
+import com.fabricmanagement.production.core.workorder.app.validation.WorkOrderProductionValidator;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
-import com.fabricmanagement.production.core.workorder.domain.specs.SpinningProductionSpecs;
 import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
+import com.fabricmanagement.production.spinning.domain.specs.SpinningProductionSpecs;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;

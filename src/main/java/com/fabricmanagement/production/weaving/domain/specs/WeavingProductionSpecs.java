@@ -1,5 +1,7 @@
-package com.fabricmanagement.production.core.workorder.domain.specs;
+package com.fabricmanagement.production.weaving.domain.specs;
 
+import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Production specifications for weaving (Yarn → Woven Fabric). */
@@ -17,4 +19,10 @@ public record WeavingProductionSpecs(
     @Schema(description = "Target fabric weight in GSM", example = "120") Integer targetGsm,
     @Schema(description = "Warp yarn information", example = "Ne 40/1 Cotton") String warpYarnInfo,
     @Schema(description = "Weft yarn information", example = "Ne 30/1 Cotton") String weftYarnInfo)
-    implements WorkOrderProductionSpecs {}
+    implements WorkOrderProductionSpecs {
+
+  @Override
+  public WorkOrderModuleType specType() {
+    return WorkOrderModuleType.WEAVING;
+  }
+}
