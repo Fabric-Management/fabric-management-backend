@@ -1,10 +1,10 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
-import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
-import com.fabricmanagement.iwm.location.dto.CreateWarehouseLocationRequest;
-import com.fabricmanagement.iwm.location.infra.repository.WarehouseLocationRepository;
+import com.fabricmanagement.inventory.location.app.WarehouseLocationService;
+import com.fabricmanagement.inventory.location.domain.WarehouseLocationType;
+import com.fabricmanagement.inventory.location.dto.CreateWarehouseLocationRequest;
+import com.fabricmanagement.inventory.location.infra.repository.WarehouseLocationRepository;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import java.util.List;

@@ -3,9 +3,9 @@ package com.fabricmanagement.production.core.batch.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
-import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
-import com.fabricmanagement.iwm.location.dto.CreateWarehouseLocationRequest;
+import com.fabricmanagement.inventory.location.app.WarehouseLocationService;
+import com.fabricmanagement.inventory.location.domain.WarehouseLocationType;
+import com.fabricmanagement.inventory.location.dto.CreateWarehouseLocationRequest;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.product.core.domain.Product;

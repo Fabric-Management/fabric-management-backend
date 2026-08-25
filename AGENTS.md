@@ -55,7 +55,7 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | `procurement` | PurchaseOrder, SubcontractOrder, SupplierRFQ, SupplierQuote |
 | `flowboard` | Board, Task, Generator, Automation, Dashboard |
 | `human` | Employee, Leave, Payroll, Compliance, Localization |
-| `iwm` | Location, Reservation, StockCount, Transfer, RMA, Adjustment, Rules |
+| `inventory` | Location, Reservation, StockCount, Transfer, RMA, Adjustment, Rules |
 | `costing` | CostCalculation, PriceList, ExchangeRate |
 | `analytics` | Cross-context read-only insights (ADR-0001; reads other contexts only via their app/ports) |
 | `notification` | Hub, i18n |
@@ -67,6 +67,7 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 - **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `product` → `core`, `fiber`, `recipe`; `production` → `core/batch`, `quality/result`
 - **Platform vs Domain:** Platform modülleri (auth, user, tenant, subscription) uygulama altyapısıdır — domain modülleri platform'u kullanabilir, tersi yasak
 - **`common/infrastructure/`:** Yalnızca framework-level, domain-agnostic altyapı: `BaseEntity`, `SecurityConfig`, `TenantContext`, `GlobalExceptionHandler`. İş mantığı burada bulunmaz
+- **Inventory asimetrileri:** Kanonik Java paketi `inventory`'dir; PostgreSQL şeması ve tenant-purge tablo referansları `iwm`, mevcut REST path'leri `/api/v1/iwm`, `IwmDomainException` ile `IWM_*`/`IWM-*` sözleşme ve iş anahtarı literalleri ise geriye dönük uyumluluk için aynen kalır. Bunları mekanik olarak normalize etme.
 
 ---
 
@@ -206,6 +207,7 @@ DomainException (abstract, common/infrastructure)
 - **Listener** → Dinleyen modülün `app/listener/` paketinde, `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async`
 - **Cross-module çağrı** → Doğrudan `@Autowired OtherService` yasak; interface (port) veya QueryService üzerinden
 - **Facade** → Controller birden fazla modül service'i çağırıyorsa `api/facade/` kullan
+- Process (süreç) modüllerinin `WorkOrderProductionValidator` ve `ProcessSpecsContribution` implementasyonları **stateless** olmalıdır — repository/servis enjekte edilmez. Gerekçe: `ProcessModuleRegistry` Jackson `ObjectMapper` kurulum zincirindedir; validator'a JPA bağımlılığı eklemek ObjectMapper → registry → validator → repository → EntityManagerFactory → ObjectMapper döngüsü yaratır.
 
 ---
 
@@ -364,7 +366,7 @@ com.fabricmanagement/
 ├── human/                          # İNSAN KAYNAKLARI
 │   └── {core/employee,leave,payroll,compliance}/
 │
-├── iwm/                            # DEPO YÖNETİMİ
+├── inventory/                      # DEPO YÖNETİMİ
 │   └── {location,reservation,stockcount,transfer,rma,adjustment,rules}/
 │
 ├── flowboard/                      # SCRUMBAN BOARD

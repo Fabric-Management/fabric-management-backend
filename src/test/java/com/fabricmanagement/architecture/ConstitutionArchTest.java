@@ -161,7 +161,7 @@ class ConstitutionArchTest {
     void eventsShouldResideInDomainEventPackage() {
       // ✅ CLEAN: All known violations fixed (2026-03-23):
       //   - flowboard/task/app/event/ → domain/event/
-      //   - iwm/rules/app/event/ → domain/event/
+      //   - inventory/rules/app/event/ → domain/event/
 
       ArchRule rule =
           noClasses()
@@ -609,7 +609,7 @@ class ConstitutionArchTest {
                   "com.fabricmanagement.procurement..",
                   "com.fabricmanagement.flowboard..",
                   "com.fabricmanagement.human..",
-                  "com.fabricmanagement.iwm..",
+                  "com.fabricmanagement.inventory..",
                   "com.fabricmanagement.costing..",
                   "com.fabricmanagement.finance..",
                   "com.fabricmanagement.logistics..",
@@ -731,6 +731,20 @@ class ConstitutionArchTest {
               .as(
                   "ADR-0012 D6: modules outside product must use product facades, query services,"
                       + " or ports instead of product repositories");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D7: legacy iwm package must not exist")
+    void legacyIwmPackageShouldNotExist() {
+      ArchRule rule =
+          noClasses()
+              .should()
+              .resideInAPackage("com.fabricmanagement.iwm..")
+              .as(
+                  "ADR-0012 D7: inventory is the canonical warehouse-management package;"
+                      + " the legacy iwm package must not be recreated");
 
       rule.check(allClasses);
     }
