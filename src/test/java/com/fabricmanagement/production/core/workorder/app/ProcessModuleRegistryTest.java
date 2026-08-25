@@ -15,7 +15,9 @@ import com.fabricmanagement.production.weaving.domain.specs.WeavingProductionSpe
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.media.Discriminator;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 class ProcessModuleRegistryTest {
+
+  private static final String BASE_SCHEMA_NAME = WorkOrderProductionSpecs.class.getSimpleName();
+  private static final String BASE_SCHEMA_REF = "#/components/schemas/" + BASE_SCHEMA_NAME;
 
   @Test
   void registersEverySubtypeInEnumOrderIncludingCoreOwnedGeneric() {
@@ -55,27 +60,63 @@ class ProcessModuleRegistryTest {
   @Test
   void restoresConcreteOpenApiSchemasWithoutAddingBaseOneOfOrMapping() {
     ProcessModuleRegistry registry = new ProcessModuleRegistry(contributions(), validators());
-    OpenAPI openApi = new OpenAPI().components(new Components());
+    Schema<?> baseSchema =
+        new Schema<>()
+            .discriminator(new Discriminator().propertyName("specType"))
+            .addProperty("specType", new StringSchema())
+            .addRequiredItem("specType");
+    Schema<?> productionSpecsProperty =
+        new Schema<>()
+            .$ref(BASE_SCHEMA_REF)
+            .description("Module-specific production specifications");
+    Schema<?> consumerSchema =
+        new Schema<>().addProperty("productionSpecs", productionSpecsProperty);
+    OpenAPI openApi =
+        new OpenAPI()
+            .components(
+                new Components()
+                    .addSchemas(BASE_SCHEMA_NAME, baseSchema)
+                    .addSchemas("WorkOrderRequest", consumerSchema));
 
     registry.customise(openApi);
 
-    Schema<?> baseSchema = openApi.getComponents().getSchemas().get("WorkOrderProductionSpecs");
-    assertThat(baseSchema).isNotNull();
-    assertThat(baseSchema.getOneOf()).isNullOrEmpty();
-    assertThat(baseSchema.getDiscriminator()).isNotNull();
-    assertThat(baseSchema.getDiscriminator().getPropertyName()).isEqualTo("specType");
-    assertThat(baseSchema.getDiscriminator().getMapping()).isNullOrEmpty();
+    Schema<?> actualBaseSchema = openApi.getComponents().getSchemas().get(BASE_SCHEMA_NAME);
+    assertThat(actualBaseSchema).isSameAs(baseSchema);
+    assertThat(actualBaseSchema.getOneOf()).isNullOrEmpty();
+    assertThat(actualBaseSchema.getDiscriminator()).isNotNull();
+    assertThat(actualBaseSchema.getDiscriminator().getPropertyName()).isEqualTo("specType");
+    assertThat(actualBaseSchema.getDiscriminator().getMapping()).isNullOrEmpty();
 
     for (ProcessModuleRegistry.Registration registration : registry.registrations()) {
       Schema<?> concreteSchema =
           openApi.getComponents().getSchemas().get(registration.specsClass().getSimpleName());
       assertThat(concreteSchema).isNotNull();
-      assertThat(concreteSchema.getAllOf())
-          .anySatisfy(
-              parentSchema ->
-                  assertThat(parentSchema.get$ref())
-                      .isEqualTo("#/components/schemas/WorkOrderProductionSpecs"));
+      assertThat(concreteSchema.getAllOf()).hasSize(2);
+      assertThat(concreteSchema.getAllOf().getFirst().get$ref()).isEqualTo(BASE_SCHEMA_REF);
+      assertThat(concreteSchema.getAllOf().getLast().getType()).isEqualTo("object");
+      assertThat(concreteSchema.getAllOf().getLast().getTypes()).containsExactly("object");
+      assertThat(concreteSchema.getAllOf().getLast().getProperties()).isNotEmpty();
     }
+
+    assertThat(productionSpecsProperty.get$ref()).isNull();
+    assertThat(productionSpecsProperty.getDescription())
+        .isEqualTo("Module-specific production specifications");
+    assertThat(productionSpecsProperty.getOneOf())
+        .extracting(Schema::get$ref)
+        .containsExactly(
+            "#/components/schemas/DyeingProductionSpecs",
+            "#/components/schemas/FinishingProductionSpecs",
+            "#/components/schemas/GenericProductionSpecs",
+            "#/components/schemas/KnittingProductionSpecs",
+            "#/components/schemas/SpinningProductionSpecs",
+            "#/components/schemas/WeavingProductionSpecs");
+
+    Schema<?> dyeingSchema = openApi.getComponents().getSchemas().get("DyeingProductionSpecs");
+    Schema<?> dyeingBody = dyeingSchema.getAllOf().getLast();
+    Schema<?> fastnessTargets = dyeingBody.getProperties().get("fastnessTargets");
+    assertThat(fastnessTargets.getItems().getDescription()).isNull();
+    assertThat(fastnessTargets.getItems().getExample()).isNull();
+    assertThat(fastnessTargets.getItems().getExampleSetFlag()).isFalse();
   }
 
   @Test
@@ -167,7 +208,9 @@ class ProcessModuleRegistryTest {
   }
 
   private static List<WorkOrderProductionValidator> validators() {
-    return Arrays.stream(WorkOrderModuleType.values()).map(TestValidator::new).toList();
+    return Arrays.stream(WorkOrderModuleType.values())
+        .<WorkOrderProductionValidator>map(TestValidator::new)
+        .toList();
   }
 
   private record TestContribution(
