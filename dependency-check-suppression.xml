@@ -14,7 +14,7 @@
         <notes>CVE-2026-41178 affects baggage-header parsing in the Go implementation of
         OpenTelemetry. This service uses the Java semantic-conventions artifact, which is matched
         only through a broad OpenTelemetry CPE and does not contain the affected Go parser.</notes>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@1\.41\.1$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@1\.43\.0$</packageUrl>
         <cve>CVE-2026-41178</cve>
     </suppress>
 

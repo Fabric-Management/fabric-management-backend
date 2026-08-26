@@ -30,13 +30,17 @@ class YarnTwistTpmMigrationIT {
   private static final String LEGACY_BATCH_ID = "aaaaaaaa-0000-4000-8000-000000000011";
   private static final String CANONICAL_BATCH_ID = "aaaaaaaa-0000-4000-8000-000000000012";
   private static final String FIBER_BATCH_ID = "aaaaaaaa-0000-4000-8000-000000000013";
-  private static final String SUNSET_GUARD_SQL =
+  private static final String MALFORMED_BATCH_ID = "aaaaaaaa-0000-4000-8000-000000000014";
+  private static final String SCIENTIFIC_BATCH_ID = "aaaaaaaa-0000-4000-8000-000000000015";
+  private static final String CONVERTIBLE_SUNSET_GUARD_SQL =
       """
       SELECT count(*)
       FROM production.production_execution_batch
       WHERE product_type = 'YARN'
         AND attributes ? 'yarn_tpi'
         AND NOT attributes ? 'yarn_twist_tpm'
+        AND btrim(attributes ->> 'yarn_tpi')
+            ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$'
       """;
 
   @Container
@@ -82,7 +86,17 @@ class YarnTwistTpmMigrationIT {
              'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'YARN-0C-FIBER-BATCH',
              'aaaaaaaa-0000-4000-8000-000000000002', 'FIBER',
              '{"yarn_tpi": 18.5}'::jsonb,
-             'YARN-0C-FIBER', 10, 0, 0, 0, 'KG', 'AVAILABLE');
+             'YARN-0C-FIBER', 10, 0, 0, 0, 'KG', 'AVAILABLE'),
+            ('aaaaaaaa-0000-4000-8000-000000000014',
+             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'YARN-0C-MALFORMED',
+             'aaaaaaaa-0000-4000-8000-000000000001', 'YARN',
+             '{"yarn_tpi": "not-a-number"}'::jsonb,
+             'YARN-0C-MALFORMED', 10, 0, 0, 0, 'KG', 'AVAILABLE'),
+            ('aaaaaaaa-0000-4000-8000-000000000015',
+             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'YARN-0C-SCIENTIFIC',
+             'aaaaaaaa-0000-4000-8000-000000000001', 'YARN',
+             '{"yarn_tpi": "+1.85e1"}'::jsonb,
+             'YARN-0C-SCIENTIFIC', 10, 0, 0, 0, 'KG', 'AVAILABLE');
           """);
     }
   }
@@ -97,14 +111,18 @@ class YarnTwistTpmMigrationIT {
     assertLegacyRow(expectedTpm, legacyTpi);
     assertCanonicalRowIsUnchanged();
     assertNonYarnRowIsUnchanged();
-    assertThat(count(SUNSET_GUARD_SQL)).isZero();
+    assertMalformedRowIsUnchanged();
+    assertScientificNotationRowMigrated(expectedTpm, legacyTpi);
+    assertThat(count(CONVERTIBLE_SUNSET_GUARD_SQL)).isZero();
 
     execute(readClasspathScript(MIGRATION_SCRIPT));
 
     assertLegacyRow(expectedTpm, legacyTpi);
     assertCanonicalRowIsUnchanged();
     assertNonYarnRowIsUnchanged();
-    assertThat(count(SUNSET_GUARD_SQL)).isZero();
+    assertMalformedRowIsUnchanged();
+    assertScientificNotationRowMigrated(expectedTpm, legacyTpi);
+    assertThat(count(CONVERTIBLE_SUNSET_GUARD_SQL)).isZero();
   }
 
   private static void assertLegacyRow(BigDecimal expectedTpm, BigDecimal expectedTpi)
@@ -124,6 +142,32 @@ class YarnTwistTpmMigrationIT {
     TwistValues values = readTwistValues(FIBER_BATCH_ID);
     assertThat(values.turnsPerMeter()).isNull();
     assertThat(values.turnsPerInch()).isEqualByComparingTo("18.5");
+  }
+
+  private static void assertMalformedRowIsUnchanged() throws SQLException {
+    try (Connection connection = ownerConnection();
+        var statement =
+            connection.prepareStatement(
+                """
+            SELECT attributes ->> 'yarn_tpi' AS turns_per_inch,
+                   jsonb_exists(attributes, 'yarn_twist_tpm') AS has_turns_per_meter
+                FROM production.production_execution_batch
+                WHERE id = ?::uuid
+                """)) {
+      statement.setString(1, MALFORMED_BATCH_ID);
+      try (ResultSet result = statement.executeQuery()) {
+        assertThat(result.next()).isTrue();
+        assertThat(result.getString("turns_per_inch")).isEqualTo("not-a-number");
+        assertThat(result.getBoolean("has_turns_per_meter")).isFalse();
+      }
+    }
+  }
+
+  private static void assertScientificNotationRowMigrated(
+      BigDecimal expectedTpm, BigDecimal expectedTpi) throws SQLException {
+    TwistValues values = readTwistValues(SCIENTIFIC_BATCH_ID);
+    assertThat(values.turnsPerMeter()).isEqualByComparingTo(expectedTpm);
+    assertThat(values.turnsPerInch()).isEqualByComparingTo(expectedTpi);
   }
 
   private static TwistValues readTwistValues(String batchId) throws SQLException {

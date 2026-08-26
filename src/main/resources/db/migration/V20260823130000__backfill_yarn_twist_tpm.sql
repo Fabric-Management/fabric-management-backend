@@ -10,11 +10,18 @@ SET attributes =
     )
 WHERE product_type = 'YARN'
   AND attributes ? 'yarn_tpi'
-  AND NOT attributes ? 'yarn_twist_tpm';
+  AND NOT attributes ? 'yarn_twist_tpm'
+  AND btrim(attributes ->> 'yarn_tpi')
+      ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$';
 
--- YARN-3B sunset guard — expected result after this migration: 0.
+-- YARN-3B sunset guard for convertible legacy values — expected result after this migration: 0.
 -- SELECT count(*)
 -- FROM production.production_execution_batch
 -- WHERE product_type = 'YARN'
 --   AND attributes ? 'yarn_tpi'
---   AND NOT attributes ? 'yarn_twist_tpm';
+--   AND NOT attributes ? 'yarn_twist_tpm'
+--   AND btrim(attributes ->> 'yarn_tpi')
+--       ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$';
+
+-- Malformed legacy values are intentionally preserved for data-quality repair instead of aborting
+-- the full Flyway migration with an invalid numeric cast.
