@@ -32,6 +32,7 @@ public class FiberTestResultDto {
   // Extended
   private Double moisturePercent;
   private Double trashContentPercent;
+  private Double uniformityIndex;
 
   // Quality gate
   private TestApprovalStatus approvalStatus;
@@ -60,6 +61,7 @@ public class FiberTestResultDto {
         .elongationPercent(entity.getElongationPercent())
         .moisturePercent(entity.getMoisturePercent())
         .trashContentPercent(entity.getTrashContentPercent())
+        .uniformityIndex(entity.getUniformityIndex())
         .approvalStatus(entity.getApprovalStatus())
         .testLab(entity.getTestLab())
         .testStandard(entity.getTestStandard())

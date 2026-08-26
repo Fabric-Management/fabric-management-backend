@@ -8,7 +8,7 @@ import java.util.UUID;
  *
  * <p>Defined in the costing module; implemented by an adapter in the production module. Follows the
  * same Port/Adapter pattern as {@link
- * com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort} but in the
+ * com.fabricmanagement.production.core.workorder.app.port.WorkOrderCostEnginePort} but in the
  * reverse direction (costing → production).
  *
  * <p>The adapter is optional ({@code @Autowired(required = false)}) — costing module remains

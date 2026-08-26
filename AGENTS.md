@@ -49,12 +49,13 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | Modül | Sorumluluk |
 |-------|------------|
 | `platform` | Auth, User, Organization, Tenant, Communication, TradingPartner, Subscription, Policy, Audit, AI |
-| `production` | Masterdata (Fiber, Material, Recipe), Execution (Batch, WorkOrder, GoodsReceipt, Inventory, Lineage), Quality |
+| `product` | Product core, Fiber, Color, QualityGrade, Recipe (ürünün NE olduğu) |
+| `production` | Execution (Batch, WorkOrder, GoodsReceipt, Inventory, Lineage), Quality ve üretim süreçleri (NASIL) |
 | `sales` | SalesOrder, Quote, Catalog, Pricing, Sample |
 | `procurement` | PurchaseOrder, SubcontractOrder, SupplierRFQ, SupplierQuote |
 | `flowboard` | Board, Task, Generator, Automation, Dashboard |
 | `human` | Employee, Leave, Payroll, Compliance, Localization |
-| `iwm` | Location, Reservation, StockCount, Transfer, RMA, Adjustment, Rules |
+| `inventory` | Location, Reservation, StockCount, Transfer, RMA, Adjustment, Rules |
 | `costing` | CostCalculation, PriceList, ExchangeRate |
 | `analytics` | Cross-context read-only insights (ADR-0001; reads other contexts only via their app/ports) |
 | `notification` | Hub, i18n |
@@ -63,9 +64,10 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | `approval` | ApprovalPolicy, ApprovalRequest, UserPromotion |
 | `offline` | Sync |
 
-- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `production` → `masterdata/fiber`, `execution/batch`, `quality/result`
+- **Alt Modüller:** Büyük bounded context'ler alt modüllere ayrılır. Her biri kendi `api/app/domain/dto/infra` yapısını taşır. Örn: `product` → `core`, `fiber`, `recipe`; `production` → `core/batch`, `quality/result`
 - **Platform vs Domain:** Platform modülleri (auth, user, tenant, subscription) uygulama altyapısıdır — domain modülleri platform'u kullanabilir, tersi yasak
 - **`common/infrastructure/`:** Yalnızca framework-level, domain-agnostic altyapı: `BaseEntity`, `SecurityConfig`, `TenantContext`, `GlobalExceptionHandler`. İş mantığı burada bulunmaz
+- **Inventory asimetrileri:** Kanonik Java paketi `inventory`'dir; PostgreSQL şeması ve tenant-purge tablo referansları `iwm`, mevcut REST path'leri `/api/v1/iwm`, `IwmDomainException` ile `IWM_*`/`IWM-*` sözleşme ve iş anahtarı literalleri ise geriye dönük uyumluluk için aynen kalır. Bunları mekanik olarak normalize etme.
 
 ---
 
@@ -180,10 +182,12 @@ Modül-spesifik iş hataları, modülün mevcut base exception'ını extend eder
 
 ```
 DomainException (abstract, common/infrastructure)
-├── ProductionDomainException
-│   ├── BatchDomainException
+├── ProductDomainException
 │   ├── FiberDomainException
-│   └── RecipeDomainException
+│   ├── RecipeDomainException
+│   └── QualityGradeDomainException
+├── ProductionDomainException
+│   └── BatchDomainException
 ├── SalesDomainException
 ├── ProcurementDomainException
 ├── IwmDomainException
@@ -203,6 +207,7 @@ DomainException (abstract, common/infrastructure)
 - **Listener** → Dinleyen modülün `app/listener/` paketinde, `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async`
 - **Cross-module çağrı** → Doğrudan `@Autowired OtherService` yasak; interface (port) veya QueryService üzerinden
 - **Facade** → Controller birden fazla modül service'i çağırıyorsa `api/facade/` kullan
+- Process (süreç) modüllerinin `WorkOrderProductionValidator` ve `ProcessSpecsContribution` implementasyonları **stateless** olmalıdır — repository/servis enjekte edilmez. Gerekçe: `ProcessModuleRegistry` Jackson `ObjectMapper` kurulum zincirindedir; validator'a JPA bağımlılığı eklemek ObjectMapper → registry → validator → repository → EntityManagerFactory → ObjectMapper döngüsü yaratır.
 
 ---
 
@@ -345,9 +350,11 @@ com.fabricmanagement/
 │   ├── tradingpartner/             # TradingPartner, PartnerUser
 │   └── user/                       # User, Role, Profile
 │
+├── product/                        # ÜRÜN TANIMLARI (NE)
+│   └── {core,fiber,color,qualitygrade,recipe}/
+│
 ├── production/                     # ÜRETİM
-│   ├── masterdata/{fiber,material,recipe}/
-│   ├── execution/{batch,workorder,goodsreceipt,inventory,lineage}/
+│   ├── core/{batch,workorder,goodsreceipt,inventory,lineage,output,stockunit}/
 │   └── quality/result/
 │
 ├── sales/                          # SATIŞ
@@ -359,7 +366,7 @@ com.fabricmanagement/
 ├── human/                          # İNSAN KAYNAKLARI
 │   └── {core/employee,leave,payroll,compliance}/
 │
-├── iwm/                            # DEPO YÖNETİMİ
+├── inventory/                      # DEPO YÖNETİMİ
 │   └── {location,reservation,stockcount,transfer,rma,adjustment,rules}/
 │
 ├── flowboard/                      # SCRUMBAN BOARD

@@ -1,0 +1,33 @@
+{
+  "description": "missing and null values are ignored without diluting weighted denominators",
+  "parents": [
+    {
+      "attributes": {
+        "fiber_micronaire": 4.0,
+        "fiber_staple_length": null,
+        "fiber_grade": 3,
+        "fiber_shade": null,
+        "fiber_organic_cert_no": "TC-1001",
+        "bale_moisture": null
+      },
+      "quantity": 600
+    },
+    {
+      "attributes": {
+        "fiber_staple_length": 28.0,
+        "fiber_shade": "CREAM",
+        "fiber_organic_cert_no": null
+      },
+      "quantity": 400
+    }
+  ],
+  "expected": {
+    "fiber_micronaire": 4.0000,
+    "fiber_staple_length": 28.0000,
+    "raw_fiber_grade": 3,
+    "raw_fiber_shade": "CREAM",
+    "fiber_organic_cert_no": [
+      "TC-1001"
+    ]
+  }
+}

@@ -6,8 +6,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService.ColorReference;
+import com.fabricmanagement.product.color.api.query.ColorQueryService;
+import com.fabricmanagement.product.color.api.query.ColorQueryService.ColorReference;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import java.util.Optional;

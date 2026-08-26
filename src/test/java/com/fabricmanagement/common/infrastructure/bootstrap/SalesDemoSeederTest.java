@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
-import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
+import com.fabricmanagement.product.core.api.facade.ProductFacade;
+import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;

@@ -4,10 +4,10 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
-import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
@@ -74,6 +74,7 @@ public class FiberTestResultService {
             .elongationPercent(request.getElongationPercent())
             .moisturePercent(request.getMoisturePercent())
             .trashContentPercent(request.getTrashContentPercent())
+            .uniformityIndex(request.getUniformityIndex())
             .approvalStatus(TestApprovalStatus.PENDING)
             .testLab(request.getTestLab())
             .testStandard(request.getTestStandard())

@@ -2,8 +2,8 @@ package com.fabricmanagement.production.quality.decision.api.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fabricmanagement.production.execution.batch.api.controller.BatchController;
-import com.fabricmanagement.production.masterdata.qualitygrade.api.QualityGradeController;
+import com.fabricmanagement.product.qualitygrade.api.QualityGradeController;
+import com.fabricmanagement.production.core.batch.api.controller.BatchController;
 import com.fabricmanagement.production.quality.decision.dto.RecordQualityDecisionRequest;
 import com.fabricmanagement.production.quality.result.api.controller.FiberTestResultController;
 import java.lang.reflect.Method;

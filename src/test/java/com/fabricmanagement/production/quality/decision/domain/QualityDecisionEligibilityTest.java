@@ -2,7 +2,7 @@ package com.fabricmanagement.production.quality.decision.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.core.batch.domain.BatchStatus;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 

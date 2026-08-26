@@ -34,7 +34,7 @@ public class ShipmentLineBatch extends BaseJunctionEntity {
   @JoinColumn(name = "shipment_line_id", nullable = false)
   private ShipmentLine shipmentLine;
 
-  /** Fiziksel parti referansı (production/execution/batch modülü). */
+  /** Fiziksel parti referansı (production/core/batch modülü). */
   @Id
   @Column(name = "batch_id", nullable = false)
   private UUID batchId;

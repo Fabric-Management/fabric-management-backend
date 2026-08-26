@@ -1,7 +1,7 @@
 package com.fabricmanagement.flowboard.generator.app.adapter;
 
 import com.fabricmanagement.flowboard.generator.domain.port.out.StockQueryPort;
-import com.fabricmanagement.production.execution.inventory.api.facade.InventoryFacade;
+import com.fabricmanagement.production.core.inventory.api.facade.InventoryFacade;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

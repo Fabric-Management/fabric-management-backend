@@ -1,7 +1,7 @@
 package com.fabricmanagement.procurement.subcontract.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;

@@ -16,8 +16,8 @@ import com.fabricmanagement.logistics.shipment.infra.repository.ShipmentReposito
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
-import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
-import com.fabricmanagement.production.execution.batch.dto.BatchDto;
+import com.fabricmanagement.production.core.batch.api.facade.BatchFacade;
+import com.fabricmanagement.production.core.batch.dto.BatchDto;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -564,7 +564,7 @@ public class ShipmentService {
 
     // Check if QC Approved (AVAILABLE corresponds to QC approved in batch module)
     if (batch.getStatus()
-        != com.fabricmanagement.production.execution.batch.domain.BatchStatus.AVAILABLE) {
+        != com.fabricmanagement.production.core.batch.domain.BatchStatus.AVAILABLE) {
       throw new LogisticsDomainException(
           "Cannot add batch to shipment: QC status is not APPROVED (AVAILABLE). Current status: "
               + batch.getStatus());

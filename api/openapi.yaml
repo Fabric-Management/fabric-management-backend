@@ -53091,6 +53091,15 @@ components:
         trashContentPctTarget:
           type: number
           format: double
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
+          type: number
+          format: double
         version:
           type: integer
           format: int64
@@ -53184,6 +53193,9 @@ components:
         testType:
           type: string
         trashContentPercent:
+          type: number
+          format: double
+        uniformityIndex:
           type: number
           format: double
         version:
@@ -55665,6 +55677,15 @@ components:
           format: double
         uid:
           type: string
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
+          type: number
+          format: double
         updatedAt:
           type: string
           format: date-time
@@ -55822,6 +55843,9 @@ components:
           format: double
         uid:
           type: string
+        uniformityIndex:
+          type: number
+          format: double
         updatedAt:
           type: string
           format: date-time
@@ -63841,6 +63865,15 @@ components:
         trashContentPctTarget:
           type: number
           format: double
+        uniformityIndexMax:
+          type: number
+          format: double
+        uniformityIndexMin:
+          type: number
+          format: double
+        uniformityIndexTarget:
+          type: number
+          format: double
         version:
           type: integer
           format: int64
@@ -65613,7 +65646,6 @@ components:
           example: 30/1
         yarn_csp:
           type: number
-          format: double
           description: Count Strength Product (CSP)
           example: 2800
         yarn_ply:
@@ -65621,15 +65653,14 @@ components:
           format: int32
           description: Number of plies
           example: 1
-        yarn_tpi:
-          type: number
-          format: double
-          description: Turns per inch (TPI)
-          example: 18.5
         yarn_twist:
           type: string
           description: Twist direction (Z or S)
           example: Z
+        yarn_twist_tpm:
+          type: number
+          description: Twist density in turns per metre (TPM)
+          example: 728.35
     YarnPurchaseSpecs:
       allOf:
       - $ref: "#/components/schemas/PurchaseOrderSpecs"

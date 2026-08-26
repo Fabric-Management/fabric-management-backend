@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.quality.decision.dto;
 
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionBlockedReason;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;

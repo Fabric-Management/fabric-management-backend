@@ -18,7 +18,7 @@ import com.fabricmanagement.costing.domain.template.CostTemplate;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
 import com.fabricmanagement.costing.dto.WorkOrderCostReportResponse;
 import com.fabricmanagement.costing.infra.repository.*;
-import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
+import com.fabricmanagement.production.core.workorder.app.port.ConsumptionCostInput;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;

@@ -1,13 +1,20 @@
 package com.fabricmanagement.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
+import com.fabricmanagement.production.core.workorder.app.ProcessSpecsContribution;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,7 +63,7 @@ class ConstitutionArchTest {
       //   - flowboard/automation/application/ → domain/port/out/
       //   - flowboard/generator/application/ → domain/port/out/
       //   - human/core/employee/application/ → app/
-      //   - production/execution/lineage/application/ → app/
+      //   - production/core/lineage/application/ → app/
 
       ArchRule rule =
           noClasses()
@@ -154,7 +161,7 @@ class ConstitutionArchTest {
     void eventsShouldResideInDomainEventPackage() {
       // ✅ CLEAN: All known violations fixed (2026-03-23):
       //   - flowboard/task/app/event/ → domain/event/
-      //   - iwm/rules/app/event/ → domain/event/
+      //   - inventory/rules/app/event/ → domain/event/
 
       ArchRule rule =
           noClasses()
@@ -391,8 +398,7 @@ class ConstitutionArchTest {
       ArchRule rule =
           classes()
               .that()
-              .resideInAPackage(
-                  "com.fabricmanagement.production.masterdata.color.infra.repository..")
+              .resideInAPackage("com.fabricmanagement.product.color.infra.repository..")
               .and()
               .areAssignableTo(org.springframework.data.repository.Repository.class)
               .should()
@@ -566,11 +572,11 @@ class ConstitutionArchTest {
       //
       // [E4] platform.tradingpartner - TradingPartner entity embeds OfflineMetadata (offline
       //      sync capability). Certification services reference FiberCertification from
-      //      production masterdata via FiberCertificationQueryService (QueryService pattern -
+      //      product definitions via FiberCertificationQueryService (QueryService pattern -
       //      @ManyToOne already crosses module boundary at JPA level).
       //
       // [E5] platform.organization - OrganizationCertification references FiberCertification
-      //      from production masterdata for fiber standard validation (same @ManyToOne
+      //      from product definitions for fiber standard validation (same @ManyToOne
       //      coupling as tradingpartner; QueryService pattern applied in Grup B refactoring).
       //
       // [E6] platform.auth - Authentication context resolution may require domain-level
@@ -603,7 +609,7 @@ class ConstitutionArchTest {
                   "com.fabricmanagement.procurement..",
                   "com.fabricmanagement.flowboard..",
                   "com.fabricmanagement.human..",
-                  "com.fabricmanagement.iwm..",
+                  "com.fabricmanagement.inventory..",
                   "com.fabricmanagement.costing..",
                   "com.fabricmanagement.finance..",
                   "com.fabricmanagement.logistics..",
@@ -690,6 +696,128 @@ class ConstitutionArchTest {
   @Nested
   @DisplayName("Article 13 — Cross-Module Infrastructure Isolation")
   class CrossModuleInfrastructureIsolationTests {
+
+    @Test
+    @DisplayName("ADR-0012 D6: product only depends on product, common, and platform")
+    void productShouldOnlyDependOnAllowedFirstPartyModules() {
+      ArchRule rule =
+          classes()
+              .that()
+              .resideInAPackage("com.fabricmanagement.product..")
+              .should()
+              .onlyDependOnClassesThat(
+                  resideInAnyPackage(
+                          "com.fabricmanagement.product..",
+                          "com.fabricmanagement.common..",
+                          "com.fabricmanagement.platform..")
+                      .or(resideOutsideOfPackage("com.fabricmanagement..")))
+              .as(
+                  "ADR-0012 D6: product definitions may only depend on product, common, platform,"
+                      + " or third-party classes");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D6: product infrastructure is private to product")
+    void noModuleShouldAccessProductInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.product..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.product..infra..")
+              .as(
+                  "ADR-0012 D6: modules outside product must use product facades, query services,"
+                      + " or ports instead of product repositories");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D7: legacy iwm package must not exist")
+    void legacyIwmPackageShouldNotExist() {
+      ArchRule rule =
+          noClasses()
+              .should()
+              .resideInAPackage("com.fabricmanagement.iwm..")
+              .as(
+                  "ADR-0012 D7: inventory is the canonical warehouse-management package;"
+                      + " the legacy iwm package must not be recreated");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D3: legacy production.execution package must not exist")
+    void legacyProductionExecutionPackageShouldNotExist() {
+      ArchRule rule =
+          noClasses()
+              .should()
+              .resideInAPackage("com.fabricmanagement.production.execution..")
+              .as(
+                  "ADR-0012 D3: the production execution engine belongs under production.core;"
+                      + " the legacy production.execution package must not be recreated");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D10: production core must not depend on process plug-ins")
+    void productionCoreShouldNotDependOnProcessModules() {
+      Set<String> processPackages = productionProcessPackages();
+
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.production.core..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAnyPackage(processPackages.toArray(String[]::new))
+              .as(
+                  "ADR-0012 D10: production.core defines the plug-in contract and must not depend"
+                      + " on process implementations");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("ADR-0012 D10: production process plug-ins must not depend on each other")
+    void productionProcessModulesShouldNotDependOnEachOther() {
+      Set<String> processPackages = productionProcessPackages();
+
+      for (String processPackage : processPackages) {
+        String[] otherProcessPackages =
+            processPackages.stream()
+                .filter(candidate -> !candidate.equals(processPackage))
+                .toArray(String[]::new);
+        ArchRule rule =
+            noClasses()
+                .that()
+                .resideInAPackage(processPackage)
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(otherProcessPackages)
+                .as(
+                    "ADR-0012 D10: process plug-ins may depend on production.core but never on"
+                        + " another process plug-in");
+
+        rule.check(allClasses);
+      }
+    }
+
+    private Set<String> productionProcessPackages() {
+      String productionPrefix = "com.fabricmanagement.production.";
+      return allClasses.stream()
+          .filter(javaClass -> !javaClass.isInterface())
+          .filter(javaClass -> javaClass.isAssignableTo(ProcessSpecsContribution.class))
+          .map(JavaClass::getPackageName)
+          .map(packageName -> packageName.substring(productionPrefix.length()))
+          .map(relativePackage -> relativePackage.substring(0, relativePackage.indexOf('.')))
+          .map(processName -> productionPrefix + processName + "..")
+          .collect(Collectors.toCollection(TreeSet::new));
+    }
 
     @Test
     @DisplayName("Rule 13.1: No outside module may access platform's infra layer")

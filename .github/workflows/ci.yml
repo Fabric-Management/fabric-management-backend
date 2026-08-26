@@ -92,12 +92,13 @@ jobs:
         run: |
           set -e
           for attempt in 1 2 3; do
-            if ./mvnw org.owasp:dependency-check-maven:check \
+            if ./mvnw org.owasp:dependency-check-maven:12.2.2:check \
                 -DfailBuildOnCVSS=7 \
                 -DdataDirectory="${HOME}/.m2/dependency-check-data" \
+                -DassemblyAnalyzerEnabled=false \
                 -DskipProvidedScope=true \
                 -DsuppressionFile=dependency-check-suppression.xml \
-                -DnvdApiKey="${NVD_API_KEY}" \
+                -DnvdApiKeyEnvironmentVariable=NVD_API_KEY \
                 -DnvdValidForHours=168 \
                 -DnvdApiDelay=6000; then
               echo "Dependency-Check passed on attempt ${attempt}."

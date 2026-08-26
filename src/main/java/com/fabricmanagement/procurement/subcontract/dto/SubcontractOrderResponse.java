@@ -2,7 +2,7 @@ package com.fabricmanagement.procurement.subcontract.dto;
 
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrder;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.product.core.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;

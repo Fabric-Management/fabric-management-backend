@@ -4,8 +4,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
-import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
-import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.core.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
+import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

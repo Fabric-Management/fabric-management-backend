@@ -1,7 +1,7 @@
 package com.fabricmanagement.sales.color.app;
 
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService.ColorReference;
+import com.fabricmanagement.product.color.api.query.ColorQueryService;
+import com.fabricmanagement.product.color.api.query.ColorQueryService.ColorReference;
 import com.fabricmanagement.sales.color.dto.SalesColorDto;
 import com.fabricmanagement.sales.common.app.SalesReferenceResolver;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;

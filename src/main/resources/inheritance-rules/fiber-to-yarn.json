@@ -1,4 +1,5 @@
 {
+  "_deprecated": "Retired by YARN-ARCHITECTURE Y8 / LOT-SPECS Amendment 1. Knowledge captured in docs/production/derivations/SPINNING-DERIVATION-SPEC.md + src/test/resources/derivations/spinning. Runtime replacement: SpinningLotDerivation (YARN-3). Physical removal: YARN-3B.",
   "sourceType": "FIBER",
   "targetType": "YARN",
   "rules": [

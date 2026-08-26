@@ -2,8 +2,8 @@ package com.fabricmanagement.flowboard.generator.app;
 
 import com.fabricmanagement.common.domain.event.production.WorkOrderRecipeAssignmentNeededEvent;
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
-import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
-import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.core.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
+import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import lombok.RequiredArgsConstructor;
