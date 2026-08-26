@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(12) // After permission clone and registered-demo seed; email send happens after commit.
+@Order(13) // After registry provisioning and registered-demo seed; email sends after commit.
 @Component
 @RequiredArgsConstructor
 @Slf4j

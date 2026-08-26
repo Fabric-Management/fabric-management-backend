@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fabricmanagement.product.color.domain.exception.ColorDomainException;
 import com.fabricmanagement.product.common.exception.ForbiddenOperationException;
 import com.fabricmanagement.product.common.exception.ProductDomainException;
+import com.fabricmanagement.product.core.domain.registry.PropertyRegistryException;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.qualitygrade.domain.exception.QualityGradeDomainException;
 import com.fabricmanagement.product.recipe.domain.exception.RecipeDomainException;
@@ -22,6 +23,7 @@ class ProductExceptionContractTest {
     assertDefaultProductContract(new FiberDomainException("fiber"), "fiber");
     assertDefaultProductContract(new RecipeDomainException("recipe"), "recipe");
     assertDefaultProductContract(new QualityGradeDomainException("grade"), "grade");
+    assertDefaultProductContract(new PropertyRegistryException("registry"), "registry");
   }
 
   @Test

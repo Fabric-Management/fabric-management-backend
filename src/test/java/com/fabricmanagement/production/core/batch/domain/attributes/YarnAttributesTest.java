@@ -2,6 +2,7 @@ package com.fabricmanagement.production.core.batch.domain.attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.product.core.domain.registry.policy.TwistConversion;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

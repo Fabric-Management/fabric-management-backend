@@ -9,7 +9,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /** Seeds registered self-service tenants with representative demo users and business data. */
-@Order(11)
+@Order(12)
 @Component
 @RequiredArgsConstructor
 @Slf4j

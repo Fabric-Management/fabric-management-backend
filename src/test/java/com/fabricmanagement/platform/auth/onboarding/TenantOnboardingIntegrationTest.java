@@ -9,12 +9,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fabricmanagement.platform.auth.app.onboarding.CloneTemplatePermissionsStep;
+import com.fabricmanagement.platform.auth.app.onboarding.CloneTemplatePropertyDefinitionsStep;
+import com.fabricmanagement.platform.auth.app.onboarding.OnboardingStep;
+import com.fabricmanagement.platform.auth.app.onboarding.PublishSelfSignupCompletedStep;
+import com.fabricmanagement.platform.auth.app.onboarding.SeedRegisteredTenantDemoStep;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +29,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -65,6 +72,8 @@ class TenantOnboardingIntegrationTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private TenantRepository tenantRepository;
   @Autowired private OrganizationRepository organizationRepository;
+  @Autowired private JdbcTemplate jdbc;
+  @Autowired private List<OnboardingStep> onboardingSteps;
 
   @MockBean private NotificationService notificationService;
   @MockBean private EmailTemplateRenderer emailTemplateRenderer;
@@ -155,6 +164,32 @@ class TenantOnboardingIntegrationTest {
     assertThat(tenant.get().getName()).isEqualTo(organizationName);
     assertThat(tenant.get().getStatus()).isNotNull();
     assertThat(tenant.get().getIsActive()).isTrue();
+
+    Integer systemDefinitions =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM production.prod_property_definition "
+                + "WHERE tenant_id = ? AND system_defined = TRUE",
+            Integer.class,
+            tenant.get().getId());
+    Integer customDefinitions =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM production.prod_property_definition "
+                + "WHERE tenant_id = ? AND property_key LIKE 'CUSTOM\\_%'",
+            Integer.class, tenant.get().getId());
+    assertThat(systemDefinitions).isEqualTo(6);
+    assertThat(customDefinitions).isZero();
+  }
+
+  @Test
+  @DisplayName("Onboarding executes registry provisioning between permissions and demo/publication")
+  void onboardingStepOrderPinsRegistryReadinessGate() {
+    List<Class<?>> orderedTypes = onboardingSteps.stream().map(Object::getClass).toList();
+    assertThat(orderedTypes)
+        .containsSubsequence(
+            CloneTemplatePermissionsStep.class,
+            CloneTemplatePropertyDefinitionsStep.class,
+            SeedRegisteredTenantDemoStep.class,
+            PublishSelfSignupCompletedStep.class);
   }
 
   @Test

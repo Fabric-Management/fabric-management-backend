@@ -83,6 +83,7 @@ class TenantTransactionalPurgeServiceTest {
             "sales.customer_commercial_assignment",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.prod_property_definition",
             "production.production_execution_batch_color_archive",
             "production.stock_unit_soft_hold",
             "production.quality_decision_unit",

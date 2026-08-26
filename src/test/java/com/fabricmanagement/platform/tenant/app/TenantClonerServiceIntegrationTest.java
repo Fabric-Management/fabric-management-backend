@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tenant.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
@@ -132,6 +133,24 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
         userId,
         deptId);
 
+    UUID goldenTemplateId = tenantClonerService.findTemplateTenantId();
+    jdbc.update(
+        """
+        INSERT INTO production.prod_property_definition (
+            id, tenant_id, uid, property_key, canonical_field_name,
+            semantic_role_default, dimension, data_type, unit_family,
+            allowed_unit_codes, description, system_defined, is_active,
+            created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'CUSTOM_TEMPLATE_ONLY',
+            'templateOnly', 'MEASUREMENT', 'templateOnly', 'DECIMAL', 'NONE',
+            '[]'::jsonb, 'Must never leave its owning tenant.', FALSE, TRUE,
+            NOW(), NOW(), 0
+        )
+        ON CONFLICT (tenant_id, property_key) DO NOTHING
+        """,
+        goldenTemplateId != null ? goldenTemplateId : TenantContext.TEMPLATE_TENANT_ID);
+
     // Act
     Tenant pg = tenantClonerService.cloneTemplateToPlayground();
 
@@ -212,6 +231,22 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     assertThat(ownershipPolicyCount)
         .as("A disabled default sales ownership policy should be cloned")
         .isEqualTo(1);
+
+    Integer systemPropertyDefinitionCount =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM production.prod_property_definition "
+                + "WHERE tenant_id = ? AND system_defined = TRUE",
+            Integer.class,
+            pg.getId());
+    Integer customPropertyDefinitionCount =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM production.prod_property_definition "
+                + "WHERE tenant_id = ? AND property_key LIKE 'CUSTOM\\_%'",
+            Integer.class, pg.getId());
+    assertThat(systemPropertyDefinitionCount).isEqualTo(6);
+    assertThat(customPropertyDefinitionCount)
+        .as("Playground provisioning must never carry tenant-owned Property Registry rows")
+        .isZero();
 
     // Verify UIDs are fresh (not copied from template) — CR-5
     List<String> playgroundOrgUids =
