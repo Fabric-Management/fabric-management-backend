@@ -62,7 +62,7 @@ public class TenantSeeder implements DataSeeder {
                 log.warn("Golden Template not found, roles were not cloned into Nexus Fabrics!");
               }
 
-              // Clone production reference data (categories, ISO codes, certifications, attributes)
+              // Clone production reference data and missing system Property Registry definitions
               // from Golden Template. This provisions the demo company so playground cloning
               // produces complete tenants. Chain: golden-template → nexus-fabrics → playground.
               int refTables = tenantClonerService.cloneReferenceDataToTenant(tenant.getId());

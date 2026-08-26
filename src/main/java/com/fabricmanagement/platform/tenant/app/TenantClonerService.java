@@ -155,10 +155,59 @@ public class TenantClonerService {
   }
 
   /**
+   * Copies only system-owned property definitions missing from the target tenant.
+   *
+   * <p>Unlike {@code cloneIfEmpty}, matching is key-based and therefore repairs partially
+   * provisioned tenants without copying tenant-owned {@code CUSTOM_} rows.
+   */
+  public int copyMissingSystemPropertyDefinitions(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> doCopyMissingSystemPropertyDefinitions(jdbc, sourceTenantId, targetTenantId));
+  }
+
+  int doCopyMissingSystemPropertyDefinitions(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return jdbc.update(
+        """
+        INSERT INTO production.prod_property_definition (
+            id, tenant_id, uid, property_key, canonical_field_name, semantic_role_default,
+            dimension, data_type, unit_family, canonical_unit_code, allowed_unit_codes,
+            conversion_policy, rounding_policy, nominal_source, tolerance_source, description,
+            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.property_key,
+            source.canonical_field_name, source.semantic_role_default, source.dimension,
+            source.data_type, source.unit_family, source.canonical_unit_code,
+            source.allowed_unit_codes, source.conversion_policy, source.rounding_policy,
+            source.nominal_source, source.tolerance_source, source.description,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM production.prod_property_definition source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_property_definition target
+              WHERE target.tenant_id = ?::uuid
+                AND target.property_key = source.property_key
+          )
+        """,
+        targetTenantId,
+        sourceTenantId,
+        targetTenantId);
+  }
+
+  /**
    * Clone production reference data (categories, ISO codes, certifications, attributes) from the
    * golden-template to a target tenant.
    *
-   * <p>Idempotent: skips tables that already have rows in the target tenant. Uses BYPASSRLS.
+   * <p>Idempotent: legacy reference tables are copied only when empty; Property Registry system
+   * definitions are repaired key-by-key so a partially provisioned tenant is completed. Uses
+   * BYPASSRLS.
    *
    * @param targetTenantId the tenant to copy reference data into
    * @return number of tables cloned
@@ -223,6 +272,9 @@ public class TenantClonerService {
                   "uid, certification_code, certification_name, certifying_body, description, is_active",
                   goldenTemplateId,
                   targetTenantId);
+          tablesCloned +=
+              copyMissingSystemPropertyDefinitionsInCurrentTransaction(
+                  jdbc, goldenTemplateId, targetTenantId);
           tablesCloned += cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId);
 
           return tablesCloned;
@@ -362,6 +414,7 @@ public class TenantClonerService {
               UUID goldenTemplateId = findTemplateTenantId(jdbc);
               if (goldenTemplateId != null) {
                 doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
+                doCopyMissingSystemPropertyDefinitions(jdbc, goldenTemplateId, newTenantId);
                 cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, newTenantId);
               }
 
@@ -538,6 +591,11 @@ public class TenantClonerService {
     demoTransactionSeeder.seedFor(clonedTenant.getId());
 
     return clonedTenant;
+  }
+
+  private int copyMissingSystemPropertyDefinitionsInCurrentTransaction(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return doCopyMissingSystemPropertyDefinitions(jdbc, sourceTenantId, targetTenantId) > 0 ? 1 : 0;
   }
 
   private void cloneTableWithoutFKs(

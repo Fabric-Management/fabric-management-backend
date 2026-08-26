@@ -24,6 +24,7 @@ import lombok.Data;
  *   <li>Step 4 (SeedOrganizationStep): Seeds default departments
  *   <li>Step 5+ (CreateAdminUserStep, etc.): Use tenantId and organizationId
  *   <li>Step 10 (CloneTemplatePermissionsStep): Clones permission templates
+ *   <li>Step 11 (CloneTemplatePropertyDefinitionsStep): Clones system Property Registry rows
  * </ul>
  */
 @Data

@@ -142,6 +142,7 @@ public class TenantTransactionalPurgeService {
           "production.production_execution_batch_lineage",
           "production.production_execution_batch",
           "production.production_fiber_request",
+          "production.prod_property_definition",
           "production.prod_yarn_category",
           "production.prod_yarn_attribute",
           "production.prod_yarn_certification",

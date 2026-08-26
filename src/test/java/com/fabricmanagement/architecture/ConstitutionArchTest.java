@@ -5,6 +5,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsid
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.production.core.workorder.app.ProcessSpecsContribution;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -764,6 +765,19 @@ class ConstitutionArchTest {
     }
 
     @Test
+    @DisplayName("LOT-REG-1: TwistConversion exists exactly once and is product-owned")
+    void twistConversionShouldBeProductOwned() {
+      Set<JavaClass> matches =
+          allClasses.stream()
+              .filter(javaClass -> javaClass.getSimpleName().equals("TwistConversion"))
+              .collect(Collectors.toSet());
+
+      assertThat(matches).hasSize(1);
+      assertThat(matches.iterator().next().getPackageName())
+          .isEqualTo("com.fabricmanagement.product.core.domain.registry.policy");
+    }
+
+    @Test
     @DisplayName("ADR-0012 D10: production core must not depend on process plug-ins")
     void productionCoreShouldNotDependOnProcessModules() {
       Set<String> processPackages = productionProcessPackages();
@@ -975,6 +989,7 @@ class ConstitutionArchTest {
       //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
+      //   - PropertyDefinitionBackfillRunner : LOT-REG-1 system registry propagation to tenants
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
@@ -1007,6 +1022,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("PermissionTemplateBackfillRunner")
               .and()
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
+              .and()
+              .doNotHaveSimpleName("PropertyDefinitionBackfillRunner")
               .and()
               .doNotHaveSimpleName("QuoteApprovalService")
               .and()

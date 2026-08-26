@@ -2,7 +2,7 @@ package com.fabricmanagement.production.core.batch.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fabricmanagement.production.core.batch.domain.attributes.TwistConversion;
+import com.fabricmanagement.product.core.domain.registry.policy.TwistConversion;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;

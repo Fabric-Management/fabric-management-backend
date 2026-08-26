@@ -4,6 +4,7 @@ import static com.fabricmanagement.production.core.batch.domain.attributes.Attri
 import static com.fabricmanagement.production.core.batch.domain.attributes.AttributeConversions.toBigDecimal;
 import static com.fabricmanagement.production.core.batch.domain.attributes.AttributeConversions.toInteger;
 
+import com.fabricmanagement.product.core.domain.registry.policy.TwistConversion;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
