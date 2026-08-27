@@ -53,14 +53,6 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
           jdbc.queryForObject(
               "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
               UUID.class);
-      Long johnCount =
-          jdbc.queryForObject(
-              "SELECT count(*) FROM common_user.common_user WHERE first_name = 'John' AND last_name = 'Doe' AND tenant_id = ?",
-              Long.class,
-              templateTenantId);
-      if (johnCount != null && johnCount > 0) {
-        return;
-      }
     }
     long templateCount = tenantRepository.findByType(TenantType.TEMPLATE).size();
     assertThat(templateCount).as("Precondition: TEMPLATE tenant must exist").isGreaterThan(0);
@@ -150,6 +142,41 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
         ON CONFLICT (tenant_id, property_key) DO NOTHING
         """,
         goldenTemplateId != null ? goldenTemplateId : TenantContext.TEMPLATE_TENANT_ID);
+    UUID yarnCatalogueSource =
+        goldenTemplateId != null ? goldenTemplateId : TenantContext.TEMPLATE_TENANT_ID;
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_spinning_system (
+            id, tenant_id, uid, code, name, display_order, technology_family,
+            system_defined, is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_SPIN',
+            'Playground Tenant Spin', 900, 'RING', FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_end_use (
+            id, tenant_id, uid, code, name, display_order, system_defined,
+            is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_USE',
+            'Playground Tenant Use', 901, FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_test_method (
+            id, tenant_id, uid, code, name, display_order, system_defined,
+            is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_METHOD',
+            'Playground Tenant Method', 902, FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
 
     // Act
     Tenant pg = tenantClonerService.cloneTemplateToPlayground();
@@ -246,6 +273,41 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     assertThat(systemPropertyDefinitionCount).isEqualTo(6);
     assertThat(customPropertyDefinitionCount)
         .as("Playground provisioning must never carry tenant-owned Property Registry rows")
+        .isZero();
+
+    Integer systemYarnCatalogueCount =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+            """,
+            Integer.class,
+            pg.getId(),
+            pg.getId(),
+            pg.getId());
+    Integer tenantYarnCatalogueCount =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+            """,
+            Integer.class,
+            pg.getId(),
+            pg.getId(),
+            pg.getId());
+    assertThat(systemYarnCatalogueCount).isEqualTo(13);
+    assertThat(tenantYarnCatalogueCount)
+        .as("Playground provisioning must never carry tenant-owned yarn catalogue rows")
         .isZero();
 
     // Verify UIDs are fresh (not copied from template) — CR-5

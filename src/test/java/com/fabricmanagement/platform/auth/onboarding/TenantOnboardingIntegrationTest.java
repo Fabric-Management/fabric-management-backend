@@ -178,10 +178,42 @@ class TenantOnboardingIntegrationTest {
             Integer.class, tenant.get().getId());
     assertThat(systemDefinitions).isEqualTo(6);
     assertThat(customDefinitions).isZero();
+    Integer systemYarnCatalogues =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+            """,
+            Integer.class,
+            tenant.get().getId(),
+            tenant.get().getId(),
+            tenant.get().getId());
+    Integer tenantYarnCatalogues =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+            """,
+            Integer.class,
+            tenant.get().getId(),
+            tenant.get().getId(),
+            tenant.get().getId());
+    assertThat(systemYarnCatalogues).isEqualTo(13);
+    assertThat(tenantYarnCatalogues).isZero();
   }
 
   @Test
-  @DisplayName("Onboarding executes registry provisioning between permissions and demo/publication")
+  @DisplayName("Onboarding provisions registry then yarn catalogues before demo/publication")
   void onboardingStepOrderPinsRegistryReadinessGate() {
     List<Class<?>> orderedTypes = onboardingSteps.stream().map(Object::getClass).toList();
     assertThat(orderedTypes)

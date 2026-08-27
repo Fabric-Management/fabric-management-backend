@@ -37,7 +37,7 @@ class TenantSeederPropertyRegistryTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void bootstrapSeederUsesReferenceClonePathThatProvisionsPropertyRegistry() {
+  void bootstrapSeederUsesReferenceClonePathThatProvisionsRegistryAndYarnCatalogues() {
     UUID tenantId = UUID.randomUUID();
     UUID templateTenantId = UUID.randomUUID();
     when(transactionTemplate.execute(any(TransactionCallback.class)))

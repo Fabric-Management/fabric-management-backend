@@ -202,11 +202,166 @@ public class TenantClonerService {
   }
 
   /**
+   * Copies only missing, system-owned yarn catalogue rows from source to target.
+   *
+   * <p>The target's system Property Registry rows must be copied first because test methods can
+   * reference {@code YARN_TWIST_TPM}.
+   */
+  public int copyMissingSystemYarnCatalogues(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> doCopyMissingSystemYarnCatalogues(jdbc, sourceTenantId, targetTenantId));
+  }
+
+  /**
+   * Repairs all live tenants from the system catalogue source without exposing a second
+   * cross-tenant executor caller.
+   */
+  public int copyMissingSystemYarnCataloguesToAllTenants(UUID sourceTenantId) {
+    if (sourceTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc ->
+            jdbc
+                .queryForList(
+                    "SELECT id FROM common_tenant.common_tenant WHERE deleted_at IS NULL",
+                    UUID.class)
+                .stream()
+                .filter(tenantId -> !sourceTenantId.equals(tenantId))
+                .mapToInt(
+                    tenantId -> doCopyMissingSystemYarnCatalogues(jdbc, sourceTenantId, tenantId))
+                .sum());
+  }
+
+  int doCopyMissingSystemYarnCatalogues(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    logYarnCatalogueCollisions(
+        jdbc,
+        "production.prod_yarn_spinning_system",
+        "spinning system",
+        sourceTenantId,
+        targetTenantId);
+    logYarnCatalogueCollisions(
+        jdbc, "production.prod_yarn_end_use", "end-use", sourceTenantId, targetTenantId);
+    logYarnCatalogueCollisions(
+        jdbc, "production.prod_yarn_test_method", "test method", sourceTenantId, targetTenantId);
+
+    int spinningSystems =
+        jdbc.update(
+            """
+            INSERT INTO production.prod_yarn_spinning_system (
+                id, tenant_id, uid, code, name, description, display_order,
+                technology_family, system_defined, is_active, created_at, created_by,
+                updated_at, updated_by, version
+            )
+            SELECT
+                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+                source.name, source.description, source.display_order, source.technology_family,
+                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+            FROM production.prod_yarn_spinning_system source
+            WHERE source.tenant_id = ?::uuid
+              AND source.system_defined = TRUE
+              AND source.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM production.prod_yarn_spinning_system target
+                  WHERE target.tenant_id = ?::uuid
+                    AND target.code = source.code
+              )
+            """,
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    int endUses =
+        jdbc.update(
+            """
+            INSERT INTO production.prod_yarn_end_use (
+                id, tenant_id, uid, code, name, description, display_order,
+                system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+            )
+            SELECT
+                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+                source.name, source.description, source.display_order, TRUE, source.is_active,
+                NOW(), NULL, NOW(), NULL, 0
+            FROM production.prod_yarn_end_use source
+            WHERE source.tenant_id = ?::uuid
+              AND source.system_defined = TRUE
+              AND source.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM production.prod_yarn_end_use target
+                  WHERE target.tenant_id = ?::uuid
+                    AND target.code = source.code
+              )
+            """,
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    int testMethods =
+        jdbc.update(
+            """
+            INSERT INTO production.prod_yarn_test_method (
+                id, tenant_id, uid, code, name, description, display_order, standard_ref,
+                instrument, applicable_property_key, system_defined, is_active, created_at,
+                created_by, updated_at, updated_by, version
+            )
+            SELECT
+                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+                source.name, source.description, source.display_order, source.standard_ref,
+                source.instrument, source.applicable_property_key, TRUE, source.is_active,
+                NOW(), NULL, NOW(), NULL, 0
+            FROM production.prod_yarn_test_method source
+            WHERE source.tenant_id = ?::uuid
+              AND source.system_defined = TRUE
+              AND source.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM production.prod_yarn_test_method target
+                  WHERE target.tenant_id = ?::uuid
+                    AND target.code = source.code
+              )
+            """,
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    return spinningSystems + endUses + testMethods;
+  }
+
+  private void logYarnCatalogueCollisions(
+      org.springframework.jdbc.core.JdbcTemplate jdbc,
+      String tableName,
+      String catalogue,
+      UUID sourceTenantId,
+      UUID targetTenantId) {
+    String sql =
+        "SELECT target.code FROM "
+            + tableName
+            + " target JOIN "
+            + tableName
+            + " source ON source.code = target.code "
+            + "WHERE source.tenant_id = ? AND source.system_defined = TRUE "
+            + "AND source.deleted_at IS NULL AND target.tenant_id = ? "
+            + "AND target.system_defined = FALSE";
+    jdbc.queryForList(sql, String.class, sourceTenantId, targetTenantId)
+        .forEach(
+            code ->
+                log.error(
+                    "Yarn system catalogue collision retained for explicit repair: "
+                        + "catalogue={}, tenant={}, code={}",
+                    catalogue,
+                    targetTenantId,
+                    code));
+  }
+
+  /**
    * Clone production reference data (categories, ISO codes, certifications, attributes) from the
    * golden-template to a target tenant.
    *
-   * <p>Idempotent: legacy reference tables are copied only when empty; Property Registry system
-   * definitions are repaired key-by-key so a partially provisioned tenant is completed. Uses
+   * <p>Idempotent: legacy reference tables are copied only when empty; Property Registry and yarn
+   * system catalogues are repaired key-by-key so a partially provisioned tenant is completed. Uses
    * BYPASSRLS.
    *
    * @param targetTenantId the tenant to copy reference data into
@@ -254,26 +409,15 @@ public class TenantClonerService {
           tablesCloned +=
               cloneIfEmpty(
                   jdbc,
-                  "production.prod_yarn_category",
-                  "uid, category_code, category_name, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_yarn_attribute",
-                  "uid, attribute_code, attribute_name, attribute_type, unit, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
                   "production.prod_yarn_certification",
                   "uid, certification_code, certification_name, certifying_body, description, is_active",
                   goldenTemplateId,
                   targetTenantId);
           tablesCloned +=
               copyMissingSystemPropertyDefinitionsInCurrentTransaction(
+                  jdbc, goldenTemplateId, targetTenantId);
+          tablesCloned +=
+              copyMissingSystemYarnCataloguesInCurrentTransaction(
                   jdbc, goldenTemplateId, targetTenantId);
           tablesCloned += cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId);
 
@@ -415,6 +559,7 @@ public class TenantClonerService {
               if (goldenTemplateId != null) {
                 doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
                 doCopyMissingSystemPropertyDefinitions(jdbc, goldenTemplateId, newTenantId);
+                doCopyMissingSystemYarnCatalogues(jdbc, goldenTemplateId, newTenantId);
                 cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, newTenantId);
               }
 
@@ -516,18 +661,6 @@ public class TenantClonerService {
                   newTenantId);
               cloneTableWithoutFKs(
                   jdbc,
-                  "production.prod_yarn_category",
-                  "uid, category_code, category_name, description, is_active",
-                  templateTenantId,
-                  newTenantId);
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_yarn_attribute",
-                  "uid, attribute_code, attribute_name, attribute_type, unit, description, is_active",
-                  templateTenantId,
-                  newTenantId);
-              cloneTableWithoutFKs(
-                  jdbc,
                   "production.prod_yarn_certification",
                   "uid, certification_code, certification_name, certifying_body, description, is_active",
                   templateTenantId,
@@ -596,6 +729,11 @@ public class TenantClonerService {
   private int copyMissingSystemPropertyDefinitionsInCurrentTransaction(
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     return doCopyMissingSystemPropertyDefinitions(jdbc, sourceTenantId, targetTenantId) > 0 ? 1 : 0;
+  }
+
+  private int copyMissingSystemYarnCataloguesInCurrentTransaction(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return doCopyMissingSystemYarnCatalogues(jdbc, sourceTenantId, targetTenantId) > 0 ? 1 : 0;
   }
 
   private void cloneTableWithoutFKs(

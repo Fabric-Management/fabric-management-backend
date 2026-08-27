@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Step 11: provision the code-owned Property Registry before demo data or publication. */
+/** Step 11: provision the Property Registry, then dependent yarn catalogues. */
 @Order(11)
 @Component
 @RequiredArgsConstructor
@@ -30,9 +30,13 @@ public class CloneTemplatePropertyDefinitionsStep implements OnboardingStep {
     }
     int inserted =
         tenantClonerService.copyMissingSystemPropertyDefinitions(templateTenantId, targetTenantId);
+    int yarnCataloguesInserted =
+        tenantClonerService.copyMissingSystemYarnCatalogues(templateTenantId, targetTenantId);
     log.info(
-        "CloneTemplatePropertyDefinitionsStep: inserted {} missing system definitions into {}.",
+        "CloneTemplatePropertyDefinitionsStep: inserted {} property definitions and {} yarn "
+            + "catalogue rows into {}.",
         inserted,
+        yarnCataloguesInserted,
         targetTenantId);
   }
 }
