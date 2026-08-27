@@ -110,14 +110,17 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
           UUID.randomUUID().toString());
     }
 
+    String fixtureFirstName =
+        "Clone" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
     UUID userId = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, 'John', 'Doe', 'INTERNAL', true, now(), now(), 0)",
+        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, 'DepartmentFixture', 'INTERNAL', true, now(), now(), 0)",
         userId,
         templateTenantId,
         UUID.randomUUID().toString(),
         orgId,
-        roleId);
+        roleId,
+        fixtureFirstName);
 
     jdbc.update(
         "INSERT INTO common_user.common_user_department (tenant_id, user_id, department_id, is_primary, created_at, updated_at) VALUES (?, ?, ?, true, now(), now())",
@@ -201,11 +204,19 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     // Assert - Users + UserDepartments
     List<User> users = userRepository.findByTenantIdWithRelations(pg.getId());
     assertThat(users).isNotEmpty();
-    assertThat(users)
-        .allSatisfy(
-            u -> {
-              assertThat(u.getTenantId()).isEqualTo(pg.getId());
-              assertThat(u.getUserDepartments()).isNotEmpty();
+    assertThat(users).allSatisfy(u -> assertThat(u.getTenantId()).isEqualTo(pg.getId()));
+
+    List<User> clonedFixtureUsers =
+        users.stream().filter(u -> fixtureFirstName.equals(u.getFirstName())).toList();
+    assertThat(clonedFixtureUsers).hasSize(1);
+    assertThat(clonedFixtureUsers.getFirst().getUserDepartments())
+        .singleElement()
+        .satisfies(
+            assignment -> {
+              assertThat(assignment.getTenantId()).isEqualTo(pg.getId());
+              assertThat(assignment.getIsPrimary()).isTrue();
+              assertThat(assignment.getDepartment()).isNotNull();
+              assertThat(assignment.getDepartment().getDepartmentCode()).isEqualTo("DPT-001");
             });
 
     // CR-8: Assert reference table cloning
