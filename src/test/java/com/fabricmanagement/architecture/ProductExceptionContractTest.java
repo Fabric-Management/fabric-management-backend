@@ -9,6 +9,7 @@ import com.fabricmanagement.product.core.domain.registry.PropertyRegistryExcepti
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.qualitygrade.domain.exception.QualityGradeDomainException;
 import com.fabricmanagement.product.recipe.domain.exception.RecipeDomainException;
+import com.fabricmanagement.product.yarn.domain.exception.YarnDomainException;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.core.stockunit.domain.exception.StockUnitDomainException;
@@ -24,6 +25,7 @@ class ProductExceptionContractTest {
     assertDefaultProductContract(new RecipeDomainException("recipe"), "recipe");
     assertDefaultProductContract(new QualityGradeDomainException("grade"), "grade");
     assertDefaultProductContract(new PropertyRegistryException("registry"), "registry");
+    assertDefaultProductContract(new YarnDomainException("yarn"), "yarn");
   }
 
   @Test

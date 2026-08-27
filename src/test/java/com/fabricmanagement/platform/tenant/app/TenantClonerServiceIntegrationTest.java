@@ -53,14 +53,6 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
           jdbc.queryForObject(
               "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
               UUID.class);
-      Long johnCount =
-          jdbc.queryForObject(
-              "SELECT count(*) FROM common_user.common_user WHERE first_name = 'John' AND last_name = 'Doe' AND tenant_id = ?",
-              Long.class,
-              templateTenantId);
-      if (johnCount != null && johnCount > 0) {
-        return;
-      }
     }
     long templateCount = tenantRepository.findByType(TenantType.TEMPLATE).size();
     assertThat(templateCount).as("Precondition: TEMPLATE tenant must exist").isGreaterThan(0);
@@ -118,14 +110,17 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
           UUID.randomUUID().toString());
     }
 
+    String fixtureFirstName =
+        "Clone" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
     UUID userId = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, 'John', 'Doe', 'INTERNAL', true, now(), now(), 0)",
+        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, 'DepartmentFixture', 'INTERNAL', true, now(), now(), 0)",
         userId,
         templateTenantId,
         UUID.randomUUID().toString(),
         orgId,
-        roleId);
+        roleId,
+        fixtureFirstName);
 
     jdbc.update(
         "INSERT INTO common_user.common_user_department (tenant_id, user_id, department_id, is_primary, created_at, updated_at) VALUES (?, ?, ?, true, now(), now())",
@@ -150,6 +145,41 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
         ON CONFLICT (tenant_id, property_key) DO NOTHING
         """,
         goldenTemplateId != null ? goldenTemplateId : TenantContext.TEMPLATE_TENANT_ID);
+    UUID yarnCatalogueSource =
+        goldenTemplateId != null ? goldenTemplateId : TenantContext.TEMPLATE_TENANT_ID;
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_spinning_system (
+            id, tenant_id, uid, code, name, display_order, technology_family,
+            system_defined, is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_SPIN',
+            'Playground Tenant Spin', 900, 'RING', FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_end_use (
+            id, tenant_id, uid, code, name, display_order, system_defined,
+            is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_USE',
+            'Playground Tenant Use', 901, FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
+    jdbc.update(
+        """
+        INSERT INTO production.prod_yarn_test_method (
+            id, tenant_id, uid, code, name, display_order, system_defined,
+            is_active, created_at, updated_at, version
+        ) VALUES (
+            gen_random_uuid(), ?, gen_random_uuid()::varchar, 'PLAYGROUND_TENANT_METHOD',
+            'Playground Tenant Method', 902, FALSE, TRUE, NOW(), NOW(), 0
+        ) ON CONFLICT (tenant_id, code) DO NOTHING
+        """,
+        yarnCatalogueSource);
 
     // Act
     Tenant pg = tenantClonerService.cloneTemplateToPlayground();
@@ -174,11 +204,19 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     // Assert - Users + UserDepartments
     List<User> users = userRepository.findByTenantIdWithRelations(pg.getId());
     assertThat(users).isNotEmpty();
-    assertThat(users)
-        .allSatisfy(
-            u -> {
-              assertThat(u.getTenantId()).isEqualTo(pg.getId());
-              assertThat(u.getUserDepartments()).isNotEmpty();
+    assertThat(users).allSatisfy(u -> assertThat(u.getTenantId()).isEqualTo(pg.getId()));
+
+    List<User> clonedFixtureUsers =
+        users.stream().filter(u -> fixtureFirstName.equals(u.getFirstName())).toList();
+    assertThat(clonedFixtureUsers).hasSize(1);
+    assertThat(clonedFixtureUsers.getFirst().getUserDepartments())
+        .singleElement()
+        .satisfies(
+            assignment -> {
+              assertThat(assignment.getTenantId()).isEqualTo(pg.getId());
+              assertThat(assignment.getIsPrimary()).isTrue();
+              assertThat(assignment.getDepartment()).isNotNull();
+              assertThat(assignment.getDepartment().getDepartmentCode()).isEqualTo("DPT-001");
             });
 
     // CR-8: Assert reference table cloning
@@ -246,6 +284,41 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     assertThat(systemPropertyDefinitionCount).isEqualTo(6);
     assertThat(customPropertyDefinitionCount)
         .as("Playground provisioning must never carry tenant-owned Property Registry rows")
+        .isZero();
+
+    Integer systemYarnCatalogueCount =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = TRUE)
+            """,
+            Integer.class,
+            pg.getId(),
+            pg.getId(),
+            pg.getId());
+    Integer tenantYarnCatalogueCount =
+        jdbc.queryForObject(
+            """
+            SELECT
+              (SELECT count(*) FROM production.prod_yarn_spinning_system
+               WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_end_use
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+              + (SELECT count(*) FROM production.prod_yarn_test_method
+                 WHERE tenant_id = ? AND system_defined = FALSE)
+            """,
+            Integer.class,
+            pg.getId(),
+            pg.getId(),
+            pg.getId());
+    assertThat(systemYarnCatalogueCount).isEqualTo(13);
+    assertThat(tenantYarnCatalogueCount)
+        .as("Playground provisioning must never carry tenant-owned yarn catalogue rows")
         .isZero();
 
     // Verify UIDs are fresh (not copied from template) — CR-5

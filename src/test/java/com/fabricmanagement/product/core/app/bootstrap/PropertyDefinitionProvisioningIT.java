@@ -41,7 +41,7 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
 
     registryStep.execute(context);
 
-    assertRegistryReadyWithoutCustomRows(tenantId);
+    assertRegistryAndYarnCataloguesReadyWithoutTenantRows(tenantId);
   }
 
   @Test
@@ -51,7 +51,7 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
 
     tenantClonerService.cloneReferenceDataToTenant(tenantId);
 
-    assertRegistryReadyWithoutCustomRows(tenantId);
+    assertRegistryAndYarnCataloguesReadyWithoutTenantRows(tenantId);
   }
 
   private UUID insertTenant(String path) {
@@ -94,7 +94,7 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
         });
   }
 
-  private void assertRegistryReadyWithoutCustomRows(UUID tenantId) {
+  private void assertRegistryAndYarnCataloguesReadyWithoutTenantRows(UUID tenantId) {
     systemTransactionExecutor.executeInTransaction(
         jdbc -> {
           Integer systemRows =
@@ -110,6 +110,38 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
                   Integer.class, tenantId);
           assertThat(systemRows).isEqualTo(6);
           assertThat(customRows).isZero();
+          Integer systemYarnRows =
+              jdbc.queryForObject(
+                  """
+                  SELECT
+                    (SELECT count(*) FROM production.prod_yarn_spinning_system
+                     WHERE tenant_id = ? AND system_defined = TRUE)
+                    + (SELECT count(*) FROM production.prod_yarn_end_use
+                       WHERE tenant_id = ? AND system_defined = TRUE)
+                    + (SELECT count(*) FROM production.prod_yarn_test_method
+                       WHERE tenant_id = ? AND system_defined = TRUE)
+                  """,
+                  Integer.class,
+                  tenantId,
+                  tenantId,
+                  tenantId);
+          Integer tenantYarnRows =
+              jdbc.queryForObject(
+                  """
+                  SELECT
+                    (SELECT count(*) FROM production.prod_yarn_spinning_system
+                     WHERE tenant_id = ? AND system_defined = FALSE)
+                    + (SELECT count(*) FROM production.prod_yarn_end_use
+                       WHERE tenant_id = ? AND system_defined = FALSE)
+                    + (SELECT count(*) FROM production.prod_yarn_test_method
+                       WHERE tenant_id = ? AND system_defined = FALSE)
+                  """,
+                  Integer.class,
+                  tenantId,
+                  tenantId,
+                  tenantId);
+          assertThat(systemYarnRows).isEqualTo(13);
+          assertThat(tenantYarnRows).isZero();
           return null;
         });
   }
