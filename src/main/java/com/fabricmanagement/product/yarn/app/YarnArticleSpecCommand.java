@@ -35,6 +35,13 @@ public record YarnArticleSpecCommand(
     List<ComponentCommand> structureComponents,
     List<TwistStageCommand> twistStages) {
 
+  /** Empty, intentionally incomplete draft spec used when create omits its optional spec. */
+  public static YarnArticleSpecCommand empty() {
+    return new YarnArticleSpecCommand(
+        null, null, null, null, null, null, null, null, null, null, null, null, Set.of(), List.of(),
+        List.of(), List.of());
+  }
+
   public YarnArticleSpecCommand {
     constructionFeatures =
         constructionFeatures == null ? Set.of() : Set.copyOf(constructionFeatures);

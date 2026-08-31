@@ -17,6 +17,7 @@ import com.fabricmanagement.product.core.infra.repository.ProductAttributeReposi
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
+import com.fabricmanagement.product.yarn.api.facade.YarnFacade;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,7 @@ class ProductServiceTest {
   @Mock private ProductRepository productRepository;
   @Mock private ProductAttributeRepository productAttributeRepository;
   @Mock private FiberFacade fiberFacade;
+  @Mock private YarnFacade yarnFacade;
   @Mock private DomainEventPublisher eventPublisher;
 
   private ProductService productService;
@@ -43,7 +45,7 @@ class ProductServiceTest {
   void setUp() {
     productService =
         new ProductService(
-            productRepository, productAttributeRepository, fiberFacade, eventPublisher);
+            productRepository, productAttributeRepository, fiberFacade, yarnFacade, eventPublisher);
   }
 
   @AfterEach
@@ -100,6 +102,7 @@ class ProductServiceTest {
                     .TEMPLATE_TENANT_ID),
             ProductType.YARN))
         .thenReturn(List.of(yarnProduct));
+    when(yarnFacade.findByProductIds(List.of(productId))).thenReturn(List.of());
 
     // Act
     List<ProductDto> result = productService.findByType(tenantId, ProductType.YARN);

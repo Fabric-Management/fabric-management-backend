@@ -16,6 +16,8 @@ import com.fabricmanagement.product.core.infra.repository.ProductAttributeReposi
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
+import com.fabricmanagement.product.yarn.api.facade.YarnFacade;
+import com.fabricmanagement.product.yarn.dto.YarnArticleSummaryDto;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +41,7 @@ public class ProductService implements ProductFacade {
   private final ProductRepository productRepository;
   private final ProductAttributeRepository productAttributeRepository;
   private final @org.springframework.context.annotation.Lazy FiberFacade fiberFacade;
+  private final @org.springframework.context.annotation.Lazy YarnFacade yarnFacade;
   private final DomainEventPublisher eventPublisher;
 
   /** Create product (internal method). */
@@ -131,6 +134,38 @@ public class ProductService implements ProductFacade {
                 String name = fiberNames.get(p.getId());
                 if (name != null) {
                   p.setDisplayName(name);
+                }
+              });
+    }
+
+    List<UUID> yarnProductIds =
+        products.stream()
+            .filter(p -> ProductType.YARN.equals(p.getProductType()))
+            .map(ProductDto::getId)
+            .toList();
+
+    if (!yarnProductIds.isEmpty()) {
+      Map<UUID, YarnArticleSummaryDto> yarnArticles =
+          yarnFacade.findByProductIds(yarnProductIds).stream()
+              .collect(
+                  Collectors.toMap(
+                      YarnArticleSummaryDto::productId,
+                      article -> article,
+                      (first, duplicate) -> first));
+
+      products.stream()
+          .filter(p -> ProductType.YARN.equals(p.getProductType()))
+          .forEach(
+              p -> {
+                YarnArticleSummaryDto article = yarnArticles.get(p.getId());
+                if (article == null) {
+                  return;
+                }
+                if (article.canonicalDesignation() != null
+                    && !article.canonicalDesignation().isBlank()) {
+                  p.setDisplayName(article.canonicalDesignation());
+                } else if (article.name() != null && !article.name().isBlank()) {
+                  p.setDisplayName(article.name());
                 }
               });
     }

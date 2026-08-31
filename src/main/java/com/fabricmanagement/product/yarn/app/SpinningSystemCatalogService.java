@@ -8,6 +8,8 @@ import com.fabricmanagement.product.yarn.infra.repository.YarnSpinningSystemRepo
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,11 @@ public class SpinningSystemCatalogService {
         TenantContext.requireTenantId());
   }
 
+  @Transactional(readOnly = true)
+  public Page<YarnSpinningSystem> list(Pageable pageable) {
+    return repository.findByTenantIdAndIsActiveTrue(TenantContext.requireTenantId(), pageable);
+  }
+
   @Transactional
   public YarnSpinningSystem update(
       UUID id,
@@ -57,10 +64,18 @@ public class SpinningSystemCatalogService {
   }
 
   @Transactional
-  public void deactivate(UUID id) {
+  public YarnSpinningSystem updateMutable(
+      UUID id, String name, String description, Integer displayOrder) {
+    YarnSpinningSystem system = findOwned(id, TenantContext.requireTenantId());
+    system.update(system.getCode(), name, description, displayOrder, system.getTechnologyFamily());
+    return repository.save(system);
+  }
+
+  @Transactional
+  public YarnSpinningSystem deactivate(UUID id) {
     YarnSpinningSystem system = findOwned(id, TenantContext.requireTenantId());
     system.delete();
-    repository.save(system);
+    return repository.save(system);
   }
 
   private YarnSpinningSystem findOwned(UUID id, UUID tenantId) {

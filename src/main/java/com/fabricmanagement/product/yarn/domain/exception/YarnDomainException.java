@@ -21,11 +21,13 @@ public class YarnDomainException extends ProductDomainException {
   public YarnDomainException(String invariantId, String message) {
     super(message, "YARN_INVARIANT_VIOLATION", 409);
     this.invariantIds = List.of(invariantId);
+    withDetail("invariantIds", this.invariantIds);
   }
 
   public YarnDomainException(List<String> invariantIds, String message) {
     super(message, "YARN_INVARIANT_VIOLATION", 409);
     this.invariantIds = List.copyOf(invariantIds);
+    withDetail("invariantIds", this.invariantIds);
   }
 
   public List<String> getInvariantIds() {

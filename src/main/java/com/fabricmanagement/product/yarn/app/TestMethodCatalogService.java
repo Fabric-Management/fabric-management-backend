@@ -9,6 +9,8 @@ import com.fabricmanagement.product.yarn.infra.repository.YarnTestMethodReposito
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,11 @@ public class TestMethodCatalogService {
         TenantContext.requireTenantId());
   }
 
+  @Transactional(readOnly = true)
+  public Page<YarnTestMethod> list(Pageable pageable) {
+    return repository.findByTenantIdAndIsActiveTrue(TenantContext.requireTenantId(), pageable);
+  }
+
   @Transactional
   public YarnTestMethod update(
       UUID id,
@@ -74,10 +81,25 @@ public class TestMethodCatalogService {
   }
 
   @Transactional
-  public void deactivate(UUID id) {
+  public YarnTestMethod updateMutable(
+      UUID id, String name, String description, Integer displayOrder) {
+    YarnTestMethod method = findOwned(id, TenantContext.requireTenantId());
+    method.update(
+        method.getCode(),
+        name,
+        description,
+        displayOrder,
+        method.getStandardRef(),
+        method.getInstrument(),
+        method.getApplicablePropertyKey());
+    return repository.save(method);
+  }
+
+  @Transactional
+  public YarnTestMethod deactivate(UUID id) {
     YarnTestMethod method = findOwned(id, TenantContext.requireTenantId());
     method.delete();
-    repository.save(method);
+    return repository.save(method);
   }
 
   private YarnTestMethod findOwned(UUID id, UUID tenantId) {

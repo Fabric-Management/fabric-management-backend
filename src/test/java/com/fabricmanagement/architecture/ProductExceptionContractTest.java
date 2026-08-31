@@ -14,6 +14,7 @@ import com.fabricmanagement.production.common.exception.ProductionDomainExceptio
 import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.core.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.core.workorder.domain.exception.WorkOrderDomainException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ProductExceptionContractTest {
@@ -47,6 +48,17 @@ class ProductExceptionContractTest {
     assertThat(forbidden.getMessage()).isEqualTo("read-only");
     assertThat(forbidden.getErrorCode()).isEqualTo("FORBIDDEN_OPERATION");
     assertThat(forbidden.getHttpStatus()).isEqualTo(403);
+  }
+
+  @Test
+  void yarnInvariantConflictCarriesEveryViolationIdAsStructuredDetail() {
+    YarnDomainException yarn =
+        new YarnDomainException(List.of("I7", "I15", "I22"), "activation rejected");
+
+    assertThat(yarn.getHttpStatus()).isEqualTo(409);
+    assertThat(yarn.getErrorCode()).isEqualTo("YARN_INVARIANT_VIOLATION");
+    assertThat(yarn.getInvariantIds()).containsExactly("I7", "I15", "I22");
+    assertThat(yarn.getDetails()).containsEntry("invariantIds", List.of("I7", "I15", "I22"));
   }
 
   @Test

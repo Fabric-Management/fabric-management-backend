@@ -263,6 +263,38 @@ class PermissionTemplateSeederTest {
                     || t.getRoleCode().startsWith("PARTNER_"));
   }
 
+  @Test
+  @DisplayName("YARN-1C: derives yarn read/write grants from fiber and never mirrors approve")
+  void derivesYarnMatrixFromFiberReadWriteRows() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    Set<String> expected =
+        saved.stream()
+            .filter(t -> "fiber".equals(t.getResource()))
+            .filter(t -> Set.of("read", "write").contains(t.getAction()))
+            .map(PermissionTemplateSeederTest::matrixKey)
+            .collect(java.util.stream.Collectors.toSet());
+    Set<String> actual =
+        saved.stream()
+            .filter(t -> "yarn".equals(t.getResource()))
+            .map(PermissionTemplateSeederTest::matrixKey)
+            .collect(java.util.stream.Collectors.toSet());
+
+    assertThat(actual).isEqualTo(expected).isNotEmpty();
+    assertThat(saved)
+        .noneMatch(t -> "yarn".equals(t.getResource()) && "approve".equals(t.getAction()));
+  }
+
+  private static String matrixKey(PermissionTemplate template) {
+    return String.join(
+        "|",
+        template.getRoleCode(),
+        template.getDepartmentCode() == null ? "__ALL__" : template.getDepartmentCode(),
+        template.getAction(),
+        template.getDataScope().name());
+  }
+
   private static PermissionTemplate template(
       String roleCode, String departmentCode, String resource, String action, DataScope scope) {
     PermissionTemplate template =
