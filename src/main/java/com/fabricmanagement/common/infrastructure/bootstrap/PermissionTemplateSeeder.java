@@ -398,7 +398,40 @@ public class PermissionTemplateSeeder {
 
     // Note: MANAGEMENT department removed — ADMIN role provides cross-org access globally.
 
+    mirrorResourceActions(templates, "fiber", "yarn", Set.of("read", "write"));
+
     return templates;
+  }
+
+  /**
+   * Derives a resource matrix from an existing catalogue slice without introducing a second list.
+   * Actions outside the allowlist (notably fiber:approve) are deliberately excluded.
+   */
+  private void mirrorResourceActions(
+      List<PermissionTemplate> templates,
+      String sourceResource,
+      String targetResource,
+      Set<String> actions) {
+    List<PermissionTemplate> derived =
+        templates.stream()
+            .filter(template -> sourceResource.equals(template.getResource()))
+            .filter(template -> actions.contains(template.getAction()))
+            .map(
+                source -> {
+                  PermissionTemplate target =
+                      PermissionTemplate.builder()
+                          .roleCode(source.getRoleCode())
+                          .departmentCode(source.getDepartmentCode())
+                          .resource(targetResource)
+                          .action(source.getAction())
+                          .dataScope(source.getDataScope())
+                          .build();
+                  target.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
+                  target.setIsActive(true);
+                  return target;
+                })
+            .toList();
+    templates.addAll(derived);
   }
 
   private void seedDepartment(

@@ -19,7 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class YarnArticleMigrationIT {
 
-  private static final String MIGRATION_VERSION = "20260831120000";
+  private static final String MIGRATION_VERSION = "20260831150000";
   private static final List<String> TABLES =
       List.of(
           "prod_yarn_article",
@@ -50,6 +50,10 @@ class YarnArticleMigrationIT {
     }
     assertThat(indexDefinition("idx_yarn_article_tenant_canonical_key").toLowerCase())
         .contains("tenant_id", "canonical_key", "canonical_key is not null")
+        .doesNotContain("unique");
+    assertThat(indexDefinition("idx_yarn_article_tenant_tex").toLowerCase())
+        .contains("tenant_id", "resultant_linear_density_tex")
+        .contains("resultant_linear_density_tex is not null")
         .doesNotContain("unique");
     assertThat(indexDefinition("uq_yarn_article_audit_spec_version").toLowerCase())
         .contains("unique", "tenant_id", "article_id", "spec_version_to")

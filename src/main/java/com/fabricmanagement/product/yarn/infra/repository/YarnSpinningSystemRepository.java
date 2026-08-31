@@ -4,6 +4,8 @@ import com.fabricmanagement.product.yarn.domain.reference.YarnSpinningSystem;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +18,8 @@ public interface YarnSpinningSystemRepository extends JpaRepository<YarnSpinning
 
   List<YarnSpinningSystem> findByTenantIdAndIsActiveTrueOrderByDisplayOrderAscCodeAsc(
       UUID tenantId);
+
+  Page<YarnSpinningSystem> findByTenantIdAndIsActiveTrue(UUID tenantId, Pageable pageable);
 
   boolean existsByTenantIdAndCode(UUID tenantId, String code);
 }

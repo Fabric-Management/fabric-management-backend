@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 class YarnArticleAuditReconstructionIT extends YarnArticleIntegrationSupport {
 
@@ -68,6 +70,19 @@ class YarnArticleAuditReconstructionIT extends YarnArticleIntegrationSupport {
             YarnArticleAuditEventType.METADATA_UPDATED,
             YarnArticleAuditEventType.ACTIVATED);
     assertThat(audits).extracting(YarnArticleAudit::getCreatedBy).containsOnly(fixture.actorId());
+
+    var history =
+        service.history(
+            article.getId(), PageRequest.of(0, 3, Sort.by(Sort.Direction.ASC, "createdAt")));
+    assertThat(history.getContent()).hasSize(3);
+    assertThat(history.getTotalElements()).isEqualTo(audits.size());
+    assertThat(
+            service
+                .historyVersion(article.getId(), 3)
+                .specAfter()
+                .path("articleSpecVersion")
+                .asInt())
+        .isEqualTo(3);
   }
 
   @Test

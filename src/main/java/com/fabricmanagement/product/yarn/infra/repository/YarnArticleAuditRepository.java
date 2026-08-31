@@ -5,6 +5,8 @@ import com.fabricmanagement.product.yarn.domain.article.YarnArticleAuditEventTyp
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -13,6 +15,9 @@ public interface YarnArticleAuditRepository extends JpaRepository<YarnArticleAud
 
   List<YarnArticleAudit> findByTenantIdAndArticle_IdOrderByCreatedAtAsc(
       UUID tenantId, UUID articleId);
+
+  Page<YarnArticleAudit> findByTenantIdAndArticle_Id(
+      UUID tenantId, UUID articleId, Pageable pageable);
 
   Optional<YarnArticleAudit> findByTenantIdAndArticle_IdAndEventTypeInAndSpecVersionTo(
       UUID tenantId, UUID articleId, List<YarnArticleAuditEventType> eventTypes, int specVersionTo);
