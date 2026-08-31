@@ -16,4 +16,7 @@ public interface FiberCategoryRepository extends JpaRepository<FiberCategory, UU
 
   /** Find by category code (e.g. NATURAL_PLANT). Used for fiber_type mapping. */
   Optional<FiberCategory> findByCategoryCode(String categoryCode);
+
+  /** Exact tenant-owned category lookup used by write paths; never relies on shared-read RLS. */
+  Optional<FiberCategory> findByTenantIdAndCategoryCode(UUID tenantId, String categoryCode);
 }

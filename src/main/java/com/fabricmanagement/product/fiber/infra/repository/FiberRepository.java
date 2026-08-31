@@ -2,6 +2,7 @@ package com.fabricmanagement.product.fiber.infra.repository;
 
 import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberStatus;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,6 +15,9 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
 
   /** Find fiber by tenant and ID. */
   Optional<Fiber> findByTenantIdAndId(UUID tenantId, UUID id);
+
+  boolean existsByTenantIdAndFiberIsoCode_IdAndMaterialSourceAndIsActiveTrue(
+      UUID tenantId, UUID fiberIsoCodeId, MaterialSource materialSource);
 
   /**
    * Find fiber by product ID.

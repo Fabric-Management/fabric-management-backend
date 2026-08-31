@@ -2,6 +2,7 @@ package com.fabricmanagement.product.fiber.dto;
 
 import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberStatus;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class FiberDto {
   private FiberCategoryDto category;
   private FiberIsoCodeDto isoCode;
   private String fiberName;
+  private MaterialSource materialSource;
   private FiberStatus status;
   private String remarks;
   private Boolean isActive;
@@ -58,6 +60,7 @@ public class FiberDto {
                 ? FiberIsoCodeDto.from(entity.getFiberIsoCode())
                 : null)
         .fiberName(entity.getFiberName())
+        .materialSource(entity.getMaterialSource())
         .status(entity.getStatus())
         .composition(entity.getComposition())
         .remarks(entity.getRemarks())

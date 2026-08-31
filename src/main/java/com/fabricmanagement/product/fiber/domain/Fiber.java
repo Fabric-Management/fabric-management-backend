@@ -2,6 +2,7 @@ package com.fabricmanagement.product.fiber.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.product.core.domain.Product;
+import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
@@ -31,7 +32,7 @@ import org.hibernate.annotations.Type;
     })
 @Getter
 @Setter
-@Builder
+@Builder(access = AccessLevel.PRIVATE)
 @NoArgsConstructor
 @AllArgsConstructor
 public class Fiber extends BaseEntity {
@@ -63,6 +64,11 @@ public class Fiber extends BaseEntity {
 
   @Column(name = "fiber_name", nullable = false, length = 255)
   private String fiberName;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "material_source", length = 20)
+  @Setter(AccessLevel.NONE)
+  private MaterialSource materialSource;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
@@ -102,16 +108,48 @@ public class Fiber extends BaseEntity {
   }
 
   public static Fiber createPureFiber(
-      Product product, FiberCategory fiberCategory, FiberIsoCode fiberIsoCode, String fiberName) {
+      Product product,
+      FiberCategory fiberCategory,
+      FiberIsoCode fiberIsoCode,
+      String fiberName,
+      MaterialSource materialSource) {
 
     return Fiber.builder()
         .product(product)
         .fiberCategory(fiberCategory)
         .fiberIsoCode(fiberIsoCode)
         .fiberName(fiberName)
+        .materialSource(materialSource)
         .composition(new HashMap<>())
         .status(FiberStatus.ACTIVE)
         .build();
+  }
+
+  /**
+   * Declares the origin of a legacy pure fiber exactly once.
+   *
+   * <p>The only supported transition is {@code null -> VIRGIN|RECYCLED}. Changing or clearing an
+   * existing declaration would rewrite the identity of every referencing yarn specification.
+   */
+  public void declareMaterialSource(MaterialSource source) {
+    if (source == null) {
+      throw new FiberDomainException(
+          "Material source declaration requires a value", "FIBER_MATERIAL_SOURCE_REQUIRED", 409);
+    }
+    if (isBlended()) {
+      throw new FiberDomainException(
+          "A blended fiber cannot carry one material source",
+          "FIBER_BLEND_MATERIAL_SOURCE_FORBIDDEN",
+          400);
+    }
+    if (materialSource != null) {
+      throw new FiberDomainException(
+          "Material source is immutable once declared",
+          "FIBER_MATERIAL_SOURCE_IMMUTABLE",
+          409,
+          new Object[] {materialSource, source});
+    }
+    materialSource = source;
   }
 
   public static Fiber createBlendedFiber(
