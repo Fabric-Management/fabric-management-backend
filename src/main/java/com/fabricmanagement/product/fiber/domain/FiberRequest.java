@@ -39,6 +39,11 @@ public class FiberRequest extends BaseEntity {
   @Column(name = "fiber_type", nullable = false, length = 50)
   private String fiberType;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "material_source", length = 20)
+  @Setter(AccessLevel.NONE)
+  private MaterialSource materialSource;
+
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
 

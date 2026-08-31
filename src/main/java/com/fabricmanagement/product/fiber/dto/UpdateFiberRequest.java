@@ -1,5 +1,6 @@
 package com.fabricmanagement.product.fiber.dto;
 
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -27,6 +28,9 @@ public class UpdateFiberRequest {
 
   @NotBlank(message = "Fiber name is required")
   private String fiberName;
+
+  /** Null means no change; a value declares a previously undeclared pure fiber exactly once. */
+  private MaterialSource materialSource;
 
   private Map<UUID, BigDecimal> composition;
 

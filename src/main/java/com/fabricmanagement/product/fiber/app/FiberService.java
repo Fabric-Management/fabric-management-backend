@@ -10,7 +10,9 @@ import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.product.fiber.app.port.FiberUsagePort;
 import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberStatus;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import com.fabricmanagement.product.fiber.domain.event.FiberCreatedEvent;
+import com.fabricmanagement.product.fiber.domain.event.FiberMaterialSourceDeclaredEvent;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.fiber.domain.exception.RecipeInUseException;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
@@ -69,6 +71,13 @@ public class FiberService implements FiberFacade {
   public FiberDto createFiber(CreateFiberRequest request) {
     boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
     log.info("Creating {} fiber: name={}", isBlended ? "blended" : "pure", request.getFiberName());
+
+    if (isBlended && request.getMaterialSource() != null) {
+      throw new FiberDomainException(
+          "A blended fiber cannot carry one material source",
+          "FIBER_BLEND_MATERIAL_SOURCE_FORBIDDEN",
+          400);
+    }
 
     UUID tenantId = TenantContext.requireTenantId();
 
@@ -162,7 +171,8 @@ public class FiberService implements FiberFacade {
       fiber =
           Fiber.createBlendedFiber(product, category, isoCode, fiberName, request.getComposition());
     } else {
-      fiber = Fiber.createPureFiber(product, category, isoCode, fiberName);
+      fiber =
+          Fiber.createPureFiber(product, category, isoCode, fiberName, request.getMaterialSource());
     }
 
     fiber.setRemarks(request.getRemarks());
@@ -430,6 +440,19 @@ public class FiberService implements FiberFacade {
 
     fiber.update(request.getFiberName(), request.getRemarks());
 
+    MaterialSource declaredSource = request.getMaterialSource();
+    boolean compositionBecomesBlend =
+        request.getComposition() != null && !request.getComposition().isEmpty();
+    if (compositionBecomesBlend && (declaredSource != null || fiber.getMaterialSource() != null)) {
+      throw new FiberDomainException(
+          "A blended fiber cannot carry one material source",
+          "FIBER_BLEND_MATERIAL_SOURCE_FORBIDDEN",
+          400);
+    }
+    if (declaredSource != null) {
+      fiber.declareMaterialSource(declaredSource);
+    }
+
     // Composition (recipe) change requires extra guards:
     // 1) Block if batches are RESERVED or IN_PROGRESS on the production floor
     // (immutability rule)
@@ -444,6 +467,16 @@ public class FiberService implements FiberFacade {
     }
 
     Fiber saved = fiberRepository.save(fiber);
+
+    if (declaredSource != null) {
+      UUID actorId =
+          TenantContext.getCurrentUserId() != null
+              ? TenantContext.getCurrentUserId()
+              : TenantContext.SYSTEM_ACTOR_ID;
+      eventPublisher.publish(
+          new FiberMaterialSourceDeclaredEvent(
+              saved.getTenantId(), saved.getId(), null, declaredSource, actorId));
+    }
 
     log.info("Fiber updated: id={}", saved.getId());
 

@@ -1,5 +1,6 @@
 package com.fabricmanagement.product.fiber.dto;
 
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -64,6 +65,9 @@ public class CreateFiberRequest {
 
   @NotBlank(message = "Fiber name is required")
   private String fiberName;
+
+  /** Declared origin for a pure fiber; forbidden when composition is non-empty. */
+  private MaterialSource materialSource;
 
   /**
    * Composition map: baseFiberId → percentage (optional).

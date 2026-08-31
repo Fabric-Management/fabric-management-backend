@@ -2,6 +2,7 @@ package com.fabricmanagement.product.fiber.dto;
 
 import com.fabricmanagement.product.fiber.domain.FiberRequest;
 import com.fabricmanagement.product.fiber.domain.FiberRequestStatus;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,7 @@ public class FiberRequestDto {
   private String isoCode;
   private String fiberName;
   private String fiberType;
+  private MaterialSource materialSource;
   private String description;
   private FiberRequestStatus status;
   private UUID reviewedBy;
@@ -54,6 +56,7 @@ public class FiberRequestDto {
         .isoCode(entity.getIsoCode())
         .fiberName(entity.getFiberName())
         .fiberType(entity.getFiberType())
+        .materialSource(entity.getMaterialSource())
         .description(entity.getDescription())
         .status(entity.getStatus())
         .reviewedBy(entity.getReviewedBy())

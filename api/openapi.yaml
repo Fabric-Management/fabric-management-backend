@@ -53122,6 +53122,11 @@ components:
         fiberName:
           type: string
           minLength: 1
+        materialSource:
+          type: string
+          enum:
+          - VIRGIN
+          - RECYCLED
         productId:
           type: string
           format: uuid
@@ -53153,6 +53158,11 @@ components:
           type: string
           maxLength: 20
           minLength: 0
+        materialSource:
+          type: string
+          enum:
+          - VIRGIN
+          - RECYCLED
       required:
       - fiberName
       - fiberType
@@ -55500,6 +55510,11 @@ components:
           type: boolean
         isoCode:
           $ref: "#/components/schemas/FiberIsoCodeDto"
+        materialSource:
+          type: string
+          enum:
+          - VIRGIN
+          - RECYCLED
         productId:
           type: string
           format: uuid
@@ -55761,6 +55776,11 @@ components:
           format: uuid
         isoCode:
           type: string
+        materialSource:
+          type: string
+          enum:
+          - VIRGIN
+          - RECYCLED
         requestedBy:
           type: string
           format: uuid
@@ -63890,6 +63910,11 @@ components:
         fiberName:
           type: string
           minLength: 1
+        materialSource:
+          type: string
+          enum:
+          - VIRGIN
+          - RECYCLED
         remarks:
           type: string
         version:

@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -19,6 +21,16 @@ public interface FiberIsoCodeRepository extends JpaRepository<FiberIsoCode, UUID
   List<FiberIsoCode> findByIsOfficialIsoTrueAndIsActiveTrue();
 
   Optional<FiberIsoCode> findByIsoCode(String isoCode);
+
+  /** Exact tenant-owned ISO lookup used by write paths; never relies on shared-read RLS. */
+  Optional<FiberIsoCode> findByTenantIdAndIsoCodeIgnoreCase(UUID tenantId, String isoCode);
+
+  /** Serializes creation of one semantic ISO code inside the current transaction. */
+  @Query(
+      value =
+          "SELECT pg_advisory_xact_lock(hashtext(CAST(:tenantId AS text) || ':' || upper(:isoCode)))",
+      nativeQuery = true)
+  void acquireCreationLock(@Param("tenantId") UUID tenantId, @Param("isoCode") String isoCode);
 
   /** Case-insensitive check: ISO code already exists in catalog. */
   boolean existsByIsoCodeIgnoreCase(String isoCode);
