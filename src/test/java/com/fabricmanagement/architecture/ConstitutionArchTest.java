@@ -663,6 +663,23 @@ class ConstitutionArchTest {
 
       rule.check(allClasses);
     }
+
+    @Test
+    @DisplayName("ADR-0012 D6: platform/ai declares tool schemas without product imports")
+    void aiModuleShouldNotDependOnProduct() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.platform.ai..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.product..")
+              .as(
+                  "ADR-0012 D6: platform/ai may name product tools but must discover their"
+                      + " implementations through AIToolProvider");
+
+      rule.check(allClasses);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════

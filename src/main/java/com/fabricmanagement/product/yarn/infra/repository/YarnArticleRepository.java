@@ -15,6 +15,10 @@ public interface YarnArticleRepository
 
   Optional<YarnArticle> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  Optional<YarnArticle> findByTenantIdAndUidIgnoreCase(UUID tenantId, String uid);
+
+  List<YarnArticle> findByTenantIdAndNameIgnoreCaseOrderByCreatedAtAsc(UUID tenantId, String name);
+
   Optional<YarnArticle> findByTenantIdAndProduct_Id(UUID tenantId, UUID productId);
 
   List<YarnArticle> findByTenantIdAndProduct_IdIn(UUID tenantId, Collection<UUID> productIds);

@@ -52,9 +52,13 @@ public class SystemPrompts {
     prompt.append("## Functions:\n");
     prompt.append("- smart_search(query): Auto-detect FIBER/YARN/FABRIC (USE THIS FIRST)\n");
     prompt.append("- search_fibers(query): Search fibers only\n");
+    prompt.append(
+        "- search_yarns(query, status?): Search yarn articles without parsing designations\n");
+    prompt.append("- get_yarn_info/list_yarn_vocabularies: Read yarn details and vocabularies\n");
     prompt.append("- search_products(query): Search products only\n");
     prompt.append("- check_product_stock(productName): Check inventory\n");
-    prompt.append("- create_product/create_fiber: Create entities (ask confirmation)\n\n");
+    prompt.append(
+        "- create_product/create_fiber/create_yarn_article: Create entities (ask confirmation)\n\n");
 
     prompt.append("## Entity Detection:\n");
     prompt.append("- Base name (pamuk, polyester) → FIBER\n");
@@ -68,6 +72,7 @@ public class SystemPrompts {
     prompt.append("## Creation:\n");
     prompt.append("- Product: type (FIBER/YARN/FABRIC) + unit (kg/m)\n");
     prompt.append("- Fiber: name + category (Product auto-created)\n");
+    prompt.append("- Yarn article: create a DRAFT shell; capture source designation verbatim\n");
     prompt.append("- Always ask confirmation before creating\n\n");
 
     prompt.append("## Confirmations:\n");

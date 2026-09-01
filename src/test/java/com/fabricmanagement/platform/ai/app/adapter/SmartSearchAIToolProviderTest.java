@@ -54,15 +54,15 @@ class SmartSearchAIToolProviderTest {
   }
 
   @Test
-  @DisplayName("Should delegate to search_products with YARN type when YARN detected")
-  void shouldDelegateToProductWithYarnType() {
+  @DisplayName("Should delegate to search_yarns when YARN detected")
+  void shouldDelegateToYarnArticles() {
     Map<String, Object> params = Map.of("query", "30/1 yarn");
-    when(mockRegistry.execute(eq(tenantId), eq("search_products"), any())).thenReturn("Yarn info");
+    when(mockRegistry.execute(eq(tenantId), eq("search_yarns"), any())).thenReturn("Yarn info");
 
     String result = provider.execute(tenantId, "smart_search", params);
 
     assertTrue(result.contains("Yarn info"));
-    verify(mockRegistry).execute(eq(tenantId), eq("search_products"), any());
+    verify(mockRegistry).execute(eq(tenantId), eq("search_yarns"), eq(params));
   }
 
   @Test

@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.ai;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -89,5 +90,47 @@ public class AIQueryNormalizer {
 
     // If translation occurred, return normalized; otherwise return original
     return result.equals(lowerQuery) ? query : result;
+  }
+
+  /**
+   * Normalize a yarn search query without interpreting any yarn designation.
+   *
+   * <p>This method exists only to improve read-side search recall. Yarn-specific phrases are
+   * replaced before composing {@link #normalizeFiberQuery(String)} so words such as {@code
+   * elastanli} are not partially consumed by the fiber dictionary. Numeric and symbolic yarn
+   * designations are deliberately left untouched and this method must never be used on a write
+   * path.
+   *
+   * @param query original yarn search query
+   * @return lower-case query with Turkish yarn and fiber words normalized to English
+   */
+  public String normalizeYarnQuery(String query) {
+    if (query == null || query.isBlank()) {
+      return query;
+    }
+
+    String normalized = query.toLowerCase().trim();
+    Map<String, String> translations = new LinkedHashMap<>();
+
+    // Longest and most specific phrases must be replaced before their component words.
+    translations.put("hava jetli", "air jet");
+    translations.put("open-end", "rotor");
+    translations.put("tek kat", "single");
+    translations.put("elastanlı", "core spun");
+    translations.put("puntalı", "intermingled");
+    translations.put("penye", "combed");
+    translations.put("karde", "carded");
+    translations.put("büküm", "twist");
+    translations.put("katlı", "plied");
+    translations.put("numara", "count");
+    translations.put("kalın", "coarse");
+    translations.put("ince", "fine");
+    translations.put("iplik", "yarn");
+
+    for (Map.Entry<String, String> entry : translations.entrySet()) {
+      normalized = normalized.replace(entry.getKey(), entry.getValue());
+    }
+
+    return normalizeFiberQuery(normalized);
   }
 }

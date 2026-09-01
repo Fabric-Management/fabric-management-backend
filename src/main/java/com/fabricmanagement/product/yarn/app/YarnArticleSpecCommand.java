@@ -37,9 +37,28 @@ public record YarnArticleSpecCommand(
 
   /** Empty, intentionally incomplete draft spec used when create omits its optional spec. */
   public static YarnArticleSpecCommand empty() {
+    return draftCapture(null);
+  }
+
+  /** Empty canonical spec that captures supplier wording without parsing or normalization. */
+  public static YarnArticleSpecCommand draftCapture(String sourceDesignation) {
     return new YarnArticleSpecCommand(
-        null, null, null, null, null, null, null, null, null, null, null, null, Set.of(), List.of(),
-        List.of(), List.of());
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        sourceDesignation,
+        null,
+        null,
+        null,
+        null,
+        Set.of(),
+        List.of(),
+        List.of(),
+        List.of());
   }
 
   public YarnArticleSpecCommand {
