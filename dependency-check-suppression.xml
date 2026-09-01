@@ -23,12 +23,4 @@
         <cve>CVE-2026-53914</cve>
     </suppress>
 
-    <suppress until="2026-10-01Z">
-        <notes>CVE-2026-66299 affects only the Apache Tomcat WebSocket chat example. This Spring Boot
-        embedded deployment does not package webapps/examples. Remove this suppression after Tomcat
-        10.1.58 is released and adopted.</notes>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat-embed-(core|websocket)@10\.1\.57$</packageUrl>
-        <cve>CVE-2026-66299</cve>
-    </suppress>
-
 </suppressions>
