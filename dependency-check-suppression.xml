@@ -16,10 +16,12 @@
         metadata deserialization; vendor score 6.7). This Maven/Java service does not use that
         plugin and contains no Gradle build path; it only receives Kotlin runtime stdlib
         artifacts transitively through OpenTelemetry -> OkHttp. Dependency-Check issue #8749
-        records the same stdlib match as a broad-CPE false positive. Versions pinned on purpose
+        records the same stdlib match as a broad-CPE false positive. Enumeration derived from the
+        Dependency-Check JSON report of the sec-depcheck-1 run (2026-09-02): the tree contains
+        kotlin-stdlib, kotlin-stdlib-common and kotlin-stdlib-jdk7 only. Versions pinned on purpose
         (see the CVE-2020-29582 rule). Remove once NVD narrows the CPE or the transitive stdlib
         moves past the flagged coordinates.</notes>
-        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/(kotlin-stdlib@2\.2\.21|kotlin-stdlib-common@1\.9\.10)$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/(kotlin-stdlib@2\.2\.21|kotlin-stdlib-jdk7@2\.2\.21|kotlin-stdlib-common@1\.9\.10)$</packageUrl>
         <cve>CVE-2026-53914</cve>
     </suppress>
 
