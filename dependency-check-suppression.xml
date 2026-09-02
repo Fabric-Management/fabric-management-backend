@@ -26,4 +26,56 @@
         <cve>CVE-2026-53914</cve>
     </suppress>
 
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47892 and
+        CVE-2026-47893; both exploit paths require Spring WebFlux. This service uses the servlet
+        stack and the 2026-09-02 Dependency-Check report contains no spring-webflux artifact.
+        DependencySecurityAssumptionsTest fails if the reactive RouterFunction becomes loadable.
+        Remove this rule after the Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47892</cve>
+        <cve>CVE-2026-47893</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-59313 when Spring MVC
+        functional endpoints stream attacker-controlled plain-text SSE data. This service uses
+        classic SseEmitter and no production class depends on org.springframework.web.servlet.function.
+        DependencySecurityAssumptionsTest guards that package boundary. Remove this rule after the
+        Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-59313</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-59283 when
+        SimpleEvaluationContext is used with compiled SpEL expressions. Neither the relevant Java
+        APIs nor spring.expression.compiler.mode appear in this repository.
+        DependencySecurityAssumptionsTest guards both facts. Remove this rule after the Spring Boot
+        4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-59283</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Security 6.5.0-6.5.11 is affected by CVE-2026-59270 when the embedded
+        UnboundID LDAP server is configured and reachable. This service has neither the UnboundID
+        server on its classpath nor spring.ldap.embedded configuration.
+        DependencySecurityAssumptionsTest guards both facts. Remove this rule after the Spring Boot
+        4 / Spring Security 7.0.7 or 7.1.1 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(config|core|crypto|web)@6\.5\.11$</packageUrl>
+        <cve>CVE-2026-59270</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Cloud Commons 4.3.0-4.3.3 is affected by CVE-2026-59284 when writable
+        /actuator/env is enabled without a property-key allow-list. The committed base allow-list
+        excludes env and wildcard, and no application profile widens that exposure;
+        DependencySecurityAssumptionsTest guards that repository-owned configuration. If env is
+        deliberately exposed, configure management.endpoint.env.post.valid-keys-regex and reassess
+        this rule. Remove it after the Spring Boot 4 / Spring Cloud Commons 5.0.3 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.cloud/spring-cloud-(commons|context|starter)@4\.3\.3$</packageUrl>
+        <cve>CVE-2026-59284</cve>
+    </suppress>
+
 </suppressions>
