@@ -1,0 +1,22 @@
+name: Suppression Hygiene
+
+on:
+  schedule:
+    # Scheduled runs are best-effort: GitHub may delay, drop, or disable them. Public repositories
+    # may also have schedules disabled after 60 days without activity. PR CI is the backstop.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expiry:
+    name: Suppression expiry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Check suppressions expiring within 30 days
+        run: python3 scripts/check-suppression-expiry.py --warn-days 30

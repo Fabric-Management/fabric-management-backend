@@ -23,6 +23,8 @@ step() {
   "$@" || { echo "✗ FAILED: $*"; fail=1; }
 }
 
+step python3 scripts/check-suppression-expiry.py --warn-days 0
+
 echo "== Code Quality Checks =="
 step "$MVN" fmt:check
 step "$MVN" checkstyle:check
