@@ -1,51 +1,29 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
-
-
-    <suppress until="2026-09-01Z">
-        <notes>alpha, sadece iç telemetri, saldırı yüzeyi değil; stabil sürümde düşecek</notes>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*$</packageUrl>
-        <cve>CVE-2026-39883</cve>
-        <cve>CVE-2026-39882</cve>
-    </suppress>
-
-    <suppress until="2026-11-01Z">
-        <notes>CVE-2026-41178 affects baggage-header parsing in the Go implementation of
-        OpenTelemetry. This service uses the Java semantic-conventions artifact, which is matched
-        only through a broad OpenTelemetry CPE and does not contain the affected Go parser.</notes>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@1\.43\.0$</packageUrl>
-        <cve>CVE-2026-41178</cve>
-    </suppress>
-
-    <suppress until="2026-09-01Z">
-        <notes>Logback aktif logger; log4j-api sadece transitive, ulaşılamaz</notes>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/.*$</packageUrl>
-        <cve>CVE-2026-34479</cve>
-        <cve>CVE-2026-34477</cve>
-    </suppress>
-
-    <suppress until="2026-09-01Z">
-        <notes>1.9.25'i etkilemeyen 2020 false positive</notes>
-        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib.*$</packageUrl>
+    <suppress until="2026-12-01Z">
+        <notes>GHSA-cqj8-47ch-rvvq (CVE-2020-29582) affects Kotlin through 1.4.20, fixed in
+        1.4.21. kotlin-stdlib-common 1.9.10 arrives transitively through OkHttp -> Okio and is
+        outside the affected range; the match comes from the broad NVD JetBrains Kotlin CPE.
+        The version is pinned on purpose: this rule must stop matching the moment the artifact
+        moves, so the assessment is redone rather than inherited.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib-common@1\.9\.10$</packageUrl>
         <cve>CVE-2020-29582</cve>
     </suppress>
 
-    <suppress until="2026-09-01Z">
-        <notes>CVE is currently matched against Kotlin stdlib artifacts by broad JetBrains CPE.
-        This Java service only receives Kotlin transitively through OkHttp/OpenTelemetry; stdlib is
-        pinned to the current managed version and should be rechecked when JetBrains publishes a
-        narrower advisory or fixed coordinate.</notes>
-        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib.*$</packageUrl>
+    <suppress until="2026-12-01Z">
+        <notes>CVE-2026-53914 affects org.jetbrains.kotlin:kotlin-gradle-plugin (build-cache
+        metadata deserialization; vendor score 6.7). This Maven/Java service does not use that
+        plugin and contains no Gradle build path; it only receives Kotlin runtime stdlib
+        artifacts transitively through OpenTelemetry -> OkHttp. Dependency-Check issue #8749
+        records the same stdlib match as a broad-CPE false positive. Enumeration derived from the
+        dependencies[].packages and relatedDependencies[].packageIds entries in the
+        Dependency-Check JSON reports of the sec-depcheck-1 runs (2026-09-02): the tree contains
+        kotlin-stdlib, kotlin-stdlib-common, kotlin-stdlib-jdk7 and kotlin-stdlib-jdk8 only. Versions
+        pinned on purpose (see the CVE-2020-29582 rule). Remove once NVD narrows the CPE or the
+        transitive stdlib moves past the flagged coordinates.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/(kotlin-stdlib@2\.2\.21|kotlin-stdlib-jdk7@2\.2\.21|kotlin-stdlib-jdk8@2\.2\.21|kotlin-stdlib-common@1\.9\.10)$</packageUrl>
         <cve>CVE-2026-53914</cve>
-    </suppress>
-
-    <suppress until="2026-10-01Z">
-        <notes>CVE-2026-66299 affects only the Apache Tomcat WebSocket chat example. This Spring Boot
-        embedded deployment does not package webapps/examples. Remove this suppression after Tomcat
-        10.1.58 is released and adopted.</notes>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat-embed-(core|websocket)@10\.1\.57$</packageUrl>
-        <cve>CVE-2026-66299</cve>
     </suppress>
 
 </suppressions>
