@@ -21,7 +21,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.util.ClassUtils;
 
 /**
- * Guards the repository-owned assumptions behind the temporary SEC-SPRING-1 suppressions.
+ * Guards the repository-owned assumptions behind the temporary Spring suppressions.
  *
  * <p>The classpath and source checks describe what this codebase depends on. The YAML checks
  * describe what its committed profiles request; external configuration can still override those
@@ -44,9 +44,20 @@ class DependencySecurityAssumptionsTest {
                 "org.springframework.web.reactive.function.server.RouterFunction",
                 getClass().getClassLoader()))
         .as(
-            "CVE-2026-47892/CVE-2026-47893: Spring WebFlux must remain absent while these"
-                + " version-pinned suppressions are active")
+            "CVE-2026-47891/CVE-2026-47892/CVE-2026-47893: Spring WebFlux must remain absent"
+                + " while these version-pinned suppressions are active")
         .isFalse();
+  }
+
+  @Test
+  void sseViewFragmentsMustRemainUnused() {
+    assertNoProductionDependency(
+        "org.springframework.web.servlet.ModelAndView",
+        "CVE-2026-47890: ModelAndView usage requires a new SSE vulnerability assessment");
+    assertNoProductionDependency(
+        "org.springframework.web.servlet.view.FragmentsRendering",
+        "CVE-2026-47890: Spring MVC view fragments require a new SSE vulnerability"
+            + " assessment");
   }
 
   @Test
@@ -84,6 +95,34 @@ class DependencySecurityAssumptionsTest {
                 + " application profiles")
         .noneMatch(
             property -> isPropertyOrDescendant(property.name(), "spring.expression.compiler.mode"));
+  }
+
+  @Test
+  void selfPopulatingListsMustRemainUnused() {
+    assertNoProductionDependency(
+        "org.springframework.util.AutoPopulatingList",
+        "CVE-2026-59282: AutoPopulatingList requires a new data-binding vulnerability"
+            + " assessment");
+    assertNoProductionDependency(
+        "org.apache.commons.collections4.list.LazyList",
+        "CVE-2026-59282: Commons Collections LazyList requires a new data-binding"
+            + " vulnerability assessment");
+    assertNoProductionDependency(
+        "org.apache.commons.collections.list.LazyList",
+        "CVE-2026-59282: legacy Commons Collections LazyList requires a new data-binding"
+            + " vulnerability assessment");
+
+    ArchRule customListRule =
+        noClasses()
+            .that()
+            .resideInAPackage(APPLICATION_PACKAGE)
+            .should()
+            .beAssignableTo(List.class)
+            .as(
+                "CVE-2026-59282: production-defined List implementations require a new"
+                    + " data-binding vulnerability assessment");
+
+    customListRule.check(APPLICATION_CLASSES);
   }
 
   @Test
@@ -162,7 +201,7 @@ class DependencySecurityAssumptionsTest {
     }
 
     assertThat(yamlFiles)
-        .as("SEC-SPRING-1: application*.yml profiles must be discovered dynamically")
+        .as("Spring suppression guards: application*.yml profiles must be discovered dynamically")
         .isNotEmpty();
 
     return yamlFiles.stream().flatMap(DependencySecurityAssumptionsTest::loadYaml).toList();

@@ -27,14 +27,27 @@
     </suppress>
 
     <suppress until="2026-12-01Z">
-        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47892 and
-        CVE-2026-47893; both exploit paths require Spring WebFlux. This service uses the servlet
-        stack and the 2026-09-02 Dependency-Check report contains no spring-webflux artifact.
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47891,
+        CVE-2026-47892 and CVE-2026-47893; all three exploit paths require Spring WebFlux, and
+        CVE-2026-47891 additionally requires the Aalto XML processor. This service uses the servlet
+        stack and the 2026-09-02 Dependency-Check reports contain no spring-webflux artifact.
         DependencySecurityAssumptionsTest fails if the reactive RouterFunction becomes loadable.
         Remove this rule after the Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47891</cve>
         <cve>CVE-2026-47892</cve>
         <cve>CVE-2026-47893</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47890 when
+        attacker-controlled data is rendered as view fragments over SSE. This service uses
+        SseEmitter only for structured MFA event and Map payloads; no production class depends on
+        ModelAndView or FragmentsRendering. DependencySecurityAssumptionsTest guards both view
+        APIs while leaving ordinary SseEmitter payloads available. Remove this rule after the
+        Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47890</cve>
     </suppress>
 
     <suppress until="2026-12-01Z">
@@ -55,6 +68,17 @@
         4 / Spring Framework 7.0.9 migration.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
         <cve>CVE-2026-59283</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-59282 when
+        user-controlled property paths are data-bound into a self-populating List whose elements
+        expose nested properties. This repository uses neither Spring AutoPopulatingList nor the
+        Commons Collections LazyList variants and defines no production List implementation.
+        DependencySecurityAssumptionsTest guards those assumptions. Remove this rule after the
+        Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-59282</cve>
     </suppress>
 
     <suppress until="2026-12-01Z">
