@@ -32,7 +32,7 @@
         <!-- Spring & Framework Versions -->
         <!-- TODO: remove when Spring Boot >= 3.5.15 ships with Framework 6.2.19 -->
         <spring-framework.version>6.2.19</spring-framework.version>
-        <spring-modulith.version>1.4.12</spring-modulith.version>
+        <spring-modulith.version>1.4.13</spring-modulith.version>
         <spring-cloud.version>2025.0.3</spring-cloud.version>
 
         <!-- Database Versions -->
@@ -48,7 +48,7 @@
 
         <!-- Testing Versions -->
         <testcontainers.version>1.21.4</testcontainers.version>
-        <archunit.version>1.4.2</archunit.version>
+        <archunit.version>1.5.0</archunit.version>
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
@@ -66,7 +66,7 @@
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <google-java-format.version>1.19.2</google-java-format.version>
         <checkstyle.version>10.26.1</checkstyle.version>
-        <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.4.0</spotbugs-maven-plugin.version>
         <!-- Ratchet upward as coverage improves; the project target remains 0.80. -->
         <jacoco.coverage.minimum>0.40</jacoco.coverage.minimum>
 
@@ -428,7 +428,7 @@
             <dependency>
                 <groupId>org.webjars</groupId>
                 <artifactId>swagger-ui</artifactId>
-                <version>5.32.13</version>
+                <version>5.32.14</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
@@ -476,7 +476,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.15.0</version>
+                <version>3.16.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
