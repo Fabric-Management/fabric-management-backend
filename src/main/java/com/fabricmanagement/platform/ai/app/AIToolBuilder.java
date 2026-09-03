@@ -104,6 +104,51 @@ public class AIToolBuilder {
                                 "Search query to find fibers. Preserve technical terms EXACTLY.")),
                 "required", List.of("query"))),
         buildTool(
+            "search_yarns",
+            "Search tenant yarn articles by name or supplier/canonical designation. Use this for yarn-specific searches; Turkish textile words are normalized for recall while designations remain unchanged.",
+            Map.of(
+                "type", "object",
+                "properties",
+                    Map.of(
+                        "query",
+                            Map.of(
+                                "type", "string",
+                                "description",
+                                    "Yarn search query. Preserve count and symbolic designations exactly, for example 'Ne 30/2'."),
+                        "status",
+                            Map.of(
+                                "type", "string",
+                                "description",
+                                    "Optional article status filter: DRAFT, ACTIVE, or OBSOLETE.")),
+                "required", List.of("query"))),
+        buildTool(
+            "get_yarn_info",
+            "Get complete details for one yarn article, including composition snapshots, structure, twist stages, and duplicate advice. Provide exactly one identifier.",
+            Map.of(
+                "type", "object",
+                "properties",
+                    Map.of(
+                        "uid",
+                            Map.of(
+                                "type", "string",
+                                "description", "Exact YarnArticle UID."),
+                        "name",
+                            Map.of(
+                                "type", "string",
+                                "description", "Exact yarn article name."),
+                        "productId",
+                            Map.of(
+                                "type", "string",
+                                "description", "Exact bound Product UUID.")),
+                "required", List.of())),
+        buildTool(
+            "list_yarn_vocabularies",
+            "List the canonical yarn enum vocabularies and the tenant's spinning-system, end-use, and twist-test-method catalogues.",
+            Map.of(
+                "type", "object",
+                "properties", Map.of(),
+                "required", List.of())),
+        buildTool(
             "list_fiber_categories",
             "List all available fiber categories. Use this when user wants to create a fiber and needs to select a category.",
             Map.of(
@@ -163,7 +208,34 @@ public class AIToolBuilder {
                                 "description", "Additional remarks (optional)")),
                 "required", List.of("fiberCategoryId", "fiberIsoCodeId", "fiberName")
                 // Note: productId OR unit is required (handled in AIFunctionCaller)
-                )));
+                )),
+        buildTool(
+            "create_yarn_article",
+            "Create a DRAFT yarn article shell after user confirmation. Provide exactly one of productId or unit. Supplier designation is captured verbatim and is never interpreted into canonical specification fields.",
+            Map.of(
+                "type", "object",
+                "properties",
+                    Map.of(
+                        "name",
+                            Map.of(
+                                "type", "string",
+                                "description", "Yarn article name (required)."),
+                        "productId",
+                            Map.of(
+                                "type", "string",
+                                "description",
+                                    "Existing YARN Product UUID. Mutually exclusive with unit."),
+                        "unit",
+                            Map.of(
+                                "type", "string",
+                                "description",
+                                    "Unit for an auto-created YARN Product. Mutually exclusive with productId."),
+                        "sourceDesignation",
+                            Map.of(
+                                "type", "string",
+                                "description",
+                                    "Optional supplier wording stored verbatim. Do not translate, parse, normalize, or derive canonical fields from it.")),
+                "required", List.of("name"))));
   }
 
   private static Map<String, Object> buildTool(

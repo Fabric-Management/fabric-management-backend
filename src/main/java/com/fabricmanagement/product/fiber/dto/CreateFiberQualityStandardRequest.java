@@ -1,5 +1,7 @@
 package com.fabricmanagement.product.fiber.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -9,7 +11,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.validator.constraints.Range;
 
 @Data
 @Builder
@@ -59,42 +60,54 @@ public class CreateFiberQualityStandardRequest {
   private Double strengthCndTexMax;
 
   // Elongation (%)
-  @Range(min = 0, max = 100, message = "Elongation min must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Elongation min must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Elongation min must be between 0 and 100")
   private Double elongationPctMin;
 
-  @Range(min = 0, max = 100, message = "Elongation target must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Elongation target must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Elongation target must be between 0 and 100")
   private Double elongationPctTarget;
 
-  @Range(min = 0, max = 100, message = "Elongation max must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Elongation max must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Elongation max must be between 0 and 100")
   private Double elongationPctMax;
 
   // Moisture (%)
-  @Range(min = 0, max = 100, message = "Moisture min must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Moisture min must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Moisture min must be between 0 and 100")
   private Double moisturePctMin;
 
-  @Range(min = 0, max = 100, message = "Moisture target must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Moisture target must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Moisture target must be between 0 and 100")
   private Double moisturePctTarget;
 
-  @Range(min = 0, max = 100, message = "Moisture max must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Moisture max must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Moisture max must be between 0 and 100")
   private Double moisturePctMax;
 
   // Trash content (%)
-  @Range(min = 0, max = 100, message = "Trash content min must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Trash content min must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Trash content min must be between 0 and 100")
   private Double trashContentPctMin;
 
-  @Range(min = 0, max = 100, message = "Trash content target must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Trash content target must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Trash content target must be between 0 and 100")
   private Double trashContentPctTarget;
 
-  @Range(min = 0, max = 100, message = "Trash content max must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Trash content max must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Trash content max must be between 0 and 100")
   private Double trashContentPctMax;
 
   // Uniformity index (%)
-  @Range(min = 0, max = 100, message = "Uniformity index min must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Uniformity index min must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Uniformity index min must be between 0 and 100")
   private Double uniformityIndexMin;
 
-  @Range(min = 0, max = 100, message = "Uniformity index target must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Uniformity index target must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Uniformity index target must be between 0 and 100")
   private Double uniformityIndexTarget;
 
-  @Range(min = 0, max = 100, message = "Uniformity index max must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Uniformity index max must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Uniformity index max must be between 0 and 100")
   private Double uniformityIndexMax;
 }

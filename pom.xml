@@ -52,7 +52,7 @@
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
-        <springdoc-openapi.version>2.8.17</springdoc-openapi.version>
+        <springdoc-openapi.version>2.9.0</springdoc-openapi.version>
 
         <!-- Cache Versions -->
         <caffeine.version>3.2.4</caffeine.version>

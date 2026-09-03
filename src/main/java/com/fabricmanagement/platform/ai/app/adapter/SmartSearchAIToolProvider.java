@@ -65,11 +65,9 @@ public class SmartSearchAIToolProvider implements AIToolProvider {
         found = !fiberResult.contains("No results found");
       }
       case YARN -> {
-        Map<String, Object> yarnParams = new java.util.HashMap<>(parameters);
-        yarnParams.put("type", "YARN");
-        String yarnResult = registry().execute(tenantId, "search_products", yarnParams);
+        String yarnResult = registry().execute(tenantId, "search_yarns", parameters);
         result.append(yarnResult);
-        found = !yarnResult.contains("No products found");
+        found = !yarnResult.contains("No yarn article found");
       }
       case FABRIC -> {
         Map<String, Object> fabricParams = new java.util.HashMap<>(parameters);

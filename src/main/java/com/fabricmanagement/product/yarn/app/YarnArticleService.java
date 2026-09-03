@@ -191,6 +191,35 @@ public class YarnArticleService {
   }
 
   @Transactional(readOnly = true)
+  public Optional<YarnArticleDto> findViewByUid(String uid) {
+    if (uid == null || uid.isBlank()) {
+      return Optional.empty();
+    }
+    return articleRepository
+        .findByTenantIdAndUidIgnoreCase(TenantContext.requireTenantId(), uid.trim())
+        .map(YarnArticleDto::from);
+  }
+
+  @Transactional(readOnly = true)
+  public List<YarnArticleDto> findViewsByName(String name) {
+    if (name == null || name.isBlank()) {
+      return List.of();
+    }
+    return articleRepository
+        .findByTenantIdAndNameIgnoreCaseOrderByCreatedAtAsc(
+            TenantContext.requireTenantId(), name.trim())
+        .stream()
+        .map(YarnArticleDto::from)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<YarnDuplicateCandidateDto> duplicateCandidates(UUID articleId) {
+    YarnArticle article = requireArticle(articleId, TenantContext.requireTenantId());
+    return duplicateCandidates(article);
+  }
+
+  @Transactional(readOnly = true)
   public Page<YarnArticleListItemDto> list(
       com.fabricmanagement.product.yarn.domain.article.YarnArticleStatus status,
       String q,
@@ -382,15 +411,18 @@ public class YarnArticleService {
   }
 
   private YarnArticleMutationResponse mutationResponse(YarnArticle article) {
-    List<YarnDuplicateCandidateDto> duplicateCandidates =
-        article.getCanonicalKey() == null
-            ? List.of()
-            : articleRepository
-                .findByTenantIdAndCanonicalKeyAndIdNotOrderByCreatedAtAsc(
-                    article.getTenantId(), article.getCanonicalKey(), article.getId())
-                .stream()
-                .map(YarnDuplicateCandidateDto::from)
-                .toList();
-    return new YarnArticleMutationResponse(YarnArticleDto.from(article), duplicateCandidates);
+    return new YarnArticleMutationResponse(
+        YarnArticleDto.from(article), duplicateCandidates(article));
+  }
+
+  private List<YarnDuplicateCandidateDto> duplicateCandidates(YarnArticle article) {
+    return article.getCanonicalKey() == null
+        ? List.of()
+        : articleRepository
+            .findByTenantIdAndCanonicalKeyAndIdNotOrderByCreatedAtAsc(
+                article.getTenantId(), article.getCanonicalKey(), article.getId())
+            .stream()
+            .map(YarnDuplicateCandidateDto::from)
+            .toList();
   }
 }

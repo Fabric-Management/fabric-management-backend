@@ -1,5 +1,7 @@
 package com.fabricmanagement.production.quality.result.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -9,7 +11,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.validator.constraints.Range;
 
 @Data
 @Builder
@@ -39,17 +40,21 @@ public class CreateFiberTestResultRequest {
   @PositiveOrZero(message = "Strength must be ≥ 0")
   private Double strengthCndTex;
 
-  @Range(min = 0, max = 100, message = "Elongation % must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Elongation % must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Elongation % must be between 0 and 100")
   private Double elongationPercent;
 
   // Extended
-  @Range(min = 0, max = 100, message = "Moisture % must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Moisture % must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Moisture % must be between 0 and 100")
   private Double moisturePercent;
 
-  @Range(min = 0, max = 100, message = "Trash content % must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Trash content % must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Trash content % must be between 0 and 100")
   private Double trashContentPercent;
 
-  @Range(min = 0, max = 100, message = "Uniformity index % must be between 0 and 100")
+  @DecimalMin(value = "0", message = "Uniformity index % must be between 0 and 100")
+  @DecimalMax(value = "100", message = "Uniformity index % must be between 0 and 100")
   private Double uniformityIndex;
 
   // Metadata
