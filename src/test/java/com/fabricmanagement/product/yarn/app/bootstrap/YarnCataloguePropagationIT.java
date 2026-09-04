@@ -2,6 +2,8 @@ package com.fabricmanagement.product.yarn.app.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.common.infrastructure.bootstrap.DevSeedDataRunner;
+import com.fabricmanagement.common.infrastructure.bootstrap.PermissionTemplateBackfillRunner;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.app.onboarding.CloneTemplatePropertyDefinitionsStep;
@@ -29,13 +31,23 @@ class YarnCataloguePropagationIT extends AbstractIntegrationTest {
   @Autowired private SystemTransactionExecutor systemTransactionExecutor;
 
   @Test
-  void runnerOrderIsStrictlyAfterPropertyDefinitions() {
-    Order propertyOrder = PropertyDefinitionBackfillRunner.class.getAnnotation(Order.class);
-    Order yarnOrder = YarnCatalogueBackfillRunner.class.getAnnotation(Order.class);
+  void runnerOrderIsStrictFromDevSeedThroughYarnCatalogue() throws NoSuchMethodException {
+    Order devSeedOrder = listenerOrder(DevSeedDataRunner.class);
+    Order permissionOrder = listenerOrder(PermissionTemplateBackfillRunner.class);
+    Order propertyOrder = listenerOrder(PropertyDefinitionBackfillRunner.class);
+    Order yarnOrder = listenerOrder(YarnCatalogueBackfillRunner.class);
 
+    assertThat(devSeedOrder).isNotNull();
+    assertThat(permissionOrder).isNotNull();
     assertThat(propertyOrder).isNotNull();
     assertThat(yarnOrder).isNotNull();
+    assertThat(permissionOrder.value()).isGreaterThan(devSeedOrder.value());
+    assertThat(propertyOrder.value()).isGreaterThan(permissionOrder.value());
     assertThat(yarnOrder.value()).isGreaterThan(propertyOrder.value());
+  }
+
+  private static Order listenerOrder(Class<?> runnerType) throws NoSuchMethodException {
+    return runnerType.getDeclaredMethod("run").getAnnotation(Order.class);
   }
 
   @Test

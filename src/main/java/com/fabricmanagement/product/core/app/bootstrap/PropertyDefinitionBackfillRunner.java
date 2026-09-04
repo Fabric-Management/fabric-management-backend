@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(210) // after tenant creation and permission-template completion
 public class PropertyDefinitionBackfillRunner {
 
   private final PropertyDefinitionSeeder seeder;
@@ -26,6 +25,7 @@ public class PropertyDefinitionBackfillRunner {
   private final SystemTransactionExecutor systemTransactionExecutor;
 
   @EventListener(ApplicationReadyEvent.class)
+  @Order(210) // after tenant creation and permission-template completion
   public void run() {
     try {
       seeder.seed(TenantContext.TEMPLATE_TENANT_ID);
