@@ -70,11 +70,36 @@ public class YarnArticleService {
     if (articleRepository.existsByTenantIdAndProduct_Id(tenantId, productId)) {
       throw new YarnDomainException("I18", "I18: Product is already bound to a YarnArticle");
     }
+    return createDraft(product, name, description, command);
+  }
+
+  /**
+   * Backfill entry point that uses an already bulk-loaded Product. Product binding invariants are
+   * checked in memory before optional specification references are resolved.
+   */
+  @Transactional
+  public YarnArticle createDraft(
+      Product product, String name, String description, YarnArticleSpecCommand command) {
+    if (product == null) {
+      throw new YarnDomainException("I18", "I18: Product must be an active current-tenant YARN");
+    }
+    UUID tenantId = TenantContext.requireTenantId();
+    if (!tenantId.equals(product.getTenantId())
+        || product.getProductType() != ProductType.YARN
+        || !Boolean.TRUE.equals(product.getIsActive())) {
+      throw new YarnDomainException("I18", "I18: Product must be an active current-tenant YARN");
+    }
     YarnArticle article =
         YarnArticle.createDraft(product, name, description, resolve(command, tenantId), serializer);
-    articleRepository.saveAndFlush(article);
+    articleRepository.save(article);
     appendAudit(article, YarnArticleAuditEventType.CREATED, 1, 1, null);
     return article;
+  }
+
+  /** Flushes all drafts, audit rows and surrounding transaction writes once per backfill tenant. */
+  @Transactional
+  public void flushDrafts() {
+    articleRepository.flush();
   }
 
   @Transactional

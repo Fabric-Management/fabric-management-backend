@@ -22,13 +22,13 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(100)
 public class DevSeedDataRunner {
 
   private final List<DataSeeder> seeders;
   private final Environment environment;
 
   @EventListener(ApplicationReadyEvent.class)
+  @Order(100)
   public void run() {
     if (!environment.acceptsProfiles(Profiles.of("local", "dev", "docker"))) {
       log.info("DevSeedDataRunner is disabled in this profile. Terminating seeder.");

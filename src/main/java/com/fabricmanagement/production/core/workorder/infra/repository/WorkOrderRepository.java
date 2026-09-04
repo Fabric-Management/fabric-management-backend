@@ -16,6 +16,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface WorkOrderRepository
     extends JpaRepository<WorkOrder, UUID>, JpaSpecificationExecutor<WorkOrder> {
+  List<WorkOrder> findByTenantIdAndIsActiveTrue(UUID tenantId);
+
   Optional<WorkOrder> findByWorkOrderNumberAndIsActiveTrue(String workOrderNumber);
 
   Optional<WorkOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);

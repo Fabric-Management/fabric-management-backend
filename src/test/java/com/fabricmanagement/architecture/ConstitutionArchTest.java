@@ -887,6 +887,21 @@ class ConstitutionArchTest {
     }
 
     @Test
+    @DisplayName("YARN-1D G3: designation provenance priority stays product-owned")
+    void designationProvenancePolicyShouldOnlyBeReferencedFromProductYarn() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.product.yarn..")
+              .should()
+              .dependOnClassesThat()
+              .haveSimpleName("DesignationProvenancePolicy")
+              .as("YARN-1D G3: adapters provide provenance data; only product/yarn may rank it");
+
+      rule.check(allClasses);
+    }
+
+    @Test
     @DisplayName("Rule 13.3: No outside module may access notification's infra layer")
     void noModuleShouldAccessNotificationInfra() {
       ArchRule rule =
@@ -1007,6 +1022,7 @@ class ConstitutionArchTest {
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
       //   - PropertyDefinitionBackfillRunner : LOT-REG-1 system registry propagation to tenants
+      //   - YarnLegacyBackfillRunner    : YARN-1D tenant enumeration before RLS-true backfill
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
@@ -1041,6 +1057,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
               .and()
               .doNotHaveSimpleName("PropertyDefinitionBackfillRunner")
+              .and()
+              .doNotHaveSimpleName("YarnLegacyBackfillRunner")
               .and()
               .doNotHaveSimpleName("QuoteApprovalService")
               .and()

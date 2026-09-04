@@ -40,7 +40,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(200) // after DevSeedDataRunner (100), which creates the tenants this backfills
 public class PermissionTemplateBackfillRunner {
 
   private static final String PERMISSIONS_CACHE = "permissions";
@@ -85,6 +84,7 @@ public class PermissionTemplateBackfillRunner {
       """;
 
   @EventListener(ApplicationReadyEvent.class)
+  @Order(200) // after DevSeedDataRunner (100), which creates the tenants this backfills
   public void run() {
     try {
       permissionTemplateSeeder.seed();

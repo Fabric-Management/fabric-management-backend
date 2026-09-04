@@ -29,6 +29,8 @@ public interface BatchRepository
 
   List<Batch> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
+  List<Batch> findByTenantIdAndProductTypeAndIsActiveTrue(UUID tenantId, ProductType productType);
+
   @Lock(LockModeType.OPTIMISTIC)
   Optional<Batch> findByIdAndTenantId(UUID id, UUID tenantId);
 

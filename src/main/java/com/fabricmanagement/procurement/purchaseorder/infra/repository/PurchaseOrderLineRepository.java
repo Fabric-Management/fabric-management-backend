@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PurchaseOrderLineRepository extends JpaRepository<PurchaseOrderLine, UUID> {
 
+  List<PurchaseOrderLine> findByTenantIdAndIsActiveTrue(UUID tenantId);
+
   List<PurchaseOrderLine> findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
       UUID purchaseOrderId);
 

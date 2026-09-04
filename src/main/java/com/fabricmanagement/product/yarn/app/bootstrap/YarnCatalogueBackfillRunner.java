@@ -13,13 +13,13 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(220) // PropertyDefinitionBackfillRunner is @Order(210); registry must exist first.
 public class YarnCatalogueBackfillRunner {
 
   private final YarnCatalogueSeeder seeder;
   private final TenantClonerService tenantClonerService;
 
   @EventListener(ApplicationReadyEvent.class)
+  @Order(220) // PropertyDefinitionBackfillRunner is @Order(210); registry must exist first.
   public void run() {
     try {
       int templateInserted = seeder.seed(TenantContext.TEMPLATE_TENANT_ID);

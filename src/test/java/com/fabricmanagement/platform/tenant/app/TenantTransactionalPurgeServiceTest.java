@@ -312,6 +312,14 @@ class TenantTransactionalPurgeServiceTest {
   }
 
   @Test
+  void shouldDeleteYarnBackfillQueueBeforeItsArticleForeignKeyTarget() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("production.prod_yarn_backfill_reconciliation"))
+        .isLessThan(tables.indexOf("production.prod_yarn_article"));
+  }
+
+  @Test
   void shouldDeleteQualityDecisionLedgerInFkSafeOrder() {
     List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
 

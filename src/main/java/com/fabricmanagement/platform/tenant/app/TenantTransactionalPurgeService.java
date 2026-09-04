@@ -141,6 +141,7 @@ public class TenantTransactionalPurgeService {
           "production.production_execution_inventory_balance",
           "production.production_execution_batch_lineage",
           "production.production_execution_batch",
+          "production.prod_yarn_backfill_reconciliation",
           "production.prod_yarn_article_audit",
           "production.prod_yarn_article_twist_stage",
           "production.prod_yarn_article_structure_component",
