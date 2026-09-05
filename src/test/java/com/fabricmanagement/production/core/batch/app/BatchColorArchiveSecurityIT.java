@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class BatchColorArchiveSecurityIT {
     }
 
     Flyway.configure()
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
         .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
         .locations("classpath:db/migration")
         .schemas("common_tenant")

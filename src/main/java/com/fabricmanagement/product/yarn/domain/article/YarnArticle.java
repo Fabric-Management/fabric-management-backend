@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.yarn.domain.SourceDesignationPolicy;
 import com.fabricmanagement.product.yarn.domain.exception.YarnDomainException;
 import com.fabricmanagement.product.yarn.domain.reference.YarnSpinningSystem;
 import com.fabricmanagement.product.yarn.domain.vocabulary.CountBasis;
@@ -162,6 +163,35 @@ public class YarnArticle extends BaseEntity {
       throw new YarnDomainException("I17", "I17: OBSOLETE articles reject spec mutation");
     }
     replaceSpecState(spec, serializer);
+    if (status == YarnArticleStatus.ACTIVE) {
+      YarnArticleInvariantCatalog.requireFullValid(this);
+    }
+    articleSpecVersion++;
+  }
+
+  public void adoptSourceDesignation(String value) {
+    if (status == YarnArticleStatus.OBSOLETE) {
+      throw new YarnDomainException("I17", "I17: OBSOLETE articles reject spec mutation");
+    }
+    if (value == null) {
+      throw new IllegalArgumentException("Source designation to adopt is required");
+    }
+    requireSourceDesignationValid(value);
+    sourceDesignation = value;
+    if (status == YarnArticleStatus.ACTIVE) {
+      YarnArticleInvariantCatalog.requireFullValid(this);
+    }
+    articleSpecVersion++;
+  }
+
+  public void clearBlankSourceDesignation() {
+    if (status == YarnArticleStatus.OBSOLETE) {
+      throw new YarnDomainException("I17", "I17: OBSOLETE articles reject spec mutation");
+    }
+    if (!SourceDesignationPolicy.isBlank(sourceDesignation)) {
+      throw new IllegalStateException("Source designation is not blank");
+    }
+    sourceDesignation = null;
     if (status == YarnArticleStatus.ACTIVE) {
       YarnArticleInvariantCatalog.requireFullValid(this);
     }
@@ -341,6 +371,13 @@ public class YarnArticle extends BaseEntity {
         && (spec.twistContractionPercent().signum() < 0
             || spec.twistContractionPercent().compareTo(new BigDecimal("100")) >= 0)) {
       throw new YarnDomainException("I28", "I28: twistContractionPercent must be in [0,100)");
+    }
+  }
+
+  private static void requireSourceDesignationValid(String value) {
+    if (SourceDesignationPolicy.isBlank(value) || SourceDesignationPolicy.isOverlength(value)) {
+      throw new YarnDomainException(
+          "I32", "I32: sourceDesignation must be non-blank and at most 255 code points");
     }
   }
 

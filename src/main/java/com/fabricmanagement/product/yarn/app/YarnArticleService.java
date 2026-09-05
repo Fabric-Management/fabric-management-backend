@@ -9,11 +9,13 @@ import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberStatus;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.product.yarn.domain.SourceDesignationPolicy;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticle;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticleAudit;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticleAuditEventType;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticleSpec;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticleSpecSerializer;
+import com.fabricmanagement.product.yarn.domain.article.YarnArticleStatus;
 import com.fabricmanagement.product.yarn.domain.exception.YarnDomainException;
 import com.fabricmanagement.product.yarn.domain.reference.YarnSpinningSystem;
 import com.fabricmanagement.product.yarn.domain.reference.YarnTestMethod;
@@ -34,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -123,6 +126,47 @@ public class YarnArticleService {
         article.getArticleSpecVersion(),
         before);
     return article;
+  }
+
+  @Transactional
+  public YarnArticle adoptSourceDesignation(UUID articleId, String sourceDesignation) {
+    UUID tenantId = TenantContext.requireTenantId();
+    YarnArticle article = requireArticle(articleId, tenantId);
+    JsonNode before = serializer.auditSnapshot(article);
+    int versionFrom = article.getArticleSpecVersion();
+    article.adoptSourceDesignation(sourceDesignation);
+    articleRepository.flush();
+    appendAudit(
+        article,
+        YarnArticleAuditEventType.SPEC_UPDATED,
+        versionFrom,
+        article.getArticleSpecVersion(),
+        before);
+    return article;
+  }
+
+  @Transactional
+  public boolean remediateBlankSourceDesignation(UUID articleId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    YarnArticle article =
+        articleRepository
+            .findByTenantIdAndIdForUpdate(tenantId, articleId)
+            .orElseThrow(() -> new NotFoundException("YarnArticle not found: " + articleId));
+    if (!Set.of(YarnArticleStatus.DRAFT, YarnArticleStatus.ACTIVE).contains(article.getStatus())
+        || !SourceDesignationPolicy.isBlank(article.getSourceDesignation())) {
+      return false;
+    }
+    JsonNode before = serializer.auditSnapshot(article);
+    int versionFrom = article.getArticleSpecVersion();
+    article.clearBlankSourceDesignation();
+    articleRepository.flush();
+    appendAudit(
+        article,
+        YarnArticleAuditEventType.SPEC_UPDATED,
+        versionFrom,
+        article.getArticleSpecVersion(),
+        before);
+    return true;
   }
 
   @Transactional

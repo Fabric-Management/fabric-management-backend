@@ -18,6 +18,33 @@ public interface WorkOrderRepository
     extends JpaRepository<WorkOrder, UUID>, JpaSpecificationExecutor<WorkOrder> {
   List<WorkOrder> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
+  @Query(
+      value =
+          """
+          SELECT DISTINCT work_order.output_product_id
+          FROM production.prod_work_order work_order
+          WHERE work_order.tenant_id = :tenantId
+            AND work_order.is_active = TRUE
+            AND work_order.status NOT IN ('COMPLETED', 'CANCELLED')
+            AND work_order.output_product_id IS NOT NULL
+          """,
+      nativeQuery = true)
+  List<UUID> findOpenReferencedProductIds(@Param("tenantId") UUID tenantId);
+
+  @Query(
+      value =
+          """
+          SELECT count(*)
+          FROM production.prod_work_order work_order
+          WHERE work_order.tenant_id = :tenantId
+            AND work_order.is_active = TRUE
+            AND work_order.status NOT IN ('COMPLETED', 'CANCELLED')
+            AND work_order.output_product_id IS NULL
+            AND work_order.production_specs ->> 'specType' = 'SPINNING'
+          """,
+      nativeQuery = true)
+  long countOpenUnlinkedSpinningWorkOrders(@Param("tenantId") UUID tenantId);
+
   Optional<WorkOrder> findByWorkOrderNumberAndIsActiveTrue(String workOrderNumber);
 
   Optional<WorkOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);

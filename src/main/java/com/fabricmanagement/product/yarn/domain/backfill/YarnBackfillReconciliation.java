@@ -3,6 +3,7 @@ package com.fabricmanagement.product.yarn.domain.backfill;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticle;
+import com.fabricmanagement.product.yarn.domain.exception.YarnReconciliationException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
@@ -46,6 +47,14 @@ public class YarnBackfillReconciliation extends BaseEntity {
   @Column(name = "candidates", nullable = false, columnDefinition = "jsonb", updatable = false)
   private JsonNode candidates;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "resolution_action", length = 20)
+  private YarnBackfillResolutionAction resolutionAction;
+
+  @Type(JsonType.class)
+  @Column(name = "resolved_candidate", columnDefinition = "jsonb")
+  private JsonNode resolvedCandidate;
+
   public static YarnBackfillReconciliation open(
       Product product, YarnArticle article, YarnBackfillQueueReason reason, JsonNode candidates) {
     YarnBackfillReconciliation row = new YarnBackfillReconciliation();
@@ -63,6 +72,27 @@ public class YarnBackfillReconciliation extends BaseEntity {
 
   public UUID getArticleId() {
     return article == null ? null : article.getId();
+  }
+
+  public void resolveChosen(JsonNode candidate) {
+    requireOpen();
+    resolutionAction = YarnBackfillResolutionAction.CHOSEN;
+    resolvedCandidate = Objects.requireNonNull(candidate, "candidate").deepCopy();
+    status = YarnBackfillQueueStatus.RESOLVED;
+  }
+
+  public void resolveDismissed() {
+    requireOpen();
+    resolutionAction = YarnBackfillResolutionAction.DISMISSED;
+    resolvedCandidate = null;
+    status = YarnBackfillQueueStatus.RESOLVED;
+  }
+
+  private void requireOpen() {
+    if (status != YarnBackfillQueueStatus.OPEN) {
+      throw new YarnReconciliationException(
+          "Yarn reconciliation row is not open", "YARN_RECONCILIATION_NOT_OPEN");
+    }
   }
 
   @Override
