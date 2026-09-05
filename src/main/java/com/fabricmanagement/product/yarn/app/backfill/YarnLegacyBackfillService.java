@@ -10,6 +10,7 @@ import com.fabricmanagement.product.yarn.app.port.LegacyDesignationDiscovery;
 import com.fabricmanagement.product.yarn.app.port.LegacyDesignationRecord;
 import com.fabricmanagement.product.yarn.app.port.LegacyDesignationSourceKind;
 import com.fabricmanagement.product.yarn.app.port.LegacyYarnDesignationSource;
+import com.fabricmanagement.product.yarn.domain.SourceDesignationPolicy;
 import com.fabricmanagement.product.yarn.domain.article.YarnArticle;
 import com.fabricmanagement.product.yarn.domain.backfill.YarnBackfillQueueReason;
 import com.fabricmanagement.product.yarn.domain.backfill.YarnBackfillQueueStatus;
@@ -37,8 +38,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class YarnLegacyBackfillService {
-
-  static final int MAX_SOURCE_DESIGNATION_CODE_POINTS = 255;
 
   private final List<LegacyYarnDesignationSource> sources;
   private final DesignationProvenancePolicy provenancePolicy;
@@ -138,7 +137,9 @@ public class YarnLegacyBackfillService {
       }
       records.addAll(discovery.records());
       discovery.records().stream()
-          .filter(record -> record.rawValue() != null && !record.rawValue().isBlank())
+          .filter(
+              record ->
+                  record.rawValue() != null && !SourceDesignationPolicy.isBlank(record.rawValue()))
           .forEach(record -> contributed.merge(record.sourceKind(), 1L, Long::sum));
       discovery.unlinkedCounts().forEach((kind, count) -> unlinked.merge(kind, count, Long::sum));
     }
@@ -148,7 +149,10 @@ public class YarnLegacyBackfillService {
   private Selection select(List<LegacyDesignationRecord> discovered) {
     List<LegacyDesignationRecord> candidates =
         discovered.stream()
-            .filter(record -> record.rawValue() != null && !record.rawValue().isBlank())
+            .filter(
+                record ->
+                    record.rawValue() != null
+                        && !SourceDesignationPolicy.isBlank(record.rawValue()))
             .toList();
     List<LegacyDesignationRecord> sortedCandidates = provenancePolicy.sorted(candidates);
     Map<String, List<LegacyDesignationRecord>> shortGroups = new LinkedHashMap<>();
@@ -189,7 +193,7 @@ public class YarnLegacyBackfillService {
   }
 
   private boolean isOverlength(String rawValue) {
-    return rawValue.codePointCount(0, rawValue.length()) > MAX_SOURCE_DESIGNATION_CODE_POINTS;
+    return SourceDesignationPolicy.isOverlength(rawValue);
   }
 
   private void requireCurrentTenant(UUID tenantId) {

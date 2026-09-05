@@ -71,6 +71,77 @@ class YarnArticleApiOpenApiTest {
     assertThat(requestFields).doesNotContainAnyElementsOf(FORBIDDEN_REQUEST_FIELDS);
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void reconciliationAndReadinessSchemasAreTypedRequiredAndAdditive() throws IOException {
+    Map<String, Object> document = new Yaml().load(Files.readString(Path.of("api/openapi.yaml")));
+    Map<String, Object> paths = (Map<String, Object>) document.get("paths");
+    Map<String, Object> schemas =
+        (Map<String, Object>) ((Map<String, Object>) document.get("components")).get("schemas");
+
+    assertThat(paths)
+        .containsKeys(
+            BASE_PATH + "/reconciliations",
+            BASE_PATH + "/reconciliations/{id}/candidates",
+            BASE_PATH + "/reconciliations/{id}/choose",
+            BASE_PATH + "/reconciliations/{id}/dismiss",
+            BASE_PATH + "/readiness");
+    assertThat(schemas)
+        .containsKeys(
+            "YarnReconciliationChooseRequest",
+            "YarnReconciliationItemDto",
+            "YarnReconciliationResolvedCandidateDto",
+            "YarnReconciliationCandidateGroupDto",
+            "YarnReconciliationCandidatePageDto",
+            "YarnReadinessDto",
+            "YarnReadinessBlockerDto",
+            "YarnUnlinkedOpenDocumentsDto");
+
+    Map<String, Object> resolved =
+        (Map<String, Object>) schemas.get("YarnReconciliationResolvedCandidateDto");
+    assertThat((List<String>) resolved.get("required"))
+        .containsExactlyInAnyOrder("rawValue", "sourceKind", "recordedAt", "sourceRecordId");
+    Map<String, Object> resolvedProperties = (Map<String, Object>) resolved.get("properties");
+    assertThat(((Map<String, Object>) resolvedProperties.get("rawValue")).get("type"))
+        .isEqualTo("string");
+    assertThat(((Map<String, Object>) resolvedProperties.get("sourceKind")).get("type"))
+        .isEqualTo("string");
+    assertThat(((Map<String, Object>) resolvedProperties.get("recordedAt")).get("type"))
+        .isEqualTo("string");
+    assertThat(((Map<String, Object>) resolvedProperties.get("sourceRecordId")).get("type"))
+        .isEqualTo("string");
+
+    Map<String, Object> item = (Map<String, Object>) schemas.get("YarnReconciliationItemDto");
+    assertThat((List<String>) item.get("required")).contains("resolvedCandidate");
+    Map<String, Object> itemProperties = (Map<String, Object>) item.get("properties");
+    Map<String, Object> resolvedCandidate =
+        (Map<String, Object>) itemProperties.get("resolvedCandidate");
+    assertThat(resolvedCandidate.toString())
+        .contains("YarnReconciliationResolvedCandidateDto")
+        .doesNotContain("additionalProperties");
+    assertThat(isNullable(resolvedCandidate)).isTrue();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static boolean isNullable(Map<String, Object> schema) {
+    if (Boolean.TRUE.equals(schema.get("nullable"))) {
+      return true;
+    }
+    Object type = schema.get("type");
+    if ("null".equals(type)) {
+      return true;
+    }
+    if (type instanceof List<?> types && types.contains("null")) {
+      return true;
+    }
+    Object oneOf = schema.get("oneOf");
+    return oneOf instanceof List<?> variants
+        && variants.stream()
+            .filter(Map.class::isInstance)
+            .map(value -> (Map<String, Object>) value)
+            .anyMatch(value -> "null".equals(value.get("type")));
+  }
+
   @SuppressWarnings("unchecked")
   private static void collectFields(
       Object node,

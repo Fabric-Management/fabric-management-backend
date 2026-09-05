@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -22,6 +23,12 @@ class YarnBackfillQueueMigrationIT {
 
   private static final String MIGRATION_VERSION = "20260901120000";
   private static final String TABLE = "prod_yarn_backfill_reconciliation";
+  private static final UUID PREEXISTING_TENANT = UUID.randomUUID();
+  private static final UUID PREEXISTING_PRODUCT = UUID.randomUUID();
+  private static final UUID PREEXISTING_ARTICLE = UUID.randomUUID();
+  private static final UUID PREEXISTING_QUEUE = UUID.randomUUID();
+  private static final UUID PREEXISTING_BATCH = UUID.randomUUID();
+  private static final UUID PREEXISTING_TRANSACTION = UUID.randomUUID();
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES =
@@ -31,13 +38,23 @@ class YarnBackfillQueueMigrationIT {
           .withPassword("fabric123");
 
   @BeforeAll
-  static void migrate() {
+  static void migrate() throws SQLException {
     Flyway.configure()
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
         .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
         .locations("classpath:db/migration")
         .schemas("common_tenant")
         .defaultSchema("common_tenant")
         .target(MIGRATION_VERSION)
+        .load()
+        .migrate();
+    insertPre1eData();
+    Flyway.configure()
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
+        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+        .locations("classpath:db/migration")
+        .schemas("common_tenant")
+        .defaultSchema("common_tenant")
         .load()
         .migrate();
   }
@@ -115,9 +132,65 @@ class YarnBackfillQueueMigrationIT {
     }
   }
 
+  @Test
+  void oneDDataSurvivesWithGeneratedCountAndBlankRemainsForTheRunner() throws SQLException {
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_yarn_backfill_reconciliation "
+                    + "WHERE id='"
+                    + PREEXISTING_QUEUE
+                    + "' AND status='OPEN' AND resolution_action IS NULL "
+                    + "AND resolved_candidate IS NULL AND candidate_occurrence_count=2"))
+        .isEqualTo(1);
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_yarn_article WHERE id='"
+                    + PREEXISTING_ARTICLE
+                    + "' AND source_designation=' '"))
+        .isEqualTo(1);
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.production_execution_inventory_transaction "
+                    + "WHERE id='"
+                    + PREEXISTING_TRANSACTION
+                    + "' AND transaction_type='RECEIPT'"))
+        .isEqualTo(1);
+    assertThat(
+            count(
+                "SELECT count(*) FROM pg_constraint "
+                    + "WHERE conname='ck_inv_txn_type_valid' "
+                    + "AND conrelid='production.production_execution_inventory_transaction'::regclass "
+                    + "AND convalidated"))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void resolutionConsistencyChecksRejectImpossibleRows() throws SQLException {
+    try (Connection connection = connection();
+        Statement statement = connection.createStatement()) {
+      statement.execute("SET app.current_tenant = '" + PREEXISTING_TENANT + "'");
+      assertThatThrownBy(
+              () ->
+                  statement.execute(
+                      "UPDATE production.prod_yarn_backfill_reconciliation "
+                          + "SET resolution_action='DISMISSED' WHERE id='"
+                          + PREEXISTING_QUEUE
+                          + "'"))
+          .isInstanceOf(SQLException.class);
+      assertThatThrownBy(
+              () ->
+                  statement.execute(
+                      "UPDATE production.prod_yarn_backfill_reconciliation "
+                          + "SET status='RESOLVED' WHERE id='"
+                          + PREEXISTING_QUEUE
+                          + "'"))
+          .isInstanceOf(SQLException.class);
+    }
+  }
+
   private static String queueInsert(UUID tenantId, UUID productId, UUID articleId, String status) {
     return "INSERT INTO production.prod_yarn_backfill_reconciliation "
-        + "(tenant_id, uid, product_id, article_id, reason, status, candidates) VALUES ('"
+        + "(tenant_id, uid, product_id, article_id, reason, status, candidates, resolution_action) VALUES ('"
         + tenantId
         + "', 'YBF-MIG-QUEUE-"
         + UUID.randomUUID()
@@ -127,7 +200,84 @@ class YarnBackfillQueueMigrationIT {
         + articleId
         + "', 'AMBIGUOUS', '"
         + status
-        + "', '{\"schemaVersion\":1,\"candidates\":[]}'::jsonb)";
+        + "', '{\"schemaVersion\":1,\"candidates\":[]}'::jsonb, "
+        + ("RESOLVED".equals(status) ? "'DISMISSED'" : "NULL")
+        + ")";
+  }
+
+  private static void insertPre1eData() throws SQLException {
+    try (Connection connection = connection();
+        Statement statement = connection.createStatement()) {
+      statement.execute("SET app.current_tenant = '" + PREEXISTING_TENANT + "'");
+      statement.execute(
+          "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, status) VALUES ('"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-1E', 'ybf-pre-1e-"
+              + PREEXISTING_TENANT
+              + "', 'Yarn pre 1E', 'ACTIVE')");
+      statement.execute(
+          "INSERT INTO production.prod_product "
+              + "(id, tenant_id, uid, product_type, unit, is_active) VALUES ('"
+              + PREEXISTING_PRODUCT
+              + "', '"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-PRODUCT-"
+              + PREEXISTING_PRODUCT
+              + "', 'YARN', 'KG', TRUE)");
+      statement.execute(
+          "INSERT INTO production.prod_yarn_article "
+              + "(id, tenant_id, uid, product_id, status, name, source_designation, is_active) "
+              + "VALUES ('"
+              + PREEXISTING_ARTICLE
+              + "', '"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-ARTICLE-"
+              + PREEXISTING_ARTICLE
+              + "', '"
+              + PREEXISTING_PRODUCT
+              + "', 'DRAFT', 'Pre 1E draft', ' ', TRUE)");
+      statement.execute(
+          "INSERT INTO production.prod_yarn_backfill_reconciliation "
+              + "(id, tenant_id, uid, product_id, article_id, reason, status, candidates) VALUES ('"
+              + PREEXISTING_QUEUE
+              + "', '"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-QUEUE-"
+              + PREEXISTING_QUEUE
+              + "', '"
+              + PREEXISTING_PRODUCT
+              + "', '"
+              + PREEXISTING_ARTICLE
+              + "', 'AMBIGUOUS', 'OPEN', "
+              + "'{\"schemaVersion\":1,\"candidates\":[{\"rawValue\":\"A\"},{\"rawValue\":\"B\"}]}'::jsonb)");
+      statement.execute(
+          "INSERT INTO production.production_execution_batch "
+              + "(id, tenant_id, uid, product_id, product_type, batch_code, quantity, "
+              + "reserved_quantity, consumed_quantity, waste_quantity, unit, status, is_active) "
+              + "VALUES ('"
+              + PREEXISTING_BATCH
+              + "', '"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-BATCH-"
+              + PREEXISTING_BATCH
+              + "', '"
+              + PREEXISTING_PRODUCT
+              + "', 'YARN', 'YBF-PRE-BATCH-CODE-"
+              + PREEXISTING_BATCH
+              + "', 1, 0, 0, 0, 'KG', 'AVAILABLE', TRUE)");
+      statement.execute(
+          "INSERT INTO production.production_execution_inventory_transaction "
+              + "(id, tenant_id, uid, batch_id, transaction_type, quantity, unit, "
+              + "transaction_date, is_active) VALUES ('"
+              + PREEXISTING_TRANSACTION
+              + "', '"
+              + PREEXISTING_TENANT
+              + "', 'YBF-PRE-TXN-"
+              + PREEXISTING_TRANSACTION
+              + "', '"
+              + PREEXISTING_BATCH
+              + "', 'RECEIPT', 1, 'KG', NOW(), TRUE)");
+    }
   }
 
   private static String constraint(String name) throws SQLException {

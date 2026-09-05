@@ -1,6 +1,7 @@
 package com.fabricmanagement.product.yarn.domain.article;
 
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.yarn.domain.SourceDesignationPolicy;
 import com.fabricmanagement.product.yarn.domain.exception.YarnDomainException;
 import com.fabricmanagement.product.yarn.domain.vocabulary.CountBasis;
 import com.fabricmanagement.product.yarn.domain.vocabulary.TwistDirection;
@@ -20,7 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
-/** The executable I1-I31 catalogue. Tests enumerate this class as their single rule source. */
+/** The executable I1-I32 catalogue. Tests enumerate this class as their single rule source. */
 public final class YarnArticleInvariantCatalog {
 
   private static final String TWIST_PROPERTY_KEY = "YARN_TWIST_TPM";
@@ -28,12 +29,12 @@ public final class YarnArticleInvariantCatalog {
   public record Violation(String id, String message) {}
 
   public static final List<String> ALL_IDS =
-      IntStream.rangeClosed(1, 31).mapToObj(number -> "I" + number).toList();
+      IntStream.rangeClosed(1, 32).mapToObj(number -> "I" + number).toList();
 
   public static final Set<String> WRITE_TIME_IDS =
       Set.of(
           "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11", "I12", "I13", "I14",
-          "I23", "I24", "I25", "I26", "I27", "I28", "I29", "I30", "I31");
+          "I23", "I24", "I25", "I26", "I27", "I28", "I29", "I30", "I31", "I32");
 
   private YarnArticleInvariantCatalog() {}
 
@@ -276,6 +277,14 @@ public final class YarnArticleInvariantCatalog {
     }
     if (!sourceSnapshotsConsistent(article)) {
       fail(failures, "I31", "one Fiber has conflicting material-source snapshots");
+    }
+    if (article.getStatus() != YarnArticleStatus.OBSOLETE
+        && (SourceDesignationPolicy.isBlank(article.getSourceDesignation())
+            || SourceDesignationPolicy.isOverlength(article.getSourceDesignation()))) {
+      fail(
+          failures,
+          "I32",
+          "sourceDesignation must be null or non-blank and at most 255 code points");
     }
 
     return failures.entrySet().stream()

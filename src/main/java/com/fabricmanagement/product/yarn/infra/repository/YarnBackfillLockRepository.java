@@ -21,4 +21,13 @@ public class YarnBackfillLockRepository {
             .getSingleResult();
     return Boolean.TRUE.equals(acquired);
   }
+
+  public void acquireBlankRemediation(UUID tenantId) {
+    entityManager
+        .createNativeQuery(
+            "SELECT pg_advisory_xact_lock("
+                + "hashtext('yarn-blank-remediation:' || CAST(?1 AS text)))")
+        .setParameter(1, tenantId)
+        .getSingleResult();
+  }
 }

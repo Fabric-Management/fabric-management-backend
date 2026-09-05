@@ -27,7 +27,7 @@ class YarnArticleApiContractTest {
   private static final String READ = "@auth.can(authentication, 'yarn', 'read')";
   private static final String WRITE = "@auth.can(authentication, 'yarn', 'write')";
   private static final Pattern INVARIANT_LITERAL =
-      Pattern.compile("\\bI(?:[1-9]|[12]\\d|3[01])\\b");
+      Pattern.compile("\\bI(?:[1-9]|[12]\\d|3[0-2])\\b");
 
   @Test
   void everyMappedHandlerHasTheExactDerivedReadOrWriteGuard() {
