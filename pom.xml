@@ -560,6 +560,10 @@
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
                     </includes>
+                    <excludes>
+                        <!-- IntegrationTest also matches *Test; run it only in Failsafe. -->
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 
