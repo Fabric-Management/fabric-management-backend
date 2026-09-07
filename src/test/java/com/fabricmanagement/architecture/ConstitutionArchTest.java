@@ -1023,6 +1023,7 @@ class ConstitutionArchTest {
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
       //   - PropertyDefinitionBackfillRunner : LOT-REG-1 system registry propagation to tenants
       //   - YarnLegacyBackfillRunner    : YARN-1D tenant enumeration before RLS-true backfill
+      //   - YarnBlankDesignationRemediationRunner : YARN-1E convergent tenant remediation
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
@@ -1059,6 +1060,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("PropertyDefinitionBackfillRunner")
               .and()
               .doNotHaveSimpleName("YarnLegacyBackfillRunner")
+              .and()
+              .doNotHaveSimpleName("YarnBlankDesignationRemediationRunner")
               .and()
               .doNotHaveSimpleName("QuoteApprovalService")
               .and()

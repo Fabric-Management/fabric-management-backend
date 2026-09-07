@@ -59,7 +59,7 @@ abstract class YarnBackfillIntegrationSupport extends AbstractIntegrationTest {
     return new TenantFixture(tenantId, Map.copyOf(productIds), Map.copyOf(productUids));
   }
 
-  protected void insertBatch(
+  protected UUID insertBatch(
       TenantFixture fixture, int productIndex, String rawValue, Instant recordedAt) {
     UUID batchId = UUID.randomUUID();
     String attributes = json(Map.of("yarn_count", rawValue));
@@ -83,6 +83,7 @@ abstract class YarnBackfillIntegrationSupport extends AbstractIntegrationTest {
               Timestamp.from(recordedAt));
           return null;
         });
+    return batchId;
   }
 
   protected YarnLegacyBackfillReport backfill(TenantFixture fixture) {

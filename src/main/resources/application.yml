@@ -37,6 +37,9 @@ spring:
     locations: classpath:db/migration
     validate-on-migrate: true
     default-schema: common_tenant
+    postgresql:
+      # CREATE INDEX CONCURRENTLY must not wait on Flyway's own transactional advisory lock.
+      transactional-lock: false
 
   cache:
     type: caffeine

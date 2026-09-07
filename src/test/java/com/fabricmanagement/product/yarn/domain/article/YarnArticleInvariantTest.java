@@ -40,7 +40,8 @@ import org.junit.jupiter.api.Test;
  * i20ActiveEditRerunsFullCatalogue; I21 i21EachStrandHasOneSingleStage; I22 i22ResultantReconciles;
  * I23 i23LayersRequireCompoundFeature; I24 i24ComponentFibersAppearInComposition; I25
  * i25SnapshotsComeFromFiber; I26 i26AuditVersionSlotIsNamed; I27 i27LayersAreCountFree; I28
- * i28ContractionBounds; I29 i29PhysicalBounds; I30 i30CountPairs; I31 i31SourceSnapshotsAgree.
+ * i28ContractionBounds; I29 i29PhysicalBounds; I30 i30CountPairs; I31 i31SourceSnapshotsAgree; I32
+ * i32SourceDesignationUsesTheSharedCodePointPolicy.
  */
 class YarnArticleInvariantTest {
 
@@ -52,10 +53,10 @@ class YarnArticleInvariantTest {
   }
 
   @Test
-  void catalogueContainsI1ThroughI31Exactly() {
+  void catalogueContainsI1ThroughI32Exactly() {
     assertThat(YarnArticleInvariantCatalog.ALL_IDS)
         .containsExactlyElementsOf(
-            java.util.stream.IntStream.rangeClosed(1, 31)
+            java.util.stream.IntStream.rangeClosed(1, 32)
                 .mapToObj(number -> "I" + number)
                 .toList());
   }
@@ -356,6 +357,61 @@ class YarnArticleInvariantTest {
     assertThat(article.getArticleSpecVersion()).isEqualTo(2);
     assertThat(article.getComposition().getFirst().getMaterialSource())
         .isEqualTo(MaterialSource.RECYCLED);
+  }
+
+  @Test
+  void i32SourceDesignationUsesTheSharedCodePointPolicy() {
+    YarnArticle article = draft(validSingle(cotton));
+    String canonicalKeyBefore = article.getCanonicalKey();
+    byte[] identityBefore = SERIALIZER.identityProjectionBytes(SERIALIZER.auditSnapshot(article));
+
+    assertThatThrownBy(() -> article.adoptSourceDesignation(" \t\n"))
+        .isInstanceOf(YarnDomainException.class)
+        .satisfies(error -> assertHasId((YarnDomainException) error, "I32"));
+    assertThatThrownBy(() -> article.adoptSourceDesignation("x".repeat(256)))
+        .isInstanceOf(YarnDomainException.class)
+        .satisfies(error -> assertHasId((YarnDomainException) error, "I32"));
+
+    var blankUpdate = validSingle(cotton);
+    blankUpdate.sourceDesignation = "\u2000";
+    assertThatThrownBy(() -> article.updateSpec(blankUpdate.build(), SERIALIZER))
+        .isInstanceOf(YarnDomainException.class)
+        .satisfies(error -> assertHasId((YarnDomainException) error, "I32"));
+    var overlengthUpdate = validSingle(cotton);
+    overlengthUpdate.sourceDesignation = "x".repeat(256);
+    assertThatThrownBy(() -> article.updateSpec(overlengthUpdate.build(), SERIALIZER))
+        .isInstanceOf(YarnDomainException.class)
+        .satisfies(error -> assertHasId((YarnDomainException) error, "I32"));
+
+    String supplementary = "\uD83E\uDDF5".repeat(255);
+    article.adoptSourceDesignation(supplementary);
+    assertThat(article.getSourceDesignation()).isEqualTo(supplementary);
+    assertThat(article.getCanonicalKey()).isEqualTo(canonicalKeyBefore);
+    assertThat(SERIALIZER.identityProjectionBytes(SERIALIZER.auditSnapshot(article)))
+        .containsExactly(identityBefore);
+
+    var nullable = validSingle(cotton);
+    nullable.sourceDesignation = null;
+    article.updateSpec(nullable.build(), SERIALIZER);
+    assertThat(article.getSourceDesignation()).isNull();
+    assertThatThrownBy(() -> article.adoptSourceDesignation(null))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void clearBlankSourceDesignationDefendsObsoleteWithI17() throws Exception {
+    YarnArticle article = draft(validSingle(cotton));
+    article.activate();
+    article.markObsolete();
+    Field sourceDesignation = YarnArticle.class.getDeclaredField("sourceDesignation");
+    sourceDesignation.setAccessible(true);
+    sourceDesignation.set(article, " ");
+
+    assertThatThrownBy(article::clearBlankSourceDesignation)
+        .isInstanceOf(YarnDomainException.class)
+        .satisfies(error -> assertHasId((YarnDomainException) error, "I17"));
+    assertThat(YarnArticleInvariantCatalog.validateFull(article))
+        .noneMatch(violation -> violation.id().equals("I32"));
   }
 
   private static YarnArticleTestFixtures.SpecBuilder validPlied(Fiber fiber) {

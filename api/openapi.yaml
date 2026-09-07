@@ -193,6 +193,8 @@ tags:
   name: Registration
 - description: Multilingual and localization management
   name: i18n
+- description: Legacy reconciliation and readiness visibility
+  name: Yarn Reconciliation
 - description: Product Batch Inventory & Lifecycle Management API
   name: Batch
 - description: Hr Policy Pack operations
@@ -39284,6 +39286,407 @@ paths:
       summary: Get a yarn article by product
       tags:
       - Yarn Articles
+  /api/v1/production/yarns/readiness:
+    get:
+      operationId: getYarnReadiness
+      parameters:
+      - in: query
+        name: blockersLimit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseYarnReadinessDto"
+          description: Readiness report
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Report tenant yarn readiness
+      tags:
+      - Yarn Reconciliation
+  /api/v1/production/yarns/reconciliations:
+    get:
+      operationId: listYarnReconciliations
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          default: OPEN
+          enum:
+          - OPEN
+          - RESOLVED
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseYarnReconciliationItemDto"
+          description: Page
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List reconciliation rows
+      tags:
+      - Yarn Reconciliation
+  /api/v1/production/yarns/reconciliations/{id}/candidates:
+    get:
+      operationId: listYarnReconciliationCandidates
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseYarnReconciliationCandidatePageDto"
+          description: Page
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List byte-equal candidate groups
+      tags:
+      - Yarn Reconciliation
+  /api/v1/production/yarns/reconciliations/{id}/choose:
+    post:
+      operationId: chooseYarnReconciliationCandidate
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YarnReconciliationChooseRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: Resolved
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Adopt one stored candidate
+      tags:
+      - Yarn Reconciliation
+  /api/v1/production/yarns/reconciliations/{id}/dismiss:
+    post:
+      operationId: dismissYarnReconciliation
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: Resolved
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Dismiss all stored candidates
+      tags:
+      - Yarn Reconciliation
   /api/v1/production/yarns/spinning-systems:
     get:
       operationId: listYarnSpinningSystems
@@ -51215,6 +51618,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponseYarnReconciliationItemDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseYarnReconciliationItemDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePartnerContactDto:
       type: object
       properties:
@@ -52533,6 +52954,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/YarnCatalogueDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseYarnReadinessDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/YarnReadinessDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseYarnReconciliationCandidatePageDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/YarnReconciliationCandidatePageDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -60319,6 +60776,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/YarnCatalogueDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseYarnReconciliationItemDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/YarnReconciliationItemDto"
         first:
           type: boolean
         last:
@@ -68474,6 +68954,252 @@ components:
             type: string
             description: Additional yarn requirements
       description: Yarn-specific RFQ specifications
+    YarnReadinessBlockerDto:
+      type: object
+      description: Actively-used YARN product whose article is not ACTIVE
+      properties:
+        articleId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        articleStatus:
+          type:
+          - string
+          - "null"
+          enum:
+          - DRAFT
+          - ACTIVE
+          - OBSOLETE
+        productId:
+          type: string
+          format: uuid
+        productUid:
+          type: string
+        signals:
+          type: array
+          items:
+            type: string
+            enum:
+            - OPEN_PURCHASE_ORDER
+            - OPEN_WORK_ORDER
+            - RECENT_BATCH_MOVEMENT
+      required:
+      - articleId
+      - articleStatus
+      - productId
+      - productUid
+      - signals
+    YarnReadinessDto:
+      type: object
+      description: "Tenant yarn-article readiness report; visibility only, never enforcement"
+      properties:
+        activeArticleCount:
+          type: integer
+          format: int64
+        activeYarnProductCount:
+          type: integer
+          format: int64
+        activelyUsedCount:
+          type: integer
+          format: int64
+        blockerCount:
+          type: integer
+          format: int64
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/YarnReadinessBlockerDto"
+        movementWindowDays:
+          type: integer
+          format: int32
+        openReconciliationCount:
+          type: integer
+          format: int64
+        ready:
+          type: boolean
+        unlinkedOpenYarnDocuments:
+          $ref: "#/components/schemas/YarnUnlinkedOpenDocumentsDto"
+      required:
+      - activeArticleCount
+      - activeYarnProductCount
+      - activelyUsedCount
+      - blockerCount
+      - blockers
+      - movementWindowDays
+      - openReconciliationCount
+      - ready
+      - unlinkedOpenYarnDocuments
+    YarnReconciliationCandidateGroupDto:
+      type: object
+      description: Byte-equal candidate spelling grouped with its occurrence count
+      properties:
+        occurrences:
+          type: integer
+          format: int64
+        overlength:
+          type: boolean
+        rawValue:
+          type: string
+        recordedAt:
+          type: string
+          format: date-time
+        sourceKind:
+          type: string
+          enum:
+          - BATCH_ACTUAL
+          - PURCHASE_ORDER_AGREED
+          - SUPPLIER_QUOTE_OFFERED
+          - RFQ_REQUESTED
+          - WORK_ORDER_TARGET
+        sourceRecordId:
+          type: string
+      required:
+      - occurrences
+      - overlength
+      - rawValue
+      - recordedAt
+      - sourceKind
+      - sourceRecordId
+    YarnReconciliationCandidatePageDto:
+      type: object
+      description: One page of grouped reconciliation candidates
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/YarnReconciliationCandidateGroupDto"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalGroups:
+          type: integer
+          format: int64
+      required:
+      - groups
+      - page
+      - size
+      - totalGroups
+    YarnReconciliationChooseRequest:
+      type: object
+      description: Stable identity of the stored candidate to adopt verbatim
+      properties:
+        sourceKind:
+          type: string
+          enum:
+          - BATCH_ACTUAL
+          - PURCHASE_ORDER_AGREED
+          - SUPPLIER_QUOTE_OFFERED
+          - RFQ_REQUESTED
+          - WORK_ORDER_TARGET
+        sourceRecordId:
+          type: string
+          minLength: 1
+      required:
+      - sourceKind
+      - sourceRecordId
+    YarnReconciliationItemDto:
+      type: object
+      description: One row in the yarn legacy reconciliation queue
+      properties:
+        articleId:
+          type: string
+          format: uuid
+        articleName:
+          type: string
+        articleStatus:
+          type: string
+          enum:
+          - DRAFT
+          - ACTIVE
+          - OBSOLETE
+        candidateOccurrenceCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        productUid:
+          type: string
+        reason:
+          type: string
+          enum:
+          - AMBIGUOUS
+          - OVERLENGTH
+        resolutionAction:
+          type:
+          - string
+          - "null"
+          enum:
+          - CHOSEN
+          - DISMISSED
+        resolvedCandidate:
+          type: "null"
+          $ref: "#/components/schemas/YarnReconciliationResolvedCandidateDto"
+        status:
+          type: string
+          enum:
+          - OPEN
+          - RESOLVED
+      required:
+      - articleId
+      - articleName
+      - articleStatus
+      - candidateOccurrenceCount
+      - createdAt
+      - id
+      - productId
+      - productUid
+      - reason
+      - resolutionAction
+      - resolvedCandidate
+      - status
+    YarnReconciliationResolvedCandidateDto:
+      type: object
+      description: The stored candidate adopted to close a reconciliation row
+      properties:
+        rawValue:
+          type: string
+        recordedAt:
+          type: string
+          format: date-time
+        sourceKind:
+          type: string
+          enum:
+          - BATCH_ACTUAL
+          - PURCHASE_ORDER_AGREED
+          - SUPPLIER_QUOTE_OFFERED
+          - RFQ_REQUESTED
+          - WORK_ORDER_TARGET
+        sourceRecordId:
+          type: string
+      required:
+      - rawValue
+      - recordedAt
+      - sourceKind
+      - sourceRecordId
+    YarnUnlinkedOpenDocumentsDto:
+      type: object
+      description: Advisory counts of open yarn documents without a product link
+      properties:
+        openPurchaseOrders:
+          type: integer
+          format: int64
+        openWorkOrders:
+          type: integer
+          format: int64
+      required:
+      - openPurchaseOrders
+      - openWorkOrders
     YieldSummary:
       type: object
       description: Average yield and completed WO count

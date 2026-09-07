@@ -2,6 +2,7 @@ package com.fabricmanagement.product.core.infra.repository;
 
 import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
   List<Product> findByTenantIdAndProductTypeAndIsActiveTrue(UUID tenantId, ProductType productType);
 
+  List<Product> findByTenantIdAndIdInAndProductType(
+      UUID tenantId, Collection<UUID> ids, ProductType productType);
+
   List<Product> findByTenantIdInAndProductTypeAndIsActiveTrue(
       List<UUID> tenantIds, ProductType productType);
 
@@ -36,4 +40,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
   long countByTenantIdAndIsActiveTrue(UUID tenantId);
 
   long countByTenantIdAndProductType(UUID tenantId, ProductType productType);
+
+  long countByTenantIdAndProductTypeAndIsActiveTrue(UUID tenantId, ProductType productType);
 }

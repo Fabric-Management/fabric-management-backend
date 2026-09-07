@@ -4,7 +4,9 @@ spring:
     register-shutdown-hook: false
   datasource:
     hikari:
+      # Keep capacity for concurrent tests without reserving ten idle connections per context.
       maximum-pool-size: 10
+      minimum-idle: 1
 
 # CR-11: Explicit system-datasource config for test profile.
 # Testcontainers uses the same superuser for all roles — this prevents
