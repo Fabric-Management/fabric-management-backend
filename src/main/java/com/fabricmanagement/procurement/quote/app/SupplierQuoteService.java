@@ -65,9 +65,8 @@ public class SupplierQuoteService {
     UUID tenantId = TenantContext.requireTenantId();
 
     Specification<SupplierQuote> spec =
-        Specification.<SupplierQuote>where(
-                (root, query, cb) -> cb.equal(root.get("tenantId"), tenantId))
-            .and((root, query, cb) -> cb.isTrue(root.get("isActive")));
+        (root, query, cb) -> cb.equal(root.get("tenantId"), tenantId);
+    spec = spec.and((root, query, cb) -> cb.isTrue(root.get("isActive")));
 
     if (status != null) {
       spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));

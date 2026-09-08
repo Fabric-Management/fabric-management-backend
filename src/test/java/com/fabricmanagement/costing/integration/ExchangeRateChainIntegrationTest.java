@@ -26,24 +26,24 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Validates the Exchange Rate chain logic and database operations. TCMB XML behavior is isolated
- * and mocked via @MockBean.
+ * and mocked via @MockitoBean.
  */
 @DisplayName("Exchange Rate Provider Chain Integration")
 class ExchangeRateChainIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private ExchangeRateService exchangeRateService;
   @Autowired private ExchangeRateCacheRepository cacheRepo;
-  @MockBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  @MockitoBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   // Mock ECB Provider (Order 1.5) so we don't do real HTTP requests
-  @MockBean private EcbExchangeRateProvider ecbProvider;
+  @MockitoBean private EcbExchangeRateProvider ecbProvider;
 
   // Mock TCMB Provider (Order 2) so we don't do real HTTP requests
-  @MockBean private TcmbExchangeRateProvider tcmbProvider;
+  @MockitoBean private TcmbExchangeRateProvider tcmbProvider;
 
   @BeforeEach
   void setUp() {

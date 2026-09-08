@@ -47,8 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -57,6 +55,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -111,13 +111,13 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private TenantSessionBinder tenantSessionBinder;
-  @SpyBean private PurchaseOrderRepository purchaseOrderRepository;
+  @MockitoSpyBean private PurchaseOrderRepository purchaseOrderRepository;
 
-  @MockBean private PurchaseOrderValidationEngine validationEngine;
-  @MockBean private ApprovalPort approvalPort;
-  @MockBean private DataScopeGuard dataScopeGuard;
-  @MockBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
-  @MockBean private ExchangeRateService exchangeRateService;
+  @MockitoBean private PurchaseOrderValidationEngine validationEngine;
+  @MockitoBean private ApprovalPort approvalPort;
+  @MockitoBean private DataScopeGuard dataScopeGuard;
+  @MockitoBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  @MockitoBean private ExchangeRateService exchangeRateService;
 
   private UUID quoteId;
   private UUID rfqId;

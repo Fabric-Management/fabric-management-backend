@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
  *     src/test/resources/derivations/spinning. Runtime replacement: SpinningLotDerivation (YARN-3).
  *     Physical removal: YARN-3B.
  */
+@SuppressWarnings("removal")
 @Deprecated(since = "YARN-0B", forRemoval = true)
 @Service
 public class BatchAttributeInheritanceEngine implements BatchAttributeInheritancePort {

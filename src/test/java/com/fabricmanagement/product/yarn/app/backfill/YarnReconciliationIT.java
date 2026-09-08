@@ -26,8 +26,8 @@ import java.util.concurrent.TimeUnit;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 class YarnReconciliationIT extends YarnBackfillIntegrationSupport {
 
@@ -35,8 +35,8 @@ class YarnReconciliationIT extends YarnBackfillIntegrationSupport {
 
   @Autowired private YarnReconciliationService reconciliationService;
   @Autowired private EntityManagerFactory entityManagerFactory;
-  @SpyBean private YarnArticleService articleService;
-  @SpyBean private YarnBackfillReconciliationRepository reconciliationRepository;
+  @MockitoSpyBean private YarnArticleService articleService;
+  @MockitoSpyBean private YarnBackfillReconciliationRepository reconciliationRepository;
 
   @Test
   void chooseAdoptsStoredBytesBumpsAndAuditsThenListReturnsTypedResolution() {

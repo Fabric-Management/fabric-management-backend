@@ -39,7 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -59,10 +59,10 @@ class CostCalculationIntegrationTest extends AbstractIntegrationTest {
   @Autowired
   private ApplicationEvents events;
 
-  @MockBean private TenantReportingCurrencyPort tenantPort;
-  @MockBean private EcbExchangeRateProvider ecbProvider;
-  @MockBean private TcmbExchangeRateProvider tcmbProvider;
-  @MockBean private WorkOrderPlanningUpdatePort planningPort;
+  @MockitoBean private TenantReportingCurrencyPort tenantPort;
+  @MockitoBean private EcbExchangeRateProvider ecbProvider;
+  @MockitoBean private TcmbExchangeRateProvider tcmbProvider;
+  @MockitoBean private WorkOrderPlanningUpdatePort planningPort;
 
   @BeforeEach
   void setUp() {

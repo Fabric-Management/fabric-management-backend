@@ -85,7 +85,7 @@ public final class WorkOrderSpecification {
    * guard is always included.
    */
   public static Specification<WorkOrder> build(UUID tenantId, WorkOrderFilterRequest filter) {
-    Specification<WorkOrder> spec = Specification.where(belongsToTenant(tenantId));
+    Specification<WorkOrder> spec = belongsToTenant(tenantId);
 
     if (filter.status() != null) spec = spec.and(hasStatus(filter.status()));
     if (filter.moduleType() != null) spec = spec.and(hasModuleType(filter.moduleType()));

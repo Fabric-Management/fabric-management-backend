@@ -29,6 +29,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
+@SuppressWarnings("removal")
 class SpinningDerivationFixtureTest {
 
   private static final String SCHEMA_LOCATION = "inheritance-rules/fiber-to-yarn.json";

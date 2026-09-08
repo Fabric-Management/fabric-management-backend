@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * (mirroring fiber-to-yarn.json). Verifies WEIGHTED_AVERAGE, MIN, REQUIRE_EQUAL, COLLECT_TO_ARRAY,
  * DROP, and conflict behaviour for REQUIRE_EQUAL.
  */
+@SuppressWarnings("removal")
 @ExtendWith(MockitoExtension.class)
 class FiberToYarnInheritanceTest {
 

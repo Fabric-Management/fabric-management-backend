@@ -148,7 +148,7 @@ public class Quote extends BaseEntity {
   }
 
   /**
-   * @deprecated the {@code leadTimeDays} parameter is superseded by per-line {@code
+   * @apiNote The {@code leadTimeDays} parameter is superseded by per-line {@code
    *     QuoteLine.deliveryStatus}/{@code deliveryDate} (QLINE-ATP-1); retained for historical data,
    *     no longer written by the FE. See
    *     docs/sales/tickets/QLINE-LEADTIME-1-remove-quote-header-lead-time.md.

@@ -27,12 +27,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -75,8 +75,8 @@ class TenantOnboardingIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private List<OnboardingStep> onboardingSteps;
 
-  @MockBean private NotificationService notificationService;
-  @MockBean private EmailTemplateRenderer emailTemplateRenderer;
+  @MockitoBean private NotificationService notificationService;
+  @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
 
   @Test
   @DisplayName("POST /api/public/signup creates tenant and returns success (e2e)")

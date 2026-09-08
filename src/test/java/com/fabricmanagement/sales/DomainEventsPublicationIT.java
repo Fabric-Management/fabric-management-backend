@@ -38,11 +38,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.annotation.Commit;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -84,8 +84,8 @@ class DomainEventsPublicationIT {
   @Autowired private TenantRepository tenantRepository;
   @Autowired private OrganizationRepository organizationRepository;
 
-  @SpyBean private DomainEventPublisher domainEventPublisher;
-  @SpyBean private EventRouterService eventRouterService;
+  @MockitoSpyBean private DomainEventPublisher domainEventPublisher;
+  @MockitoSpyBean private EventRouterService eventRouterService;
 
   private UUID tenantId;
 

@@ -35,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @DisplayName("Multi-Product Cost Integration Test")
 class MultiProductCostIntegrationTest extends AbstractIntegrationTest {
@@ -48,10 +48,10 @@ class MultiProductCostIntegrationTest extends AbstractIntegrationTest {
   @Autowired private ExchangeRateCacheRepository cacheRepo;
   @Autowired private CostCalculationRepository calcRepo;
 
-  @MockBean private TenantReportingCurrencyPort tenantPort;
-  @MockBean private EcbExchangeRateProvider ecbProvider; // Mock external calls
-  @MockBean private TcmbExchangeRateProvider tcmbProvider; // Mock external calls
-  @MockBean private WorkOrderPlanningUpdatePort planningPort; // Ignore upstream updates
+  @MockitoBean private TenantReportingCurrencyPort tenantPort;
+  @MockitoBean private EcbExchangeRateProvider ecbProvider; // Mock external calls
+  @MockitoBean private TcmbExchangeRateProvider tcmbProvider; // Mock external calls
+  @MockitoBean private WorkOrderPlanningUpdatePort planningPort; // Ignore upstream updates
 
   @BeforeEach
   void setUp() {

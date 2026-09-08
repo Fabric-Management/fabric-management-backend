@@ -20,9 +20,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @AutoConfigureMockMvc(addFilters = false)
@@ -33,8 +33,8 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
   @Autowired private LeadRepository leadRepository;
   @Autowired private TenantResetService tenantResetService;
 
-  @MockBean private NotificationService notificationService;
-  @MockBean private EmailTemplateRenderer emailTemplateRenderer;
+  @MockitoBean private NotificationService notificationService;
+  @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
 
   @Test
   void signupCreatesLeadThatSurvivesDemoResetAndHasNoTenantIdColumn() throws Exception {

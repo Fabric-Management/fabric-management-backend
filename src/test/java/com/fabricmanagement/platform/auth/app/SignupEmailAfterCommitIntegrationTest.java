@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class SignupEmailAfterCommitIntegrationTest extends AbstractIntegrationTest {
@@ -21,8 +21,8 @@ class SignupEmailAfterCommitIntegrationTest extends AbstractIntegrationTest {
   @Autowired private DomainEventPublisher eventPublisher;
   @Autowired private TransactionTemplate transactionTemplate;
 
-  @MockBean private NotificationService notificationService;
-  @MockBean private EmailTemplateRenderer emailTemplateRenderer;
+  @MockitoBean private NotificationService notificationService;
+  @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
 
   @Test
   void rollbackPreventsSignupEmailListenerDelivery() {
