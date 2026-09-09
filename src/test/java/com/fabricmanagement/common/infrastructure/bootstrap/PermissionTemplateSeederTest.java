@@ -10,6 +10,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
@@ -284,6 +285,81 @@ class PermissionTemplateSeederTest {
     assertThat(actual).isEqualTo(expected).isNotEmpty();
     assertThat(saved)
         .noneMatch(t -> "yarn".equals(t.getResource()) && "approve".equals(t.getAction()));
+  }
+
+  @Test
+  void newPermissionsMirrorExactlyTheirApprovedSiblingMatrices() {
+    List<PermissionTemplate> rows =
+        new PermissionTemplateSeeder(null, null).buildDesiredTemplates();
+    Set<String> productionDepartments =
+        Set.of("FIBER", "YARN", "WEAVING", "KNITTING", "DYEING", "GARMENT");
+    for (String action : List.of("read", "write")) {
+      Set<String> expected =
+          rows.stream()
+              .filter(row -> "fiber".equals(row.getResource()) && action.equals(row.getAction()))
+              .filter(row -> productionDepartments.contains(row.getDepartmentCode()))
+              .map(PermissionTemplateSeederTest::matrixKey)
+              .collect(java.util.stream.Collectors.toSet());
+      assertThat(
+              rows.stream()
+                  .filter(
+                      row ->
+                          "production".equals(row.getResource()) && action.equals(row.getAction()))
+                  .map(PermissionTemplateSeederTest::matrixKey)
+                  .collect(java.util.stream.Collectors.toSet()))
+          .isEqualTo(expected)
+          .isNotEmpty();
+    }
+    for (String action : List.of("read", "write", "manage")) {
+      Set<String> expected =
+          rows.stream()
+              .filter(row -> "finance".equals(row.getResource()) && action.equals(row.getAction()))
+              .filter(row -> "FINANCE".equals(row.getDepartmentCode()))
+              .map(PermissionTemplateSeederTest::matrixKey)
+              .collect(java.util.stream.Collectors.toSet());
+      assertThat(
+              rows.stream()
+                  .filter(
+                      row -> "costing".equals(row.getResource()) && action.equals(row.getAction()))
+                  .map(PermissionTemplateSeederTest::matrixKey)
+                  .collect(java.util.stream.Collectors.toSet()))
+          .isEqualTo(expected)
+          .isNotEmpty();
+    }
+    assertThat(
+            rows.stream()
+                .filter(
+                    row ->
+                        "logistics".equals(row.getResource()) && "delete".equals(row.getAction()))
+                .map(PermissionTemplateSeederTest::matrixKey)
+                .toList())
+        .containsExactly("MANAGER|WAREHOUSE|delete|ORGANIZATION");
+    assertThat(
+            rows.stream()
+                .filter(
+                    row ->
+                        "logistics".equals(row.getResource()) && "cancel".equals(row.getAction()))
+                .map(PermissionTemplateSeederTest::matrixKey)
+                .toList())
+        .containsExactly("MANAGER|WAREHOUSE|cancel|ORGANIZATION");
+  }
+
+  @Test
+  void existingNarrowedOrInactiveNewGrantIsNotOverwrittenBySeeder() {
+    PermissionTemplate customised =
+        template("MANAGER", "FINANCE", "costing", "manage", DataScope.OWN);
+    customised.setIsActive(false);
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(customised), saved).seed();
+    assertThat(saved)
+        .noneMatch(
+            row ->
+                "MANAGER".equals(row.getRoleCode())
+                    && Objects.equals("FINANCE", row.getDepartmentCode())
+                    && "costing".equals(row.getResource())
+                    && "manage".equals(row.getAction()));
+    assertThat(customised.getDataScope()).isEqualTo(DataScope.OWN);
+    assertThat(customised.getIsActive()).isFalse();
   }
 
   private static String matrixKey(PermissionTemplate template) {

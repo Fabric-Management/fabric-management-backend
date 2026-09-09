@@ -18,16 +18,16 @@ import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 class YarnLegacyBackfillIT extends YarnBackfillIntegrationSupport {
 
   private static final Instant BASE_TIME = Instant.parse("2026-08-31T12:00:00Z");
 
-  @SpyBean private ProductRepository productRepository;
-  @SpyBean private YarnArticleRepository articleRepository;
-  @SpyBean private YarnBackfillReconciliationRepository reconciliationRepository;
+  @MockitoSpyBean private ProductRepository productRepository;
+  @MockitoSpyBean private YarnArticleRepository articleRepository;
+  @MockitoSpyBean private YarnBackfillReconciliationRepository reconciliationRepository;
   @Autowired private EntityManagerFactory entityManagerFactory;
 
   @Test

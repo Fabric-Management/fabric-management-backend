@@ -13,10 +13,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FxExposureController.class)
@@ -25,14 +25,14 @@ class FxExposureControllerSecurityTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private FxExposureService fxExposureService;
+  @MockitoBean private FxExposureService fxExposureService;
 
-  @MockBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
+  @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean(name = "auth")
+  @MockitoBean(name = "auth")
   private SpELPermissionEvaluator authEvaluator;
 
   private final UUID tenantId = UUID.randomUUID();

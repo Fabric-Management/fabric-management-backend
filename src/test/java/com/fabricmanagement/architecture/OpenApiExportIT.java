@@ -1,12 +1,17 @@
 package com.fabricmanagement.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
@@ -69,6 +74,16 @@ public class OpenApiExportIT {
     Map<String, Object> generatedDocument =
         new YAMLMapper().readValue(generatedSpec, new TypeReference<Map<String, Object>>() {});
     assertValidationContracts(generatedDocument);
+    assertPermissionCatalogueContract(generatedDocument);
+
+    // Red probe uses a separate copy: the actual export must never contain the mutated value.
+    Map<String, Object> corruptedDocument =
+        new YAMLMapper().readValue(generatedSpec, new TypeReference<Map<String, Object>>() {});
+    mapAt(corruptedDocument, "components", "schemas", "PermissionKey")
+        .put("enum", List.of("sales:teleport"));
+    assertThatThrownBy(() -> assertPermissionCatalogueContract(corruptedDocument))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("PermissionKey");
 
     // 2. Define the target spec file location
     File specFile = new File("api/openapi.yaml");
@@ -91,6 +106,24 @@ public class OpenApiExportIT {
               "OpenAPI contract has drifted! Run 'UPDATE_OPENAPI=true ./mvnw verify -Dit.test=OpenApiExportIT' to accept changes and commit.")
           .isEqualTo(existingSpec);
     }
+  }
+
+  private void assertPermissionCatalogueContract(Map<String, Object> document) {
+    // Validate the live springdoc document BEFORE either writing or comparing the stored YAML.
+    Map<String, Object> schema = mapAt(document, "components", "schemas", "PermissionKey");
+    assertThat(schema).containsEntry("type", "string");
+    assertThat(schema.get("enum")).isInstanceOf(List.class);
+    List<?> values = (List<?>) schema.get("enum");
+    assertThat(values).doesNotHaveDuplicates();
+    assertThat(new HashSet<>(values))
+        .as("PermissionKey must expose exactly the catalogue's resource:action wire values")
+        .isEqualTo(
+            new HashSet<>(Arrays.stream(PermissionKey.values()).map(PermissionKey::key).toList()));
+    assertThat(schemaProperty(document, "PermissionCatalogueEntryDto", "key"))
+        .containsEntry("$ref", "#/components/schemas/PermissionKey");
+    assertThat(
+            mapAt(document, "paths", "/api/v1/platform/permissions/catalogue", "get", "responses"))
+        .containsKey("200");
   }
 
   private void assertValidationContracts(Map<String, Object> document) {

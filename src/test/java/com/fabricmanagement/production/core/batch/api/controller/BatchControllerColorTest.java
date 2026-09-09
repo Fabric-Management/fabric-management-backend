@@ -22,11 +22,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(BatchController.class)
@@ -38,16 +38,16 @@ class BatchControllerColorTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private BatchService batchService;
-  @MockBean private BatchOperationsService batchOperationsService;
-  @MockBean private BatchCertificationService batchCertificationService;
-  @MockBean private BatchAttributeService batchAttributeService;
-  @MockBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
+  @MockitoBean private BatchService batchService;
+  @MockitoBean private BatchOperationsService batchOperationsService;
+  @MockitoBean private BatchCertificationService batchCertificationService;
+  @MockitoBean private BatchAttributeService batchAttributeService;
+  @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean(name = "auth")
+  @MockitoBean(name = "auth")
   private SpELPermissionEvaluator authEvaluator;
 
   @Test

@@ -28,12 +28,12 @@ import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ColorPartnerRefController.class)
@@ -47,15 +47,15 @@ class ColorPartnerRefControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private ColorPartnerRefService colorPartnerRefService;
-  @MockBean private ColorPartnerRefQueryService colorPartnerRefQueryService;
-  @MockBean private ColorPartnerRefMapper colorPartnerRefMapper;
-  @MockBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
+  @MockitoBean private ColorPartnerRefService colorPartnerRefService;
+  @MockitoBean private ColorPartnerRefQueryService colorPartnerRefQueryService;
+  @MockitoBean private ColorPartnerRefMapper colorPartnerRefMapper;
+  @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean(name = "auth")
+  @MockitoBean(name = "auth")
   private SpELPermissionEvaluator authEvaluator;
 
   private final ColorPartnerRefMapper delegateMapper =

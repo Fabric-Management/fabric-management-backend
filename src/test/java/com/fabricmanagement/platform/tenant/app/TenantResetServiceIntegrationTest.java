@@ -19,9 +19,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @AutoConfigureMockMvc(addFilters = false)
@@ -31,8 +31,8 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private TenantResetService tenantResetService;
 
-  @MockBean private NotificationService notificationService;
-  @MockBean private EmailTemplateRenderer emailTemplateRenderer;
+  @MockitoBean private NotificationService notificationService;
+  @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
 
   @Test
   @DisplayName("Reset demo restores registered demo seed while preserving tenant, owner, and clock")

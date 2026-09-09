@@ -26,16 +26,16 @@ import org.hibernate.StaleObjectStateException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 class YarnBlankDesignationRemediationIT extends YarnArticleIntegrationSupport {
 
   @Autowired private YarnBlankDesignationRemediationService remediationService;
   @Autowired private YarnReconciliationService reconciliationService;
   @Autowired private YarnReadinessService readinessService;
-  @SpyBean private YarnArticleService articleServiceSpy;
-  @SpyBean private YarnArticleSpecSerializer serializerSpy;
+  @MockitoSpyBean private YarnArticleService articleServiceSpy;
+  @MockitoSpyBean private YarnArticleSpecSerializer serializerSpy;
 
   @AfterEach
   void resetInterleavingSpies() {

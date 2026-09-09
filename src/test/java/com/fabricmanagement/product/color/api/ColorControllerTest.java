@@ -35,7 +35,6 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +43,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ColorController.class)
@@ -56,14 +56,14 @@ class ColorControllerTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
-  @MockBean private ColorService colorService;
-  @MockBean private ColorMapper colorMapper;
-  @MockBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
+  @MockitoBean private ColorService colorService;
+  @MockitoBean private ColorMapper colorMapper;
+  @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean(name = "auth")
+  @MockitoBean(name = "auth")
   private SpELPermissionEvaluator authEvaluator;
 
   private final ColorMapper delegateMapper = Mappers.getMapper(ColorMapper.class);

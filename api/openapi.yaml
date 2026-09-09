@@ -76,6 +76,8 @@ tags:
   name: Sales Lot
 - description: Contact operations
   name: Contact
+- description: Canonical permission vocabulary
+  name: Permission Catalogue
 - description: Incomplete background follow-up flags
   name: Follow-up flags
 - description: Platform Notification operations
@@ -24635,6 +24637,65 @@ paths:
           description: Internal Server Error
       tags:
       - Platform Notification
+  /api/v1/platform/permissions/catalogue:
+    get:
+      description: "Available to every authenticated session. Returns vocabulary,\
+        \ not effective grants."
+      operationId: catalogue
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListPermissionCatalogueEntryDto"
+          description: Complete catalogue ordered by key
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          description: Authentication required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List the permission catalogue
+      tags:
+      - Permission Catalogue
   /api/v1/playground/impersonate/{userId}:
     post:
       description: "Validates the current tenant is in demo mode, verifies the target\
@@ -49965,6 +50026,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListPermissionCatalogueEntryDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionCatalogueEntryDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListPermissionOverrideDto:
       type: object
       properties:
@@ -61189,6 +61270,94 @@ components:
         updatedAt:
           type: string
           format: date-time
+    PermissionCatalogueEntryDto:
+      type: object
+      description: One declared permission; inclusion does not grant it to the caller.
+      properties:
+        action:
+          type: string
+          example: read
+        enforced:
+          type: boolean
+          description: Whether a backend or frontend enforcement point currently consumes
+            the pair.
+        key:
+          $ref: "#/components/schemas/PermissionKey"
+        resource:
+          type: string
+          example: sales
+      required:
+      - action
+      - enforced
+      - key
+      - resource
+    PermissionKey:
+      type: string
+      description: Canonical resource:action pair. Catalogue membership does not grant
+        access.
+      enum:
+      - admin:access
+      - colors:approve
+      - colors:manage
+      - colors:read
+      - colors:write
+      - costing:manage
+      - costing:read
+      - costing:write
+      - dashboard:view
+      - fiber:approve
+      - fiber:read
+      - fiber:write
+      - finance:manage
+      - finance:read
+      - finance:write
+      - flowboard:edit
+      - flowboard:manage
+      - flowboard:read
+      - flowboard:view
+      - flowboard:write
+      - logistics:cancel
+      - logistics:delete
+      - logistics:deliver
+      - logistics:prepare
+      - logistics:read
+      - logistics:ship
+      - logistics:write
+      - members:manage
+      - members:read
+      - members:write
+      - notifications:view
+      - partners:read
+      - partners:write
+      - procurement:read
+      - procurement:write
+      - production:read
+      - production:write
+      - products:read
+      - products:write
+      - projects:manage
+      - projects:read
+      - projects:write
+      - quality:approve
+      - quality:manage
+      - quality:read
+      - quality:write
+      - reports:export
+      - reports:view
+      - sales:approve
+      - sales:assign-owner
+      - sales:cancel
+      - sales:confirm
+      - sales:delete
+      - sales:read
+      - sales:ship
+      - sales:write
+      - settings:manage
+      - settings:read
+      - settings:view
+      - settings:write
+      - yarn:read
+      - yarn:write
     PermissionOverrideDto:
       type: object
       properties:

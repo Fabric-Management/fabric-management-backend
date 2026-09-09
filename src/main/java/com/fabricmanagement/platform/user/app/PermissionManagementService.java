@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
-import com.fabricmanagement.common.infrastructure.security.PermissionRegistry;
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.PermissionOverride;
@@ -211,11 +211,9 @@ public class PermissionManagementService {
   }
 
   private void validateResourceAction(String resource, String action) {
-    if (!PermissionRegistry.isValidResource(resource)) {
-      throw new PlatformDomainException("Invalid resource name: " + resource, "BAD_REQUEST", 400);
-    }
-    if (!PermissionRegistry.isValidAction(action)) {
-      throw new PlatformDomainException("Invalid action name: " + action, "BAD_REQUEST", 400);
+    if (PermissionKey.of(resource, action).isEmpty()) {
+      throw new PlatformDomainException(
+          "Invalid permission pair: " + resource + ":" + action, "BAD_REQUEST", 400);
     }
   }
 }

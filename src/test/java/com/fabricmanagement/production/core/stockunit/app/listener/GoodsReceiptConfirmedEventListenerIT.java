@@ -31,12 +31,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -80,10 +80,10 @@ class GoodsReceiptConfirmedEventListenerIT {
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private MeterRegistry meterRegistry;
 
-  @MockBean private StockUnitService stockUnitService;
-  @MockBean private BatchRepository batchRepository;
-  @MockBean private StockUnitRepository stockUnitRepository;
-  @MockBean private SubcontractOrderQueryService subcontractOrderQueryService;
+  @MockitoBean private StockUnitService stockUnitService;
+  @MockitoBean private BatchRepository batchRepository;
+  @MockitoBean private StockUnitRepository stockUnitRepository;
+  @MockitoBean private SubcontractOrderQueryService subcontractOrderQueryService;
 
   @BeforeEach
   void setUp() {

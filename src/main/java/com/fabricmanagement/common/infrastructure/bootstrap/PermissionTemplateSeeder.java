@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.PermissionTemplate;
@@ -11,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -118,7 +120,7 @@ public class PermissionTemplateSeeder {
     }
   }
 
-  private List<PermissionTemplate> buildDesiredTemplates() {
+  public List<PermissionTemplate> buildDesiredTemplates() {
     List<PermissionTemplate> templates = new ArrayList<>();
 
     // 1. Wildcards (All departments)
@@ -126,119 +128,120 @@ public class PermissionTemplateSeeder {
         templates,
         null,
         List.of(
-            new String[] {"WORKER", "dashboard", "view", "ORGANIZATION"},
-            new String[] {"WORKER", "notifications", "view", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "dashboard", "view", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "notifications", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "dashboard", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "notifications", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "finance", "read", "ORGANIZATION"},
-            new String[] {"VIEWER", "dashboard", "view", "ORGANIZATION"},
-            new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"},
-            new String[] {"WORKER", "members", "read", "OWN"},
-            new String[] {"WORKER", "settings", "read", "OWN"},
-            new String[] {"WORKER", "settings", "write", "OWN"},
-            new String[] {"WORKER", "flowboard", "read", "OWN"},
-            new String[] {"WORKER", "flowboard", "write", "OWN"},
-            new String[] {"SUPERVISOR", "members", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "settings", "read", "OWN"},
-            new String[] {"SUPERVISOR", "settings", "write", "OWN"},
-            new String[] {"SUPERVISOR", "flowboard", "read", "OWN"},
-            new String[] {"SUPERVISOR", "flowboard", "write", "OWN"},
-            new String[] {"MANAGER", "members", "read", "DEPARTMENT"},
-            new String[] {"MANAGER", "settings", "read", "OWN"},
-            new String[] {"MANAGER", "settings", "write", "OWN"},
-            new String[] {"MANAGER", "flowboard", "read", "OWN"},
-            new String[] {"MANAGER", "flowboard", "write", "OWN"},
+            new GrantRule("WORKER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.REPORTS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_READ, DataScope.ORGANIZATION),
+            new GrantRule("VIEWER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("VIEWER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.SETTINGS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_READ, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
+            new GrantRule("MANAGER", PermissionKey.MEMBERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SETTINGS_READ, DataScope.OWN),
+            new GrantRule("MANAGER", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
+            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
+            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
             // Department-agnostic quote approval. Previously inserted by migration
             // V20260706120000 (APPROVAL-1); ownership moved here so the seeder alone
             // writes the template tenant. ADMIN is listed for parity with that migration
             // even though PermissionEvaluator short-circuits ADMIN before consulting rows.
-            new String[] {"ADMIN", "sales", "approve", "GLOBAL"},
-            new String[] {"ADMIN", "sales", "assign-owner", "GLOBAL"},
-            new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "sales", "approve", "ORGANIZATION"},
-            new String[] {"ADMIN", "quality", "read", "GLOBAL"},
-            new String[] {"ADMIN", "quality", "write", "GLOBAL"},
-            new String[] {"ADMIN", "quality", "approve", "GLOBAL"},
-            new String[] {"ADMIN", "quality", "manage", "GLOBAL"},
-            new String[] {"PLATFORM_ADMIN", "quality", "read", "GLOBAL"},
-            new String[] {"PLATFORM_ADMIN", "quality", "write", "GLOBAL"},
-            new String[] {"PLATFORM_ADMIN", "quality", "approve", "GLOBAL"},
-            new String[] {"PLATFORM_ADMIN", "quality", "manage", "GLOBAL"}));
+            new GrantRule("ADMIN", PermissionKey.SALES_APPROVE, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.SALES_ASSIGN_OWNER, DataScope.GLOBAL),
+            new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("ADMIN", PermissionKey.QUALITY_READ, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.QUALITY_WRITE, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.QUALITY_APPROVE, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.QUALITY_MANAGE, DataScope.GLOBAL),
+            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_READ, DataScope.GLOBAL),
+            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_WRITE, DataScope.GLOBAL),
+            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_APPROVE, DataScope.GLOBAL),
+            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_MANAGE, DataScope.GLOBAL)));
 
     // 2. SALES
     seedDepartment(
         templates,
         SystemDepartment.SALES.code(),
         List.of(
-            new String[] {"WORKER", "sales", "read", "OWN"},
-            new String[] {"WORKER", "sales", "write", "OWN"},
-            new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
-            new String[] {"WORKER", "flowboard", "view", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "confirm", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "ship", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "delete", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "sales", "approve", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "flowboard", "view", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "flowboard", "edit", "DEPARTMENT"},
-            new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "sales", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "sales", "delete", "DEPARTMENT"},
-            new String[] {"MANAGER", "sales", "confirm", "ORGANIZATION"},
-            new String[] {"MANAGER", "sales", "ship", "ORGANIZATION"},
-            new String[] {"MANAGER", "sales", "cancel", "ORGANIZATION"},
-            new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
-            new String[] {"MANAGER", "sales", "assign-owner", "ORGANIZATION"},
-            new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "flowboard", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "flowboard", "edit", "DEPARTMENT"},
-            new String[] {"MANAGER", "reports", "export", "DEPARTMENT"},
-            new String[] {"WORKER", "finance", "read", "OWN"},
-            new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
-            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "finance", "read", "ORGANIZATION"}));
+            new GrantRule("WORKER", PermissionKey.SALES_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.SALES_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.FLOWBOARD_VIEW, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_CONFIRM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_SHIP, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_APPROVE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_VIEW, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_EDIT, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_CONFIRM, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_SHIP, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_CANCEL, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_ASSIGN_OWNER, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_EDIT, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.FINANCE_READ, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.FINANCE_READ, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_READ, DataScope.ORGANIZATION)));
 
     // 3. Production sub-departments (FIBER, YARN, WEAVING, KNITTING, DYEING, GARMENT)
     //    Each sub-dept gets the same base production permissions.
-    List<String[]> productionRules =
+    List<GrantRule> productionRules =
         List.of(
-            new String[] {"WORKER", "fiber", "read", "OWN"},
-            new String[] {"WORKER", "products", "read", "OWN"},
-            new String[] {"WORKER", "projects", "read", "OWN"},
-            new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "fiber", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "projects", "read", "DEPARTMENT"},
-            new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "fiber", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "fiber", "approve", "DEPARTMENT"},
-            new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"},
+            new GrantRule("WORKER", PermissionKey.FIBER_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PROJECTS_READ, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.FIBER_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FIBER_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PROJECTS_READ, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FIBER_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FIBER_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FIBER_APPROVE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PROJECTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PROJECTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PROJECTS_MANAGE, DataScope.DEPARTMENT),
             // COLOR-RBAC-1: every production department reads tenant colour cards.
-            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"});
-    for (String deptCode :
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION));
+    List<String> productionDepartments =
         List.of(
             SystemDepartment.FIBER.code(),
             SystemDepartment.YARN.code(),
             SystemDepartment.WEAVING.code(),
             SystemDepartment.KNITTING.code(),
             SystemDepartment.DYEING.code(),
-            SystemDepartment.GARMENT.code())) {
+            SystemDepartment.GARMENT.code());
+    for (String deptCode : productionDepartments) {
       seedDepartment(templates, deptCode, productionRules);
     }
 
@@ -248,137 +251,137 @@ public class PermissionTemplateSeeder {
         templates,
         SystemDepartment.DYEING.code(),
         List.of(
-            new String[] {"SUPERVISOR", "colors", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "write", "ORGANIZATION"}));
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_WRITE, DataScope.ORGANIZATION)));
 
     // 4. QUALITY
     seedDepartment(
         templates,
         SystemDepartment.QUALITY.code(),
         List.of(
-            new String[] {"WORKER", "fiber", "read", "OWN"},
-            new String[] {"WORKER", "products", "read", "OWN"},
-            new String[] {"WORKER", "quality", "read", "ORGANIZATION"},
-            new String[] {"WORKER", "quality", "write", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "quality", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "quality", "write", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "quality", "approve", "ORGANIZATION"},
-            new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "quality", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "quality", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "quality", "approve", "ORGANIZATION"},
-            new String[] {"MANAGER", "quality", "manage", "ORGANIZATION"},
-            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "approve", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "manage", "ORGANIZATION"},
-            new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
+            new GrantRule("WORKER", PermissionKey.FIBER_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.QUALITY_READ, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.QUALITY_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.FIBER_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.QUALITY_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.QUALITY_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.QUALITY_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FIBER_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.QUALITY_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.QUALITY_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.QUALITY_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.QUALITY_MANAGE, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_APPROVE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_MANAGE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.DEPARTMENT)));
 
     // 5. WAREHOUSE
     seedDepartment(
         templates,
         SystemDepartment.WAREHOUSE.code(),
         List.of(
-            new String[] {"WORKER", "products", "read", "OWN"},
-            new String[] {"WORKER", "products", "write", "OWN"},
-            new String[] {"WORKER", "logistics", "read", "OWN"},
-            new String[] {"WORKER", "logistics", "write", "OWN"},
-            new String[] {"WORKER", "logistics", "prepare", "OWN"},
-            new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "logistics", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "logistics", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "logistics", "prepare", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "logistics", "ship", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "logistics", "deliver", "DEPARTMENT"},
-            new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "logistics", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "logistics", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "logistics", "prepare", "DEPARTMENT"},
-            new String[] {"MANAGER", "logistics", "ship", "ORGANIZATION"},
-            new String[] {"MANAGER", "logistics", "deliver", "ORGANIZATION"},
-            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "logistics", "cancel", "ORGANIZATION"}));
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_PREPARE, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FIBER_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_PREPARE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_SHIP, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_DELIVER, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FIBER_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_PREPARE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_SHIP, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_DELIVER, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_CANCEL, DataScope.ORGANIZATION)));
 
     // 6. FINANCE
     seedDepartment(
         templates,
         SystemDepartment.FINANCE.code(),
         List.of(
-            new String[] {"WORKER", "sales", "read", "ORGANIZATION"},
-            new String[] {"WORKER", "reports", "view", "OWN"},
-            new String[] {"SUPERVISOR", "sales", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "partners", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "reports", "view", "DEPARTMENT"},
-            new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "reports", "export", "ORGANIZATION"},
-            new String[] {"WORKER", "members", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
-            new String[] {"WORKER", "finance", "read", "OWN"},
-            new String[] {"WORKER", "finance", "write", "OWN"},
-            new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "finance", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "finance", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "finance", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "finance", "manage", "ORGANIZATION"}));
+            new GrantRule("WORKER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.REPORTS_VIEW, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.REPORTS_VIEW, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.REPORTS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.FINANCE_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.FINANCE_WRITE, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.FINANCE_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FINANCE_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_MANAGE, DataScope.ORGANIZATION)));
 
     // 7. HR
     seedDepartment(
         templates,
         SystemDepartment.HR.code(),
         List.of(
-            new String[] {"WORKER", "settings", "view", "OWN"},
-            new String[] {"SUPERVISOR", "settings", "view", "DEPARTMENT"},
-            new String[] {"MANAGER", "settings", "view", "ORGANIZATION"},
-            new String[] {"MANAGER", "settings", "manage", "DEPARTMENT"},
-            new String[] {"WORKER", "members", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "members", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "members", "write", "ORGANIZATION"},
-            new String[] {"MANAGER", "members", "manage", "ORGANIZATION"}));
+            new GrantRule("WORKER", PermissionKey.SETTINGS_VIEW, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_VIEW, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SETTINGS_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SETTINGS_MANAGE, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.MEMBERS_WRITE, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.MEMBERS_MANAGE, DataScope.ORGANIZATION)));
 
     // 8. PROCUREMENT
     seedDepartment(
         templates,
         SystemDepartment.PROCUREMENT.code(),
         List.of(
-            new String[] {"WORKER", "procurement", "read", "OWN"},
-            new String[] {"WORKER", "procurement", "write", "OWN"},
-            new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
-            new String[] {"WORKER", "products", "read", "OWN"},
-            new String[] {"SUPERVISOR", "procurement", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "procurement", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-            new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "procurement", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "procurement", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
-            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
-            new String[] {"MANAGER", "products", "write", "DEPARTMENT"}));
+            new GrantRule("WORKER", PermissionKey.PROCUREMENT_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PROCUREMENT_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
+            new GrantRule("SUPERVISOR", PermissionKey.PROCUREMENT_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PROCUREMENT_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PROCUREMENT_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PROCUREMENT_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT)));
 
     // 9. PARTNER roles — visible only in partner invitation UIs
     // Partners do not have departments, so wildcard (null) is used here.
@@ -387,70 +390,90 @@ public class PermissionTemplateSeeder {
         templates,
         null,
         List.of(
-            new String[] {"PARTNER_OWNER", "dashboard", "view", "ORGANIZATION"},
-            new String[] {"PARTNER_OWNER", "sales", "read", "ORGANIZATION"},
-            new String[] {"PARTNER_OWNER", "partners", "read", "OWN"},
-            new String[] {"PARTNER_ACCOUNTANT", "dashboard", "view", "OWN"},
-            new String[] {"PARTNER_ACCOUNTANT", "sales", "read", "ORGANIZATION"},
-            new String[] {"PARTNER_BUYER", "sales", "read", "OWN"},
-            new String[] {"PARTNER_BUYER", "sales", "write", "OWN"},
-            new String[] {"PARTNER_VIEWER", "dashboard", "view", "OWN"}));
+            new GrantRule("PARTNER_OWNER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
+            new GrantRule("PARTNER_OWNER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("PARTNER_OWNER", PermissionKey.PARTNERS_READ, DataScope.OWN),
+            new GrantRule("PARTNER_ACCOUNTANT", PermissionKey.DASHBOARD_VIEW, DataScope.OWN),
+            new GrantRule("PARTNER_ACCOUNTANT", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
+            new GrantRule("PARTNER_BUYER", PermissionKey.SALES_READ, DataScope.OWN),
+            new GrantRule("PARTNER_BUYER", PermissionKey.SALES_WRITE, DataScope.OWN),
+            new GrantRule("PARTNER_VIEWER", PermissionKey.DASHBOARD_VIEW, DataScope.OWN)));
 
     // Note: MANAGEMENT department removed — ADMIN role provides cross-org access globally.
 
-    mirrorResourceActions(templates, "fiber", "yarn", Set.of("read", "write"));
+    // Mirror only named pairs. In particular fiber:approve never becomes yarn:approve.
+    mirrorResourceActions(
+        templates,
+        Map.of(
+            PermissionKey.FIBER_READ, PermissionKey.YARN_READ,
+            PermissionKey.FIBER_WRITE, PermissionKey.YARN_WRITE),
+        template -> true);
+
+    // PERM-CAT-1: preserve every existing row and derive only the six approved missing pairs.
+    mirrorResourceActions(
+        templates,
+        Map.of(
+            PermissionKey.FIBER_READ, PermissionKey.PRODUCTION_READ,
+            PermissionKey.FIBER_WRITE, PermissionKey.PRODUCTION_WRITE),
+        template ->
+            template.getDepartmentCode() != null
+                && productionDepartments.contains(template.getDepartmentCode()));
+    mirrorResourceActions(
+        templates,
+        Map.of(
+            PermissionKey.FINANCE_READ, PermissionKey.COSTING_READ,
+            PermissionKey.FINANCE_WRITE, PermissionKey.COSTING_WRITE,
+            PermissionKey.FINANCE_MANAGE, PermissionKey.COSTING_MANAGE),
+        template -> SystemDepartment.FINANCE.code().equals(template.getDepartmentCode()));
+    mirrorResourceActions(
+        templates,
+        Map.of(PermissionKey.LOGISTICS_CANCEL, PermissionKey.LOGISTICS_DELETE),
+        template -> SystemDepartment.WAREHOUSE.code().equals(template.getDepartmentCode()));
 
     return templates;
   }
 
-  /**
-   * Derives a resource matrix from an existing catalogue slice without introducing a second list.
-   * Actions outside the allowlist (notably fiber:approve) are deliberately excluded.
-   */
+  /** Derives approved GrantRules from existing rows without inventing a second policy matrix. */
   private void mirrorResourceActions(
       List<PermissionTemplate> templates,
-      String sourceResource,
-      String targetResource,
-      Set<String> actions) {
+      Map<PermissionKey, PermissionKey> pairs,
+      Predicate<PermissionTemplate> departmentFilter) {
     List<PermissionTemplate> derived =
         templates.stream()
-            .filter(template -> sourceResource.equals(template.getResource()))
-            .filter(template -> actions.contains(template.getAction()))
+            .filter(departmentFilter)
+            .filter(
+                source ->
+                    pairs.containsKey(
+                        PermissionKey.of(source.getResource(), source.getAction()).orElseThrow()))
             .map(
                 source -> {
-                  PermissionTemplate target =
-                      PermissionTemplate.builder()
-                          .roleCode(source.getRoleCode())
-                          .departmentCode(source.getDepartmentCode())
-                          .resource(targetResource)
-                          .action(source.getAction())
-                          .dataScope(source.getDataScope())
-                          .build();
-                  target.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
-                  target.setIsActive(true);
-                  return target;
+                  PermissionKey targetKey =
+                      pairs.get(
+                          PermissionKey.of(source.getResource(), source.getAction()).orElseThrow());
+                  GrantRule target =
+                      new GrantRule(source.getRoleCode(), targetKey, source.getDataScope());
+                  return toTemplate(source.getDepartmentCode(), target);
                 })
             .toList();
     templates.addAll(derived);
   }
 
   private void seedDepartment(
-      List<PermissionTemplate> templatesToSave, String departmentCode, List<String[]> rules) {
-    for (String[] rule : rules) {
-      PermissionTemplate template =
-          PermissionTemplate.builder()
-              .roleCode(rule[0])
-              .departmentCode(departmentCode)
-              .resource(rule[1])
-              .action(rule[2])
-              .dataScope(DataScope.valueOf(rule[3]))
-              .build();
+      List<PermissionTemplate> templatesToSave, String departmentCode, List<GrantRule> rules) {
+    rules.stream().map(rule -> toTemplate(departmentCode, rule)).forEach(templatesToSave::add);
+  }
 
-      // Explicitly setting System Tenant ID to establish them as System Default templates
-      template.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
-      template.setIsActive(true);
-
-      templatesToSave.add(template);
-    }
+  private PermissionTemplate toTemplate(String departmentCode, GrantRule rule) {
+    PermissionTemplate template =
+        PermissionTemplate.builder()
+            .roleCode(rule.roleCode())
+            .departmentCode(departmentCode)
+            .resource(rule.key().resource())
+            .action(rule.key().action())
+            .dataScope(rule.scope())
+            .build();
+    template.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
+    template.setIsActive(true);
+    return template;
   }
 }

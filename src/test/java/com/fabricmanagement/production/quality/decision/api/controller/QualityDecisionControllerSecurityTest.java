@@ -33,12 +33,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(QualityDecisionController.class)
@@ -51,15 +51,15 @@ class QualityDecisionControllerSecurityTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private QualityDecisionService decisionService;
-  @MockBean private QualityDecisionQueryService queryService;
-  @MockBean private QualityDecisionMapper mapper;
-  @MockBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
+  @MockitoBean private QualityDecisionService decisionService;
+  @MockitoBean private QualityDecisionQueryService queryService;
+  @MockitoBean private QualityDecisionMapper mapper;
+  @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean(name = "auth")
+  @MockitoBean(name = "auth")
   private SpELPermissionEvaluator authEvaluator;
 
   @BeforeEach

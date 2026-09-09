@@ -119,6 +119,25 @@ class PermissionTemplateBackfillIT {
     assertThat(templateCount(crippled)).isEqualTo(templateCount(TEMPLATE_TENANT));
     assertThat(templateCount(healthy)).isEqualTo(templateCount(TEMPLATE_TENANT));
 
+    // PERM-CAT-1: all six previously unseeded pairs reach both existing-tenant scenarios.
+    for (String tenant : java.util.List.of(crippled, healthy)) {
+      assertThat(countGrant(tenant, "SUPERVISOR", "WEAVING", "production", "read")).isEqualTo(1);
+      assertThat(countGrant(tenant, "SUPERVISOR", "WEAVING", "production", "write")).isEqualTo(1);
+      assertThat(countGrant(tenant, "WORKER", "FINANCE", "costing", "read")).isEqualTo(1);
+      assertThat(countGrant(tenant, "WORKER", "FINANCE", "costing", "write")).isEqualTo(1);
+      assertThat(countGrant(tenant, "MANAGER", "FINANCE", "costing", "manage")).isEqualTo(1);
+      assertThat(countGrant(tenant, "MANAGER", "WAREHOUSE", "logistics", "delete")).isEqualTo(1);
+      assertThat(countGrant(tenant, "WORKER", "FINANCE", "costing", "manage")).isZero();
+      assertThat(countGrant(tenant, "SUPERVISOR", "WAREHOUSE", "logistics", "delete")).isZero();
+      assertThat(countGrant(tenant, "MANAGER", "LOGISTICS", "logistics", "delete")).isZero();
+      // No retirement or exception-granting in the additive catalogue slice.
+      assertThat(countOf(tenant, "dashboard", "view")).isGreaterThan(0);
+      assertThat(countOf(tenant, "settings", "view")).isGreaterThan(0);
+      assertThat(countOf(tenant, "flowboard", "view")).isGreaterThan(0);
+      assertThat(countOf(tenant, "flowboard", "manage")).isZero();
+      assertThat(countOf(tenant, "admin", "access")).isZero();
+    }
+
     // Partner roles are cloned as declared, and none of them may touch finance.
     Integer partnerFinance =
         systemTransactionExecutor.executeInTransaction(

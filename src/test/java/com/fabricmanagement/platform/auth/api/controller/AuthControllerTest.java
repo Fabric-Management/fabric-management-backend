@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = AuthController.class)
@@ -30,22 +30,22 @@ class AuthControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private LoginService loginService;
-  @MockBean private LogoutService logoutService;
-  @MockBean private RefreshTokenService refreshTokenService;
-  @MockBean private SwitchOrganizationService switchOrganizationService;
-  @MockBean private ExistingAccountOrganizationService existingAccountOrganizationService;
-  @MockBean private JwtService jwtService;
-  @MockBean private MfaSetupService mfaSetupService;
-  @MockBean private MfaEventService mfaEventService;
-  @MockBean private AuthCookieSupport authCookieSupport;
+  @MockitoBean private LoginService loginService;
+  @MockitoBean private LogoutService logoutService;
+  @MockitoBean private RefreshTokenService refreshTokenService;
+  @MockitoBean private SwitchOrganizationService switchOrganizationService;
+  @MockitoBean private ExistingAccountOrganizationService existingAccountOrganizationService;
+  @MockitoBean private JwtService jwtService;
+  @MockitoBean private MfaSetupService mfaSetupService;
+  @MockitoBean private MfaEventService mfaEventService;
+  @MockitoBean private AuthCookieSupport authCookieSupport;
 
   // The web slice still registers the global interceptors (JwtContextInterceptor etc.), whose
   // dependencies live outside the slice — mock them like the sibling controller tests do.
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.platform.tenant.infra.repository.TenantRepository tenantRepository;
 
   @AfterEach

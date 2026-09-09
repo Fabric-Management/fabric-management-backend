@@ -23,8 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = PublicSignupController.class)
@@ -34,26 +34,26 @@ class PublicSignupControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private OrganizationRepository organizationRepository;
+  @MockitoBean private OrganizationRepository organizationRepository;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.platform.tenant.infra.repository.TenantRepository tenantRepository;
 
-  @MockBean private JwtService jwtService;
+  @MockitoBean private JwtService jwtService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockBean private TenantOnboardingService onboardingService;
+  @MockitoBean private TenantOnboardingService onboardingService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.platform.communication.app.NotificationService notificationService;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.platform.communication.app.EmailTemplateRenderer
       emailTemplateRenderer;
 
-  @MockBean
+  @MockitoBean
   private com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider frontendUrlProvider;
 
   @Test

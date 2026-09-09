@@ -36,12 +36,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -89,7 +89,7 @@ class PurchaseOrderReceiptMaterializationIT {
   @Autowired private QualityDecisionRepository qualityDecisionRepository;
   @Autowired private QualityDecisionUnitRepository qualityDecisionUnitRepository;
 
-  @MockBean private PurchaseOrderQueryService purchaseOrderQueryService;
+  @MockitoBean private PurchaseOrderQueryService purchaseOrderQueryService;
 
   @BeforeEach
   void setUp() throws Exception {
