@@ -12,7 +12,7 @@ public class SpELPermissionEvaluator {
   private final PermissionEvaluator permissionEvaluator;
   private final AuthenticatedUserContextResolver contextResolver;
 
-  /** Used in SpEL expressions: @PreAuthorize("@auth.can(authentication, 'SALES', 'WRITE')") */
+  /** Used in SpEL expressions: @PreAuthorize("@auth.can(authentication, 'sales', 'write')") */
   public boolean can(Authentication authentication, String resource, String action) {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;
@@ -31,7 +31,7 @@ public class SpELPermissionEvaluator {
   }
 
   /**
-   * Data scope control: @PreAuthorize("@auth.hasScope(authentication, 'SALES', 'READ',
+   * Data scope control: @PreAuthorize("@auth.hasScope(authentication, 'sales', 'read',
    * 'ORGANIZATION')")
    */
   public boolean hasScope(
