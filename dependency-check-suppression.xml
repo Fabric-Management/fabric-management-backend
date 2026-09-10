@@ -92,6 +92,22 @@
     </suppress>
 
     <suppress until="2026-12-01Z">
+        <notes>Spring Security 6.5.0-6.5.11 is affected by CVE-2026-47841 only when
+        WebAuthn is enabled with userVerification REQUIRED and a distributed HTTP session store
+        serializes the ceremony state. This service has no production dependency on the WebAuthn
+        configurer or API, no webauthn4j dependency, and no Spring Session implementation.
+        Dependency-Check matches this CVE per jar through the shared Spring Security CPE, so it
+        reports it on every spring-security artifact at this version, not only the one that
+        carries the WebAuthn code. The selector therefore covers the same four exact 6.5.11
+        coordinates as the CVE-2026-59270 rule above.
+        DependencySecurityAssumptionsTest guards the applicability conditions. The 6.5.x fix
+        (6.5.12) is Enterprise-only; remove this version-pinned suppression after the Spring Boot
+        4 / Spring Security 7.0.7 or 7.1.1 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(config|core|crypto|web)@6\.5\.11$</packageUrl>
+        <cve>CVE-2026-47841</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
         <notes>Spring Cloud Commons 4.3.0-4.3.3 is affected by CVE-2026-59284 when writable
         /actuator/env is enabled without a property-key allow-list. The committed base allow-list
         excludes env and wildcard, and no application profile widens that exposure;

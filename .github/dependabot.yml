@@ -1,4 +1,8 @@
 version: 2
+# Version updates are paused on purpose (open-pull-requests-limit: 0). Dependencies are
+# upgraded manually in planned batches. Security updates stay enabled in the repository
+# settings; the ignore rules below still apply to them, so keep them in sync. To resume
+# scheduled updates, restore the limits (5 for weekly, 3 for docker).
 
 updates:
   - package-ecosystem: maven
@@ -9,7 +13,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/London
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       maven-minor-and-patch:
         patterns:
@@ -46,7 +50,7 @@ updates:
       day: monday
       time: "06:15"
       timezone: Europe/London
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       github-actions:
         patterns:
@@ -61,7 +65,7 @@ updates:
       interval: monthly
       time: "06:30"
       timezone: Europe/London
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     ignore:
       # Dependabot mixes the Maven and JDK versions in this tag. Keep the builder
       # on the Java 21 image line and update it manually as a coordinated change.
