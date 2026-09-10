@@ -147,6 +147,31 @@ class DependencySecurityAssumptionsTest {
   }
 
   @Test
+  void webAuthnWithDistributedSessionsMustRemainUnused() {
+    assertNoProductionDependency(
+        "org.springframework.security.config.annotation.web.configurers.WebAuthnConfigurer",
+        "CVE-2026-47841: enabling the WebAuthn DSL requires a new user-verification"
+            + " vulnerability assessment");
+    assertNoProductionDependency(
+        "org.springframework.security.web.webauthn.api.UserVerificationRequirement",
+        "CVE-2026-47841: using the WebAuthn API requires a new user-verification"
+            + " vulnerability assessment");
+
+    assertThat(ClassUtils.isPresent("com.webauthn4j.WebAuthnManager", getClass().getClassLoader()))
+        .as(
+            "CVE-2026-47841: webauthn4j must remain absent while the Spring Security 6.5.11"
+                + " suppression is active")
+        .isFalse();
+    assertThat(
+            ClassUtils.isPresent(
+                "org.springframework.session.SessionRepository", getClass().getClassLoader()))
+        .as(
+            "CVE-2026-47841: distributed Spring Session must remain absent while the"
+                + " Spring Security 6.5.11 suppression is active")
+        .isFalse();
+  }
+
+  @Test
   void actuatorEnvironmentEndpointMustRemainUnexposed() throws IOException {
     List<YamlProperty> exposureProperties =
         loadApplicationYamlProperties().stream()
