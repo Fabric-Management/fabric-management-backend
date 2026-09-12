@@ -32,13 +32,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * PERM-CAT-1: source/seed guards. OpenAPI is checked on the generated document in OpenApiExportIT.
  */
 class PermissionCatalogueTest {
-  private static final Map<PermissionKey, String> UNGRANTED_EXCEPTIONS =
-      Map.of(
-          PermissionKey.FLOWBOARD_MANAGE,
-          "Temporary legacy route gate; FE-ARCH-3 owns the fix. Do not seed it just to satisfy this test.",
-          PermissionKey.ADMIN_ACCESS,
-          "Admin uses the existing role-based mechanism. Changing its grant model is outside PERM-CAT-1.");
-
   private static PermissionSourceScanner.Result scan;
   private static List<PermissionTemplate> grants;
 
@@ -81,23 +74,28 @@ class PermissionCatalogueTest {
   @Test
   void enforcementClassificationMatchesCallSitesInBothDirections() {
     assertThat(enforcementMismatches(catalogue(), scan.sites())).isEmpty();
-    assertThat(
-            Arrays.stream(PermissionKey.values())
-                .filter(
-                    key ->
-                        key.enforcedBy() == EnforcedBy.NONE
-                            || key.enforcedBy() == EnforcedBy.FRONTEND_ROUTE))
-        .allSatisfy(key -> assertThat(key.note()).as(key.key()).isNotBlank());
   }
 
   @Test
-  void everyEnforcedPairHasADefaultGrantExceptTheTwoDocumentedRoutes() {
-    assertThat(UNGRANTED_EXCEPTIONS).hasSize(2);
-    assertThat(UNGRANTED_EXCEPTIONS.values()).allSatisfy(reason -> assertThat(reason).isNotBlank());
-    assertThat(missingGrants(catalogue(), grants)).isEmpty();
-    // Exceptions must not outlive the condition they document or silently turn into new grants.
-    assertThat(grantKeys(grants))
-        .doesNotContain(PermissionKey.FLOWBOARD_MANAGE.key(), PermissionKey.ADMIN_ACCESS.key());
+  void catalogueEnforcementAndDefaultGrantsAreExactlyTheSameSet() {
+    Set<String> catalogued = catalogue().keySet();
+    Set<String> enforced =
+        scan.sites().stream().map(PermissionSourceScanner.Site::key).collect(Collectors.toSet());
+    Set<String> seeded = grantKeys(grants);
+    assertThat(catalogued).hasSize(45);
+    assertSameKeys("catalogue", catalogued, "enforcement", enforced);
+    assertSameKeys("catalogue", catalogued, "seed", seeded);
+    assertSameKeys("enforcement", enforced, "seed", seeded);
+  }
+
+  private static void assertSameKeys(
+      String leftName, Set<String> left, String rightName, Set<String> right) {
+    Set<String> onlyLeft = new TreeSet<>(left);
+    onlyLeft.removeAll(right);
+    assertThat(onlyLeft).as("%s absent from %s", leftName, rightName).isEmpty();
+    Set<String> onlyRight = new TreeSet<>(right);
+    onlyRight.removeAll(left);
+    assertThat(onlyRight).as("%s absent from %s", rightName, leftName).isEmpty();
   }
 
   @Test
@@ -167,15 +165,15 @@ class PermissionCatalogueTest {
     var result =
         fixture(
             """
-        class Probe {
-          // perms.can("widget", "read");
-          /** @PreAuthorize("@auth.can(authentication, 'SALES', 'WRITE')") */
-          String example = "@auth.can(authentication, 'widget', 'read')";
-          @PreAuthorize("@auth.can(authentication, " +
-              "'sales', 'read')")
-          void run() {}
-        }
-        """);
+            class Probe {
+              // perms.can("widget", "read");
+              /** @PreAuthorize("@auth.can(authentication, 'SALES', 'WRITE')") */
+              String example = "@auth.can(authentication, 'widget', 'read')";
+              @PreAuthorize("@auth.can(authentication, " +
+                  "'sales', 'read')")
+              void run() {}
+            }
+            """);
     assertThat(result.sites())
         .extracting(PermissionSourceScanner.Site::key)
         .containsExactly("sales:read");
@@ -185,15 +183,16 @@ class PermissionCatalogueTest {
   void redProbeCaseMismatchNamesTheSiteAndCanonicalPair() throws IOException {
     var result =
         fixture(
-            "class Probe { @PreAuthorize(\"@auth.can(authentication, 'Sales', 'read')\") void run() {} }");
+            "class Probe { @PreAuthorize(\"@auth.can(authentication, 'Sales', 'read')\") void run()"
+                + " {} }");
     assertThat(nonCanonicalSites(result.sites()))
         .anySatisfy(error -> assertThat(error).contains("Probe.java", "Sales:read", "sales:read"));
   }
 
   @Test
-  void redProbeLivePairCannotBeMarkedNone() {
+  void redProbeJavaPairCannotBeMisclassifiedAsAnnotation() {
     var changed = new HashMap<>(catalogue());
-    changed.put(PermissionKey.MEMBERS_MANAGE.key(), EnforcedBy.NONE);
+    changed.put(PermissionKey.MEMBERS_MANAGE.key(), EnforcedBy.ANNOTATION);
     assertThat(enforcementMismatches(changed, scan.sites()))
         .anySatisfy(error -> assertThat(error).contains("members:manage"));
   }
@@ -231,7 +230,8 @@ class PermissionCatalogueTest {
   void redProbeReinventingTheRegistryIsRejected() throws IOException {
     var result =
         fixture(
-            "class Probe { static final java.util.Set<String> VALID_RESOURCES = java.util.Set.of(\"widget\"); }");
+            "class Probe { static final java.util.Set<String> VALID_RESOURCES ="
+                + " java.util.Set.of(\"widget\"); }");
     assertThat(result.parallelVocabularies())
         .anySatisfy(error -> assertThat(error).contains("Probe.java", "VALID_RESOURCES"));
   }
@@ -315,7 +315,7 @@ class PermissionCatalogueTest {
         (key, kind) -> {
           if ((kind == EnforcedBy.ANNOTATION || kind == EnforcedBy.JAVA)
               && !observed.containsKey(key))
-            failures.add(key + " has no call site; add enforcement or document NONE");
+            failures.add(key + " has no call site; remove the unused key or add enforcement");
         });
     return failures;
   }
@@ -323,12 +323,9 @@ class PermissionCatalogueTest {
   private static Set<String> missingGrants(
       Map<String, EnforcedBy> catalogue, List<PermissionTemplate> rows) {
     Set<String> granted = grantKeys(rows);
-    Set<String> exceptions =
-        UNGRANTED_EXCEPTIONS.keySet().stream().map(PermissionKey::key).collect(Collectors.toSet());
     return catalogue.entrySet().stream()
-        .filter(entry -> entry.getValue() != EnforcedBy.NONE)
         .map(Map.Entry::getKey)
-        .filter(key -> !granted.contains(key) && !exceptions.contains(key))
+        .filter(key -> !granted.contains(key))
         .collect(Collectors.toCollection(TreeSet::new));
   }
 

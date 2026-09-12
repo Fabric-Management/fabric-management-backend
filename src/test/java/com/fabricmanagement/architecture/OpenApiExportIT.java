@@ -103,7 +103,8 @@ public class OpenApiExportIT {
 
       assertThat(generatedSpec)
           .as(
-              "OpenAPI contract has drifted! Run 'UPDATE_OPENAPI=true ./mvnw verify -Dit.test=OpenApiExportIT' to accept changes and commit.")
+              "OpenAPI contract has drifted! Run 'UPDATE_OPENAPI=true ./mvnw verify"
+                  + " -Dit.test=OpenApiExportIT' to accept changes and commit.")
           .isEqualTo(existingSpec);
     }
   }
@@ -121,6 +122,14 @@ public class OpenApiExportIT {
             new HashSet<>(Arrays.stream(PermissionKey.values()).map(PermissionKey::key).toList()));
     assertThat(schemaProperty(document, "PermissionCatalogueEntryDto", "key"))
         .containsEntry("$ref", "#/components/schemas/PermissionKey");
+    assertThat(
+            mapAt(document, "components", "schemas", "PermissionCatalogueEntryDto", "properties"))
+        .doesNotContainKey("enforced");
+    Object required =
+        mapAt(document, "components", "schemas", "PermissionCatalogueEntryDto").get("required");
+    assertThat(required).isInstanceOf(List.class);
+    assertThat(((List<?>) required).stream().map(Object::toString).toList())
+        .containsExactlyInAnyOrder("action", "key", "resource");
     assertThat(
             mapAt(document, "paths", "/api/v1/platform/permissions/catalogue", "get", "responses"))
         .containsKey("200");

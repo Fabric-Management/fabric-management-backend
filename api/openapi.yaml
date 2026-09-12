@@ -61277,10 +61277,6 @@ components:
         action:
           type: string
           example: read
-        enforced:
-          type: boolean
-          description: Whether a backend or frontend enforcement point currently consumes
-            the pair.
         key:
           $ref: "#/components/schemas/PermissionKey"
         resource:
@@ -61288,7 +61284,6 @@ components:
           example: sales
       required:
       - action
-      - enforced
       - key
       - resource
     PermissionKey:
@@ -61296,7 +61291,6 @@ components:
       description: Canonical resource:action pair. Catalogue membership does not grant
         access.
       enum:
-      - admin:access
       - colors:approve
       - colors:manage
       - colors:read
@@ -61304,17 +61298,12 @@ components:
       - costing:manage
       - costing:read
       - costing:write
-      - dashboard:view
-      - fiber:approve
       - fiber:read
       - fiber:write
       - finance:manage
       - finance:read
       - finance:write
-      - flowboard:edit
-      - flowboard:manage
       - flowboard:read
-      - flowboard:view
       - flowboard:write
       - logistics:cancel
       - logistics:delete
@@ -61326,24 +61315,16 @@ components:
       - members:manage
       - members:read
       - members:write
-      - notifications:view
-      - partners:read
-      - partners:write
       - procurement:read
       - procurement:write
       - production:read
       - production:write
       - products:read
       - products:write
-      - projects:manage
-      - projects:read
-      - projects:write
       - quality:approve
       - quality:manage
       - quality:read
       - quality:write
-      - reports:export
-      - reports:view
       - sales:approve
       - sales:assign-owner
       - sales:cancel
@@ -61352,10 +61333,7 @@ components:
       - sales:read
       - sales:ship
       - sales:write
-      - settings:manage
       - settings:read
-      - settings:view
-      - settings:write
       - yarn:read
       - yarn:write
     PermissionOverrideDto:

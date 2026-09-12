@@ -7,14 +7,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record PermissionCatalogueEntryDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PermissionKey key,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "sales") String resource,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "read") String action,
-    @Schema(
-            requiredMode = Schema.RequiredMode.REQUIRED,
-            description =
-                "Whether a backend or frontend enforcement point currently consumes the pair.")
-        boolean enforced) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "read") String action) {
 
   public static PermissionCatalogueEntryDto from(PermissionKey key) {
-    return new PermissionCatalogueEntryDto(key, key.resource(), key.action(), key.enforced());
+    return new PermissionCatalogueEntryDto(key, key.resource(), key.action());
   }
 }

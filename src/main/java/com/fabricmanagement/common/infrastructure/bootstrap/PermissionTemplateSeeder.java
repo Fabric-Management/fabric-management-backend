@@ -128,29 +128,17 @@ public class PermissionTemplateSeeder {
         templates,
         null,
         List.of(
-            new GrantRule("WORKER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("WORKER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("SUPERVISOR", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("SUPERVISOR", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.REPORTS_VIEW, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.FINANCE_READ, DataScope.ORGANIZATION),
-            new GrantRule("VIEWER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("VIEWER", PermissionKey.NOTIFICATIONS_VIEW, DataScope.ORGANIZATION),
             new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.SETTINGS_READ, DataScope.OWN),
-            new GrantRule("WORKER", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_READ, DataScope.OWN),
-            new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
             new GrantRule("MANAGER", PermissionKey.MEMBERS_READ, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SETTINGS_READ, DataScope.OWN),
-            new GrantRule("MANAGER", PermissionKey.SETTINGS_WRITE, DataScope.OWN),
             new GrantRule("MANAGER", PermissionKey.FLOWBOARD_READ, DataScope.OWN),
             new GrantRule("MANAGER", PermissionKey.FLOWBOARD_WRITE, DataScope.OWN),
             // Department-agnostic quote approval. Previously inserted by migration
@@ -177,18 +165,12 @@ public class PermissionTemplateSeeder {
         List.of(
             new GrantRule("WORKER", PermissionKey.SALES_READ, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.SALES_WRITE, DataScope.OWN),
-            new GrantRule("WORKER", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
-            new GrantRule("WORKER", PermissionKey.FLOWBOARD_VIEW, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_WRITE, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_CONFIRM, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_SHIP, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_APPROVE, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_VIEW, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.FLOWBOARD_EDIT, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
@@ -197,11 +179,6 @@ public class PermissionTemplateSeeder {
             new GrantRule("MANAGER", PermissionKey.SALES_CANCEL, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_ASSIGN_OWNER, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.FLOWBOARD_EDIT, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.DEPARTMENT),
             new GrantRule("WORKER", PermissionKey.FINANCE_READ, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FINANCE_READ, DataScope.DEPARTMENT),
             new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
@@ -215,20 +192,14 @@ public class PermissionTemplateSeeder {
         List.of(
             new GrantRule("WORKER", PermissionKey.FIBER_READ, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
-            new GrantRule("WORKER", PermissionKey.PROJECTS_READ, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FIBER_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.FIBER_WRITE, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.PROJECTS_READ, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.FIBER_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.FIBER_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.FIBER_APPROVE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.PROJECTS_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PROJECTS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.PROJECTS_MANAGE, DataScope.DEPARTMENT),
             // COLOR-RBAC-1: every production department reads tenant colour cards.
             new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
@@ -282,8 +253,7 @@ public class PermissionTemplateSeeder {
             new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.COLORS_WRITE, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.COLORS_APPROVE, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.COLORS_MANAGE, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.DEPARTMENT)));
+            new GrantRule("MANAGER", PermissionKey.COLORS_MANAGE, DataScope.ORGANIZATION)));
 
     // 5. WAREHOUSE
     seedDepartment(
@@ -322,15 +292,8 @@ public class PermissionTemplateSeeder {
         SystemDepartment.FINANCE.code(),
         List.of(
             new GrantRule("WORKER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
-            new GrantRule("WORKER", PermissionKey.REPORTS_VIEW, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
-            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
-            new GrantRule("SUPERVISOR", PermissionKey.REPORTS_VIEW, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.REPORTS_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.REPORTS_EXPORT, DataScope.ORGANIZATION),
             new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
@@ -347,10 +310,6 @@ public class PermissionTemplateSeeder {
         templates,
         SystemDepartment.HR.code(),
         List.of(
-            new GrantRule("WORKER", PermissionKey.SETTINGS_VIEW, DataScope.OWN),
-            new GrantRule("SUPERVISOR", PermissionKey.SETTINGS_VIEW, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.SETTINGS_VIEW, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.SETTINGS_MANAGE, DataScope.DEPARTMENT),
             new GrantRule("WORKER", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.MEMBERS_WRITE, DataScope.ORGANIZATION),
@@ -365,18 +324,13 @@ public class PermissionTemplateSeeder {
         List.of(
             new GrantRule("WORKER", PermissionKey.PROCUREMENT_READ, DataScope.OWN),
             new GrantRule("WORKER", PermissionKey.PROCUREMENT_WRITE, DataScope.OWN),
-            new GrantRule("WORKER", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
             new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.PROCUREMENT_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.PROCUREMENT_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_READ, DataScope.DEPARTMENT),
-            new GrantRule("SUPERVISOR", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.PROCUREMENT_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.PROCUREMENT_WRITE, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.PARTNERS_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
             new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
@@ -390,18 +344,14 @@ public class PermissionTemplateSeeder {
         templates,
         null,
         List.of(
-            new GrantRule("PARTNER_OWNER", PermissionKey.DASHBOARD_VIEW, DataScope.ORGANIZATION),
             new GrantRule("PARTNER_OWNER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
-            new GrantRule("PARTNER_OWNER", PermissionKey.PARTNERS_READ, DataScope.OWN),
-            new GrantRule("PARTNER_ACCOUNTANT", PermissionKey.DASHBOARD_VIEW, DataScope.OWN),
             new GrantRule("PARTNER_ACCOUNTANT", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
             new GrantRule("PARTNER_BUYER", PermissionKey.SALES_READ, DataScope.OWN),
-            new GrantRule("PARTNER_BUYER", PermissionKey.SALES_WRITE, DataScope.OWN),
-            new GrantRule("PARTNER_VIEWER", PermissionKey.DASHBOARD_VIEW, DataScope.OWN)));
+            new GrantRule("PARTNER_BUYER", PermissionKey.SALES_WRITE, DataScope.OWN)));
 
     // Note: MANAGEMENT department removed — ADMIN role provides cross-org access globally.
 
-    // Mirror only named pairs. In particular fiber:approve never becomes yarn:approve.
+    // Mirror named read/write pairs only; future fiber actions require an explicit grant decision.
     mirrorResourceActions(
         templates,
         Map.of(
