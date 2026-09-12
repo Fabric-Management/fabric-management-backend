@@ -88,6 +88,14 @@ public class PermissionManagementService {
             .findById(id)
             .orElseThrow(() -> new PlatformDomainException("Template not found", "NOT_FOUND", 404));
 
+    if (template.getTenantId() != null && !template.getTenantId().equals(tenantId)) {
+      throw new PlatformDomainException("Unauthorized access to template", "FORBIDDEN", 403);
+    }
+    if (template.getDeletedAt() != null) {
+      throw new PlatformDomainException("Permission template is retired", "GONE", 410);
+    }
+    validateResourceAction(template.getResource(), template.getAction());
+
     if (template.getTenantId() == null) {
       // Copy-On-Write for system defaults
       PermissionTemplate copy =
@@ -106,10 +114,6 @@ public class PermissionManagementService {
     }
 
     // Direct update for tenant-specific templates
-    if (!template.getTenantId().equals(tenantId)) {
-      throw new PlatformDomainException("Unauthorized access to template", "FORBIDDEN", 403);
-    }
-
     template.setDataScope(request.getDataScope());
     template.setIsActive(request.getIsActive());
 

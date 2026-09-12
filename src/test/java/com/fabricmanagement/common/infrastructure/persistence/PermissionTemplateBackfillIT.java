@@ -1,11 +1,27 @@
 package com.fabricmanagement.common.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.common.infrastructure.bootstrap.PermissionTemplateBackfillRunner;
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import com.fabricmanagement.platform.tenant.app.TenantClonerService;
+import com.fabricmanagement.platform.user.app.PermissionManagementService;
+import com.fabricmanagement.platform.user.domain.DataScope;
+import com.fabricmanagement.platform.user.dto.UpdatePermissionTemplateRequest;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -53,6 +69,18 @@ class PermissionTemplateBackfillIT {
 
   @Autowired private SystemTransactionExecutor systemTransactionExecutor;
   @Autowired private PermissionTemplateBackfillRunner backfillRunner;
+  @Autowired private PermissionEvaluator permissionEvaluator;
+  @Autowired private TenantClonerService tenantClonerService;
+  @Autowired private PermissionManagementService permissionManagementService;
+  @Autowired private CacheManager cacheManager;
+
+  private static final UUID RETIREMENT_TENANT =
+      UUID.fromString("ca720000-0000-4000-8000-000000000010");
+  private static final UUID BACKFILL_TENANT =
+      UUID.fromString("ca720000-0000-4000-8000-000000000011");
+  private static final UUID CLONE_TENANT = UUID.fromString("ca720000-0000-4000-8000-000000000012");
+  private static final String RETIREMENT_ROLE = "PC2_RETIREMENT";
+  private static final String RETIREMENT_DEPARTMENT = "PC2";
 
   @Test
   void bringsCrippledTenantsUpToTheTemplateWithoutTenantContext() {
@@ -130,10 +158,10 @@ class PermissionTemplateBackfillIT {
       assertThat(countGrant(tenant, "WORKER", "FINANCE", "costing", "manage")).isZero();
       assertThat(countGrant(tenant, "SUPERVISOR", "WAREHOUSE", "logistics", "delete")).isZero();
       assertThat(countGrant(tenant, "MANAGER", "LOGISTICS", "logistics", "delete")).isZero();
-      // No retirement or exception-granting in the additive catalogue slice.
-      assertThat(countOf(tenant, "dashboard", "view")).isGreaterThan(0);
-      assertThat(countOf(tenant, "settings", "view")).isGreaterThan(0);
-      assertThat(countOf(tenant, "flowboard", "view")).isGreaterThan(0);
+      // PERM-CAT-2: retired grants never become active in backfilled tenants.
+      assertThat(countOf(tenant, "dashboard", "view")).isZero();
+      assertThat(countOf(tenant, "settings", "view")).isZero();
+      assertThat(countOf(tenant, "flowboard", "view")).isZero();
       assertThat(countOf(tenant, "flowboard", "manage")).isZero();
       assertThat(countOf(tenant, "admin", "access")).isZero();
     }
@@ -181,13 +209,271 @@ class PermissionTemplateBackfillIT {
         .isEqualTo(1);
   }
 
+  @Test
+  void retiredPermissionsCannotBeEvaluatedBackfilledClonedOrReactivated() {
+    UUID user = UUID.randomUUID();
+    UUID retiredRow = UUID.randomUUID();
+    try {
+      systemTransactionExecutor.executeInTransaction(
+          jdbc -> {
+            createRetirementTenant(jdbc, RETIREMENT_TENANT);
+            seedRetirementUser(jdbc, user);
+            for (UUID tenant : List.of(UUID.fromString(TEMPLATE_TENANT), RETIREMENT_TENANT)) {
+              insertRetirementTemplate(
+                  jdbc,
+                  tenant.equals(RETIREMENT_TENANT) ? retiredRow : UUID.randomUUID(),
+                  tenant,
+                  "projects",
+                  "read",
+                  null);
+              insertRetirementTemplate(jdbc, UUID.randomUUID(), tenant, "sales", "read", null);
+            }
+            // State 3 would still be selected by the cloner unless the migration closes it.
+            insertRetirementTemplate(
+                jdbc,
+                UUID.randomUUID(),
+                UUID.fromString(TEMPLATE_TENANT),
+                "dashboard",
+                "view",
+                Timestamp.valueOf("2025-09-12 10:00:00"));
+            return null;
+          });
+      assertThat(retirementCan(user, "projects", "read")).isTrue();
+      assertThat(retirementCan(user, "sales", "read")).isTrue();
+      Map<String, Object> keptBefore = retirementRow("sales", "read");
+
+      runRetirementMigration();
+      assertThat(retirementCan(user, "projects", "read")).isFalse();
+      assertThat(retirementCan(user, "sales", "read")).isTrue();
+      assertThat(retirementRow("sales", "read")).isEqualTo(keptBefore);
+
+      systemTransactionExecutor.executeInTransaction(
+          jdbc -> {
+            createRetirementTenant(jdbc, BACKFILL_TENANT);
+            return null;
+          });
+      clearPermissionsCache();
+      backfillRunner.run();
+      assertThat(countOf(BACKFILL_TENANT.toString(), "sales", "read")).isGreaterThan(0);
+      assertNoRetiredRows(BACKFILL_TENANT);
+
+      // Create D after the cross-tenant backfill, or the cloner's any-row guard skips the copy.
+      systemTransactionExecutor.executeInTransaction(
+          jdbc -> {
+            createRetirementTenant(jdbc, CLONE_TENANT);
+            return null;
+          });
+      clearPermissionsCache();
+      Integer beforeClone =
+          systemTransactionExecutor.executeInTransaction(
+              jdbc ->
+                  jdbc.queryForObject(
+                      "SELECT count(*) FROM common_user.permission_template WHERE tenant_id = ?",
+                      Integer.class,
+                      CLONE_TENANT));
+      assertThat(beforeClone).isZero();
+      assertThat(
+              tenantClonerService.clonePermissionTemplatesToTenant(
+                  UUID.fromString(TEMPLATE_TENANT), CLONE_TENANT))
+          .isGreaterThan(0);
+      assertThat(countOf(CLONE_TENANT.toString(), "sales", "read")).isGreaterThan(0);
+      assertNoRetiredRows(CLONE_TENANT);
+
+      Map<String, Object> retiredBefore = retirementRow("projects", "read");
+      var request = new UpdatePermissionTemplateRequest();
+      request.setDataScope(DataScope.ORGANIZATION);
+      request.setIsActive(true);
+      assertThatThrownBy(
+              () ->
+                  TenantContext.executeInTenantContext(
+                      RETIREMENT_TENANT,
+                      () ->
+                          permissionManagementService.updateTemplate(
+                              RETIREMENT_TENANT, retiredRow, request)))
+          .isInstanceOfSatisfying(
+              PlatformDomainException.class,
+              error -> {
+                assertThat(error.getHttpStatus()).isEqualTo(410);
+                assertThat(error.getErrorCode()).isEqualTo("GONE");
+              });
+      assertThat(retirementRow("projects", "read")).isEqualTo(retiredBefore);
+      assertThat(retirementCan(user, "projects", "read")).isFalse();
+    } finally {
+      cleanupRetirementFixture();
+      clearPermissionsCache();
+    }
+  }
+
+  private void runRetirementMigration() {
+    String script;
+    try (var input =
+        new ClassPathResource("db/migration/V20260912120000__retire_stale_permission_pairs.sql")
+            .getInputStream()) {
+      script = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    } catch (IOException exception) {
+      throw new IllegalStateException("Could not read permission retirement migration", exception);
+    }
+    systemTransactionExecutor.executeInTransaction(
+        jdbc -> {
+          jdbc.execute(script);
+          return null;
+        });
+    clearPermissionsCache();
+  }
+
+  private boolean retirementCan(UUID user, String resource, String action) {
+    clearPermissionsCache();
+    return TenantContext.executeInTenantContext(
+        RETIREMENT_TENANT,
+        () ->
+            permissionEvaluator
+                .evaluate(RETIREMENT_TENANT, RETIREMENT_ROLE, List.of(RETIREMENT_DEPARTMENT), user)
+                .can(resource, action));
+  }
+
+  private void clearPermissionsCache() {
+    var cache = cacheManager.getCache("permissions");
+    assertThat(cache).isNotNull();
+    cache.clear();
+  }
+
+  private void createRetirementTenant(JdbcTemplate jdbc, UUID tenant) {
+    jdbc.update(
+        "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, status) "
+            + "VALUES (?, ?, ?, 'Permission retirement fixture', 'ACTIVE')",
+        tenant,
+        "PC2-" + tenant,
+        "pc2-" + tenant);
+  }
+
+  private void seedRetirementUser(JdbcTemplate jdbc, UUID user) {
+    UUID organization = UUID.randomUUID();
+    UUID department = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, tax_id) "
+            + "VALUES (?, ?, ?, 'Permission retirement fixture', ?)",
+        organization,
+        RETIREMENT_TENANT,
+        "PC2-ORG-" + organization,
+        organization.toString());
+    jdbc.update(
+        "INSERT INTO common_company.common_department "
+            + "(id, tenant_id, uid, organization_id, department_name, department_code) "
+            + "VALUES (?, ?, ?, ?, 'Permission retirement fixture', ?)",
+        department,
+        RETIREMENT_TENANT,
+        "PC2-DEPT-" + department,
+        organization,
+        RETIREMENT_DEPARTMENT);
+    jdbc.update(
+        "INSERT INTO common_user.common_user "
+            + "(id, tenant_id, uid, first_name, last_name, organization_id) "
+            + "VALUES (?, ?, ?, 'Permission', 'Fixture', ?)",
+        user,
+        RETIREMENT_TENANT,
+        "PC2-USER-" + user,
+        organization);
+    jdbc.update(
+        "INSERT INTO common_user.common_user_department "
+            + "(user_id, department_id, tenant_id, is_primary) VALUES (?, ?, ?, true)",
+        user,
+        department,
+        RETIREMENT_TENANT);
+  }
+
+  private void insertRetirementTemplate(
+      JdbcTemplate jdbc,
+      UUID id,
+      UUID tenant,
+      String resource,
+      String action,
+      Timestamp deletedAt) {
+    jdbc.update(
+        "INSERT INTO common_user.permission_template "
+            + "(id, tenant_id, uid, role_code, department_code, resource, action, data_scope, "
+            + "is_active, deleted_at, created_at, updated_at, version) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, 'OWN', true, ?, NOW(), NOW(), 0)",
+        id,
+        tenant,
+        "PC2-" + id,
+        RETIREMENT_ROLE,
+        RETIREMENT_DEPARTMENT,
+        resource,
+        action,
+        deletedAt);
+  }
+
+  private Map<String, Object> retirementRow(String resource, String action) {
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc ->
+            jdbc.queryForMap(
+                "SELECT * FROM common_user.permission_template "
+                    + "WHERE tenant_id = ? AND role_code = ? AND resource = ? AND action = ?",
+                RETIREMENT_TENANT,
+                RETIREMENT_ROLE,
+                resource,
+                action));
+  }
+
+  private void assertNoRetiredRows(UUID tenant) {
+    // Literal oracle, independent of PermissionKey (where these pairs have already disappeared).
+    List<String> retired =
+        List.of(
+            "admin:access",
+            "dashboard:view",
+            "fiber:approve",
+            "flowboard:edit",
+            "flowboard:manage",
+            "flowboard:view",
+            "notifications:view",
+            "partners:read",
+            "partners:write",
+            "projects:read",
+            "projects:write",
+            "projects:manage",
+            "reports:view",
+            "reports:export",
+            "settings:view",
+            "settings:write",
+            "settings:manage");
+    List<String> actual =
+        systemTransactionExecutor.executeInTransaction(
+            jdbc ->
+                jdbc.queryForList(
+                    "SELECT resource || ':' || action FROM common_user.permission_template WHERE"
+                        + " tenant_id = ?",
+                    String.class,
+                    tenant));
+    assertThat(actual).doesNotContainAnyElementsOf(retired);
+  }
+
+  private void cleanupRetirementFixture() {
+    systemTransactionExecutor.executeInTransaction(
+        jdbc -> {
+          // The backfill can copy our custom source row into other tests' tenants too.
+          jdbc.update(
+              "DELETE FROM common_user.permission_template WHERE role_code = ?", RETIREMENT_ROLE);
+          for (UUID tenant : List.of(RETIREMENT_TENANT, BACKFILL_TENANT, CLONE_TENANT)) {
+            jdbc.update("DELETE FROM common_user.permission_template WHERE tenant_id = ?", tenant);
+            jdbc.update(
+                "DELETE FROM common_user.common_user_department WHERE tenant_id = ?", tenant);
+            jdbc.update("DELETE FROM common_user.common_user WHERE tenant_id = ?", tenant);
+            jdbc.update("DELETE FROM common_company.common_department WHERE tenant_id = ?", tenant);
+            jdbc.update(
+                "DELETE FROM common_company.common_organization WHERE tenant_id = ?", tenant);
+            jdbc.update("DELETE FROM common_tenant.common_tenant WHERE id = ?", tenant);
+          }
+          return null;
+        });
+  }
+
   private Integer countOf(String tenantId, String resource, String action) {
     return systemTransactionExecutor.executeInTransaction(
         jdbcTemplate ->
             jdbcTemplate.queryForObject(
                 """
                 SELECT count(*) FROM common_user.permission_template
-                WHERE tenant_id = ?::uuid AND resource = ? AND action = ?
+                WHERE tenant_id = ?::uuid AND resource = ? AND action = ? AND is_active = true
                 """,
                 Integer.class,
                 tenantId,
@@ -221,7 +507,8 @@ class PermissionTemplateBackfillIT {
     return systemTransactionExecutor.executeInTransaction(
         jdbcTemplate ->
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM common_user.permission_template WHERE tenant_id = ?::uuid",
+                "SELECT count(*) FROM common_user.permission_template "
+                    + "WHERE tenant_id = ?::uuid AND is_active = true AND deleted_at IS NULL",
                 Integer.class,
                 tenantId));
   }

@@ -65,7 +65,7 @@ class PermissionCatalogueControllerTest {
           String action = entry.path("action").asText();
           PermissionKey key = PermissionKey.of(resource, action).orElseThrow();
           assertThat(entry.path("key").asText()).isEqualTo(key.key());
-          assertThat(entry.path("enforced").asBoolean()).isEqualTo(key.enforced());
+          assertThat(entry.has("enforced")).isFalse();
           assertThat(entry.has("enforcedBy")).isFalse();
           assertThat(entry.has("note")).isFalse();
           actual.add(entry.path("key").asText());
