@@ -3,12 +3,15 @@ package com.fabricmanagement.platform.user.api.controller;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.app.UserNavPreferencesService;
+import com.fabricmanagement.platform.user.dto.NavPreferencesImportResponse;
 import com.fabricmanagement.platform.user.dto.NavPreferencesRequest;
 import com.fabricmanagement.platform.user.dto.NavPreferencesResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +30,24 @@ import org.springframework.web.bind.annotation.*;
 public class UserNavPreferencesController {
 
   private final UserNavPreferencesService userNavPreferencesService;
+
+  @Operation(
+      summary = "Import local navigation preferences if no account preferences exist",
+      description =
+          "Only the authenticated user may import their preferences in the current tenant. "
+              + "Existing preferences, including empty lists, are returned unchanged. "
+              + "Returns 403 for another user, 404 for a user absent from the tenant, "
+              + "and 400 for invalid arguments.")
+  @PreAuthorize("isAuthenticated()")
+  @PostMapping(value = "/{id}/nav-preferences/import", produces = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<ApiResponse<NavPreferencesImportResponse>> importNavPreferences(
+      @PathVariable UUID id, @Valid @RequestBody NavPreferencesRequest request) {
+    ensureSelf(id);
+    UUID tenantId = TenantContext.requireTenantId();
+    NavPreferencesImportResponse data =
+        userNavPreferencesService.importPreferences(tenantId, id, request);
+    return ResponseEntity.ok(ApiResponse.success(data));
+  }
 
   /**
    * Get nav preferences for the user. Returns 200 with stored or default preferences; never 404.

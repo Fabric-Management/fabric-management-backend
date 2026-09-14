@@ -75,6 +75,7 @@ public class OpenApiExportIT {
         new YAMLMapper().readValue(generatedSpec, new TypeReference<Map<String, Object>>() {});
     assertValidationContracts(generatedDocument);
     assertPermissionCatalogueContract(generatedDocument);
+    assertNavPreferencesImportContract(generatedDocument);
 
     // Red probe uses a separate copy: the actual export must never contain the mutated value.
     Map<String, Object> corruptedDocument =
@@ -107,6 +108,26 @@ public class OpenApiExportIT {
                   + " -Dit.test=OpenApiExportIT' to accept changes and commit.")
           .isEqualTo(existingSpec);
     }
+  }
+
+  private void assertNavPreferencesImportContract(Map<String, Object> document) {
+    Map<String, Object> operation =
+        mapAt(document, "paths", "/api/v1/common/users/{id}/nav-preferences/import", "post");
+    assertThat(mapAt(operation, "requestBody", "content", "application/json", "schema"))
+        .containsEntry("$ref", "#/components/schemas/NavPreferencesRequest");
+    assertThat(mapAt(operation, "responses", "200", "content", "application/json", "schema"))
+        .containsEntry("$ref", "#/components/schemas/ApiResponseNavPreferencesImportResponse");
+    assertThat(schemaProperty(document, "ApiResponseNavPreferencesImportResponse", "data"))
+        .containsEntry("$ref", "#/components/schemas/NavPreferencesImportResponse");
+    assertThat(schemaProperty(document, "NavPreferencesImportResponse", "imported"))
+        .containsEntry("type", "boolean");
+    assertThat(schemaProperty(document, "NavPreferencesImportResponse", "preferences"))
+        .containsEntry("$ref", "#/components/schemas/NavPreferencesResponse");
+    Object required =
+        mapAt(document, "components", "schemas", "NavPreferencesImportResponse").get("required");
+    assertThat(required).isInstanceOf(List.class);
+    assertThat(((List<?>) required).stream().map(Object::toString).toList())
+        .containsExactlyInAnyOrder("imported", "preferences");
   }
 
   private void assertPermissionCatalogueContract(Map<String, Object> document) {

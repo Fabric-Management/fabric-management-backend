@@ -13675,6 +13675,87 @@ paths:
           description: Internal Server Error
       tags:
       - User Nav Preferences
+  /api/v1/common/users/{id}/nav-preferences/import:
+    post:
+      description: "Only the authenticated user may import their preferences in the\
+        \ current tenant. Existing preferences, including empty lists, are returned\
+        \ unchanged. Returns 403 for another user, 404 for a user absent from the\
+        \ tenant, and 400 for invalid arguments."
+      operationId: importNavPreferences
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NavPreferencesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseNavPreferencesImportResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Import local navigation preferences if no account preferences exist
+      tags:
+      - User Nav Preferences
   /api/v1/common/users/{id}/profile:
     put:
       operationId: updateUserProfile
@@ -50943,6 +51024,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseNavPreferencesImportResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/NavPreferencesImportResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseNavPreferencesResponse:
       type: object
       properties:
@@ -59527,6 +59626,18 @@ components:
         currency:
           type: string
           description: Currency code
+    NavPreferencesImportResponse:
+      type: object
+      description: Atomic navigation preference import result
+      properties:
+        imported:
+          type: boolean
+          description: True only when this request created the account's preferences
+        preferences:
+          $ref: "#/components/schemas/NavPreferencesResponse"
+      required:
+      - imported
+      - preferences
     NavPreferencesRequest:
       type: object
       properties:
