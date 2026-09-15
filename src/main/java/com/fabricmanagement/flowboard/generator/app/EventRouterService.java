@@ -9,12 +9,12 @@ import com.fabricmanagement.flowboard.generator.app.adapter.DomainEventAdapter;
 import com.fabricmanagement.flowboard.generator.app.adapter.TaskTemplateContext;
 import com.fabricmanagement.flowboard.generator.domain.TaskTemplate;
 import com.fabricmanagement.flowboard.generator.infra.repository.TaskTemplateRepository;
+import com.fabricmanagement.flowboard.task.app.TaskGenerationKey;
 import com.fabricmanagement.flowboard.task.app.TaskLabelService;
 import com.fabricmanagement.flowboard.task.app.TaskService;
 import com.fabricmanagement.flowboard.task.domain.ModuleType;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.flowboard.task.dto.CreateTaskRequest;
-import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,6 @@ public class EventRouterService {
   private final Map<Class<?>, DomainEventAdapter<?>> adapterMap;
   private final TaskTemplateRepository templateRepo;
   private final TaskService taskService;
-  private final TaskRepository taskRepo;
   private final BoardRepository boardRepo;
   private final TaskLabelService taskLabelService;
 
@@ -40,14 +39,12 @@ public class EventRouterService {
       List<DomainEventAdapter<?>> adapters,
       TaskTemplateRepository templateRepo,
       TaskService taskService,
-      TaskRepository taskRepo,
       BoardRepository boardRepo,
       TaskLabelService taskLabelService) {
     this.adapterMap =
         adapters.stream().collect(toMap(DomainEventAdapter::getSupportedEventType, identity()));
     this.templateRepo = templateRepo;
     this.taskService = taskService;
-    this.taskRepo = taskRepo;
     this.boardRepo = boardRepo;
     this.taskLabelService = taskLabelService;
   }
@@ -108,16 +105,6 @@ public class EventRouterService {
               template.getEventType()));
     }
 
-    if (taskRepo.existsOpenTaskByEntityAndType(
-        ctx.entityType(), ctx.entityId(), template.getTaskType())) {
-      log.info(
-          "Idempotency: {} task already open for entity {}={} — skipping",
-          template.getTaskType(),
-          ctx.entityType(),
-          ctx.entityId());
-      return;
-    }
-
     UUID boardId = resolveBoardId(template, ctx.tenantId());
     if (boardId == null) {
       log.warn("No matching board for template={} — task not created", template.getId());
@@ -146,7 +133,11 @@ public class EventRouterService {
             "TEMPLATE",
             template.getId());
 
-    var task = taskService.createTask(req);
+    var task =
+        taskService.createTask(
+            req,
+            TaskGenerationKey.subject(
+                ctx.entityType(), ctx.entityId(), template.getTaskType(), null));
     log.info(
         "SmartTaskGenerator created: taskId={} taskType={} entityType={}",
         task.getId(),

@@ -1,33 +1,35 @@
 package com.fabricmanagement.flowboard.task.domain;
 
-/** Task tiplerini tanımlar — SmartTaskGenerator event → task eşlemesinde kullanılır. */
+/** Task types used by manual work and event-driven Task generation. */
 public enum TaskType {
-  /** Recipe ata, WorkOrder oluştur. */
+  /** Assign a recipe or prepare production work. */
   PLANNING,
-  /** Batch başlat, üretimi yönet. */
+  /** Start and manage production. */
   PRODUCTION,
-  /** QC kontrol yap. */
+  /** Perform a quality check. */
   QUALITY,
-  /** Lokasyona yerleştir, stok yönet. */
+  /** Place or manage warehouse stock. */
   WAREHOUSE,
-  /** Sevkiyat hazırla, gönder. */
+  /** Prepare or dispatch a shipment. */
   SHIPMENT,
-  /** Onay bekleyen işlem. */
+  /** Review an operation awaiting approval. */
   APPROVAL,
-  /** Manuel recipe seçimi gerekiyor. */
+  /** Select a recipe manually. */
   RECIPE_ASSIGNMENT,
-  /** Tedarikçiden temin et. */
+  /** Source material from a supplier. */
   PROCUREMENT,
-  /** Maliyet sapması inceleme. */
+  /** Review a costing variance. */
   COSTING,
-  /** Numune hazırlama/gönderme. */
+  /** Prepare or send a sample. */
   SAMPLE,
-  /** İade işleme. */
+  /** Process a return. */
   RETURN,
-  /** Stok sayımı. */
+  /** Perform a stock count. */
   STOCK_COUNT,
-  /** Bakım görevi. */
+  /** Perform maintenance. */
   MAINTENANCE,
-  /** Genel görev. */
+  /** Decide how a confirmed SalesOrder is covered. */
+  ORDER_COVER,
+  /** General work without a narrower type. */
   GENERAL
 }

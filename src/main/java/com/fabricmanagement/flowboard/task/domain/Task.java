@@ -102,6 +102,18 @@ public class Task extends BaseEntity {
   @Column(name = "completed_at")
   private Instant completedAt;
 
+  @Column(name = "generation_key", nullable = false, length = 500)
+  private String generationKey;
+
+  @Column(name = "closed_at")
+  private Instant closedAt;
+
+  @Column(name = "workflow_definition_id", nullable = false)
+  private UUID workflowDefinitionId;
+
+  @Column(name = "workflow_version", nullable = false)
+  private Integer workflowVersion;
+
   /** Phase 3.1: Idempotency flag for approaching deadline warnings. */
   @Column(name = "is_deadline_warning_fired", nullable = false)
   private Boolean isDeadlineWarningFired = false;
@@ -188,6 +200,7 @@ public class Task extends BaseEntity {
       this.startedAt = Instant.now();
     }
     this.completedAt = null;
+    this.closedAt = null;
   }
 
   /** Task'ı IN_REVIEW durumuna alır — IN_PROGRESS'ten. */
@@ -210,6 +223,7 @@ public class Task extends BaseEntity {
     }
     this.status = TaskStatus.DONE;
     this.completedAt = Instant.now();
+    this.closedAt = this.completedAt;
   }
 
   /**
@@ -229,6 +243,7 @@ public class Task extends BaseEntity {
       throw new TaskStatusTransitionException(this.status, TaskStatus.CANCELLED);
     }
     this.status = TaskStatus.CANCELLED;
+    this.closedAt = Instant.now();
   }
 
   // =========================================================================
@@ -291,6 +306,60 @@ public class Task extends BaseEntity {
       this.sourceType = sourceType;
     }
     this.sourceId = sourceId;
+  }
+
+  /** Closes a governed execution after its authoritative unresolved scope becomes empty. */
+  public void closeGovernedExecution(Instant closedAt) {
+    if (workflowDefinitionId == null || workflowVersion == null) {
+      throw new IllegalStateException(
+          "Only a workflow-pinned Task can be closed by a domain action");
+    }
+    if (closedAt == null) {
+      throw new IllegalArgumentException("Closure time is required");
+    }
+    if (this.closedAt != null
+        || this.status == TaskStatus.DONE
+        || this.status == TaskStatus.CANCELLED) {
+      throw new IllegalStateException("A terminal Task execution cannot be closed again");
+    }
+    this.status = TaskStatus.DONE;
+    this.completedAt = closedAt;
+    this.closedAt = closedAt;
+    this.priorityScore = 0;
+  }
+
+  /** Applies the same identity and audit defaults used by BaseEntity before a native insert. */
+  public void prepareNativeInsert(UUID tenantId, UUID actorId, Instant now) {
+    if (getId() != null) {
+      throw new IllegalStateException("Task already has a persistence identity");
+    }
+    setId(UUID.randomUUID());
+    setTenantId(tenantId);
+    setUid(generateUid());
+    setCreatedAt(now);
+    setUpdatedAt(now);
+    setCreatedBy(actorId);
+    setUpdatedBy(actorId);
+    setIsActive(true);
+    setVersion(0L);
+  }
+
+  /** Pins the logical identity and immutable workflow used by this execution. */
+  public void govern(String generationKey, UUID workflowDefinitionId, int workflowVersion) {
+    if (generationKey == null || generationKey.isBlank()) {
+      throw new IllegalArgumentException("Task generation key is required");
+    }
+    if (workflowDefinitionId == null || workflowVersion < 1) {
+      throw new IllegalArgumentException("A valid workflow definition pin is required");
+    }
+    if (this.workflowDefinitionId != null
+        && (!this.workflowDefinitionId.equals(workflowDefinitionId)
+            || !this.workflowVersion.equals(workflowVersion))) {
+      throw new IllegalStateException("An active task workflow pin is immutable");
+    }
+    this.generationKey = generationKey;
+    this.workflowDefinitionId = workflowDefinitionId;
+    this.workflowVersion = workflowVersion;
   }
 
   // =========================================================================

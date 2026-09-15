@@ -50,6 +50,8 @@ public class TenantTransactionalPurgeService {
 
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
+          "flowboard.task_transition_attempt",
+          "flowboard.task_affected_subject",
           "flowboard.task_attachment",
           "flowboard.task_time_entry",
           "flowboard.task_dependency",

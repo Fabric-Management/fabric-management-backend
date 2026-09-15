@@ -7,11 +7,15 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** Task repository — FlowBoard'un en kritik sorgu noktası. */
 public interface TaskRepository extends JpaRepository<Task, UUID> {
+
+  java.util.Optional<Task> findByTenantIdAndGenerationKeyAndIsActiveTrueAndClosedAtIsNull(
+      UUID tenantId, String generationKey);
 
   /**
    * Board'daki tüm aktif task'ları priorityScore'a göre sıralı getirir. Kanban view için
@@ -78,25 +82,9 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
   /** Polimorfik entity referansına göre bağlı task'ları bulur. */
   List<Task> findAllByEntityTypeAndEntityIdAndIsActiveTrue(String entityType, UUID entityId);
 
-  /**
-   * [P2 FIX] Entity + taskType için açık task var mı — idempotency check.
-   *
-   * <p>Belleğe yüklemeden COUNT sorgusu yapar. DONE ve CANCELLED olanlar hariç tutulur.
-   */
-  @Query(
-      """
-      SELECT COUNT(t) > 0 FROM Task t
-      WHERE t.entityType = :entityType
-        AND t.entityId = :entityId
-        AND t.taskType = :taskType
-        AND t.isActive = true
-        AND t.status NOT IN (com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE,
-                             com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)
-      """)
-  boolean existsOpenTaskByEntityAndType(
-      @Param("entityType") String entityType,
-      @Param("entityId") UUID entityId,
-      @Param("taskType") com.fabricmanagement.flowboard.task.domain.TaskType taskType);
+  @Lock(jakarta.persistence.LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+  @Query("SELECT t FROM Task t WHERE t.id = :taskId")
+  java.util.Optional<Task> findByIdForAssignmentUpdate(@Param("taskId") UUID taskId);
 
   /**
    * [L2 FIX] DB sequence ile race-condition safe task numarası üretir. countByTenantId yerine

@@ -11,6 +11,7 @@ import com.fabricmanagement.flowboard.task.domain.*;
 import com.fabricmanagement.flowboard.task.dto.CreateTaskRequest;
 import com.fabricmanagement.flowboard.task.dto.UpdateTaskStatusRequest;
 import com.fabricmanagement.flowboard.task.infra.repository.*;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -40,6 +41,8 @@ class TaskServiceTest {
   @Mock private PriorityScoreCalculator scoreCalculator;
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private com.fabricmanagement.platform.user.api.facade.UserFacade userFacade;
+  @Mock private TaskProvisioningService taskProvisioningService;
+  @Mock private TaskWorkflowRegistry taskWorkflowRegistry;
 
   @InjectMocks private TaskService taskService;
 
@@ -57,6 +60,7 @@ class TaskServiceTest {
     when(scoreCalculator.calculate(any())).thenReturn(50);
     when(taskRepo.getNextTaskNumber()).thenReturn(1L);
     when(taskLabelAssignmentRepo.findAllByTaskIdIn(any())).thenReturn(java.util.List.of());
+    when(taskWorkflowRegistry.allowsManualCreation(any())).thenReturn(true);
     doNothing().when(eventPublisher).publish(any());
     // UserDto stub: wipLimit = 5 (DEFAULT_WIP_LIMIT) olarak set edilmiş
     com.fabricmanagement.platform.user.dto.UserDto userDto =
@@ -257,26 +261,26 @@ class TaskServiceTest {
               "MANUAL",
               null);
 
-      // Task.getId() == null before JPA persist → save() returns a spy with id set
-      when(taskRepo.save(any()))
-          .thenAnswer(
-              inv -> {
-                Task t = inv.getArgument(0);
-                // inject ID via reflection to simulate JPA persist
-                var idField =
-                    com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class
-                        .getDeclaredField("id");
-                idField.setAccessible(true);
-                idField.set(t, UUID.randomUUID());
-                return t;
-              });
+      Task provisioned =
+          Task.create(
+              "TSK-0001",
+              BOARD_ID,
+              "Yeni task",
+              TaskType.PRODUCTION,
+              ModuleType.FIBER,
+              Priority.HIGH,
+              req.deadline(),
+              req.estimatedHours(),
+              null,
+              null);
+      when(taskProvisioningService.createOrSynchronizeActive(any())).thenReturn(provisioned);
 
       Task result = taskService.createTask(req);
 
       assertThat(result.getStatus()).isEqualTo(TaskStatus.BACKLOG);
       assertThat(result.getTitle()).isEqualTo("Yeni task");
       assertThat(result.getTaskType()).isEqualTo(TaskType.PRODUCTION);
-      verify(taskRepo).save(any(Task.class));
+      verify(taskProvisioningService).createOrSynchronizeActive(any(TaskCreation.class));
     }
 
     @Test
@@ -298,21 +302,37 @@ class TaskServiceTest {
               "MANUAL",
               null);
 
-      when(taskRepo.save(any()))
-          .thenAnswer(
-              inv -> {
-                Task t = inv.getArgument(0);
-                var idField =
-                    com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class
-                        .getDeclaredField("id");
-                idField.setAccessible(true);
-                idField.set(t, UUID.randomUUID());
-                return t;
-              });
+      Task provisioned =
+          Task.create(
+              "TSK-0002",
+              BOARD_ID,
+              "QC task",
+              TaskType.QUALITY,
+              ModuleType.FABRIC,
+              Priority.CRITICAL,
+              req.deadline(),
+              null,
+              null,
+              null);
+      provisioned.updatePriorityScore(75);
+      when(taskProvisioningService.createOrSynchronizeActive(any())).thenReturn(provisioned);
 
       Task result = taskService.createTask(req);
 
       assertThat(result.getPriorityScore()).isEqualTo(75);
     }
+  }
+
+  @Test
+  void duplicateSystemAssignmentIsAnIdempotentReplay() {
+    TaskAssignee existing = TaskAssignee.assignToUser(TASK_ID, USER_ID, AssignedBy.SYSTEM);
+    when(assigneeRepo.findByTaskIdAndUserIdAndIsActiveTrue(TASK_ID, USER_ID))
+        .thenReturn(Optional.of(existing));
+
+    taskService.assignToUser(TASK_ID, USER_ID, AssignedBy.SYSTEM, SystemUser.ID);
+
+    verify(taskRepo, never()).findByIdForAssignmentUpdate(any());
+    verify(assigneeRepo, never()).save(any());
+    verify(eventPublisher, never()).publish(any());
   }
 }

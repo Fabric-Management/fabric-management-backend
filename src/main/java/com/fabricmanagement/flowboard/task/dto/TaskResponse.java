@@ -36,6 +36,7 @@ public record TaskResponse(
     Instant completedAt,
     String entityType,
     UUID entityId,
+    Long version,
     List<TaskAssigneeResponse> assignees,
     List<LabelResponse> labels) {
 
@@ -64,6 +65,7 @@ public record TaskResponse(
         task.getCompletedAt(),
         task.getEntityType(),
         task.getEntityId(),
+        task.getVersion(),
         assignees != null ? assignees : List.of(),
         labels != null ? labels : List.of());
   }

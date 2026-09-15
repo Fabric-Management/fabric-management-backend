@@ -5,6 +5,7 @@ import com.fabricmanagement.flowboard.automation.domain.AutomationRule;
 import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
 import com.fabricmanagement.flowboard.task.app.EscalationService;
+import com.fabricmanagement.flowboard.task.app.TaskGenerationKey;
 import com.fabricmanagement.flowboard.task.app.TaskLabelService;
 import com.fabricmanagement.flowboard.task.app.TaskService;
 import com.fabricmanagement.flowboard.task.domain.EscalationType;
@@ -90,22 +91,6 @@ public class AutomationActionExecutor {
                 ? titleTemplate.replace("{task.title}", task.getTitle())
                 : (task.getTitle() != null ? task.getTitle() + " — " + taskTypeStr : taskTypeStr);
 
-        // Idempotency: entityId null kontrolü + DB COUNT sorgusu
-        if (task.getEntityId() != null) {
-          if (taskRepo.existsOpenTaskByEntityAndType(
-              task.getEntityType(), task.getEntityId(), taskType)) {
-            log.info(
-                "AutomationActionExecutor: CREATE_TASK idempotency — {} already exists for entity {}",
-                taskType,
-                task.getEntityId());
-            return;
-          }
-        } else {
-          log.debug(
-              "AutomationActionExecutor: CREATE_TASK entityId null — idempotency check skipped for rule='{}'",
-              rule.getName());
-        }
-
         var req =
             new CreateTaskRequest(
                 task.getBoardId(),
@@ -120,7 +105,12 @@ public class AutomationActionExecutor {
                 task.getEntityId(),
                 "AUTOMATION_RULE",
                 rule.getId());
-        var newTask = taskService.createTask(req);
+        String generationKey =
+            task.getEntityType() != null && task.getEntityId() != null
+                ? TaskGenerationKey.automation(
+                    rule.getId(), task.getEntityType(), task.getEntityId(), taskType)
+                : TaskGenerationKey.automation(rule.getId(), "TASK", task.getId(), taskType);
+        var newTask = taskService.createTask(req, generationKey);
         if (!context.deeper().isDepthExceeded()) {
           log.debug(
               "AutomationActionExecutor: evaluating rules for newly created task={}",

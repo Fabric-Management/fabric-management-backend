@@ -2,11 +2,9 @@ package com.fabricmanagement.flowboard.task.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
 import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import com.fabricmanagement.flowboard.task.domain.*;
 import com.fabricmanagement.flowboard.task.domain.event.TaskAssignedEvent;
-import com.fabricmanagement.flowboard.task.domain.event.TaskCreatedEvent;
 import com.fabricmanagement.flowboard.task.domain.event.TaskStatusChangedEvent;
 import com.fabricmanagement.flowboard.task.dto.*;
 import com.fabricmanagement.flowboard.task.infra.repository.*;
@@ -48,10 +46,10 @@ public class TaskService {
   private final TaskAssigneeRepository assigneeRepo;
   private final TaskLabelAssignmentRepository taskLabelAssignmentRepo;
   private final TaskLabelRepository taskLabelRepo;
-  private final BoardRepository boardRepo;
-  private final PriorityScoreCalculator scoreCalculator;
   private final DomainEventPublisher eventPublisher;
   private final UserFacade userFacade;
+  private final TaskProvisioningService taskProvisioningService;
+  private final TaskWorkflowRegistry workflowRegistry;
 
   // =========================================================================
   // TASK OLUŞTURMA
@@ -64,61 +62,39 @@ public class TaskService {
    */
   @Transactional
   public Task createTask(CreateTaskRequest req) {
-    // Board varlık kontrolü
-    boardRepo
-        .findById(req.boardId())
-        .orElseThrow(() -> new EntityNotFoundException("Board not found: " + req.boardId()));
+    if (!workflowRegistry.allowsManualCreation(req.taskType())) {
+      throw new FlowBoardDomainException(
+          "Order-cover work can only be created by its domain provisioning path",
+          "FLOWBOARD_ORDER_COVER_MANUAL_CREATE_FORBIDDEN",
+          409,
+          new Object[0]);
+    }
+    return createTask(req, TaskGenerationKey.manualRequest(UUID.randomUUID()));
+  }
 
-    // [L2 FIX] Task numarası üret — DB sequence ile race-condition safe
-    String taskNumber = generateTaskNumber();
-
-    Task task =
-        Task.create(
-            taskNumber,
+  /** Internal generated paths supply their stable logical identity. */
+  @Transactional
+  public Task createTask(CreateTaskRequest req, String generationKey) {
+    java.util.Set<TaskSubject> subjects =
+        req.entityType() != null && req.entityId() != null
+            ? java.util.Set.of(new TaskSubject(req.entityType(), req.entityId()))
+            : java.util.Set.of();
+    return taskProvisioningService.createOrSynchronizeActive(
+        new TaskCreation(
             req.boardId(),
             req.title(),
+            req.description(),
             req.taskType(),
             req.moduleType(),
-            req.priority(), // [Q2 FIX] double default kaldırıldı, Task.create() handler
+            req.priority(),
             req.deadline(),
             req.estimatedHours(),
             req.entityType(),
-            req.entityId());
-
-    // [X3 FIX] description set edilmiyordu
-    if (req.description() != null) {
-      task.updateDescription(req.description());
-    }
-
-    // [Faz 3 FIX] Audit Trail ataması (sourceType, sourceId)
-    String sourceType = req.sourceType() != null ? req.sourceType() : "MANUAL";
-    task.assignSource(sourceType, req.sourceId());
-
-    // PriorityScore hesapla
-    int score = scoreCalculator.calculateWithLabels(task, List.of());
-    task.updatePriorityScore(score);
-
-    Task saved = taskRepo.save(task);
-
-    log.info(
-        "Task created: taskNumber={} boardId={} taskType={}",
-        taskNumber,
-        req.boardId(),
-        req.taskType());
-
-    // [B2 FIX] Domain event yayınla — WS publish TaskEventListener (AFTER_COMMIT) tarafından
-    // yapılacak.
-    // [EV1 FIX] TaskCreatedEvent artık yayınlanıyor.
-    eventPublisher.publish(
-        new TaskCreatedEvent(
-            TenantContext.requireTenantId(),
-            saved.getId(),
-            req.boardId(),
-            taskNumber,
-            TaskStatus.BACKLOG.name(),
-            req.taskType().name()));
-
-    return saved;
+            req.entityId(),
+            req.sourceType() != null ? req.sourceType() : "MANUAL",
+            req.sourceId(),
+            generationKey,
+            subjects));
   }
 
   // =========================================================================
@@ -143,6 +119,7 @@ public class TaskService {
         taskRepo
             .findById(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
+    rejectGovernedStatusBypass(task);
 
     TaskStatus targetStatus = req.newStatus();
 
@@ -343,6 +320,9 @@ public class TaskService {
   /**
    * Task'ı bir kullanıcıya atar.
    *
+   * <p>System assignment is idempotent: replaying the same assignment creates no row, event, or
+   * Task version change.
+   *
    * @param taskId Atanacak task
    * @param userId Atanacak kullanıcı
    * @param assignedBy Atama yapan (SYSTEM/MANAGER/SELF)
@@ -352,19 +332,21 @@ public class TaskService {
   @Transactional
   public void assignToUser(
       UUID taskId, UUID userId, AssignedBy assignedBy, UUID requestedByUserId) {
-    // [L3 FIX] Tek sorgu — task + boardId birlikte
-    if (!taskRepo.existsById(taskId)) {
-      throw new EntityNotFoundException("Task not found: " + taskId);
-    }
-
-    // [L4 FIX] Duplicate assignment koruması
     if (assigneeRepo.findByTaskIdAndUserIdAndIsActiveTrue(taskId, userId).isPresent()) {
+      if (assignedBy == AssignedBy.SYSTEM) {
+        return;
+      }
       throw new FlowBoardDomainException(
           "User is already assigned to task",
           "FLOWBOARD_USER_ALREADY_ASSIGNED",
           409,
           new Object[] {userId, taskId});
     }
+
+    Task task =
+        taskRepo
+            .findByIdForAssignmentUpdate(taskId)
+            .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
 
     var assignee = TaskAssignee.assignToUser(taskId, userId, assignedBy);
     assigneeRepo.save(assignee);
@@ -423,9 +405,10 @@ public class TaskService {
   /** Kullanıcının atamasını kaldırır. */
   @Transactional
   public void unassignUser(UUID taskId, UUID userId, UUID requestedByUserId) {
-    if (!taskRepo.existsById(taskId)) {
-      throw new EntityNotFoundException("Task not found: " + taskId);
-    }
+    Task task =
+        taskRepo
+            .findByIdForAssignmentUpdate(taskId)
+            .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
 
     TaskAssignee assignee =
         assigneeRepo
@@ -457,6 +440,7 @@ public class TaskService {
         taskRepo
             .findById(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
+    rejectGovernedStatusBypass(task);
 
     TaskStatus oldStatus = task.getStatus();
     task.cancel();
@@ -497,12 +481,13 @@ public class TaskService {
     }
   }
 
-  /**
-   * [L2 FIX] DB sequence ile race-condition safe task numarası üretir. Migration'da tanımlı:
-   * flowboard.task_number_seq
-   */
-  private String generateTaskNumber() {
-    long nextVal = taskRepo.getNextTaskNumber();
-    return String.format("TSK-%04d", nextVal);
+  private void rejectGovernedStatusBypass(Task task) {
+    if (workflowRegistry.isGoverned(task.getWorkflowDefinitionId(), task.getWorkflowVersion())) {
+      throw new FlowBoardDomainException(
+          "Order-cover status changes require a typed domain action",
+          "FLOWBOARD_GOVERNED_STATUS_BYPASS",
+          409,
+          new Object[] {task.getId()});
+    }
   }
 }
