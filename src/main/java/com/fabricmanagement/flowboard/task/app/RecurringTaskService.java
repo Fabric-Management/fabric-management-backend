@@ -65,7 +65,10 @@ public class RecurringTaskService {
                   null,
                   "TEMPLATE",
                   template.getId());
-          Task newTask = taskService.createTask(request);
+          Task newTask =
+              taskService.createTask(
+                  request,
+                  TaskGenerationKey.recurring(template.getId(), template.getNextTriggerAt()));
 
           if (template.getTargetAssigneeId() != null) {
             taskService.assignToUser(

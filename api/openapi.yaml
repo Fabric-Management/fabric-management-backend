@@ -56863,6 +56863,7 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         title:
           type: string
@@ -56931,6 +56932,7 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         titleTemplate:
           type: string
@@ -63967,6 +63969,7 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         title:
           type: string
@@ -65820,9 +65823,13 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         title:
           type: string
+        version:
+          type: integer
+          format: int64
     TaskTemplateDto:
       type: object
       properties:
@@ -65884,6 +65891,7 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         titleTemplate:
           type: string
@@ -67239,6 +67247,7 @@ components:
           - RETURN
           - STOCK_COUNT
           - MAINTENANCE
+          - ORDER_COVER
           - GENERAL
         titleTemplate:
           type: string
