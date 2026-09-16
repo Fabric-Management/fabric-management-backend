@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.util.List;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -24,7 +24,7 @@ class RlsPolicyEnforcementIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

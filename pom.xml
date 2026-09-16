@@ -38,6 +38,8 @@
         <!-- Database Versions -->
         <postgresql.version>42.7.13</postgresql.version>
         <flyway.version>10.22.0</flyway.version>
+        <!-- BUILD-4: single authored PostgreSQL container image; compose is generated from this. -->
+        <postgres.image>postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685</postgres.image>
 
         <!-- Security & JWT Versions -->
         <jjwt.version>0.13.0</jjwt.version>
@@ -556,6 +558,9 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -Xshare:off</argLine>
+                    <systemPropertyVariables>
+                        <postgres.image>${postgres.image}</postgres.image>
+                    </systemPropertyVariables>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
@@ -572,6 +577,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
+                    <systemPropertyVariables>
+                        <postgres.image>${postgres.image}</postgres.image>
+                    </systemPropertyVariables>
                     <includes>
                         <include>**/*IT.java</include>
                         <include>**/*IntegrationTest.java</include>

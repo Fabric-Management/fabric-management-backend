@@ -4,7 +4,7 @@
 
 .SHELLFLAGS := -eu -o pipefail -c
 .ONESHELL:
-.PHONY: help setup build compile check check-run run format lint test verify verify-coverage up down logs status db-migrate db-repair db-repair-checksum db-reset db-reset-local db-shell clean dev-reset info
+.PHONY: help setup build compile check check-run run format lint test verify verify-coverage build-4-verify up down logs status db-migrate db-repair db-repair-checksum db-reset db-reset-local db-shell clean dev-reset info
 
 .DEFAULT_GOAL := help
 
@@ -17,6 +17,10 @@ POSTGRES_LOCAL_USER ?= postgres
 # psql: use PATH, or common macOS locations. Override: make db-reset-local PSQL=/path/to/psql
 PSQL ?= $(shell which psql 2>/dev/null || ( [ -x /usr/local/opt/postgresql@16/bin/psql ] && echo /usr/local/opt/postgresql@16/bin/psql ) || ( [ -x /usr/local/opt/postgresql/bin/psql ] && echo /usr/local/opt/postgresql/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql@16/bin/psql ] && echo /opt/homebrew/opt/postgresql@16/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql/bin/psql ] && echo /opt/homebrew/opt/postgresql/bin/psql ) || ( [ -x /Applications/Postgres.app/Contents/Versions/latest/bin/psql ] && echo /Applications/Postgres.app/Contents/Versions/latest/bin/psql ) || echo psql)
 MVN := $(if $(wildcard mvnw),./mvnw,mvn)
+BUILD_4_BASELINE ?= $(HOME)/build-4-baseline
+BUILD_4_AFTER ?= $(HOME)/build-4-after
+BUILD_4_EVIDENCE ?= $(abspath ../docs/platform/evidence/build-4/after.md)
+BUILD_4_EXPLANATIONS ?= $(abspath ../docs/platform/evidence/build-4/expected-deltas.json)
 # Auto-detect JAVA_HOME for Homebrew OpenJDK when not set (prefer Java 21 for project compatibility)
 export JAVA_HOME ?= $(or $(shell [ -d /usr/local/opt/openjdk@21 ] && echo /usr/local/opt/openjdk@21),$(shell [ -d /opt/homebrew/opt/openjdk@21 ] && echo /opt/homebrew/opt/openjdk@21),$(shell [ -d /usr/local/opt/openjdk ] && echo /usr/local/opt/openjdk),$(shell [ -d /opt/homebrew/opt/openjdk ] && echo /opt/homebrew/opt/openjdk))
 
@@ -95,6 +99,13 @@ verify-coverage: ## Run all tests and enforce the ratcheted line-coverage baseli
 	@echo "$(YELLOW)🧪 Running tests with coverage gate...$(NC)"
 	$(MVN) verify -Pcoverage
 	@echo "$(GREEN)✅ Tests and coverage check passed.$(NC)"
+
+build-4-verify: ## Run and archive the complete BUILD-4 PostgreSQL verification
+	./scripts/build_4_verify.sh \
+		"$(BUILD_4_BASELINE)" \
+		"$(BUILD_4_AFTER)" \
+		"$(BUILD_4_EVIDENCE)" \
+		"$(BUILD_4_EXPLANATIONS)"
 
 ##@ 🐳 DOCKER INFRASTRUCTURE
 up: ## Start all required infrastructure (PostgreSQL, etc.)

@@ -28,7 +28,7 @@ Fabric Management System is a comprehensive platform for fabric manufacturing, i
 - Java 21+ (recommended: `brew install openjdk@21` on macOS)
 - Maven 3.9+ (or use `./mvnw` – Maven wrapper included)
 - Docker & Docker Compose
-- PostgreSQL 15+ (via Docker)
+- PostgreSQL 16 (via Docker)
 
 > **macOS:** Makefile and pre-commit hooks auto-detect `JAVA_HOME` for Homebrew OpenJDK. If `mvn` is not in PATH, use `./mvnw` or `make format` (uses wrapper).
 >
@@ -65,7 +65,7 @@ fabric-management-backend/
 ## 🛠️ Technology Stack
 
 - **Backend**: Java 21, Spring Boot 3.5.5
-- **Database**: PostgreSQL 15, Flyway migrations
+- **Database**: PostgreSQL 16, Flyway migrations
 - **Messaging**: Apache Kafka (optional)
 - **Containerization**: Docker, Docker Compose
 - **Build**: Maven
@@ -112,6 +112,32 @@ make lint            # Blocking format + Checkstyle + SpotBugs checks
 
 See `make help` for all available commands. **Code quality & automatic error detection:** [docs/CODE_QUALITY.md](docs/CODE_QUALITY.md).
 The CI gates and container-release policy are documented in [docs/CI_CD.md](docs/CI_CD.md).
+
+### PostgreSQL support and local-volume upgrade
+
+FabricOS's first deployment target is PostgreSQL 16. Other PostgreSQL majors are unsupported until
+they are verified separately. The exact Testcontainers and local Compose image is authored once as
+`postgres.image` in `pom.xml`; the Compose image line is generated with:
+
+```bash
+python3 -B scripts/postgres_image.py --write
+```
+
+This keeps a bare `docker compose up` working without an image-related flag or `.env` entry.
+
+A named `postgres_data` volume created by PostgreSQL 15 cannot be started directly with PostgreSQL
+16. Before starting the upgraded image, choose explicitly:
+
+- If the local data is disposable, remove the volume yourself with the destructive `make db-reset`
+  command.
+- If the data must be retained, back it up first and use a supported `pg_upgrade` procedure or a
+  dump/restore into a fresh PostgreSQL 16 volume.
+
+No setup, generation, or guard command removes a volume automatically.
+
+Run `make build-4-verify` for the complete PostgreSQL verification and evidence archive. It
+preserves logs and XML reports outside Maven's `target/` directory before a later `clean` can remove
+them.
 
 ## 🔐 Security Features
 

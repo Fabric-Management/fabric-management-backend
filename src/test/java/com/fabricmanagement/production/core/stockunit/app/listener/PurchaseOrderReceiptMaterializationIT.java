@@ -25,6 +25,7 @@ import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnit
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOrigin;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionRepository;
 import com.fabricmanagement.production.quality.decision.infra.repository.QualityDecisionUnitRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.math.BigDecimal;
 import java.sql.DriverManager;
 import java.time.Duration;
@@ -46,7 +47,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(
     properties = {
@@ -63,7 +63,7 @@ class PurchaseOrderReceiptMaterializationIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

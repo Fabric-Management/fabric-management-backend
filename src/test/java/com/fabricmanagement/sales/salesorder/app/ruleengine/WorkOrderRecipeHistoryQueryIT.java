@@ -15,6 +15,7 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
@@ -35,7 +36,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
@@ -51,7 +51,7 @@ class WorkOrderRecipeHistoryQueryIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("test")
           .withPassword("test");

@@ -30,6 +30,12 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Test PostgreSQL build governance
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Verify PostgreSQL image governance
+        run: python3 -B scripts/postgres_image.py --check
+
       - name: Verify formatting
         run: ./mvnw fmt:check
 
@@ -136,6 +142,9 @@ jobs:
           java-version: "21"
           distribution: temurin
           cache: maven
+
+      - name: Pull governed PostgreSQL image on the CI architecture
+        run: docker pull "$(python3 -B scripts/postgres_image.py --print-image)"
 
       - name: Run unit, integration and coverage gates
         run: ./mvnw clean verify -Pcoverage

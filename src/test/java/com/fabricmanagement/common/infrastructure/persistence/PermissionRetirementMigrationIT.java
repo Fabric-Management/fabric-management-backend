@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -22,7 +23,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * PERM-CAT-2: upgrade populated legacy data through Flyway, then exercise both scripts twice. The
@@ -70,7 +70,7 @@ class PermissionRetirementMigrationIT {
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("permission_retirement_migration")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

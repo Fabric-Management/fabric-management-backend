@@ -21,6 +21,7 @@ import com.fabricmanagement.production.knitting.domain.specs.KnittingProductionS
 import com.fabricmanagement.production.spinning.domain.specs.SpinningProductionSpecs;
 import com.fabricmanagement.production.weaving.domain.specs.WeavingProductionSpecs;
 import com.fabricmanagement.sales.salesproduct.domain.SalesProduct;
+import com.fabricmanagement.testsupport.PostgresImage;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.List;
@@ -42,7 +43,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -55,7 +55,7 @@ class WorkOrderProductionSpecsJsonbIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("test")
           .withPassword("test");

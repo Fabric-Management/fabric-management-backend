@@ -3,6 +3,7 @@ package com.fabricmanagement.product.yarn.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -16,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class YarnCatalogueMigrationIT {
@@ -119,7 +119,7 @@ class YarnCatalogueMigrationIT {
   }
 
   private static PostgreSQLContainer<?> newPostgres(String databaseName) {
-    return new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+    return PostgresImage.container()
         .withDatabaseName(databaseName)
         .withUsername("fabric_owner")
         .withPassword("fabric123");
