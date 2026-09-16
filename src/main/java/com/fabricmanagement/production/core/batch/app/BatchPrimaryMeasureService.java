@@ -31,13 +31,24 @@ public class BatchPrimaryMeasureService {
     if (productType == null) {
       throw new IllegalArgumentException("Product type is required");
     }
-    return switch (productType) {
-      case FABRIC -> PrimaryMeasure.LENGTH;
-      case FIBER, YARN -> PrimaryMeasure.WEIGHT;
-      case CHEMICAL, CONSUMABLE ->
-          throw new IllegalArgumentException(
-              "Unsupported product type for primary measure: " + productType);
-    };
+    return findResolution(productType)
+        .map(Resolution::primaryMeasure)
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Unsupported product type for primary measure: " + productType));
+  }
+
+  /** One supported-type catalog shared by presentation and evidence readers. */
+  public Optional<Resolution> findResolution(ProductType productType) {
+    if (productType == null) return Optional.empty();
+    Optional<PrimaryMeasure> measure =
+        switch (productType) {
+          case FABRIC -> Optional.of(PrimaryMeasure.LENGTH);
+          case FIBER, YARN -> Optional.of(PrimaryMeasure.WEIGHT);
+          case CHEMICAL, CONSUMABLE -> Optional.empty();
+        };
+    return measure.map(value -> new Resolution(value, canonicalUnit(value)));
   }
 
   public String canonicalUnit(PrimaryMeasure measure) {

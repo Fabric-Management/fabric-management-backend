@@ -20,6 +20,18 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 class DomainExceptionStatusContractTest {
 
   @Test
+  void jakartaOptimisticLockMapsToTyped409Response() {
+    var handler = new GlobalExceptionHandler(null);
+    var request = new MockHttpServletRequest();
+    request.setRequestURI("/api/v1/sales-orders/test/cover");
+    var response =
+        handler.handleOptimisticLock(
+            new jakarta.persistence.OptimisticLockException("Stale evidence"), request);
+    assertThat(response.getStatus()).isEqualTo(409);
+    assertThat(response.getCode()).isEqualTo("OPTIMISTIC_LOCK");
+  }
+
+  @Test
   @DisplayName("WeightReconciliationException MUST map to 409 Conflict")
   void testWeightReconciliationException() {
     WeightReconciliationException ex =

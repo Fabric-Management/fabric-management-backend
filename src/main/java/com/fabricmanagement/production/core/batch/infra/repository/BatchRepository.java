@@ -41,6 +41,10 @@ public interface BatchRepository
 
   List<Batch> findByTenantIdAndProductId(UUID tenantId, UUID productId);
 
+  /** Complete evidence population, including batches hidden by presentation availability. */
+  List<Batch> findByTenantIdAndProductIdInAndIsActiveTrueOrderById(
+      UUID tenantId, Collection<UUID> productIds);
+
   List<Batch> findByTenantIdAndProductIdAndIsActiveTrue(UUID tenantId, UUID productId);
 
   List<Batch> findByTenantIdAndIdInAndIsActiveTrue(UUID tenantId, Collection<UUID> ids);

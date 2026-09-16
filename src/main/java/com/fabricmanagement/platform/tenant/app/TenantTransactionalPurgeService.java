@@ -28,6 +28,8 @@ public class TenantTransactionalPurgeService {
   private static final String QUALITY_DECISION_PURGE_SETTING = "app.quality_decision_purge_tenant";
   private static final String COMMERCIAL_ASSIGNMENT_PURGE_SETTING =
       "app.customer_commercial_assignment_purge_tenant";
+  private static final String ORDER_COVER_EVIDENCE_PURGE_SETTING =
+      "app.order_cover_evidence_purge_tenant";
 
   /**
    * Users removed by a demo purge: template-seeded users, plus users anchored to an
@@ -165,6 +167,8 @@ public class TenantTransactionalPurgeService {
           "procurement.subcontract_order",
           "procurement.purchase_order_line",
           "procurement.purchase_order",
+          "sales_ord.order_cover_evidence",
+          "sales_ord.order_cover_evidence_stream",
           "sales_ord.sales_order_line",
           "sales_ord.sales_order",
           "sales.sample_delivery",
@@ -278,6 +282,11 @@ public class TenantTransactionalPurgeService {
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
     authorizeQualityDecisionPurge(jdbc, tenantId);
     authorizeCommercialAssignmentPurge(jdbc, tenantId);
+    jdbc.queryForObject(
+        "SELECT set_config(?, ?, true)",
+        String.class,
+        ORDER_COVER_EVIDENCE_PURGE_SETTING,
+        tenantId.toString());
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
       delete(jdbc, rows, table, "DELETE FROM " + table + " WHERE tenant_id = ?", tenantId);

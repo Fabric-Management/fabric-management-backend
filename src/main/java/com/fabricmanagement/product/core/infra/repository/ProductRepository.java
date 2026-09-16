@@ -16,6 +16,27 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, UUID> {
+  @org.springframework.data.jpa.repository.Query(
+      """
+      select p.id as id, p.productType as productType, p.version as revision,
+             p.createdAt as recordedAt, p.isActive as active
+      from Product p where p.tenantId = :tenantId and p.id in :ids
+      """)
+  List<EvidenceReferenceRow> findEvidenceReferences(
+      @org.springframework.data.repository.query.Param("tenantId") UUID tenantId,
+      @org.springframework.data.repository.query.Param("ids") Collection<UUID> ids);
+
+  interface EvidenceReferenceRow {
+    UUID getId();
+
+    ProductType getProductType();
+
+    Long getRevision();
+
+    java.time.Instant getRecordedAt();
+
+    Boolean getActive();
+  }
 
   Optional<Product> findByTenantIdAndId(UUID tenantId, UUID id);
 
