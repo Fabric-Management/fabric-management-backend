@@ -9,6 +9,7 @@ import com.fabricmanagement.finance.invoice.dto.CreateInvoiceLineRequest;
 import com.fabricmanagement.finance.invoice.dto.CreateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.dto.InvoiceDto;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,7 +29,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
@@ -44,7 +44,7 @@ class InvoicePersistenceIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("test")
           .withPassword("test");

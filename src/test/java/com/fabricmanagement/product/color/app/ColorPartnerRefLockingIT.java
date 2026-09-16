@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.color.domain.ColorPartnerRef;
 import com.fabricmanagement.product.color.infra.repository.ColorPartnerRefRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.OptimisticLockException;
 import java.util.UUID;
@@ -29,7 +30,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -40,7 +40,7 @@ class ColorPartnerRefLockingIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

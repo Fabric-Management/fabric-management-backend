@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRegistryRepository;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration tests for TradingPartner deduplication (Registry golden record).
@@ -51,7 +51,7 @@ class TradingPartnerDeduplicationIntegrationTest {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("test")
           .withPassword("test");

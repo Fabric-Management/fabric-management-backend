@@ -19,6 +19,9 @@ public interface BatchLotQuantityIntentRepository
 
   List<BatchLotQuantityIntent> findByTenantIdAndQuoteLineId(UUID tenantId, UUID quoteLineId);
 
+  List<BatchLotQuantityIntent> findByTenantIdAndBatchIdInAndIsActiveTrueOrderById(
+      UUID tenantId, Collection<UUID> batchIds);
+
   Optional<BatchLotQuantityIntent> findByTenantIdAndQuoteLineIdAndBatchId(
       UUID tenantId, UUID quoteLineId, UUID batchId);
 

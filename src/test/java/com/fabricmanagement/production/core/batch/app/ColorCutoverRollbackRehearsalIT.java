@@ -2,6 +2,7 @@ package com.fabricmanagement.production.core.batch.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.SQLException;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,14 +10,13 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class ColorCutoverRollbackRehearsalIT extends BatchColorCutoverSqlTestSupport {
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("batch_color_rollback")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

@@ -6,6 +6,7 @@ import com.fabricmanagement.FabricManagementApplication;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.core.domain.registry.PropertyRegistryException;
+import com.fabricmanagement.testsupport.PostgresImage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.WebApplicationType;
@@ -17,7 +18,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -30,7 +30,7 @@ class PropertyRegistryStartupValidationIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("property_registry_startup")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

@@ -54,6 +54,23 @@ public class StockAvailabilityQueryService {
   private final BatchCommitmentQuantityService commitmentQuantityService;
   private final QualityGradeQueryService qualityGradeQueryService;
 
+  /** Internal, explicitly product-bounded evidence read; no pagination or saleability filtering. */
+  public List<StockAvailabilityDtos.Lot> lotsForProducts(Set<UUID> productIds) {
+    if (productIds.isEmpty()) return List.of();
+    UUID tenantId = TenantContext.requireTenantId();
+    List<Batch> batches =
+        batchRepository
+            .findByTenantIdAndProductIdInAndIsActiveTrueOrderById(tenantId, productIds)
+            .stream()
+            .filter(
+                batch -> primaryMeasureService.findResolution(batch.getProductType()).isPresent())
+            .toList();
+    Filter filter = new Filter(null, false, null, null, null, false);
+    return computeLots(tenantId, batches, filter, true, true).values().stream()
+        .map(LotComputation::lot)
+        .toList();
+  }
+
   public Page<StockAvailabilityDtos.Summary> summary(
       UUID colorId,
       Boolean colourless,
@@ -146,6 +163,15 @@ public class StockAvailabilityQueryService {
 
   private Map<UUID, LotComputation> computeLots(
       UUID tenantId, List<Batch> batches, Filter filter, boolean includeColours) {
+    return computeLots(tenantId, batches, filter, includeColours, false);
+  }
+
+  private Map<UUID, LotComputation> computeLots(
+      UUID tenantId,
+      List<Batch> batches,
+      Filter filter,
+      boolean includeColours,
+      boolean tolerateMissingGrades) {
     if (batches.isEmpty()) {
       return Map.of();
     }
@@ -207,7 +233,8 @@ public class StockAvailabilityQueryService {
                         qualityRows.getOrDefault(batch.getId(), List.of()),
                         qualityGrades,
                         commitments.get(batch.getId()),
-                        colours.get(batch.getId())),
+                        colours.get(batch.getId()),
+                        tolerateMissingGrades),
                 (left, right) -> left,
                 LinkedHashMap::new));
   }
@@ -222,7 +249,8 @@ public class StockAvailabilityQueryService {
       List<StockUnitRepository.AvailabilityQualityBreakdownRow> qualityRows,
       Map<UUID, QualityGradeReference> qualityGrades,
       BatchCommitmentQuantityService.Summary commitments,
-      StockAvailabilityDtos.Colour colour) {
+      StockAvailabilityDtos.Colour colour,
+      boolean tolerateMissingGrades) {
     var resolution = primaryMeasureService.resolve(batch);
     boolean hasPieces = pieceBacked || !vectorRows.isEmpty();
     List<StockUnitRepository.AvailabilityVectorRow> selectableRows =
@@ -272,7 +300,8 @@ public class StockAvailabilityQueryService {
         .forEach(
             mismatch ->
                 log.warn(
-                    "Excluded non-canonical physical quantity: tenantId={}, batchId={}, source={}, unit={}, quantity={}, rowCount={}",
+                    "Excluded non-canonical physical quantity: tenantId={}, batchId={}, source={},"
+                        + " unit={}, quantity={}, rowCount={}",
                     tenantId,
                     batch.getId(),
                     mismatch.source(),
@@ -282,7 +311,7 @@ public class StockAvailabilityQueryService {
     List<StockAvailabilityDtos.PieceBreakdown> pieceBreakdown =
         pieceBreakdown(pieceRows, resolution.primaryMeasure());
     List<StockAvailabilityDtos.QualityBreakdown> qualityBreakdown =
-        qualityBreakdown(qualityRows, qualityGrades);
+        qualityBreakdown(qualityRows, qualityGrades, tolerateMissingGrades);
     StockAvailabilityDtos.Lot lot =
         new StockAvailabilityDtos.Lot(
             batch.getId(),
@@ -419,7 +448,8 @@ public class StockAvailabilityQueryService {
 
   private List<StockAvailabilityDtos.QualityBreakdown> qualityBreakdown(
       List<StockUnitRepository.AvailabilityQualityBreakdownRow> rows,
-      Map<UUID, QualityGradeReference> grades) {
+      Map<UUID, QualityGradeReference> grades,
+      boolean tolerateMissingGrades) {
     Map<UUID, MutableQualityBreakdown> grouped = new HashMap<>();
     MutableQualityBreakdown unassigned = new MutableQualityBreakdown(null);
     rows.forEach(
@@ -430,6 +460,10 @@ public class StockAvailabilityQueryService {
           } else {
             QualityGradeReference grade = grades.get(row.getQualityGradeId());
             if (grade == null) {
+              if (tolerateMissingGrades) {
+                unassigned.add(row, primaryMeasureService);
+                return;
+              }
               throw new IllegalStateException(
                   "Quality grade reference not found: " + row.getQualityGradeId());
             }

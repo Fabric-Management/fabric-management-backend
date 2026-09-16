@@ -11,6 +11,9 @@ public interface SalesOrderLineRepository extends JpaRepository<SalesOrderLine, 
 
   Optional<SalesOrderLine> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  List<SalesOrderLine> findByTenantIdAndSalesOrderIdAndIsActiveTrueOrderByCreatedAtAscIdAsc(
+      UUID tenantId, UUID salesOrderId);
+
   List<SalesOrderLine> findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(UUID salesOrderId);
 
   List<SalesOrderLine> findByLineStatusAndIsActiveTrue(SalesOrderLineStatus lineStatus);

@@ -95,4 +95,20 @@ public class QualityGradeQueryService {
           Boolean.TRUE.equals(grade.getIsActive()));
     }
   }
+
+  /** Additive provenance contract; existing presentation references retain their shape. */
+  public List<QualityGradeEvidenceReference> findEvidenceReferencesByIds(
+      Collection<UUID> gradeIds) {
+    if (gradeIds == null || gradeIds.isEmpty()) return List.of();
+    UUID tenantId = TenantContext.requireTenantId();
+    return qualityGradeRepository.findByTenantIdAndIdIn(tenantId, gradeIds).stream()
+        .map(
+            grade ->
+                new QualityGradeEvidenceReference(
+                    QualityGradeReference.from(grade), grade.getVersion(), grade.getCreatedAt()))
+        .toList();
+  }
+
+  public record QualityGradeEvidenceReference(
+      QualityGradeReference grade, Long revision, java.time.Instant recordedAt) {}
 }

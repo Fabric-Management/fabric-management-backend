@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 class TaskGovernanceMigrationIT extends AbstractIntegrationTest {
 
@@ -256,7 +256,7 @@ class TaskGovernanceMigrationIT extends AbstractIntegrationTest {
   }
 
   private static PostgreSQLContainer<?> newMigrationDatabase(String name) {
-    return new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+    return PostgresImage.container()
         .withDatabaseName(name)
         .withUsername("fabric_owner")
         .withPassword("fabric123");

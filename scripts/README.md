@@ -7,6 +7,11 @@ Utility scripts for development, deployment, and maintenance.
 ```
 scripts/
 ├── README.md                  # This file
+├── postgres_image.py          # Generate and guard the PostgreSQL image pin
+├── test_postgres_image.py     # Red probes for PostgreSQL image governance
+├── build_4_test_reports.py    # Extract and compare Surefire/Failsafe identities
+├── test_build_4_test_reports.py # Report-policy regression tests
+├── build_4_verify.sh           # Run and archive complete BUILD-4 verification
 ├── help.awk                   # Groups make help by section (used by make help)
 ├── docker-entrypoint.sh       # Docker container entrypoint (DO NOT RUN MANUALLY)
 ├── setup-git-hooks.sh         # Install Git pre-commit hooks
@@ -29,6 +34,71 @@ make spotbugs             # SpotBugs only
 ```
 
 See [docs/CODE_QUALITY.md](../docs/CODE_QUALITY.md) for full details.
+
+### PostgreSQL Image Governance
+
+`pom.xml` is the single authored source for the PostgreSQL container image. Regenerate the Compose
+counterpart after changing that property, then use the check mode to detect drift, hardcoded test
+images, accessor bypasses, or a digest that is not a Linux amd64/arm64 manifest index:
+
+```bash
+python3 -B scripts/postgres_image.py --write
+python3 -B scripts/postgres_image.py --check
+```
+
+The check reads Docker Hub's official tag metadata, so it requires network access. CI also pulls the
+exact generated image before the test suite. Run all build-governance tests with:
+
+```bash
+python3 -B -m unittest discover -s scripts -p 'test_*.py'
+```
+
+### BUILD-4 Verification Evidence
+
+The supported workflow is a single command:
+
+```bash
+make build-4-verify
+```
+
+It refuses to overwrite an existing archive. By default it reads `~/build-4-baseline`, writes the
+new archive to `~/build-4-after`, and generates
+`../docs/platform/evidence/build-4/after.md`. Override the archive paths when needed:
+
+```bash
+make build-4-verify \
+  BUILD_4_BASELINE=/absolute/path/to/baseline \
+  BUILD_4_AFTER=/absolute/path/to/new-archive
+```
+
+The command records the environment and complete command log, runs the Python governance tests and
+image guard, resolves the Compose image, pulls the exact digest on the local architecture, runs
+`./mvnw -B -ntp clean verify`, preserves Surefire/Failsafe and quality artifacts outside `target/`,
+stores the generated comparison and its expected-delta input in the archive, and writes a SHA-256
+manifest. It generates the comparison even after a Maven failure when both report directories
+exist.
+
+For lower-level report work, generate a snapshot or compare two already preserved runs:
+
+```bash
+python3 -B scripts/build_4_test_reports.py snapshot \
+  ~/build-4-baseline \
+  ../docs/platform/evidence/build-4/baseline.md \
+  --title "BUILD-4 pre-change mixed-version baseline"
+
+python3 -B scripts/build_4_test_reports.py compare \
+  ~/build-4-baseline \
+  ~/build-4-after \
+  ../docs/platform/evidence/build-4/after.md \
+  --title "BUILD-4 PostgreSQL 16 verification" \
+  --explanations ../docs/platform/evidence/build-4/expected-deltas.json
+```
+
+The comparison uses test identity, status, and skip/failure reason. It returns a non-zero status if
+a baseline identity disappears without an exact written explanation, an existing result changes, a
+failure or error remains, a test identity is newly skipped, or `build.log` does not record a successful
+build. Stale explanation entries also fail so an obsolete exception cannot remain silently active.
+Missing logs are reported as not assessable rather than consistent.
 
 ### Setup Git Hooks
 
@@ -139,4 +209,4 @@ readonly NC='\033[0m'  # No Color
 
 ---
 
-**Last Updated:** 2025-01-28
+**Last Updated:** 2026-09-16

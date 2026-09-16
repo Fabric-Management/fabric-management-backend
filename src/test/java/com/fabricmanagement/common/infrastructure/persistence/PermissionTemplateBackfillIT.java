@@ -10,6 +10,7 @@ import com.fabricmanagement.platform.tenant.app.TenantClonerService;
 import com.fabricmanagement.platform.user.app.PermissionManagementService;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.dto.UpdatePermissionTemplateRequest;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -28,7 +29,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * PERM-SEED-1: the backfill must repair tenants that were created while the seeder was skipping its
@@ -52,7 +52,7 @@ class PermissionTemplateBackfillIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

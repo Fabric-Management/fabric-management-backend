@@ -1,0 +1,27 @@
+{
+  "formatVersion": 1,
+  "schemas": {
+    "ConfirmProductionCoverPayload": "caseId; evidenceId; evidenceRevision; lineIds:UUID[]; note?",
+    "DecisionAssignment": "bucket: MINE/DEPARTMENT/UNASSIGNED/WAITING; directAssigneeIds[]; departmentIds[]; holderDisplay? (redacted if inaccessible)",
+    "DecisionBlockedReason": "code: PERMISSION_DENIED/OUTSIDE_ROUTING_POOL/ASSIGNED_ELSEWHERE/UNASSIGNED/EVIDENCE_UNKNOWN/EVIDENCE_CHANGED/CASE_CLOSED/UNSUPPORTED_ROUTE; messageKey; parameters:DecisionReasonParameters",
+    "DecisionCapability": "action; allowed:boolean; reason:DecisionBlockedReason?; routesTo:DecisionRouteTarget?; needsApproval:boolean; evaluatedAt; requiredPermissions:PermissionKey[]",
+    "DecisionQueueItem": "id (= caseId); kind: ORDER_COVER; taskId; taskVersion; subject; assignment; priority; dueAt?; createdAt; projectedAt; state: OPEN/WAITING; verdictCode; actions:DecisionCapability[]; detailHref",
+    "DecisionQueueSummary": "mineCount; departmentCount; unassignedCount?; waitingCount; computedAt; stale:boolean",
+    "DecisionReasonParameters": "requiredPermission:PermissionKey?; currentTaskVersion:int64?; no other properties or arbitrary serialized domain objects",
+    "DecisionResultRef": "type: ORDER_COVER_RESULT/WORK_ORDER/TASK; id; accessibleHref?",
+    "DecisionRouteTarget": "kind: USER/DEPARTMENT/SYSTEM; id?; labelKey?; accessibleHref?",
+    "DecisionSubjectRef": "type: SALES_ORDER; id; number; accessibleHref? (validated local app route, supplied by BE adapter)",
+    "DecisionTransitionRequest": "action: CONFIRM_PRODUCTION_COVER; expectedVersion; idempotencyKey:UUID; payload:ConfirmProductionCoverPayload",
+    "DecisionTransitionResult": "result:OrderCoverResult; taskId; taskVersion; taskState; remainingLineIds[]; replayed:boolean",
+    "OrderCoverCase": "id; salesOrderId; revision; state: OPEN/PARTIALLY_SETTLED/SETTLED/CANCELLED; taskId?; taskVersion?; unresolvedLineIds[]; latestEvidenceId?",
+    "OrderCoverCompetingAllocation": "lineId; quantity:OrderCoverQuantity",
+    "OrderCoverDetail": "case:OrderCoverCase; subject; assignment; evidence:OrderCoverEvidence?; actions:DecisionCapability[]; results:OrderCoverResult[]",
+    "OrderCoverEvidence": "id; caseId; revision; orderVersion; computedAt; inputFingerprint; ruleVersion; lines:OrderCoverLineEvidence[]",
+    "OrderCoverLineEvidence": "lineId; lineVersion; productId?; requested:OrderCoverQuantity; suitableFree:OrderCoverQuantity; remainingSuitableFree:OrderCoverQuantity; shortfall:OrderCoverQuantity; suitability: EXACT/AMBIGUOUS/NO_MATCH/UNKNOWN; competingAllocations:OrderCoverCompetingAllocation[]; controlReasons[]; sources[]; blockingReasons[]",
+    "OrderCoverLineResult": "lineId; outcome: STOCK/MAKE_TO_ORDER; quantity:OrderCoverQuantity (KNOWN only); downstream:DecisionResultRef[]",
+    "OrderCoverQuantity": "state: KNOWN/ESTIMATE/UNKNOWN; value?; unit?; reasonCode?",
+    "OrderCoverResult": "id; caseId; caseRevision; actorId; actorKind: USER/SYSTEM; policyKey?; recordedAt; evidenceId; evidenceRevision; lines:OrderCoverLineResult[]; supersedesResultId? (null in v1)",
+    "OrderCoverSource": "type; id; revision?; observedAt?; recordedAt?; knowledge: VERIFIED/UNKNOWN/CONTRADICTED; accessibleHref?"
+  },
+  "source": "docs/frontend/evidence/fe-arch-5a/contract.md"
+}

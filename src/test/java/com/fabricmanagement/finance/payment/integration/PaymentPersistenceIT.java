@@ -14,6 +14,7 @@ import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
 import com.fabricmanagement.finance.payment.dto.CreatePaymentRequest;
 import com.fabricmanagement.finance.payment.dto.PaymentDto;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -40,7 +41,7 @@ class PaymentPersistenceIT {
   @Container
   @SuppressWarnings("resource")
   static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:15-alpine")
+      PostgresImage.container()
           .withDatabaseName("fabric")
           .withUsername("fabric")
           .withPassword("fabric");

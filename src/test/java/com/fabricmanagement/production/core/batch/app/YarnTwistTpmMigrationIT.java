@@ -3,6 +3,7 @@ package com.fabricmanagement.production.core.batch.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.product.core.domain.registry.policy.TwistConversion;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +19,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class YarnTwistTpmMigrationIT {
@@ -45,7 +45,7 @@ class YarnTwistTpmMigrationIT {
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("yarn_twist_tpm_migration")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

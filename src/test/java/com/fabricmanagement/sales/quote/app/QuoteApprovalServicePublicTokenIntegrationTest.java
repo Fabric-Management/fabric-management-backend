@@ -14,6 +14,7 @@ import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.dto.PublicQuoteResponse;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteApprovalTokenRepository;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -35,7 +36,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
@@ -47,7 +47,7 @@ class QuoteApprovalServicePublicTokenIntegrationTest {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

@@ -3,6 +3,7 @@ package com.fabricmanagement.product.fiber.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 @TestMethodOrder(OrderAnnotation.class)
@@ -225,7 +225,7 @@ class FiberMaterialSourceIT {
   }
 
   private static PostgreSQLContainer<?> newPostgres(String databaseName) {
-    return new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+    return PostgresImage.container()
         .withDatabaseName(databaseName)
         .withUsername("fabric_owner")
         .withPassword("fabric123");

@@ -11,6 +11,7 @@ import com.fabricmanagement.product.color.domain.ColorFamily;
 import com.fabricmanagement.product.color.domain.ColorStandardStatus;
 import com.fabricmanagement.product.color.domain.ColorType;
 import com.fabricmanagement.product.color.domain.PantoneSystem;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.DriverManager;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -31,7 +32,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -45,7 +45,7 @@ class ColorPersistenceIT {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.2-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("fabric_owner")
           .withPassword("fabric123");

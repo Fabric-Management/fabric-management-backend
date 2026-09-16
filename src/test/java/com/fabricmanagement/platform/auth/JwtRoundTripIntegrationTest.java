@@ -19,6 +19,7 @@ import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.testsupport.PostgresImage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * JWT round-trip integration test.
@@ -70,7 +70,7 @@ class JwtRoundTripIntegrationTest {
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+      PostgresImage.container()
           .withDatabaseName("fabric_test")
           .withUsername("test")
           .withPassword("test");
