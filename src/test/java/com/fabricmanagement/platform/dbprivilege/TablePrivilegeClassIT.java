@@ -11,9 +11,11 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +34,13 @@ class TablePrivilegeClassIT {
   private static final String ROLLBACK_SCRIPT =
       "db/rollback/V20260916120000_ROLLBACK__customer_commercial_assignment_privileges.sql";
   private static final String MEASUREMENT_SCRIPT = "db/privilege/effective-grants.sql";
+  private static final String DEFAULT_ACL_BASELINE = "20260916120000";
+  private static final String DEFAULT_ACL_VERSION = "20260916160000";
+  private static final String DEFAULT_ACL_MIGRATION =
+      "db/migration/V" + DEFAULT_ACL_VERSION + "__close_default_table_privileges.sql";
+  private static final String DEFAULT_ACL_ROLLBACK =
+      "db/rollback/V" + DEFAULT_ACL_VERSION + "_ROLLBACK__close_default_table_privileges.sql";
+  private static final String OWNER_PASSWORD = "owner_test";
 
   private static final String TENANT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   private static final String OTHER_TENANT = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -90,20 +99,28 @@ class TablePrivilegeClassIT {
   static final PostgreSQLContainer<?> FULL_POSTGRES =
       PostgresImage.container()
           .withDatabaseName("table_privilege_full")
-          .withUsername("fabric_owner")
+          .withUsername("test_admin")
           .withPassword("fabric123");
 
   @Container
   static final PostgreSQLContainer<?> BASELINE_POSTGRES =
       PostgresImage.container()
           .withDatabaseName("table_privilege_baseline")
-          .withUsername("fabric_owner")
+          .withUsername("test_admin")
+          .withPassword("fabric123");
+
+  @Container
+  static final PostgreSQLContainer<?> UPGRADE_POSTGRES =
+      PostgresImage.container()
+          .withDatabaseName("table_privilege_upgrade")
+          .withUsername("test_admin")
           .withPassword("fabric123");
 
   @BeforeAll
   static void migrateAndSeed() throws SQLException {
     createRuntimeRoles(FULL_POSTGRES);
     createRuntimeRoles(BASELINE_POSTGRES);
+    createRuntimeRoles(UPGRADE_POSTGRES);
     migrate(FULL_POSTGRES, null);
     migrate(BASELINE_POSTGRES, BASELINE_TARGET);
     seedFullMigrationFixtures();
@@ -185,8 +202,9 @@ class TablePrivilegeClassIT {
         expected.put(relation.relation(), roles);
       }
       assertThat(expected).as("Full migration catalogue must not be empty").isNotEmpty();
-      // Execute the operator's resource unchanged; its first result contains the classifications.
+      // Execute the operator's resource unchanged; skip Q0 context to read Q1 classifications.
       assertThat(statement.execute(readClasspathScript(MEASUREMENT_SCRIPT))).isTrue();
+      assertThat(statement.getMoreResults(Statement.CLOSE_CURRENT_RESULT)).isTrue();
       Map<String, Map<RuntimeDatabaseRole, String>> actual = new LinkedHashMap<>();
       try (ResultSet result = statement.getResultSet()) {
         while (result.next()) {
@@ -389,9 +407,314 @@ class TablePrivilegeClassIT {
     }
   }
 
+  @Test
+  void latestDefaultAclGuardIsEmpty() throws SQLException {
+    try (Connection connection = ownerConnection(FULL_POSTGRES)) {
+      TablePrivilegeComparator.assertNoDifferences(DefaultAclGuard.differences(connection));
+    }
+  }
+
+  @Test
+  void defaultAclUpgradeRollbackAndReapplicationPreserveExistingPrivilegeVectors()
+      throws SQLException {
+    migrate(UPGRADE_POSTGRES, DEFAULT_ACL_BASELINE);
+    Set<DefaultAclGuard.Entry> historical = historicalDefaults();
+    List<MeasuredRelation> baseline;
+    try (Connection connection = ownerConnection(UPGRADE_POSTGRES)) {
+      assertThat(DefaultAclGuard.violations(connection)).isEqualTo(historical);
+      baseline = measure(connection);
+    }
+
+    // This upper pin must not follow latest: later tickets intentionally alter table grants.
+    migrate(UPGRADE_POSTGRES, DEFAULT_ACL_VERSION);
+    try (Connection connection = ownerConnection(UPGRADE_POSTGRES);
+        Statement statement = connection.createStatement()) {
+      assertThat(measure(connection)).containsExactlyInAnyOrderElementsOf(baseline);
+      assertThat(DefaultAclGuard.violations(connection)).isEmpty();
+      Set<DefaultAclGuard.Entry> afterUpgrade = DefaultAclGuard.snapshot(connection);
+
+      statement.execute(readClasspathScript(DEFAULT_ACL_ROLLBACK));
+      assertThat(measure(connection)).containsExactlyInAnyOrderElementsOf(baseline);
+      Set<DefaultAclGuard.Entry> afterRollback = DefaultAclGuard.snapshot(connection);
+      Set<DefaultAclGuard.Entry> expectedRollback = new LinkedHashSet<>(afterUpgrade);
+      expectedRollback.addAll(historical);
+      assertThat(afterRollback).isEqualTo(expectedRollback);
+      assertThat(DefaultAclGuard.violations(connection)).isEqualTo(historical);
+
+      statement.execute(readClasspathScript(DEFAULT_ACL_MIGRATION));
+      assertThat(DefaultAclGuard.violations(connection)).isEmpty();
+      assertThat(DefaultAclGuard.snapshot(connection)).isEqualTo(afterUpgrade);
+      assertThat(measure(connection)).containsExactlyInAnyOrderElementsOf(baseline);
+
+      // Execute the body again, rather than asking Flyway to skip an applied version.
+      statement.execute(readClasspathScript(DEFAULT_ACL_MIGRATION));
+      assertThat(DefaultAclGuard.snapshot(connection)).isEqualTo(afterUpgrade);
+    }
+  }
+
+  @Test
+  void newOwnerTablesHaveNoRuntimePrivilegesInEveryMigrationSchemaAndPublic() throws SQLException {
+    inDefaultTransaction(
+        false,
+        connection -> {
+          Set<String> schemas = new LinkedHashSet<>(defaultAclSchemas());
+          schemas.add("public");
+          try (Statement statement = connection.createStatement()) {
+            for (String schema : schemas) {
+              String relation = schema + ".db_priv_2_probe";
+              statement.execute("CREATE TABLE " + relation + " (id bigint)");
+              assertTableProbe(connection, new TableProbe(relation, Set.of(), Set.of()));
+            }
+          }
+        });
+  }
+
+  @Test
+  void newTablesRequireExplicitClassGrants() throws SQLException {
+    inDefaultTransaction(
+        false,
+        connection -> {
+          String mutable = "sales.db_priv_2_mutable";
+          String ledger = "sales.db_priv_2_ledger";
+          try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE " + mutable + " (id bigint)");
+            statement.execute("CREATE TABLE " + ledger + " (id bigint)");
+            List<PrivilegeDifference> missing = new ArrayList<>();
+            for (RuntimeDatabaseRole role : RuntimeDatabaseRole.values()) {
+              for (TablePrivilege privilege :
+                  TablePrivilegeClass.MUTABLE.expected(role).granted()) {
+                missing.add(difference(mutable, role.databaseName(), "missing: " + privilege));
+              }
+            }
+            assertThat(TablePrivilegeComparator.compare(measureOnly(connection, mutable), Map.of()))
+                .containsExactlyInAnyOrderElementsOf(missing);
+
+            statement.execute(
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON "
+                    + mutable
+                    + " TO fabric_app, fabric_system");
+            assertThat(TablePrivilegeComparator.compare(measureOnly(connection, mutable), Map.of()))
+                .isEmpty();
+
+            statement.execute("GRANT SELECT, INSERT ON " + ledger + " TO fabric_app");
+            statement.execute("GRANT SELECT, INSERT, DELETE ON " + ledger + " TO fabric_system");
+            assertThat(
+                    TablePrivilegeComparator.compare(
+                        measureOnly(connection, ledger),
+                        Map.of(ledger, TablePrivilegeClass.APPEND_ONLY_LEDGER)))
+                .isEmpty();
+          }
+        });
+  }
+
+  @Test
+  void defaultAclGuardDetectsExactOwnerGlobalPublicAndMembershipViolations() throws SQLException {
+    // (a) Owner-scoped default.
+    assertAclProbe(
+        false,
+        List.of("ALTER DEFAULT PRIVILEGES IN SCHEMA sales GRANT SELECT ON TABLES TO fabric_app"),
+        Set.of(defaultEntry("fabric_owner", "sales", "fabric_app", "SELECT")));
+    assertAclProbe(
+        false,
+        List.of(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA sales "
+                + "GRANT SELECT ON TABLES TO fabric_app WITH GRANT OPTION"),
+        Set.of(
+            new DefaultAclGuard.Entry(
+                "fabric_owner", "sales", "TABLES", "fabric_app", "SELECT", true)));
+    // (b) Global default.
+    assertAclProbe(
+        false,
+        List.of("ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO fabric_system"),
+        Set.of(defaultEntry("fabric_owner", "<global>", "fabric_system", "SELECT")));
+    // (c) PUBLIC reaches both runtime roles.
+    assertAclProbe(
+        false,
+        List.of("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO PUBLIC"),
+        Set.of(defaultEntry("fabric_owner", "public", "PUBLIC", "SELECT")),
+        new TableProbe(
+            "public.db_priv_2_probe",
+            Set.of(TablePrivilege.SELECT),
+            Set.of(TablePrivilege.SELECT)));
+    // (d) A foreign creator's defaults cannot be ignored.
+    Set<DefaultAclGuard.Entry> foreignDefaults = new LinkedHashSet<>();
+    for (TablePrivilege privilege :
+        TablePrivilegeClass.MUTABLE.expected(RuntimeDatabaseRole.FABRIC_APP).granted()) {
+      foreignDefaults.add(defaultEntry("probe_owner", "sales", "fabric_app", privilege.name()));
+    }
+    assertAclProbe(
+        true,
+        List.of(
+            "CREATE ROLE probe_owner NOLOGIN",
+            "ALTER DEFAULT PRIVILEGES FOR ROLE probe_owner IN SCHEMA sales "
+                + "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fabric_app"),
+        foreignDefaults);
+    // (e) Direct parent.
+    assertAclProbe(
+        true,
+        List.of(
+            "CREATE ROLE probe_parent NOLOGIN",
+            "GRANT probe_parent TO fabric_app",
+            "ALTER DEFAULT PRIVILEGES FOR ROLE fabric_owner IN SCHEMA sales "
+                + "GRANT UPDATE ON TABLES TO probe_parent"),
+        Set.of(defaultEntry("fabric_owner", "sales", "probe_parent", "UPDATE")),
+        new TableProbe("sales.db_priv_2_probe", Set.of(TablePrivilege.UPDATE), Set.of()));
+    // (f), (g) Two-level closure, including an edge which does not inherit privileges.
+    for (boolean inherit : List.of(true, false)) {
+      assertAclProbe(
+          true,
+          List.of(
+              "CREATE ROLE probe_parent NOLOGIN",
+              "CREATE ROLE probe_grandparent NOLOGIN",
+              "GRANT probe_grandparent TO probe_parent",
+              "GRANT probe_parent TO fabric_system WITH INHERIT " + inherit,
+              "ALTER DEFAULT PRIVILEGES FOR ROLE fabric_owner IN SCHEMA sales "
+                  + "GRANT DELETE ON TABLES TO probe_grandparent"),
+          Set.of(defaultEntry("fabric_owner", "sales", "probe_grandparent", "DELETE")),
+          new TableProbe(
+              "sales.db_priv_2_probe",
+              Set.of(),
+              inherit ? Set.of(TablePrivilege.DELETE) : Set.of()));
+    }
+    // (h) Non-table defaults are listed, but are not violations.
+    inDefaultTransaction(
+        true,
+        connection -> {
+          try (Statement statement = connection.createStatement()) {
+            statement.execute(
+                "ALTER DEFAULT PRIVILEGES IN SCHEMA sales GRANT EXECUTE ON FUNCTIONS TO fabric_app");
+          }
+          assertThat(DefaultAclGuard.violations(connection)).isEmpty();
+          assertThat(DefaultAclGuard.snapshot(connection))
+              .contains(
+                  new DefaultAclGuard.Entry(
+                      "test_admin", "sales", "FUNCTIONS", "fabric_app", "EXECUTE", false));
+        });
+    try (Connection connection = ownerConnection(FULL_POSTGRES)) {
+      TablePrivilegeComparator.assertNoDifferences(DefaultAclGuard.differences(connection));
+    }
+  }
+
+  private static void assertAclProbe(
+      boolean admin,
+      List<String> statements,
+      Set<DefaultAclGuard.Entry> expected,
+      TableProbe... tables)
+      throws SQLException {
+    inDefaultTransaction(
+        admin,
+        connection -> {
+          try (Statement statement = connection.createStatement()) {
+            for (String sql : statements) {
+              statement.execute(sql);
+            }
+            assertThat(DefaultAclGuard.violations(connection)).isEqualTo(expected);
+            assertThat(DefaultAclGuard.differences(connection))
+                .containsExactlyElementsOf(
+                    expected.stream().map(DefaultAclGuard.Entry::difference).sorted().toList());
+            for (TableProbe table : tables) {
+              if (admin) {
+                statement.execute("SET LOCAL ROLE fabric_owner");
+              }
+              statement.execute("CREATE TABLE " + table.relation() + " (id bigint)");
+              if (admin) {
+                statement.execute("RESET ROLE");
+              }
+              assertTableProbe(connection, table);
+            }
+          }
+        });
+  }
+
+  private static void assertTableProbe(Connection connection, TableProbe table)
+      throws SQLException {
+    List<MeasuredRelation> measured = measureOnly(connection, table.relation());
+    MeasuredRelation relation = measured.getFirst();
+    assertThat(relation.privileges())
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                RuntimeDatabaseRole.FABRIC_APP, MeasuredPrivileges.of(table.app()),
+                RuntimeDatabaseRole.FABRIC_SYSTEM, MeasuredPrivileges.of(table.system())));
+    List<PrivilegeDifference> expected = new ArrayList<>();
+    table
+        .app()
+        .forEach(
+            privilege ->
+                expected.add(difference(table.relation(), "fabric_app", "surplus: " + privilege)));
+    table
+        .system()
+        .forEach(
+            privilege ->
+                expected.add(
+                    difference(table.relation(), "fabric_system", "surplus: " + privilege)));
+    assertThat(
+            TablePrivilegeComparator.compare(
+                measured, Map.of(table.relation(), TablePrivilegeClass.NO_RUNTIME_ACCESS)))
+        .containsExactlyInAnyOrderElementsOf(expected);
+  }
+
+  private static List<MeasuredRelation> measureOnly(Connection connection, String relation)
+      throws SQLException {
+    List<MeasuredRelation> measured =
+        measure(connection).stream().filter(row -> row.relation().equals(relation)).toList();
+    assertThat(measured).as("Catalogue contains probe table %s", relation).hasSize(1);
+    return measured;
+  }
+
+  private static Set<String> defaultAclSchemas() {
+    var array =
+        Pattern.compile("schemas\\s+text\\[\\]\\s*:=\\s*ARRAY\\[(.*?)]", Pattern.DOTALL)
+            .matcher(readClasspathScript(DEFAULT_ACL_MIGRATION));
+    assertThat(array.find()).as("Migration must declare its schema array").isTrue();
+    var literals = Pattern.compile("'([^']+)'").matcher(array.group(1));
+    Set<String> schemas = new LinkedHashSet<>();
+    while (literals.find()) {
+      schemas.add(literals.group(1));
+    }
+    assertThat(schemas).hasSize(22).doesNotContain("public");
+    return schemas;
+  }
+
+  private static Set<DefaultAclGuard.Entry> historicalDefaults() {
+    Set<DefaultAclGuard.Entry> historical = new LinkedHashSet<>();
+    for (String schema : defaultAclSchemas()) {
+      for (RuntimeDatabaseRole role : RuntimeDatabaseRole.values()) {
+        for (TablePrivilege privilege : TablePrivilegeClass.MUTABLE.expected(role).granted()) {
+          historical.add(
+              defaultEntry("fabric_owner", schema, role.databaseName(), privilege.name()));
+        }
+      }
+    }
+    return historical;
+  }
+
+  private static DefaultAclGuard.Entry defaultEntry(
+      String owner, String schema, String grantee, String privilege) {
+    return new DefaultAclGuard.Entry(owner, schema, "TABLES", grantee, privilege, false);
+  }
+
+  private static void inDefaultTransaction(boolean admin, SqlProbe probe) throws SQLException {
+    try (Connection connection =
+        admin ? adminConnection(FULL_POSTGRES) : ownerConnection(FULL_POSTGRES)) {
+      connection.setAutoCommit(false);
+      try {
+        probe.run(connection);
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  @FunctionalInterface
+  private interface SqlProbe {
+    void run(Connection connection) throws SQLException;
+  }
+
+  private record TableProbe(String relation, Set<TablePrivilege> app, Set<TablePrivilege> system) {}
+
   private static void assertProbe(List<String> probeStatements, List<PrivilegeDifference> expected)
       throws SQLException {
-    try (Connection connection = ownerConnection(FULL_POSTGRES)) {
+    try (Connection connection = adminConnection(FULL_POSTGRES)) {
       connection.setAutoCommit(false);
       try (Statement statement = connection.createStatement()) {
         for (String probeStatement : probeStatements) {
@@ -554,8 +877,14 @@ class TablePrivilegeClassIT {
   }
 
   private static void createRuntimeRoles(PostgreSQLContainer<?> postgres) throws SQLException {
-    try (Connection connection = ownerConnection(postgres);
+    try (Connection connection = adminConnection(postgres);
         Statement statement = connection.createStatement()) {
+      statement.execute(
+          "CREATE ROLE fabric_owner LOGIN NOSUPERUSER NOCREATEROLE BYPASSRLS PASSWORD '"
+              + OWNER_PASSWORD
+              + "'");
+      statement.execute(
+          "ALTER DATABASE \"" + postgres.getDatabaseName() + "\" OWNER TO fabric_owner");
       statement.execute(
           "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'app_test'");
       statement.execute(
@@ -563,11 +892,23 @@ class TablePrivilegeClassIT {
     }
   }
 
-  private static void migrate(PostgreSQLContainer<?> postgres, String target) {
+  private static void migrate(PostgreSQLContainer<?> postgres, String target) throws SQLException {
+    try (Connection connection = ownerConnection(postgres);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                "SELECT current_user, rolsuper, rolcreaterole, rolbypassrls "
+                    + "FROM pg_roles WHERE rolname = current_user")) {
+      assertThat(result.next()).isTrue();
+      assertThat(result.getString("current_user")).isEqualTo("fabric_owner");
+      assertThat(result.getBoolean("rolsuper")).isFalse();
+      assertThat(result.getBoolean("rolcreaterole")).isFalse();
+      assertThat(result.getBoolean("rolbypassrls")).isTrue();
+    }
     var configuration =
         Flyway.configure()
             .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
-            .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+            .dataSource(postgres.getJdbcUrl(), "fabric_owner", OWNER_PASSWORD)
             .locations("classpath:db/migration")
             .schemas("common_tenant")
             .defaultSchema("common_tenant");
@@ -578,7 +919,7 @@ class TablePrivilegeClassIT {
   }
 
   private static void seedFullMigrationFixtures() throws SQLException {
-    try (Connection connection = ownerConnection(FULL_POSTGRES);
+    try (Connection connection = adminConnection(FULL_POSTGRES);
         Statement statement = connection.createStatement()) {
       connection.setAutoCommit(false);
       try {
@@ -660,6 +1001,10 @@ class TablePrivilegeClassIT {
   }
 
   private static Connection ownerConnection(PostgreSQLContainer<?> postgres) throws SQLException {
+    return DriverManager.getConnection(postgres.getJdbcUrl(), "fabric_owner", OWNER_PASSWORD);
+  }
+
+  private static Connection adminConnection(PostgreSQLContainer<?> postgres) throws SQLException {
     return DriverManager.getConnection(
         postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
   }
