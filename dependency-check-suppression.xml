@@ -27,6 +27,51 @@
     </suppress>
 
     <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47884 only when
+        XsltView renders an implicitly resolved view for a /** mapping. This REST service has no
+        production dependency on XsltView or XsltViewResolver.
+        DependencySecurityAssumptionsTest guards both APIs. The 6.2.x fix (6.2.20) is
+        Enterprise-only; remove this version-pinned suppression after the Spring Boot 4 / Spring
+        Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47884</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47885 when a WebFlux
+        controller consumes Flux&lt;PartEvent&gt; with unlimited in-memory buffering, and by
+        CVE-2026-47889 when WebFlux runs on the Jetty 12 Core reactive adapter. This service uses
+        the servlet stack and the dependency tree contains no spring-webflux artifact.
+        DependencySecurityAssumptionsTest fails if the reactive RouterFunction becomes loadable.
+        The 6.2.x fix (6.2.20) is Enterprise-only; remove this version-pinned suppression after the
+        Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47885</cve>
+        <cve>CVE-2026-47889</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47886 when an application
+        evaluates attacker-controlled SpEL with a reachable BigDecimal or BigInteger value. This
+        service uses framework-owned static expressions and no production class depends on the
+        Spring ExpressionParser or SpelExpressionParser APIs. DependencySecurityAssumptionsTest
+        guards both parser entry points. The 6.2.x fix (6.2.20) is Enterprise-only; remove this
+        version-pinned suppression after the Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47886</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47888 only in Spring
+        RSocket applications using RSocketMessageHandler. This service has no RSocket dependency
+        and no production class depends on RSocketMessageHandler. DependencySecurityAssumptionsTest
+        guards both conditions. The 6.2.x fix (6.2.20) is Enterprise-only; remove this
+        version-pinned suppression after the Spring Boot 4 / Spring Framework 7.0.9 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(aop|aspects|beans|context|context-support|core|expression|jcl|jdbc|messaging|orm|tx|web|webmvc|websocket)@6\.2\.19$</packageUrl>
+        <cve>CVE-2026-47888</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
         <notes>Spring Framework 6.2.0-6.2.19 is affected by CVE-2026-47891,
         CVE-2026-47892 and CVE-2026-47893; all three exploit paths require Spring WebFlux, and
         CVE-2026-47891 additionally requires the Aalto XML processor. This service uses the servlet

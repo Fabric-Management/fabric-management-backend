@@ -52,7 +52,7 @@ public class PermissionEvaluator {
 
     List<String> userDepts =
         (departmentCodes == null || departmentCodes.isEmpty())
-            ? List.of((String) null)
+            ? java.util.Collections.singletonList(null)
             : departmentCodes;
 
     // Expand search width by gathering all ancestors for each assigned department
