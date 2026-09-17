@@ -44,9 +44,47 @@ class DependencySecurityAssumptionsTest {
                 "org.springframework.web.reactive.function.server.RouterFunction",
                 getClass().getClassLoader()))
         .as(
-            "CVE-2026-47891/CVE-2026-47892/CVE-2026-47893: Spring WebFlux must remain absent"
-                + " while these version-pinned suppressions are active")
+            "CVE-2026-47885/CVE-2026-47889/CVE-2026-47891/CVE-2026-47892/"
+                + "CVE-2026-47893: Spring WebFlux must remain absent while these version-pinned"
+                + " suppressions are active")
         .isFalse();
+  }
+
+  @Test
+  void xsltViewsMustRemainUnused() {
+    assertNoProductionDependency(
+        "org.springframework.web.servlet.view.xslt.XsltView",
+        "CVE-2026-47884: XsltView usage requires a new path-resolution vulnerability"
+            + " assessment");
+    assertNoProductionDependency(
+        "org.springframework.web.servlet.view.xslt.XsltViewResolver",
+        "CVE-2026-47884: XsltViewResolver usage requires a new path-resolution vulnerability"
+            + " assessment");
+  }
+
+  @Test
+  void applicationControlledSpelMustRemainTheOnlySpelUsage() {
+    assertNoProductionDependency(
+        "org.springframework.expression.ExpressionParser",
+        "CVE-2026-47886: ExpressionParser usage requires a new untrusted-SpEL vulnerability"
+            + " assessment");
+    assertNoProductionDependency(
+        "org.springframework.expression.spel.standard.SpelExpressionParser",
+        "CVE-2026-47886: SpelExpressionParser usage requires a new untrusted-SpEL vulnerability"
+            + " assessment");
+  }
+
+  @Test
+  void rSocketMustRemainUnused() {
+    assertThat(ClassUtils.isPresent("io.rsocket.RSocket", getClass().getClassLoader()))
+        .as(
+            "CVE-2026-47888: RSocket must remain off the classpath while the Spring Framework"
+                + " 6.2.19 suppression is active")
+        .isFalse();
+    assertNoProductionDependency(
+        "org.springframework.messaging.rsocket.annotation.support.RSocketMessageHandler",
+        "CVE-2026-47888: RSocketMessageHandler usage requires a new memory-leak vulnerability"
+            + " assessment");
   }
 
   @Test
