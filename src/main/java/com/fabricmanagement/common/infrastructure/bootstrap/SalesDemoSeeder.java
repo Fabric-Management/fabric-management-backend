@@ -99,8 +99,7 @@ public class SalesDemoSeeder {
                 .build()));
 
     SalesOrderDto order = salesOrderService.createOrder(req);
-    // DRAFT → CONFIRMED so the order is picked up by analytics (margin + backlog). In a fresh
-    // playground tenant there is no approval policy, so confirmOrder confirms directly.
-    salesOrderService.confirmOrder(order.getId());
+    // Fresh playground tenants confirm directly; an approval policy leaves the order pending.
+    salesOrderService.confirmDemoSeedOrder(order.getId());
   }
 }

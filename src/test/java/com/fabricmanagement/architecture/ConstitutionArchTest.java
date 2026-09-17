@@ -12,7 +12,11 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -47,6 +51,41 @@ class ConstitutionArchTest {
         new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.fabricmanagement");
+  }
+
+  @Test
+  void salesOrderInternalEntriesHaveOnlyAllowListedDirectProductionCallers() {
+    String service = "com.fabricmanagement.sales.salesorder.app.SalesOrderService";
+    String listener =
+        "com.fabricmanagement.sales.salesorder.app.listener.SalesOrderApprovalEventListener";
+    Map<String, String> callers =
+        Map.of(
+            "confirmOrderAsSystem", listener,
+            "rejectOrder", listener,
+            "confirmDemoSeedOrder",
+                "com.fabricmanagement.common.infrastructure.bootstrap.SalesDemoSeeder");
+
+    classes()
+        .should(
+            new ArchCondition<JavaClass>(
+                "respect the direct-call boundary of sales-order internal entries") {
+              @Override
+              public void check(JavaClass origin, ConditionEvents events) {
+                origin.getMethodCallsFromSelf().stream()
+                    .filter(call -> call.getTargetOwner().getName().equals(service))
+                    .filter(call -> callers.containsKey(call.getTarget().getName()))
+                    .forEach(
+                        call -> {
+                          boolean allowed =
+                              origin.getName().equals(callers.get(call.getTarget().getName()))
+                                  && !java.util.Arrays.asList(origin.getPackageName().split("\\."))
+                                      .contains("api");
+                          events.add(
+                              new SimpleConditionEvent(call, allowed, call.getDescription()));
+                        });
+              }
+            })
+        .check(allClasses);
   }
 
   // ═══════════════════════════════════════════════════════════════════

@@ -124,8 +124,9 @@ public class SalesOrderController {
   @DeleteMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'delete')")
   @Operation(summary = "Delete order (soft delete)")
-  public ResponseEntity<ApiResponse<Void>> deleteOrder(@PathVariable UUID id) {
-    orderService.deleteOrder(id);
+  public ResponseEntity<ApiResponse<Void>> deleteOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    orderService.deleteOrder(id, currentUserId(authentication));
     return ResponseEntity.ok(ApiResponse.success(null));
   }
 
@@ -176,38 +177,50 @@ public class SalesOrderController {
   @PostMapping("/{id}/confirm")
   @PreAuthorize("@auth.can(authentication, 'sales', 'confirm')")
   @Operation(summary = "Confirm an order")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.confirmOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.confirmOrder(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/process")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Start processing an order")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> startProcessing(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.startProcessing(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> startProcessing(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.startProcessing(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/ship")
   @PreAuthorize("@auth.can(authentication, 'sales', 'ship')")
   @Operation(summary = "Ship an order")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> shipOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.shipOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> shipOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.shipOrder(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/deliver")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Deliver an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> deliverOrder(
-      @PathVariable UUID id, @RequestParam(required = false) LocalDate deliveryDate) {
+      @PathVariable UUID id,
+      @RequestParam(required = false) LocalDate deliveryDate,
+      Authentication authentication) {
     LocalDate effectiveDate = deliveryDate != null ? deliveryDate : LocalDate.now();
-    return ResponseEntity.ok(ApiResponse.success(orderService.deliverOrder(id, effectiveDate)));
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            orderService.deliverOrder(id, currentUserId(authentication), effectiveDate)));
   }
 
   @PostMapping("/{id}/cancel")
   @PreAuthorize("@auth.can(authentication, 'sales', 'cancel')")
   @Operation(summary = "Cancel an order")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.cancelOrder(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/hold")
@@ -215,8 +228,10 @@ public class SalesOrderController {
   @Operation(
       summary = "Put an order on hold",
       description = "Transitions the order status to ON_HOLD")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> holdOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.holdOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> holdOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.holdOrder(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/resume")
@@ -224,8 +239,10 @@ public class SalesOrderController {
   @Operation(
       summary = "Resume an order from ON_HOLD",
       description = "Restores the order to its pre-hold status")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> resumeOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.resumeOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> resumeOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.resumeOrder(id, currentUserId(authentication))));
   }
 
   @PostMapping("/{id}/revise")
@@ -233,8 +250,10 @@ public class SalesOrderController {
   @Operation(
       summary = "Revise a rejected order back to DRAFT",
       description = "Allows a rejected order to be edited and resubmitted")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> reviseOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.reviseOrder(id)));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> reviseOrder(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.reviseOrder(id, currentUserId(authentication))));
   }
 
   private UUID currentUserId(Authentication authentication) {

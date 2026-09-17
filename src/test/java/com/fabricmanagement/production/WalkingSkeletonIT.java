@@ -9,12 +9,16 @@ import com.fabricmanagement.approval.domain.ApprovalRequest;
 import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
-import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.platform.user.app.UserQueryService;
+import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
@@ -113,6 +117,9 @@ class WalkingSkeletonIT {
   @Autowired private BatchRepository batchRepository;
   @Autowired private FiberRepository fiberRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private UserQueryService userQueryService;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private OrganizationRepository organizationRepository;
   @Autowired private ProductionLotService productionLotService;
   @Autowired private WorkOrderConsumptionService workOrderConsumptionService;
   @Autowired private ProductionRecordService productionRecordService;
@@ -125,22 +132,34 @@ class WalkingSkeletonIT {
 
   @BeforeEach
   void setUp() {
-    // SYSTEM_TENANT_ID is defined in V010__SEEDS.sql
+    // Preserve the existing production/approval seed fixture's tenant.
     tenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
     TenantContext.setCurrentTenantId(tenantId);
 
-    // Find a proper admin user to approve requests
-    User adminUser =
-        userRepository.findAll().stream()
-            .filter(
-                u ->
-                    tenantId.equals(u.getTenantId())
-                        && u.getIsActive()
-                        && !SystemUser.ID.equals(u.getId()))
-            .findFirst()
-            .orElseThrow();
-    adminUserId = adminUser.getId();
+    // V20260606074500 moves the seeded admin's role to TEMPLATE while the user stays here.
+    // RLS correctly hides that cross-tenant role. Create a dedicated actor with a local role;
+    // do not weaken the real policy or mutate the platform seed user's role assignment.
+    UUID organizationId =
+        organizationRepository
+            .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
+            .orElseThrow(
+                () -> new IllegalStateException("Walking Skeleton seed organization missing"))
+            .getId();
+    Role adminRole =
+        roleRepository
+            .findByTenantIdAndRoleCode(tenantId, "ADMIN")
+            .orElseGet(
+                () ->
+                    roleRepository.saveAndFlush(
+                        Role.create("Walking Skeleton Admin", "ADMIN", "Integration test actor")));
+    User adminUser = User.create("Walking Skeleton", "Admin", organizationId);
+    adminUser.setRole(adminRole);
+    adminUserId = userRepository.saveAndFlush(adminUser).getId();
     TenantContext.setCurrentUserId(adminUserId);
+
+    assertThat(userQueryService.findPermissionIdentity(tenantId, adminUserId))
+        .as("The test actor's role must be visible through the real RLS-scoped permission query")
+        .hasValueSatisfying(identity -> assertThat(identity.roleCode()).isEqualTo("ADMIN"));
   }
 
   @AfterEach
@@ -183,7 +202,8 @@ class WalkingSkeletonIT {
     req.setLines(List.of(lineReq));
 
     SalesOrderDto createdOrder = salesOrderService.createOrder(req);
-    SalesOrderDto confirmedOrder = salesOrderService.confirmOrder(createdOrder.getId());
+    SalesOrderDto confirmedOrder =
+        salesOrderService.confirmOrder(createdOrder.getId(), adminUserId);
     assertThat(confirmedOrder.getStatus().name()).isEqualTo("CONFIRMED");
 
     // We must manually publish the SalesOrderConfirmedEvent since confirmOrder only
