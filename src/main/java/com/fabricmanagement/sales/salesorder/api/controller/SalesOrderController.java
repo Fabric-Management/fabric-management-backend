@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.api.controller;
 
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
@@ -19,7 +20,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -75,19 +78,22 @@ public class SalesOrderController {
       responseCode = "409",
       description = "Optimistic locking conflict or order not in DRAFT status")
   public ResponseEntity<ApiResponse<SalesOrderDto>> updateOrder(
-      @PathVariable UUID id, @Valid @RequestBody UpdateSalesOrderRequest request) {
-    SalesOrderDto order = orderService.updateOrder(id, request);
+      @PathVariable UUID id,
+      @Valid @RequestBody UpdateSalesOrderRequest request,
+      Authentication authentication) {
+    SalesOrderDto order = orderService.updateOrder(id, currentUserId(authentication), request);
     return ResponseEntity.ok(ApiResponse.success(order, "Sales order updated"));
   }
 
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get order by ID")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> getOrder(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<SalesOrderDto>> getOrder(
+      @PathVariable UUID id, Authentication authentication) {
     return ResponseEntity.ok(
         ApiResponse.success(
             orderService
-                .findById(id)
+                .findById(id, currentUserId(authentication))
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + id))));
   }
 
@@ -95,11 +101,11 @@ public class SalesOrderController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get order by order number")
   public ResponseEntity<ApiResponse<SalesOrderDto>> getOrderByNumber(
-      @PathVariable String orderNumber) {
+      @PathVariable String orderNumber, Authentication authentication) {
     return ResponseEntity.ok(
         ApiResponse.success(
             orderService
-                .findByOrderNumber(orderNumber)
+                .findByOrderNumber(orderNumber, currentUserId(authentication))
                 .orElseThrow(
                     () -> new EntityNotFoundException("Sales order not found: " + orderNumber))));
   }
@@ -108,9 +114,11 @@ public class SalesOrderController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get all orders (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<SalesOrderDto>>> getAllOrders(
-      @PageableDefault(size = 20, sort = "orderDate") Pageable pageable) {
+      @PageableDefault(size = 20, sort = "orderDate") Pageable pageable,
+      Authentication authentication) {
     return ResponseEntity.ok(
-        ApiResponse.success(PagedResponse.from(orderService.findAll(pageable))));
+        ApiResponse.success(
+            PagedResponse.from(orderService.findAll(pageable, currentUserId(authentication)))));
   }
 
   @DeleteMapping("/{id}")
@@ -129,30 +137,36 @@ public class SalesOrderController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get orders by partner ID")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByPartner(
-      @PathVariable UUID partnerId) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.findByPartner(partnerId)));
+      @PathVariable UUID partnerId, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.findByPartner(partnerId, currentUserId(authentication))));
   }
 
   @GetMapping("/status/{status}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get orders by status")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByStatus(
-      @PathVariable OrderStatus status) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.findByStatus(status)));
+      @PathVariable OrderStatus status, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.findByStatus(status, currentUserId(authentication))));
   }
 
   @GetMapping("/open")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get open orders (not delivered or cancelled)")
-  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOpenOrders() {
-    return ResponseEntity.ok(ApiResponse.success(orderService.findOpenOrders()));
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOpenOrders(
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.findOpenOrders(currentUserId(authentication))));
   }
 
   @GetMapping("/overdue")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get overdue orders")
-  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOverdueOrders() {
-    return ResponseEntity.ok(ApiResponse.success(orderService.findOverdueOrders()));
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOverdueOrders(
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(orderService.findOverdueOrders(currentUserId(authentication))));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -221,5 +235,13 @@ public class SalesOrderController {
       description = "Allows a rejected order to be edited and resubmitted")
   public ResponseEntity<ApiResponse<SalesOrderDto>> reviseOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.reviseOrder(id)));
+  }
+
+  private UUID currentUserId(Authentication authentication) {
+    if (authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUserContext context) {
+      return context.userId();
+    }
+    throw new AccessDeniedException("Authenticated user context is required.");
   }
 }

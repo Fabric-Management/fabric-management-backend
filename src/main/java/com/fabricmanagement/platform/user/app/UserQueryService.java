@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -119,6 +120,41 @@ public class UserQueryService {
   @Transactional(readOnly = true)
   public boolean exists(UUID tenantId, UUID userId) {
     return userRepository.existsByTenantIdAndId(tenantId, userId);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<PermissionIdentity> findPermissionIdentity(UUID tenantId, UUID userId) {
+    return userRepository
+        .findByIdWithPermissionData(tenantId, userId)
+        .map(
+            user ->
+                new PermissionIdentity(
+                    user.getRole() != null ? user.getRole().getRoleCode() : null,
+                    user.getUserDepartments().stream()
+                        .filter(assignment -> Boolean.TRUE.equals(assignment.getIsActive()))
+                        .map(
+                            com.fabricmanagement.platform.user.domain.UserDepartment::getDepartment)
+                        .filter(java.util.Objects::nonNull)
+                        .filter(department -> Boolean.TRUE.equals(department.getIsActive()))
+                        .map(department -> department.getDepartmentCode())
+                        .filter(code -> code != null && !code.isBlank())
+                        .map(code -> code.toUpperCase(Locale.ROOT))
+                        .distinct()
+                        .toList()));
+  }
+
+  @Transactional(readOnly = true)
+  public Set<UUID> findActiveUserIdsByDepartmentCodes(UUID tenantId, Set<String> departmentCodes) {
+    if (departmentCodes.isEmpty()) {
+      return Set.of();
+    }
+    return userRepository.findActiveUserIdsByDepartmentCodes(tenantId, departmentCodes);
+  }
+
+  public record PermissionIdentity(String roleCode, List<String> departmentCodes) {
+    public PermissionIdentity {
+      departmentCodes = List.copyOf(departmentCodes);
+    }
   }
 
   /**

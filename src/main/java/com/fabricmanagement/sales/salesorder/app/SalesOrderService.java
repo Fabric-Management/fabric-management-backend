@@ -42,7 +42,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +70,7 @@ public class SalesOrderService {
   private final DocumentNumberGenerator documentNumberGenerator;
   private final ApprovalPort approvalPort;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
+  private final SalesOrderAccessPolicy accessPolicy;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -174,11 +178,15 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto updateOrder(UUID orderId, UpdateSalesOrderRequest request) {
+  public SalesOrderDto updateOrder(
+      UUID orderId, UUID currentUserId, UpdateSalesOrderRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
 
     // 1. Fetch managed entity (Hibernate loads version)
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    if (!accessPolicy.canWrite(tenantId, currentUserId, order)) {
+      throw new AccessDeniedException("You do not have access to update this sales order.");
+    }
 
     // 2. Optimistic lock — compare, DON'T setVersion
     if (!order.getVersion().equals(request.getVersion())) {
@@ -334,11 +342,11 @@ public class SalesOrderService {
    * @return Order DTO if found
    */
   @Transactional(readOnly = true)
-  public Optional<SalesOrderDto> findById(UUID orderId) {
+  public Optional<SalesOrderDto> findById(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
-        .findByTenantIdAndId(tenantId, orderId)
+        .findOne(accessPolicy.readRestriction(tenantId, currentUserId).and(byId(orderId)))
         .map(
             order -> {
               TradingPartnerDto partner =
@@ -361,11 +369,12 @@ public class SalesOrderService {
    * @return Order DTO if found
    */
   @Transactional(readOnly = true)
-  public Optional<SalesOrderDto> findByOrderNumber(String orderNumber) {
+  public Optional<SalesOrderDto> findByOrderNumber(String orderNumber, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
-        .findByTenantIdAndOrderNumber(tenantId, orderNumber)
+        .findOne(
+            accessPolicy.readRestriction(tenantId, currentUserId).and(byOrderNumber(orderNumber)))
         .map(SalesOrderDto::from);
   }
 
@@ -376,13 +385,18 @@ public class SalesOrderService {
    * @return List of orders
    */
   @Transactional(readOnly = true)
-  public List<SalesOrderDto> findByPartner(UUID partnerId) {
+  public List<SalesOrderDto> findByPartner(UUID partnerId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID to ensure we query with the correct ID
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
 
-    return orderRepository.findActiveByPartner(tenantId, tradingPartnerId).stream()
+    Specification<SalesOrder> restriction =
+        accessPolicy
+            .readRestriction(tenantId, currentUserId)
+            .and(active())
+            .and(byPartner(tradingPartnerId));
+    return orderRepository.findAll(restriction, Sort.by(Sort.Direction.DESC, "orderDate")).stream()
         .map(SalesOrderDto::from)
         .toList();
   }
@@ -394,10 +408,12 @@ public class SalesOrderService {
    * @return List of orders
    */
   @Transactional(readOnly = true)
-  public List<SalesOrderDto> findByStatus(OrderStatus status) {
+  public List<SalesOrderDto> findByStatus(OrderStatus status, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    return orderRepository.findByTenantIdAndStatus(tenantId, status).stream()
+    return orderRepository
+        .findAll(accessPolicy.readRestriction(tenantId, currentUserId).and(byStatus(status)))
+        .stream()
         .map(SalesOrderDto::from)
         .toList();
   }
@@ -408,10 +424,14 @@ public class SalesOrderService {
    * @return List of open orders
    */
   @Transactional(readOnly = true)
-  public List<SalesOrderDto> findOpenOrders() {
+  public List<SalesOrderDto> findOpenOrders(UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    return orderRepository.findOpenOrders(tenantId).stream().map(SalesOrderDto::from).toList();
+    Specification<SalesOrder> restriction =
+        accessPolicy.readRestriction(tenantId, currentUserId).and(active()).and(open());
+    return orderRepository.findAll(restriction, Sort.by(Sort.Direction.DESC, "orderDate")).stream()
+        .map(SalesOrderDto::from)
+        .toList();
   }
 
   /**
@@ -420,10 +440,17 @@ public class SalesOrderService {
    * @return List of overdue orders
    */
   @Transactional(readOnly = true)
-  public List<SalesOrderDto> findOverdueOrders() {
+  public List<SalesOrderDto> findOverdueOrders(UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    return orderRepository.findOverdueOrders(tenantId, LocalDate.now()).stream()
+    Specification<SalesOrder> restriction =
+        accessPolicy
+            .readRestriction(tenantId, currentUserId)
+            .and(active())
+            .and(overdue(LocalDate.now()));
+    return orderRepository
+        .findAll(restriction, Sort.by(Sort.Direction.ASC, "promisedDeliveryDate"))
+        .stream()
         .map(SalesOrderDto::from)
         .toList();
   }
@@ -435,11 +462,11 @@ public class SalesOrderService {
    * @return Page of orders
    */
   @Transactional(readOnly = true)
-  public Page<SalesOrderDto> findAll(Pageable pageable) {
+  public Page<SalesOrderDto> findAll(Pageable pageable, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
-        .findByTenantIdAndIsActiveTrue(tenantId, pageable)
+        .findAll(accessPolicy.readRestriction(tenantId, currentUserId).and(active()), pageable)
         .map(SalesOrderDto::from);
   }
 
@@ -790,6 +817,42 @@ public class SalesOrderService {
             () ->
                 new com.fabricmanagement.sales.common.exception.OrderDomainException(
                     "Sales order not found: " + orderId));
+  }
+
+  private Specification<SalesOrder> byId(UUID orderId) {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("id"), orderId);
+  }
+
+  private Specification<SalesOrder> byOrderNumber(String orderNumber) {
+    return (root, query, criteriaBuilder) ->
+        criteriaBuilder.equal(root.get("orderNumber"), orderNumber);
+  }
+
+  private Specification<SalesOrder> byPartner(UUID partnerId) {
+    return (root, query, criteriaBuilder) ->
+        criteriaBuilder.equal(root.get("tradingPartnerId"), partnerId);
+  }
+
+  private Specification<SalesOrder> byStatus(OrderStatus status) {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("status"), status);
+  }
+
+  private Specification<SalesOrder> active() {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("isActive"));
+  }
+
+  private Specification<SalesOrder> open() {
+    return (root, query, criteriaBuilder) ->
+        criteriaBuilder.not(
+            root.get("status").in(List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED)));
+  }
+
+  private Specification<SalesOrder> overdue(LocalDate date) {
+    return (root, query, criteriaBuilder) ->
+        criteriaBuilder.and(
+            criteriaBuilder.lessThan(root.<LocalDate>get("promisedDeliveryDate"), date),
+            criteriaBuilder.not(
+                root.get("status").in(List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED))));
   }
 
   // ── Line mapping helpers ─────────────────────────────────────────────────
