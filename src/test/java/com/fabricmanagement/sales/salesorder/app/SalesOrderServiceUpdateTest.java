@@ -55,6 +55,7 @@ class SalesOrderServiceUpdateTest {
   @Mock private DomainEventPublisher domainEventPublisher;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private ApprovalPort approvalPort;
+  @Mock private SalesOrderAccessPolicy accessPolicy;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
@@ -62,11 +63,13 @@ class SalesOrderServiceUpdateTest {
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID orderId = UUID.randomUUID();
+  private final UUID currentUserId = UUID.randomUUID();
   private SalesOrder draftOrder;
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(currentUserId);
     draftOrder =
         SalesOrder.builder()
             .totals(OrderTotals.zero("GBP"))
@@ -89,6 +92,7 @@ class SalesOrderServiceUpdateTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+    when(accessPolicy.canWrite(tenantId, currentUserId, draftOrder)).thenReturn(true);
   }
 
   @AfterEach
@@ -104,7 +108,7 @@ class SalesOrderServiceUpdateTest {
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(99L); // Mismatched version
 
-    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, request))
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
   }
 
@@ -122,7 +126,7 @@ class SalesOrderServiceUpdateTest {
     request.setCurrency("TRY");
     request.setLines(new ArrayList<>());
 
-    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, request))
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("does not allow editing");
   }
@@ -147,7 +151,7 @@ class SalesOrderServiceUpdateTest {
     request.setCurrency("TRY");
     request.setLines(new ArrayList<>()); // Empty lines
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(line1).delete();
     verify(line2).delete();
@@ -169,7 +173,7 @@ class SalesOrderServiceUpdateTest {
     request.setCurrency("TRY");
     request.setLines(List.of(lineReq));
 
-    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, request))
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(CurrencyMismatchException.class);
   }
 
@@ -234,7 +238,7 @@ class SalesOrderServiceUpdateTest {
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(orderRepository).save(orderCaptor.capture());
     SalesOrder savedOrder = orderCaptor.getValue();
@@ -259,7 +263,7 @@ class SalesOrderServiceUpdateTest {
     UpdateSalesOrderRequest request = updateRequest(List.of(req));
     request.setModuleType(ModuleType.YARN);
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(orderRepository).save(orderCaptor.capture());
     assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
@@ -287,7 +291,7 @@ class SalesOrderServiceUpdateTest {
                 updateLineRequest(yarnLine.getId(), ModuleType.YARN)));
     request.setModuleType(ModuleType.FIBER);
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(orderRepository).save(orderCaptor.capture());
     assertThat(orderCaptor.getValue().getModuleType()).isNull();
@@ -314,7 +318,7 @@ class SalesOrderServiceUpdateTest {
                 updateLineRequest(fabricLine.getId(), ModuleType.FABRIC),
                 updateLineRequest(nullLine.getId(), null)));
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(orderRepository).save(orderCaptor.capture());
     assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
@@ -333,7 +337,7 @@ class SalesOrderServiceUpdateTest {
     request.setCurrency("TRY");
     request.setLines(new ArrayList<>());
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(orderRepository).save(draftOrder);
   }
@@ -364,7 +368,7 @@ class SalesOrderServiceUpdateTest {
     when(orderRepository.save(any())).thenReturn(draftOrder);
     when(lineRepository.save(any())).thenReturn(mock(SalesOrderLine.class));
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(lineRepository).save(any(SalesOrderLine.class));
   }
@@ -395,7 +399,7 @@ class SalesOrderServiceUpdateTest {
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(lineToRemove).delete();
   }
@@ -424,7 +428,7 @@ class SalesOrderServiceUpdateTest {
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
 
-    salesOrderService.updateOrder(orderId, request);
+    salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(existingLine).setRequestedQty(BigDecimal.TEN);
   }
@@ -444,7 +448,7 @@ class SalesOrderServiceUpdateTest {
     request.setCurrency("TRY");
     request.setLines(List.of(req));
 
-    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, request))
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Line not found");
   }
