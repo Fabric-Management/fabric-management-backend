@@ -22,6 +22,10 @@ enum TablePrivilegeClass {
   CLOSE_ONCE_LEDGER(
       'r',
       ExpectedPrivileges.of(TablePrivilege.SELECT, TablePrivilege.INSERT, TablePrivilege.UPDATE),
+      ExpectedPrivileges.of(TablePrivilege.SELECT, TablePrivilege.INSERT, TablePrivilege.DELETE)),
+  MUTABLE_SYSTEM_PURGE(
+      'r',
+      ExpectedPrivileges.of(TablePrivilege.SELECT, TablePrivilege.INSERT, TablePrivilege.UPDATE),
       ExpectedPrivileges.of(
           TablePrivilege.SELECT,
           TablePrivilege.INSERT,

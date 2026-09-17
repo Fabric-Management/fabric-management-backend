@@ -40,6 +40,11 @@ class TablePrivilegeClassIT {
       "db/migration/V" + DEFAULT_ACL_VERSION + "__close_default_table_privileges.sql";
   private static final String DEFAULT_ACL_ROLLBACK =
       "db/rollback/V" + DEFAULT_ACL_VERSION + "_ROLLBACK__close_default_table_privileges.sql";
+  private static final String FINALISED_PRIVILEGES_VERSION = "20260917100000";
+  private static final String FINALISED_PRIVILEGES_MIGRATION =
+      "db/migration/V" + FINALISED_PRIVILEGES_VERSION + "__finalise_ledger_privileges.sql";
+  private static final String FINALISED_PRIVILEGES_ROLLBACK =
+      "db/rollback/V" + FINALISED_PRIVILEGES_VERSION + "_ROLLBACK__finalise_ledger_privileges.sql";
   private static final String OWNER_PASSWORD = "owner_test";
 
   private static final String TENANT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
@@ -127,11 +132,14 @@ class TablePrivilegeClassIT {
   }
 
   @Test
-  void pinnedTargetReportsOnlyCustomerAssignmentDeleteAsSurplus() throws SQLException {
+  void pinnedTargetReportsThreeHistoricalPrivilegeSurpluses() throws SQLException {
     try (Connection connection = ownerConnection(BASELINE_POSTGRES)) {
       assertThat(differences(connection))
           .containsExactly(
-              difference("sales.customer_commercial_assignment", "fabric_app", "surplus: DELETE"));
+              difference("sales.customer_commercial_assignment", "fabric_app", "surplus: DELETE"),
+              difference(
+                  "sales.customer_commercial_assignment", "fabric_system", "surplus: UPDATE"),
+              difference("sales_ord.order_cover_evidence_stream", "fabric_app", "surplus: DELETE"));
     }
   }
 
@@ -294,6 +302,42 @@ class TablePrivilegeClassIT {
   }
 
   @Test
+  void systemCannotUpdateCustomerAssignmentEvenWithAValidDomainClosure() throws SQLException {
+    try (Connection connection = systemConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        assertSqlState(connection, fullClosureSql(CCA_REPRESENTATIVE), "42501");
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  void appCannotDeleteOrderCoverEvidenceStream() throws SQLException {
+    try (Connection connection = appConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        assertSqlState(
+            connection,
+            "DELETE FROM sales_ord.order_cover_evidence_stream WHERE id = '" + STREAM + "'",
+            "42501");
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  void systemCanPurgeOrderCoverEvidenceBeforeItsStream() throws SQLException {
+    assertSystemPurgeSucceeds(
+        "app.order_cover_evidence_purge_tenant",
+        List.of(
+            "DELETE FROM sales_ord.order_cover_evidence WHERE id = '" + EVIDENCE + "'",
+            "DELETE FROM sales_ord.order_cover_evidence_stream WHERE id = '" + STREAM + "'"));
+  }
+
+  @Test
   void customerAssignmentAcceptsTheFullDomainShapedClosure() throws SQLException {
     try (Connection connection = appConnection()) {
       connection.setAutoCommit(false);
@@ -401,6 +445,27 @@ class TablePrivilegeClassIT {
             .containsExactly(
                 difference(
                     "sales.customer_commercial_assignment", "fabric_app", "surplus: DELETE"));
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  void finalisedPrivilegeRollbackRestoresOnlyTwoSurplusesAndReapplicationClosesThem()
+      throws SQLException {
+    try (Connection connection = ownerConnection(FULL_POSTGRES)) {
+      connection.setAutoCommit(false);
+      try (Statement statement = connection.createStatement()) {
+        statement.execute(readClasspathScript(FINALISED_PRIVILEGES_ROLLBACK));
+        assertThat(differences(connection))
+            .containsExactly(
+                difference(
+                    "sales.customer_commercial_assignment", "fabric_system", "surplus: UPDATE"),
+                difference(
+                    "sales_ord.order_cover_evidence_stream", "fabric_app", "surplus: DELETE"));
+        statement.execute(readClasspathScript(FINALISED_PRIVILEGES_MIGRATION));
+        assertThat(differences(connection)).isEmpty();
       } finally {
         connection.rollback();
       }

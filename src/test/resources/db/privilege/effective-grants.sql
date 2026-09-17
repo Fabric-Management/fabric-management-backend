@@ -40,6 +40,7 @@ classified_relations AS (
                WHEN 'production.quality_decision' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'production.quality_decision_unit' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_cover_evidence' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'sales_ord.order_cover_evidence_stream' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales.customer_commercial_assignment' THEN 'CLOSE_ONCE_LEDGER'
                WHEN 'production.production_execution_batch_color_archive' THEN 'READ_ONLY_ARCHIVE'
                WHEN 'common_tenant.flyway_schema_history' THEN 'NO_RUNTIME_ACCESS'
