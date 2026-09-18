@@ -2,6 +2,8 @@ package com.fabricmanagement.common.infrastructure.persistence;
 
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -43,7 +45,13 @@ public class PrimaryDataSourceConfig {
    */
   @Bean
   @Primary
-  public PlatformTransactionManager transactionManager(EntityManagerFactory emf) {
-    return new JpaTransactionManager(emf);
+  public PlatformTransactionManager transactionManager(
+      EntityManagerFactory emf, @Qualifier("dataSource") DataSource dataSource) {
+    JpaTransactionManager transactionManager = new JpaTransactionManager(emf);
+    // Bind JDBC access using this DataSource to the Hibernate transaction's connection.
+    // Callers must also use this primary DataSource: a template using systemDataSource
+    // does not participate in this transaction.
+    transactionManager.setDataSource(dataSource);
+    return transactionManager;
   }
 }

@@ -380,7 +380,14 @@ public class PermissionTemplateSeeder {
         Map.of(PermissionKey.LOGISTICS_CANCEL, PermissionKey.LOGISTICS_DELETE),
         template -> SystemDepartment.WAREHOUSE.code().equals(template.getDepartmentCode()));
 
-    return templates;
+    return templates.stream()
+        .filter(
+            template ->
+                PermissionKey.of(template.getResource(), template.getAction())
+                        .orElseThrow()
+                        .distribution()
+                    == PermissionKey.Distribution.SEEDED_BY_DEFAULT)
+        .toList();
   }
 
   /** Derives approved GrantRules from existing rows without inventing a second policy matrix. */

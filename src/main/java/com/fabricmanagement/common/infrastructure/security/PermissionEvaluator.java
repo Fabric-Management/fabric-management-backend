@@ -34,8 +34,14 @@ public class PermissionEvaluator {
       key = "#tenantId + '_' + #userId")
   public PermissionResult evaluate(
       UUID tenantId, String roleCode, List<String> departmentCodes, UUID userId) {
+    return evaluateFresh(tenantId, roleCode, departmentCodes, userId);
+  }
+
+  /** Calculates effective permissions directly from persistence, bypassing the permission cache. */
+  public PermissionResult evaluateFresh(
+      UUID tenantId, String roleCode, List<String> departmentCodes, UUID userId) {
     log.debug(
-        "Evaluating permissions for user={}, role={}, departments={}",
+        "Evaluating fresh permissions for user={}, role={}, departments={}",
         userId,
         roleCode,
         departmentCodes);

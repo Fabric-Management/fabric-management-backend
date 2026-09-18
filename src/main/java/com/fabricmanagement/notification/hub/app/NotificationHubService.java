@@ -6,8 +6,10 @@ import com.fabricmanagement.notification.i18n.app.TranslationService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
  * tercihine göre kanal.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class NotificationHubService {
 
@@ -29,6 +30,62 @@ public class NotificationHubService {
   private final NotificationLogRepository logRepo;
   private final UserNotificationPreferenceRepository prefRepo;
   private final TranslationService translationService;
+  private final JdbcTemplate jdbc;
+
+  public NotificationHubService(
+      NotificationTemplateRepository templateRepo,
+      NotificationQueueRepository queueRepo,
+      NotificationLogRepository logRepo,
+      UserNotificationPreferenceRepository prefRepo,
+      TranslationService translationService,
+      @Qualifier("dataSource") DataSource dataSource) {
+    this.templateRepo = templateRepo;
+    this.queueRepo = queueRepo;
+    this.logRepo = logRepo;
+    this.prefRepo = prefRepo;
+    this.translationService = translationService;
+    // The mandatory insert must enlist in the alert's primary JPA transaction, not the
+    // independently configured systemJdbcTemplate/BYPASSRLS connection.
+    this.jdbc = new JdbcTemplate(dataSource);
+  }
+
+  /** Synchronous durable in-app delivery; must join the caller's status-update transaction. */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public void deliverMandatoryInApp(NotificationContext ctx, UUID deliveryKey) {
+    java.util.Objects.requireNonNull(deliveryKey, "deliveryKey");
+    var template =
+        templateRepo
+            .findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+                ctx.tenantId(), ctx.eventType(), NotificationChannel.IN_APP)
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Mandatory in-app template missing: " + ctx.eventType()));
+    String locale = translationService.resolveLocaleForUser(ctx.tenantId(), ctx.recipientId());
+    var rendered =
+        NotificationRenderer.render(
+            translationService, ctx.tenantId(), locale, template, ctx.payload());
+    jdbc.update(
+        """
+        INSERT INTO notification.notification_log
+          (id, tenant_id, uid, recipient_id, event_type, channel, importance, title, body, locale,
+           sent_at, is_read, is_clicked, reference_id, reference_type, delivery_key,
+           is_active, created_at, updated_at, version)
+        VALUES (gen_random_uuid(), ?, gen_random_uuid()::text, ?, ?, 'IN_APP', ?, ?, ?, ?,
+           now(), false, false, ?, ?, ?, true, now(), now(), 0)
+        ON CONFLICT (tenant_id, delivery_key) WHERE delivery_key IS NOT NULL DO NOTHING
+        """,
+        ctx.tenantId(),
+        ctx.recipientId(),
+        ctx.eventType(),
+        template.getImportance().name(),
+        rendered.title(),
+        rendered.body(),
+        locale,
+        ctx.referenceId(),
+        ctx.referenceType(),
+        deliveryKey);
+  }
 
   /**
    * Bir alıcı için bildirim oluşturur ve kuyruğa ekler.

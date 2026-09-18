@@ -18,6 +18,12 @@ final class TablePrivilegeClassification {
 
   private static Map<String, TablePrivilegeClass> entries() {
     Map<String, TablePrivilegeClass> entries = new LinkedHashMap<>();
+    entries.put("flowboard.routing_pool", TablePrivilegeClass.MUTABLE);
+    entries.put("flowboard.routing_pool_member", TablePrivilegeClass.MUTABLE);
+    entries.put("flowboard.routing_task_state", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("flowboard.routing_failure", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("flowboard.routing_failure_resolution", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("flowboard.routing_failure_alert", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.quality_decision", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("production.quality_decision_unit", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_cover_evidence", TablePrivilegeClass.APPEND_ONLY_LEDGER);

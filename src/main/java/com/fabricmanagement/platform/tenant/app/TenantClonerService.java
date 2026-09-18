@@ -134,7 +134,8 @@ public class TenantClonerService {
     jdbc.query(
         "SELECT role_code, department_code, resource, action, data_scope "
             + "FROM common_user.permission_template "
-            + "WHERE tenant_id = ? AND is_active = true",
+            + "WHERE tenant_id = ? AND is_active = true AND deleted_at IS NULL "
+            + "AND NOT (resource || ':' || action = ANY(string_to_array(?, ',')))",
         rs -> {
           jdbc.update(
               "INSERT INTO common_user.permission_template "
@@ -150,7 +151,9 @@ public class TenantClonerService {
               rs.getString("data_scope"));
           count[0]++;
         },
-        sourceTenantId);
+        sourceTenantId,
+        com.fabricmanagement.common.infrastructure.security.PermissionKey
+            .explicitAuthorisationKeysCsv());
     return count[0];
   }
 

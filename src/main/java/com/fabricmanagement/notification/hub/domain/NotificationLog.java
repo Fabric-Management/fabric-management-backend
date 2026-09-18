@@ -21,6 +21,9 @@ public class NotificationLog extends BaseEntity {
   @Column(name = "recipient_id", nullable = false)
   private UUID recipientId;
 
+  @Column(name = "delivery_key")
+  private UUID deliveryKey;
+
   @Column(name = "event_type", nullable = false, length = 100)
   private String eventType;
 

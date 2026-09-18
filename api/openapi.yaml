@@ -62,6 +62,8 @@ tags:
   name: Address Validation
 - description: Batch Lineage operations
   name: Batch Lineage
+- description: "Governed pool configuration, eligibility and repair"
+  name: FlowBoard Routing
 - description: Address operations
   name: Address
 - description: Permission Management operations
@@ -20745,6 +20747,502 @@ paths:
       summary: Recurring task templates for board
       tags:
       - FlowBoard — Recurring Tasks
+  /api/v1/flowboard/routing/failures:
+    get:
+      operationId: failures
+      parameters:
+      - in: query
+        name: poolKey
+        required: false
+        schema:
+          type: string
+          enum:
+          - ORDER_COVER
+      - in: query
+        name: open
+        required: false
+        schema:
+          type: boolean
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseRoutingFailureResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List routing failures and their delivery state without order details
+      tags:
+      - FlowBoard Routing
+  /api/v1/flowboard/routing/pools/{poolKey}:
+    get:
+      operationId: pool
+      parameters:
+      - in: path
+        name: poolKey
+        required: true
+        schema:
+          type: string
+          enum:
+          - ORDER_COVER
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseRoutingPoolResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read a routing pool; unconfigured pools return configured=false
+      tags:
+      - FlowBoard Routing
+    put:
+      operationId: configure
+      parameters:
+      - in: path
+        name: poolKey
+        required: true
+        schema:
+          type: string
+          enum:
+          - ORDER_COVER
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoutingPoolUpdateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseRoutingPoolResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Revision conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: "Non-candidate members, with per-user reasons"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Configure a routing pool with an expected revision
+      tags:
+      - FlowBoard Routing
+  /api/v1/flowboard/routing/pools/{poolKey}/candidates:
+    get:
+      operationId: candidates
+      parameters:
+      - in: path
+        name: poolKey
+        required: true
+        schema:
+          type: string
+          enum:
+          - ORDER_COVER
+      - in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseRoutingMemberResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "List current candidates, freshly filtered before pagination"
+      tags:
+      - FlowBoard Routing
+  /api/v1/flowboard/routing/pools/{poolKey}/repair:
+    post:
+      operationId: repair
+      parameters:
+      - in: path
+        name: poolKey
+        required: true
+        schema:
+          type: string
+          enum:
+          - ORDER_COVER
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseRoutingRepairResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Re-evaluate all open governed tasks and retry owed alerts
+      tags:
+      - FlowBoard Routing
+  /api/v1/flowboard/routing/tasks/{taskId}/eligibility:
+    get:
+      operationId: eligibility
+      parameters:
+      - in: path
+        name: taskId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseRoutingEligibilityResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Evaluate members against the task's sales write scope
+      tags:
+      - FlowBoard Routing
   /api/v1/flowboard/tasks:
     post:
       operationId: createTask
@@ -51546,6 +52044,42 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponseRoutingFailureResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseRoutingFailureResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseRoutingMemberResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseRoutingMemberResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponseSalesOrderDto:
       type: object
       properties:
@@ -52343,6 +52877,60 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/RoleDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseRoutingEligibilityResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RoutingEligibilityResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseRoutingPoolResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RoutingPoolResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseRoutingRepairResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RoutingRepairResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -60664,6 +61252,52 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponseRoutingFailureResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingFailureResponse"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseRoutingMemberResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingMemberResponse"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponseSalesOrderDto:
       type: object
       properties:
@@ -61417,6 +62051,7 @@ components:
       - finance:read
       - finance:write
       - flowboard:read
+      - flowboard:manage-routing
       - flowboard:write
       - logistics:cancel
       - logistics:delete
@@ -64200,6 +64835,196 @@ components:
           format: uuid
         uid:
           type: string
+    RoutingAlertResponse:
+      type: object
+      properties:
+        attempts:
+          type: integer
+          format: int32
+        channel:
+          type: string
+          enum:
+          - IN_APP
+        lastError:
+          type: string
+        recipientId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - FAILED
+          - DELIVERED
+          - CANCELLED
+      required:
+      - attempts
+      - channel
+      - recipientId
+      - status
+    RoutingEligibilityResponse:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingMemberEligibilityResponse"
+        taskId:
+          type: string
+          format: uuid
+      required:
+      - members
+      - taskId
+    RoutingFailureResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingAlertResponse"
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        poolKey:
+          type: string
+          enum:
+          - ORDER_COVER
+        poolRevision:
+          type: integer
+          format: int64
+        reasonCode:
+          type: string
+          enum:
+          - NO_POOL
+          - POOL_EMPTY
+          - NO_VALID_RECIPIENT
+          - RECIPIENT_INVALID
+        resolvedAt:
+          type: string
+          format: date-time
+        taskId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+      required:
+      - alerts
+      - id
+      - occurredAt
+      - poolKey
+      - reasonCode
+      - taskId
+    RoutingMemberEligibilityResponse:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        reasons:
+          type: array
+          items:
+            type: string
+            enum:
+            - INACTIVE
+            - MISSING_FLOWBOARD_WRITE
+            - MISSING_SALES_WRITE
+            - OUTSIDE_SALES_WRITE_SCOPE
+            - NOT_A_MEMBER
+        userId:
+          type: string
+          format: uuid
+      required:
+      - eligible
+      - reasons
+      - userId
+    RoutingMemberResponse:
+      type: object
+      properties:
+        active:
+          type: boolean
+        candidacyReasons:
+          type: array
+          items:
+            type: string
+            enum:
+            - INACTIVE
+            - MISSING_FLOWBOARD_WRITE
+            - MISSING_SALES_WRITE
+            - OUTSIDE_SALES_WRITE_SCOPE
+            - NOT_A_MEMBER
+        candidate:
+          type: boolean
+        displayName:
+          type: string
+          description: "Current display name, if the user is visible"
+        userId:
+          type: string
+          format: uuid
+      required:
+      - active
+      - candidacyReasons
+      - candidate
+      - userId
+    RoutingPoolResponse:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingMemberResponse"
+        poolKey:
+          type: string
+          enum:
+          - ORDER_COVER
+        revision:
+          type: integer
+          format: int64
+          description: Null when never configured
+      required:
+      - configured
+      - members
+      - poolKey
+    RoutingPoolUpdateRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          description: Absent only when configuring the pool for the first time
+          exclusiveMinimum: 0
+        memberUserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          uniqueItems: true
+      required:
+      - memberUserIds
+    RoutingRepairResponse:
+      type: object
+      properties:
+        changed:
+          type: integer
+          format: int32
+        evaluated:
+          type: integer
+          format: int32
+        failuresOpened:
+          type: integer
+          format: int32
+        failuresResolved:
+          type: integer
+          format: int32
+      required:
+      - changed
+      - evaluated
+      - failuresOpened
+      - failuresResolved
     RuleVersionDto:
       type: object
       properties:

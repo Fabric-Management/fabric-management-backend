@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -70,6 +71,7 @@ public class PermissionTemplateBackfillRunner {
           SELECT role_code, department_code, resource, action, data_scope, is_active
           FROM common_user.permission_template
           WHERE tenant_id = ?::uuid AND deleted_at IS NULL
+            AND NOT (resource || ':' || action = ANY(string_to_array(?, ',')))
       ) g
       WHERE t.id <> ?::uuid
         AND t.deleted_at IS NULL
@@ -102,7 +104,11 @@ public class PermissionTemplateBackfillRunner {
       rowsInserted =
           systemTransactionExecutor.executeInTransaction(
               jdbcTemplate ->
-                  jdbcTemplate.update(BACKFILL_SQL, templateTenantId, templateTenantId));
+                  jdbcTemplate.update(
+                      BACKFILL_SQL,
+                      templateTenantId,
+                      PermissionKey.explicitAuthorisationKeysCsv(),
+                      templateTenantId));
     } catch (Exception e) {
       log.error(
           "CRITICAL: cross-tenant permission template backfill failed. Tenants created before this"
