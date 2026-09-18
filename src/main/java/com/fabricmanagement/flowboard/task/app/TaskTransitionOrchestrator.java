@@ -10,6 +10,7 @@ import com.fabricmanagement.flowboard.task.dto.TaskTransitionResult;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptClaimRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptRepository;
+import com.fabricmanagement.flowboard.task.infra.repository.TaskVersionLockRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import java.time.Clock;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TaskTransitionOrchestrator {
 
   private final TaskRepository taskRepository;
+  private final TaskVersionLockRepository taskVersionLockRepository;
   private final TaskTransitionAttemptRepository attemptRepository;
   private final TaskTransitionAttemptClaimRepository attemptClaimRepository;
   private final TaskWorkflowRegistry workflowRegistry;
@@ -48,6 +50,7 @@ public class TaskTransitionOrchestrator {
 
   public TaskTransitionOrchestrator(
       TaskRepository taskRepository,
+      TaskVersionLockRepository taskVersionLockRepository,
       TaskTransitionAttemptRepository attemptRepository,
       TaskTransitionAttemptClaimRepository attemptClaimRepository,
       TaskWorkflowRegistry workflowRegistry,
@@ -55,6 +58,7 @@ public class TaskTransitionOrchestrator {
       ObjectProvider<DomainTaskAction> actionProvider,
       Clock clock) {
     this.taskRepository = taskRepository;
+    this.taskVersionLockRepository = taskVersionLockRepository;
     this.attemptRepository = attemptRepository;
     this.attemptClaimRepository = attemptClaimRepository;
     this.workflowRegistry = workflowRegistry;
@@ -124,6 +128,9 @@ public class TaskTransitionOrchestrator {
     Instant completedAt = Instant.now(clock);
     switch (domainResult) {
       case DomainTaskActionResult.Accepted accepted -> {
+        // A partial action can change only affected-subject rows. It still consumes the
+        // task version, so a competing recipient cannot commit against the same version.
+        taskVersionLockRepository.forceIncrement(task);
         affectedSubjectService.synchronize(task.getId(), accepted.remainingSubjects());
         if (accepted.remainingSubjects().isEmpty()) {
           task.closeGovernedExecution(completedAt);

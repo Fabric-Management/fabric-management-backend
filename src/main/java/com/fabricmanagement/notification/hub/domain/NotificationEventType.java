@@ -16,6 +16,7 @@ public final class NotificationEventType {
   }
 
   // ---- CRITICAL ----
+  public static final String ROUTING_FAILURE = "ROUTING_FAILURE";
   public static final String BATCH_QC_FAILED = "BATCH_QC_FAILED";
   public static final String RETURN_RATE_EXCEEDED = "RETURN_RATE_EXCEEDED";
 

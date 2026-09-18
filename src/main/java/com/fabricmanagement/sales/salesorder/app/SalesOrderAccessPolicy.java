@@ -24,15 +24,21 @@ public class SalesOrderAccessPolicy {
   private final UserQueryService userQueryService;
 
   public boolean canRead(UUID tenantId, UUID userId, SalesOrder order) {
-    return canAccess(tenantId, userId, order, "read");
+    return canAccess(tenantId, userId, order, "read", PermissionFreshness.CACHED);
   }
 
   public boolean canWrite(UUID tenantId, UUID userId, SalesOrder order) {
-    return canAccess(tenantId, userId, order, "write");
+    return canWrite(tenantId, userId, order, PermissionFreshness.CACHED);
+  }
+
+  public boolean canWrite(
+      UUID tenantId, UUID userId, SalesOrder order, PermissionFreshness freshness) {
+    return canAccess(tenantId, userId, order, "write", freshness);
   }
 
   public Specification<SalesOrder> readRestriction(UUID tenantId, UUID userId) {
-    AccessScope accessScope = resolveAccessScope(tenantId, userId, "read");
+    AccessScope accessScope =
+        resolveAccessScope(tenantId, userId, "read", PermissionFreshness.CACHED);
     return (root, query, criteriaBuilder) -> {
       var tenantPredicate = criteriaBuilder.equal(root.get("tenantId"), tenantId);
       if (accessScope.scope() == null) {
@@ -52,7 +58,8 @@ public class SalesOrderAccessPolicy {
     };
   }
 
-  private boolean canAccess(UUID tenantId, UUID userId, SalesOrder order, String action) {
+  private boolean canAccess(
+      UUID tenantId, UUID userId, SalesOrder order, String action, PermissionFreshness freshness) {
     if (tenantId == null
         || userId == null
         || order == null
@@ -60,7 +67,7 @@ public class SalesOrderAccessPolicy {
       return false;
     }
 
-    AccessScope accessScope = resolveAccessScope(tenantId, userId, action);
+    AccessScope accessScope = resolveAccessScope(tenantId, userId, action, freshness);
     if (accessScope.scope() == null) {
       return false;
     }
@@ -73,7 +80,8 @@ public class SalesOrderAccessPolicy {
     };
   }
 
-  private AccessScope resolveAccessScope(UUID tenantId, UUID userId, String action) {
+  private AccessScope resolveAccessScope(
+      UUID tenantId, UUID userId, String action, PermissionFreshness freshness) {
     if (tenantId == null || userId == null) {
       return AccessScope.denied();
     }
@@ -85,7 +93,8 @@ public class SalesOrderAccessPolicy {
     }
 
     PermissionResult permissions =
-        resolvePermissions(tenantId, userId, targetUser.roleCode(), targetUser.departmentCodes());
+        resolvePermissions(
+            tenantId, userId, targetUser.roleCode(), targetUser.departmentCodes(), freshness);
     DataScope scope = permissions.scopeOf(RESOURCE, action);
 
     if (scope != DataScope.DEPARTMENT) {
@@ -96,15 +105,30 @@ public class SalesOrderAccessPolicy {
     if (!targetUser.departmentCodes().isEmpty()) {
       memberIds.addAll(
           userQueryService.findActiveUserIdsByDepartmentCodes(
-              tenantId, Set.copyOf(targetUser.departmentCodes())));
+              tenantId,
+              targetUser.departmentCodes().stream()
+                  .map(code -> code.toUpperCase(java.util.Locale.ROOT))
+                  .collect(java.util.stream.Collectors.toUnmodifiableSet())));
     }
     memberIds.add(userId);
     return new AccessScope(scope, Set.copyOf(memberIds));
   }
 
   private PermissionResult resolvePermissions(
-      UUID tenantId, UUID userId, String roleCode, List<String> departmentCodes) {
-    return permissionEvaluator.evaluate(tenantId, roleCode, departmentCodes, userId);
+      UUID tenantId,
+      UUID userId,
+      String roleCode,
+      List<String> departmentCodes,
+      PermissionFreshness freshness) {
+    return switch (freshness) {
+      case CACHED -> permissionEvaluator.evaluate(tenantId, roleCode, departmentCodes, userId);
+      case FRESH -> permissionEvaluator.evaluateFresh(tenantId, roleCode, departmentCodes, userId);
+    };
+  }
+
+  public enum PermissionFreshness {
+    CACHED,
+    FRESH
   }
 
   private record AccessScope(DataScope scope, Set<UUID> departmentMemberIds) {

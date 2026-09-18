@@ -52,6 +52,12 @@ public class TenantTransactionalPurgeService {
 
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
+          "flowboard.routing_failure_alert",
+          "flowboard.routing_failure_resolution",
+          "flowboard.routing_failure",
+          "flowboard.routing_task_state",
+          "flowboard.routing_pool_member",
+          "flowboard.routing_pool",
           "flowboard.task_transition_attempt",
           "flowboard.task_affected_subject",
           "flowboard.task_attachment",
@@ -281,6 +287,10 @@ public class TenantTransactionalPurgeService {
   private void deleteTransactionalRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
     authorizeQualityDecisionPurge(jdbc, tenantId);
+    jdbc.queryForObject(
+        "SELECT set_config('app.routing_purge_tenant', ?, true)",
+        String.class,
+        tenantId.toString());
     authorizeCommercialAssignmentPurge(jdbc, tenantId);
     jdbc.queryForObject(
         "SELECT set_config(?, ?, true)",

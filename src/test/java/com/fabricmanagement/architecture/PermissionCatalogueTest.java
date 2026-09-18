@@ -82,10 +82,15 @@ class PermissionCatalogueTest {
     Set<String> enforced =
         scan.sites().stream().map(PermissionSourceScanner.Site::key).collect(Collectors.toSet());
     Set<String> seeded = grantKeys(grants);
-    assertThat(catalogued).hasSize(45);
+    assertThat(catalogued).hasSize(46);
     assertSameKeys("catalogue", catalogued, "enforcement", enforced);
-    assertSameKeys("catalogue", catalogued, "seed", seeded);
-    assertSameKeys("enforcement", enforced, "seed", seeded);
+    Set<String> defaultKeys =
+        Arrays.stream(PermissionKey.values())
+            .filter(key -> key.distribution() == PermissionKey.Distribution.SEEDED_BY_DEFAULT)
+            .map(PermissionKey::key)
+            .collect(Collectors.toSet());
+    assertThat(defaultKeys).hasSize(45);
+    assertSameKeys("seeded-by-default catalogue", defaultKeys, "seed", seeded);
   }
 
   private static void assertSameKeys(
@@ -325,6 +330,14 @@ class PermissionCatalogueTest {
     Set<String> granted = grantKeys(rows);
     return catalogue.entrySet().stream()
         .map(Map.Entry::getKey)
+        .filter(
+            key ->
+                Arrays.stream(PermissionKey.values())
+                    .noneMatch(
+                        permission ->
+                            permission.key().equals(key)
+                                && permission.distribution()
+                                    == PermissionKey.Distribution.EXPLICIT_AUTHORISATION_ONLY))
         .filter(key -> !granted.contains(key))
         .collect(Collectors.toCollection(TreeSet::new));
   }

@@ -136,6 +136,25 @@ class SalesOrderAccessPolicyTest {
     assertThat(policy.canWrite(TENANT_ID, TARGET_USER_ID, otherTenantOrder)).isFalse();
   }
 
+  @Test
+  void freshWriteSelectsFreshEvaluatorWithoutChangingScopeRules() {
+    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
+        .thenReturn(
+            new PermissionResult(Map.of("sales", Map.of("write", DataScope.GLOBAL)), false));
+    when(permissionEvaluator.evaluateFresh(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
+        .thenReturn(new PermissionResult(Map.of("sales", Map.of("write", DataScope.OWN)), false));
+    SalesOrder anotherUsersOrder = order(TENANT_ID, OUTSIDER_ID);
+
+    assertThat(policy.canWrite(TENANT_ID, TARGET_USER_ID, anotherUsersOrder)).isTrue();
+    assertThat(
+            policy.canWrite(
+                TENANT_ID,
+                TARGET_USER_ID,
+                anotherUsersOrder,
+                SalesOrderAccessPolicy.PermissionFreshness.FRESH))
+        .isFalse();
+  }
+
   private void stubPermissions(DataScope readScope, DataScope writeScope) {
     PermissionResult permissions =
         new PermissionResult(

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
@@ -29,6 +30,7 @@ class UserQueryServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private EmployeeProjectionPort employeeProjectionPort;
   @Mock private UserWorkLocationService userWorkLocationService;
+  @Mock private PermissionEvaluator permissionEvaluator;
 
   @InjectMocks private UserQueryService service;
 
@@ -89,5 +91,32 @@ class UserQueryServiceTest {
   void exists_Delegation() {
     when(userRepository.existsByTenantIdAndId(tenantId, userId)).thenReturn(true);
     assertThat(service.exists(tenantId, userId)).isTrue();
+  }
+
+  @Test
+  void permissionIdentityPreservesPersistedDepartmentCodeCase() {
+    User user = User.create("Mixed", "Case", UUID.randomUUID());
+    user.setId(userId);
+    user.setTenantId(tenantId);
+    var department =
+        com.fabricmanagement.platform.organization.domain.Department.create(
+            user.getOrganizationId(), "Quality", "QUALITY-mixed", "Case-sensitive key");
+    department.setId(UUID.randomUUID());
+    user.getUserDepartments()
+        .add(
+            com.fabricmanagement.platform.user.domain.UserDepartment.builder()
+                .tenantId(tenantId)
+                .userId(userId)
+                .departmentId(department.getId())
+                .user(user)
+                .department(department)
+                .isActive(true)
+                .isPrimary(true)
+                .build());
+    when(userRepository.findByIdWithPermissionData(tenantId, userId)).thenReturn(Optional.of(user));
+
+    assertThat(service.findPermissionIdentity(tenantId, userId))
+        .hasValueSatisfying(
+            identity -> assertThat(identity.departmentCodes()).containsExactly("QUALITY-mixed"));
   }
 }

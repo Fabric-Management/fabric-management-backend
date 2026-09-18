@@ -13,23 +13,28 @@ import com.fabricmanagement.flowboard.task.domain.ModuleType;
 import com.fabricmanagement.flowboard.task.domain.Priority;
 import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.domain.TaskActionCommand;
+import com.fabricmanagement.flowboard.task.domain.TaskSubject;
 import com.fabricmanagement.flowboard.task.domain.TaskTransitionAttempt;
 import com.fabricmanagement.flowboard.task.domain.TaskTransitionOutcome;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptClaimRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptRepository;
+import com.fabricmanagement.flowboard.task.infra.repository.TaskVersionLockRepository;
 import jakarta.persistence.OptimisticLockException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,6 +48,7 @@ class TaskTransitionOrchestratorTest {
   private static final String FINGERPRINT = "a".repeat(64);
 
   @Mock private TaskRepository taskRepository;
+  @Mock private TaskVersionLockRepository taskVersionLockRepository;
   @Mock private TaskTransitionAttemptRepository attemptRepository;
   @Mock private TaskTransitionAttemptClaimRepository attemptClaimRepository;
   @Mock private TaskAffectedSubjectService affectedSubjectService;
@@ -72,6 +78,7 @@ class TaskTransitionOrchestratorTest {
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.ACCEPTED);
     assertThat(result.replayed()).isTrue();
     verify(taskRepository, never()).findById(any());
+    verify(taskVersionLockRepository, never()).forceIncrement(any());
   }
 
   @Test
@@ -113,13 +120,17 @@ class TaskTransitionOrchestratorTest {
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.REJECTED_BUSINESS);
     assertThat(result.rejectionCode()).isEqualTo("STOCK_UNKNOWN");
     verify(taskRepository, never()).save(any());
+    verify(taskVersionLockRepository, never()).forceIncrement(any());
   }
 
-  @Test
-  void acceptedFinalResultSynchronizesScopeAndClosesTaskAtomically() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void acceptedResultConsumesVersionAndClosesOnlyWhenNoSubjectsRemain(boolean partial) {
     Task task = governedTask(2L);
     TaskActionCommand command = command(2);
     UUID resultId = UUID.randomUUID();
+    Set<TaskSubject> remainingSubjects =
+        partial ? Set.of(new TaskSubject("TEST_SCOPE", UUID.randomUUID())) : Set.of();
     DomainTaskAction acceptingAction =
         new DomainTaskAction() {
           public String actionKey() {
@@ -131,7 +142,8 @@ class TaskTransitionOrchestratorTest {
           }
 
           public DomainTaskActionResult execute(Task candidate, TaskActionCommand ignored) {
-            return new DomainTaskActionResult.Accepted("ORDER_COVER_RESULT", resultId);
+            return new DomainTaskActionResult.Accepted(
+                "ORDER_COVER_RESULT", resultId, remainingSubjects);
           }
         };
     stubWinningClaim(command);
@@ -141,10 +153,17 @@ class TaskTransitionOrchestratorTest {
     var result = orchestrator(List.of(acceptingAction)).execute(command);
 
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.ACCEPTED);
-    assertThat(task.getClosedAt()).isEqualTo(Instant.parse("2026-09-15T12:00:00Z"));
-    assertThat(task.getStatus())
-        .isEqualTo(com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE);
-    verify(affectedSubjectService).synchronize(task.getId(), java.util.Set.of());
+    if (partial) {
+      assertThat(task.getClosedAt()).isNull();
+      assertThat(task.getStatus())
+          .isEqualTo(com.fabricmanagement.flowboard.task.domain.TaskStatus.BACKLOG);
+    } else {
+      assertThat(task.getClosedAt()).isEqualTo(Instant.parse("2026-09-15T12:00:00Z"));
+      assertThat(task.getStatus())
+          .isEqualTo(com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE);
+    }
+    verify(taskVersionLockRepository).forceIncrement(task);
+    verify(affectedSubjectService).synchronize(task.getId(), remainingSubjects);
     verify(taskRepository).save(task);
   }
 
@@ -164,6 +183,7 @@ class TaskTransitionOrchestratorTest {
     when(provider.orderedStream()).thenReturn(actions.stream());
     return new TaskTransitionOrchestrator(
         taskRepository,
+        taskVersionLockRepository,
         attemptRepository,
         attemptClaimRepository,
         new TaskWorkflowRegistry(),

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ class NotificationHubServiceTest {
   @Mock private NotificationLogRepository logRepo;
   @Mock private UserNotificationPreferenceRepository prefRepo;
   @Mock private TranslationService translationService;
+  @Mock private DataSource dataSource;
 
   @InjectMocks private NotificationHubService notificationHubService;
 

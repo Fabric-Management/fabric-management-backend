@@ -91,12 +91,15 @@ public class NotificationItemProcessor {
 
       var template = templateOpt.get();
 
-      String title =
-          translationService.translateAndRender(
-              item.getTenantId(), item.getLocale(), template.getTitleKey(), item.getPayload());
-      String body =
-          translationService.translateAndRender(
-              item.getTenantId(), item.getLocale(), template.getBodyKey(), item.getPayload());
+      var rendered =
+          NotificationRenderer.render(
+              translationService,
+              item.getTenantId(),
+              item.getLocale(),
+              template,
+              item.getPayload());
+      String title = rendered.title();
+      String body = rendered.body();
 
       // Kanal bazlı gönderim
       switch (item.getChannel()) {

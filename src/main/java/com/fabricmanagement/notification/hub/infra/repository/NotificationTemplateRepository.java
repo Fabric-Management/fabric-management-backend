@@ -13,6 +13,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface NotificationTemplateRepository extends JpaRepository<NotificationTemplate, UUID> {
 
+  Optional<NotificationTemplate> findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+      UUID tenantId, String eventType, NotificationChannel channel);
+
   @Query(
       """
       SELECT t FROM NotificationTemplate t

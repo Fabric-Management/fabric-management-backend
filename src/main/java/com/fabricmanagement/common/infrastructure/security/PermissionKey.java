@@ -45,6 +45,11 @@ public enum PermissionKey {
   FINANCE_READ("finance:read", EnforcedBy.ANNOTATION, ""),
   FINANCE_WRITE("finance:write", EnforcedBy.ANNOTATION, ""),
   FLOWBOARD_READ("flowboard:read", EnforcedBy.ANNOTATION, ""),
+  FLOWBOARD_MANAGE_ROUTING(
+      "flowboard:manage-routing",
+      EnforcedBy.ANNOTATION,
+      Distribution.EXPLICIT_AUTHORISATION_ONLY,
+      "Explicit tenant authorisation only (D40)."),
   FLOWBOARD_WRITE("flowboard:write", EnforcedBy.ANNOTATION, ""),
   LOGISTICS_CANCEL("logistics:cancel", EnforcedBy.ANNOTATION, ""),
   LOGISTICS_DELETE(
@@ -92,6 +97,11 @@ public enum PermissionKey {
     JAVA
   }
 
+  public enum Distribution {
+    SEEDED_BY_DEFAULT,
+    EXPLICIT_AUTHORISATION_ONLY
+  }
+
   private static final Map<String, PermissionKey> BY_KEY =
       Arrays.stream(values())
           .collect(Collectors.toUnmodifiableMap(PermissionKey::key, Function.identity()));
@@ -99,11 +109,29 @@ public enum PermissionKey {
   private final String key;
   private final EnforcedBy enforcedBy;
   private final String note;
+  private final Distribution distribution;
 
   PermissionKey(String key, EnforcedBy enforcedBy, String note) {
+    this(key, enforcedBy, Distribution.SEEDED_BY_DEFAULT, note);
+  }
+
+  PermissionKey(String key, EnforcedBy enforcedBy, Distribution distribution, String note) {
     this.key = key;
     this.enforcedBy = enforcedBy;
+    this.distribution = distribution;
     this.note = note;
+  }
+
+  public Distribution distribution() {
+    return distribution;
+  }
+
+  /** Catalogue-derived exclusions for bulk SQL distribution paths. */
+  public static String explicitAuthorisationKeysCsv() {
+    return Arrays.stream(values())
+        .filter(key -> key.distribution == Distribution.EXPLICIT_AUTHORISATION_ONLY)
+        .map(PermissionKey::key)
+        .collect(Collectors.joining(","));
   }
 
   @JsonValue

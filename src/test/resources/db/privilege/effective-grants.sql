@@ -37,6 +37,12 @@ classified_relations AS (
            relation_name,
            relkind,
            CASE schema_name || '.' || relation_name
+               WHEN 'flowboard.routing_pool' THEN 'MUTABLE'
+               WHEN 'flowboard.routing_pool_member' THEN 'MUTABLE'
+               WHEN 'flowboard.routing_task_state' THEN 'MUTABLE_SYSTEM_PURGE'
+               WHEN 'flowboard.routing_failure' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'flowboard.routing_failure_resolution' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'flowboard.routing_failure_alert' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'production.quality_decision' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'production.quality_decision_unit' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_cover_evidence' THEN 'APPEND_ONLY_LEDGER'

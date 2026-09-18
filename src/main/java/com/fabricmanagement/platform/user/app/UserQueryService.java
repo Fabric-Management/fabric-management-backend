@@ -1,5 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
@@ -7,7 +9,6 @@ import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +36,7 @@ public class UserQueryService {
   private final UserRepository userRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final UserWorkLocationService userWorkLocationService;
+  private final PermissionEvaluator permissionEvaluator;
 
   @Transactional(readOnly = true)
   public Optional<UserDto> findById(UUID tenantId, UUID userId) {
@@ -126,21 +128,26 @@ public class UserQueryService {
   public Optional<PermissionIdentity> findPermissionIdentity(UUID tenantId, UUID userId) {
     return userRepository
         .findByIdWithPermissionData(tenantId, userId)
-        .map(
-            user ->
-                new PermissionIdentity(
-                    user.getRole() != null ? user.getRole().getRoleCode() : null,
-                    user.getUserDepartments().stream()
-                        .filter(assignment -> Boolean.TRUE.equals(assignment.getIsActive()))
-                        .map(
-                            com.fabricmanagement.platform.user.domain.UserDepartment::getDepartment)
-                        .filter(java.util.Objects::nonNull)
-                        .filter(department -> Boolean.TRUE.equals(department.getIsActive()))
-                        .map(department -> department.getDepartmentCode())
-                        .filter(code -> code != null && !code.isBlank())
-                        .map(code -> code.toUpperCase(Locale.ROOT))
-                        .distinct()
-                        .toList()));
+        .map(this::permissionIdentity);
+  }
+
+  /** Returns active tenant users whose freshly evaluated permissions contain the requested key. */
+  @Transactional(readOnly = true)
+  public Set<UUID> findUsersWithAction(UUID tenantId, PermissionKey permissionKey) {
+    if (tenantId == null || permissionKey == null) {
+      return Set.of();
+    }
+    return userRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        .filter(
+            user -> {
+              PermissionIdentity identity = permissionIdentity(user);
+              return permissionEvaluator
+                  .evaluateFresh(
+                      tenantId, identity.roleCode(), identity.departmentCodes(), user.getId())
+                  .can(permissionKey.resource(), permissionKey.action());
+            })
+        .map(User::getId)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
   @Transactional(readOnly = true)
@@ -155,6 +162,20 @@ public class UserQueryService {
     public PermissionIdentity {
       departmentCodes = List.copyOf(departmentCodes);
     }
+  }
+
+  private PermissionIdentity permissionIdentity(User user) {
+    return new PermissionIdentity(
+        user.getRole() != null ? user.getRole().getRoleCode() : null,
+        user.getUserDepartments().stream()
+            .filter(assignment -> Boolean.TRUE.equals(assignment.getIsActive()))
+            .map(com.fabricmanagement.platform.user.domain.UserDepartment::getDepartment)
+            .filter(java.util.Objects::nonNull)
+            .filter(department -> Boolean.TRUE.equals(department.getIsActive()))
+            .map(department -> department.getDepartmentCode())
+            .filter(code -> code != null && !code.isBlank())
+            .distinct()
+            .toList());
   }
 
   /**

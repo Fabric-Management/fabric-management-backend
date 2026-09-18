@@ -134,7 +134,7 @@ class TablePrivilegeClassIT {
   @Test
   void pinnedTargetReportsThreeHistoricalPrivilegeSurpluses() throws SQLException {
     try (Connection connection = ownerConnection(BASELINE_POSTGRES)) {
-      assertThat(differences(connection))
+      assertThat(pinnedBaselineDifferences(connection))
           .containsExactly(
               difference("sales.customer_commercial_assignment", "fabric_app", "surplus: DELETE"),
               difference(
@@ -795,6 +795,24 @@ class TablePrivilegeClassIT {
   private static List<PrivilegeDifference> differences(Connection connection) throws SQLException {
     return TablePrivilegeComparator.compare(
         measure(connection), TablePrivilegeClassification.declaredEntries());
+  }
+
+  private static List<PrivilegeDifference> pinnedBaselineDifferences(Connection connection)
+      throws SQLException {
+    List<MeasuredRelation> measured = measure(connection);
+    Set<String> baselineRelations =
+        measured.stream()
+            .map(MeasuredRelation::relation)
+            .collect(java.util.stream.Collectors.toSet());
+    Map<String, TablePrivilegeClass> baselineClassifications = new LinkedHashMap<>();
+    TablePrivilegeClassification.declaredEntries()
+        .forEach(
+            (relation, privilegeClass) -> {
+              if (baselineRelations.contains(relation)) {
+                baselineClassifications.put(relation, privilegeClass);
+              }
+            });
+    return TablePrivilegeComparator.compare(measured, baselineClassifications);
   }
 
   private static List<MeasuredRelation> measure(Connection connection) throws SQLException {
