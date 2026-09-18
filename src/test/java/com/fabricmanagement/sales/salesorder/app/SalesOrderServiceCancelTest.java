@@ -34,9 +34,11 @@ class SalesOrderServiceCancelTest {
   @Mock private SalesOrderRepository orderRepository;
   @Mock private SalesOrderLineRepository lineRepository;
   @Mock private DomainEventPublisher domainEventPublisher;
+  @Mock private SalesOrderAccessPolicy accessPolicy;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
+  private final UUID userId = UUID.randomUUID();
   private UUID tenantId;
   private UUID orderId;
   private SalesOrder order;
@@ -55,6 +57,7 @@ class SalesOrderServiceCancelTest {
             .status(OrderStatus.IN_PROGRESS)
             .build();
     ReflectionTestUtils.setField(order, "id", orderId);
+    when(accessPolicy.canWrite(tenantId, userId, order)).thenReturn(true);
   }
 
   @AfterEach
@@ -72,7 +75,7 @@ class SalesOrderServiceCancelTest {
     when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
         .thenReturn(List.of(line));
 
-    SalesOrderDto result = salesOrderService.cancelOrder(orderId);
+    SalesOrderDto result = salesOrderService.cancelOrder(orderId, userId);
 
     assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 
@@ -95,7 +98,7 @@ class SalesOrderServiceCancelTest {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
-    SalesOrderDto result = salesOrderService.resumeOrder(orderId);
+    SalesOrderDto result = salesOrderService.resumeOrder(orderId, userId);
 
     assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
@@ -107,7 +110,7 @@ class SalesOrderServiceCancelTest {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
-    SalesOrderDto result = salesOrderService.reviseOrder(orderId);
+    SalesOrderDto result = salesOrderService.reviseOrder(orderId, userId);
 
     assertThat(result.getStatus()).isEqualTo(OrderStatus.DRAFT);
   }
@@ -121,7 +124,8 @@ class SalesOrderServiceCancelTest {
     when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
         .thenReturn(List.of());
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> salesOrderService.cancelOrder(orderId))
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> salesOrderService.cancelOrder(orderId, userId))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class)
         .hasMessageContaining("Cannot cancel order");
   }
@@ -132,7 +136,8 @@ class SalesOrderServiceCancelTest {
 
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> salesOrderService.resumeOrder(orderId))
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> salesOrderService.resumeOrder(orderId, userId))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class)
         .hasMessageContaining("must be ON_HOLD");
   }
@@ -143,7 +148,8 @@ class SalesOrderServiceCancelTest {
 
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> salesOrderService.reviseOrder(orderId))
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> salesOrderService.reviseOrder(orderId, userId))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class)
         .hasMessageContaining("only REJECTED orders can be revised");
   }
@@ -155,7 +161,8 @@ class SalesOrderServiceCancelTest {
 
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> salesOrderService.resumeOrder(orderId))
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> salesOrderService.resumeOrder(orderId, userId))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("statusBeforeHold is null");
   }

@@ -18,6 +18,10 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.platform.user.domain.Role;
+import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.production.core.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.core.workorder.domain.FulfillmentType;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderStatus;
@@ -83,11 +87,14 @@ class DomainEventsPublicationIT {
   @Autowired private TradingPartnerService tradingPartnerService;
   @Autowired private TenantRepository tenantRepository;
   @Autowired private OrganizationRepository organizationRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private UserRepository userRepository;
 
   @MockitoSpyBean private DomainEventPublisher domainEventPublisher;
   @MockitoSpyBean private EventRouterService eventRouterService;
 
   private UUID tenantId;
+  private UUID userId;
 
   @BeforeEach
   void setUpTenant() {
@@ -103,7 +110,11 @@ class DomainEventsPublicationIT {
     Organization org =
         Organization.create(
             "Org " + timestamp, "TAX" + timestamp % 100000, OrganizationType.SPINNER);
-    organizationRepository.save(org);
+    org = organizationRepository.save(org);
+    Role role = roleRepository.save(Role.create("Events admin", "ADMIN", "Event test actor"));
+    User actor = User.create("Events", "Admin", org.getId());
+    actor.setRole(role);
+    userId = userRepository.save(actor).getId();
     TenantContext.clear();
 
     clearInvocations(domainEventPublisher, eventRouterService);
@@ -119,6 +130,7 @@ class DomainEventsPublicationIT {
   @DisplayName("confirmOrder publishes SalesOrderConfirmedEvent and routes after commit")
   void confirmOrder_publishesSalesOrderConfirmedEvent() {
     TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(userId);
 
     TradingPartnerDto partner =
         tradingPartnerService.createPartner(
@@ -136,7 +148,7 @@ class DomainEventsPublicationIT {
     req.setRequestedDeliveryDate(delivery);
 
     SalesOrderDto created = salesOrderService.createOrder(req);
-    SalesOrderDto confirmed = salesOrderService.confirmOrder(created.getId());
+    SalesOrderDto confirmed = salesOrderService.confirmOrder(created.getId(), userId);
 
     assertThat(confirmed.getStatus().name()).isEqualTo("CONFIRMED");
 

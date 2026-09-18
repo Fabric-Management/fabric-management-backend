@@ -52,6 +52,7 @@ class SalesOrderServiceConfirmTest {
   @Mock private DomainEventPublisher domainEventPublisher;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private ApprovalPort approvalPort;
+  @Mock private SalesOrderAccessPolicy accessPolicy;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
@@ -66,6 +67,13 @@ class SalesOrderServiceConfirmTest {
   void setUp() {
     TenantContext.setCurrentTenantId(tenantId);
     TenantContext.setCurrentUserId(userId);
+    org.mockito.Mockito.lenient()
+        .when(
+            accessPolicy.canWrite(
+                org.mockito.ArgumentMatchers.eq(tenantId),
+                org.mockito.ArgumentMatchers.eq(userId),
+                any(SalesOrder.class)))
+        .thenReturn(true);
   }
 
   @AfterEach
@@ -112,7 +120,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(lines);
 
     // Act
-    SalesOrderDto result = salesOrderService.confirmOrder(orderId);
+    SalesOrderDto result = salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -139,7 +147,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(lines);
 
     // Act
-    salesOrderService.confirmOrder(orderId);
+    salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -166,7 +174,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(lines);
 
     // Act
-    salesOrderService.confirmOrder(orderId);
+    salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -190,7 +198,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(List.of());
 
     // Act
-    salesOrderService.confirmOrder(orderId);
+    salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -214,7 +222,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(List.of());
 
     // Act
-    salesOrderService.confirmOrder(orderId);
+    salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -236,7 +244,7 @@ class SalesOrderServiceConfirmTest {
         .thenReturn(List.of());
 
     // Act
-    salesOrderService.confirmOrder(orderId);
+    salesOrderService.confirmOrder(orderId, userId);
 
     // Assert
     assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
@@ -252,12 +260,31 @@ class SalesOrderServiceConfirmTest {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
 
     // Act & Assert
-    assertThatThrownBy(() -> salesOrderService.confirmOrder(orderId))
+    assertThatThrownBy(() -> salesOrderService.confirmOrder(orderId, userId))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Order is awaiting approval; cannot be confirmed manually");
 
     verify(ruleEngine, never()).processConfirmedOrder(any());
     verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void confirmOrder_usesExplicitApprovalActorNotContextActor() {
+    SalesOrder order = createDraftOrder();
+    TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              assertThat((UUID) invocation.getArgument(1)).isEqualTo(userId);
+              return true;
+            });
+    when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
+
+    SalesOrderDto result = salesOrderService.confirmOrder(orderId, userId);
+
+    assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
   }
 
   @Test

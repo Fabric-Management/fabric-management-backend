@@ -481,11 +481,23 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto confirmOrder(UUID orderId) {
+  public SalesOrderDto confirmOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
+    return confirmOrderFlow(order, tenantId, currentUserId);
+  }
 
+  /** Confirm a demo order, preserving approval rules but not applying user object scope. */
+  @Transactional
+  public SalesOrderDto confirmDemoSeedOrder(UUID orderId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    return confirmOrderFlow(order, tenantId, TenantContext.getCurrentUserId());
+  }
+
+  private SalesOrderDto confirmOrderFlow(SalesOrder order, UUID tenantId, UUID approvalActorId) {
     if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
           "Order is awaiting approval; cannot be confirmed manually", 409);
@@ -495,7 +507,7 @@ public class SalesOrderService {
       boolean needsApproval =
           approvalPort.requiresApproval(
               tenantId,
-              TenantContext.getCurrentUserId(),
+              approvalActorId,
               "SALES_ORDER",
               order.getId(),
               order.getTotals() != null
@@ -646,10 +658,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto startProcessing(UUID orderId) {
+  public SalesOrderDto startProcessing(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.startProcessing();
     SalesOrder saved = orderRepository.save(order);
 
@@ -664,10 +677,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto shipOrder(UUID orderId) {
+  public SalesOrderDto shipOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.ship();
     SalesOrder saved = orderRepository.save(order);
 
@@ -683,10 +697,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto deliverOrder(UUID orderId, LocalDate deliveryDate) {
+  public SalesOrderDto deliverOrder(UUID orderId, UUID currentUserId, LocalDate deliveryDate) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.deliver(deliveryDate);
     SalesOrder saved = orderRepository.save(order);
 
@@ -701,10 +716,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto cancelOrder(UUID orderId) {
+  public SalesOrderDto cancelOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
 
     // Collect active line IDs for cascade notification before cancellation
     List<UUID> activeLineIds =
@@ -730,10 +746,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto holdOrder(UUID orderId) {
+  public SalesOrderDto holdOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.hold();
     SalesOrder saved = orderRepository.save(order);
 
@@ -751,10 +768,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto resumeOrder(UUID orderId) {
+  public SalesOrderDto resumeOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.resume();
     SalesOrder saved = orderRepository.save(order);
 
@@ -769,10 +787,11 @@ public class SalesOrderService {
    * @return Updated order DTO
    */
   @Transactional
-  public SalesOrderDto reviseOrder(UUID orderId) {
+  public SalesOrderDto reviseOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
     order.reviseRejected();
     SalesOrder saved = orderRepository.save(order);
 
@@ -786,10 +805,11 @@ public class SalesOrderService {
    * @param orderId Order ID
    */
   @Transactional
-  public void deleteOrder(UUID orderId) {
+  public void deleteOrder(UUID orderId, UUID currentUserId) {
     UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    requireWriteAccess(tenantId, currentUserId, order);
 
     // Cascade soft-delete all active lines first
     List<SalesOrderLine> lines =
@@ -809,6 +829,12 @@ public class SalesOrderService {
   // ═══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  private void requireWriteAccess(UUID tenantId, UUID currentUserId, SalesOrder order) {
+    if (!accessPolicy.canWrite(tenantId, currentUserId, order)) {
+      throw new AccessDeniedException("You do not have access to update this sales order.");
+    }
+  }
 
   private SalesOrder getOrderOrThrow(UUID tenantId, UUID orderId) {
     return orderRepository
