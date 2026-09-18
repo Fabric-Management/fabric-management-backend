@@ -1,9 +1,11 @@
 package com.fabricmanagement.sales.lot.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService;
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.LotColourReference;
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.LotQualityReference;
+import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotIntentReference;
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesLotReference;
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesPieceReference;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
@@ -12,6 +14,7 @@ import com.fabricmanagement.sales.lot.dto.SalesLotDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotIntentDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotPieceDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotQualityDto;
+import com.fabricmanagement.sales.quote.app.QuoteScopeQueryService;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotPieceSnapshot;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSelectionRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
@@ -35,15 +38,46 @@ import org.springframework.transaction.annotation.Transactional;
 public class SalesLotService {
 
   private final ProductionSalesLotQueryService productionLotQueryService;
+  private final QuoteScopeQueryService quoteScopeQueries;
 
-  public List<SalesLotDto> listSalesLots() {
+  List<SalesLotDto> listSalesLots() {
     return listSalesLots(null);
   }
 
-  public List<SalesLotDto> listSalesLots(UUID excludedQuoteLineId) {
+  List<SalesLotDto> listSalesLots(UUID excludedQuoteLineId) {
     return productionLotQueryService.listSaleableLots(excludedQuoteLineId).stream()
         .map(this::toDto)
         .toList();
+  }
+
+  public List<SalesLotDto> listSalesLots(UUID excludedQuoteLineId, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    UUID authorizedExcludedLineId =
+        authorizedExcludedLineId(tenantId, currentUserId, excludedQuoteLineId);
+    List<ProductionSalesLotReference> lots =
+        productionLotQueryService.listSaleableLots(authorizedExcludedLineId);
+    Set<UUID> quoteIds =
+        lots.stream()
+            .flatMap(lot -> lot.intents().stream())
+            .map(ProductionSalesLotIntentReference::quoteId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    Set<UUID> readableQuoteIds =
+        quoteIds.isEmpty()
+            ? Set.of()
+            : quoteScopeQueries.findReadableQuoteIds(tenantId, currentUserId, quoteIds);
+    return lots.stream().map(lot -> toDto(lot, readableQuoteIds)).toList();
+  }
+
+  private UUID authorizedExcludedLineId(
+      UUID tenantId, UUID currentUserId, UUID excludedQuoteLineId) {
+    if (excludedQuoteLineId == null) {
+      return null;
+    }
+    return quoteScopeQueries.canReadQuoteContainingLine(
+            tenantId, currentUserId, excludedQuoteLineId)
+        ? excludedQuoteLineId
+        : null;
   }
 
   public List<QuoteLineLotSnapshot> resolveNewSelectionSnapshots(
@@ -162,6 +196,15 @@ public class SalesLotService {
   }
 
   private SalesLotDto toDto(ProductionSalesLotReference ref) {
+    return toDto(
+        ref,
+        ref.intents().stream()
+            .map(ProductionSalesLotIntentReference::quoteId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet()));
+  }
+
+  private SalesLotDto toDto(ProductionSalesLotReference ref, Set<UUID> readableQuoteIds) {
     return new SalesLotDto(
         ref.id(),
         ref.lotNo(),
@@ -177,6 +220,7 @@ public class SalesLotService {
         ref.freeQuantity(),
         ref.overCommitted(),
         ref.intents().stream()
+            .filter(intent -> readableQuoteIds.contains(intent.quoteId()))
             .map(
                 intent ->
                     new SalesLotIntentDto(

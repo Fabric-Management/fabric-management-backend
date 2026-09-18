@@ -15,7 +15,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +27,39 @@ public class SampleManagementService {
 
   private final SampleRequestRepository requestRepository;
   private final SampleDeliveryRepository deliveryRepository;
+  private final SampleAccessPolicy accessPolicy;
 
   @Transactional(readOnly = true)
-  public Page<SampleRequest> findAll(Pageable pageable) {
+  Page<SampleRequest> findAll(Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
     return requestRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
   }
 
   @Transactional(readOnly = true)
-  public Optional<SampleRequest> findById(UUID requestId) {
+  public Page<SampleRequest> findAll(Pageable pageable, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Specification<SampleRequest> active =
+        (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("isActive"));
+    return requestRepository.findAll(
+        accessPolicy.readRestriction(tenantId, currentUserId).and(active), pageable);
+  }
+
+  @Transactional(readOnly = true)
+  Optional<SampleRequest> findById(UUID requestId) {
     UUID tenantId = TenantContext.requireTenantId();
     return requestRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<SampleRequest> findById(UUID requestId, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Specification<SampleRequest> activeRequest =
+        (root, query, criteriaBuilder) ->
+            criteriaBuilder.and(
+                criteriaBuilder.equal(root.get("id"), requestId),
+                criteriaBuilder.isTrue(root.get("isActive")));
+    return requestRepository.findOne(
+        accessPolicy.readRestriction(tenantId, currentUserId).and(activeRequest));
   }
 
   @Transactional
@@ -46,7 +70,7 @@ public class SampleManagementService {
   }
 
   @Transactional
-  public SampleDelivery dispatchSample(
+  SampleDelivery dispatchSample(
       UUID requestId,
       DeliveryMethod method,
       String trackingNumber,
@@ -82,7 +106,19 @@ public class SampleManagementService {
   }
 
   @Transactional
-  public SampleDelivery markAsDelivered(UUID deliveryId, String recipientName, String photoUrl) {
+  public SampleDelivery dispatchSample(
+      UUID requestId,
+      DeliveryMethod method,
+      String trackingNumber,
+      String cargoCompany,
+      UUID deliveredById,
+      UUID currentUserId) {
+    requireWriteAccess(requestId, currentUserId);
+    return dispatchSample(requestId, method, trackingNumber, cargoCompany, deliveredById);
+  }
+
+  @Transactional
+  SampleDelivery markAsDelivered(UUID deliveryId, String recipientName, String photoUrl) {
     UUID tenantId = TenantContext.requireTenantId();
 
     // Fix #6: tenant-isolated delivery lookup
@@ -103,10 +139,34 @@ public class SampleManagementService {
     return delivery;
   }
 
+  @Transactional
+  public SampleDelivery markAsDelivered(
+      UUID deliveryId, String recipientName, String photoUrl, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    SampleDelivery delivery =
+        deliveryRepository
+            .findByTenantIdAndIdAndIsActiveTrue(tenantId, deliveryId)
+            .orElseThrow(() -> new NotFoundException("Sample delivery not found: " + deliveryId));
+    requireWriteAccess(delivery.getSampleRequestId(), currentUserId);
+    return markAsDelivered(deliveryId, recipientName, photoUrl);
+  }
+
   private SampleRequest getActiveRequest(UUID requestId) {
     UUID tenantId = TenantContext.requireTenantId();
     return requestRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId)
         .orElseThrow(() -> new NotFoundException("Sample request not found: " + requestId));
+  }
+
+  private SampleRequest requireWriteAccess(UUID requestId, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    SampleRequest request =
+        requestRepository
+            .findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId)
+            .orElseThrow(() -> new NotFoundException("Sample request not found: " + requestId));
+    if (!accessPolicy.canWrite(tenantId, currentUserId, request)) {
+      throw new AccessDeniedException("You do not have access to update this sample request.");
+    }
+    return request;
   }
 }
