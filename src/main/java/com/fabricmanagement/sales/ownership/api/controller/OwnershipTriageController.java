@@ -41,7 +41,7 @@ public class OwnershipTriageController {
   private final CustomerCommercialAssignmentService assignmentService;
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'assign-owner')")
   @Operation(summary = "List current sales ownership triage cases")
   public ResponseEntity<ApiResponse<PagedResponse<OwnershipTriageCaseResponse>>> list(
       @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
