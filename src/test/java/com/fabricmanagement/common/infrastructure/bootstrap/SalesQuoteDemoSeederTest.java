@@ -223,11 +223,11 @@ class SalesQuoteDemoSeederTest {
     verify(userCreationService, times(1)).createInternalUser(userCaptor.capture());
     assertThat(userCaptor.getValue().isInvitationEmailSuppressed()).isTrue();
 
-    // Intents ride through QuoteService.addQuoteLine: per line, the selected-lot quantity must
+    // Intents ride through the named demo-seed entry: per line, the selected-lot quantity must
     // equal the requested quantity so BatchLotQuantityIntentPort invariants hold.
     ArgumentCaptor<AddQuoteLineRequest> lineCaptor =
         ArgumentCaptor.forClass(AddQuoteLineRequest.class);
-    verify(quoteService, times(3)).addQuoteLine(any(UUID.class), lineCaptor.capture());
+    verify(quoteService, times(3)).addQuoteLineForDemoSeed(any(UUID.class), lineCaptor.capture());
     List<AddQuoteLineRequest> lines = lineCaptor.getAllValues();
 
     List<AddQuoteLineRequest> lotBackedLines =

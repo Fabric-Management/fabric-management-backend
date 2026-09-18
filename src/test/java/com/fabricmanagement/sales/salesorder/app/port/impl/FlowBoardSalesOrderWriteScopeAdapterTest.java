@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.sales.common.app.SalesAccessScopeResolver;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
@@ -45,7 +46,7 @@ class FlowBoardSalesOrderWriteScopeAdapterTest {
   void setUp() {
     adapter =
         new FlowBoardSalesOrderWriteScopeAdapter(
-            orders, new SalesOrderAccessPolicy(evaluator, users));
+            orders, new SalesOrderAccessPolicy(new SalesAccessScopeResolver(evaluator, users)));
     lenient()
         .when(users.findPermissionIdentity(TENANT, TARGET))
         .thenReturn(Optional.of(new PermissionIdentity("WORKER", List.of("SALES"))));

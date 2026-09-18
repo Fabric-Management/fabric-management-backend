@@ -600,7 +600,7 @@ public class SalesQuoteDemoSeeder {
     req.setRequestedQty(new BigDecimal(qty));
     req.setUnit("M");
     req.setOfferedPrice(new BigDecimal(GABARDINE_OFFERED_PRICE));
-    quoteService.addQuoteLine(quoteId, req);
+    quoteService.addQuoteLineForDemoSeed(quoteId, req);
   }
 
   private void addFreeEntryLine(UUID quoteId, UUID productId, UUID qualityGradeId, UUID colourId) {
@@ -611,7 +611,7 @@ public class SalesQuoteDemoSeeder {
     req.setRequestedQty(new BigDecimal("400"));
     req.setUnit("M");
     req.setOfferedPrice(new BigDecimal(GABARDINE_LIST_PRICE));
-    quoteService.addQuoteLine(quoteId, req);
+    quoteService.addQuoteLineForDemoSeed(quoteId, req);
   }
 
   private String quoteNumber(String stem, UUID tenantId) {

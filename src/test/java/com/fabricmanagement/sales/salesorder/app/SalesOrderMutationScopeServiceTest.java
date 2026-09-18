@@ -12,6 +12,7 @@ import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.sales.common.app.SalesAccessScopeResolver;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
@@ -56,7 +57,8 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
-            new SalesOrderAccessPolicy(permissionEvaluator, userQueryService));
+            new SalesOrderAccessPolicy(
+                new SalesAccessScopeResolver(permissionEvaluator, userQueryService)));
   }
 
   @AfterEach

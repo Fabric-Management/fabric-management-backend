@@ -42,13 +42,13 @@ public class QuoteApprovalService {
   private final TransactionTemplate transactionTemplate;
 
   @Transactional
-  public QuoteApprovalToken generateTokenForQuote(
+  QuoteApprovalToken generateTokenForQuote(
       UUID quoteId, QuoteApprovalChannel channel, String sentTo) {
     return generateTokenForQuote(quoteId, channel, sentTo, null);
   }
 
   @Transactional
-  public QuoteApprovalToken generateTokenForQuote(
+  QuoteApprovalToken generateTokenForQuote(
       UUID quoteId, QuoteApprovalChannel channel, String sentTo, UUID contactId) {
     Quote quote = getActiveQuote(quoteId);
     validateSentTo(channel, sentTo);
@@ -101,7 +101,7 @@ public class QuoteApprovalService {
   }
 
   @Transactional
-  public void expirePendingTokensForQuote(UUID tenantId, UUID quoteId) {
+  void expirePendingTokensForQuote(UUID tenantId, UUID quoteId) {
     List<QuoteApprovalToken> pendingTokens =
         tokenRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId);
     if (pendingTokens.isEmpty()) {

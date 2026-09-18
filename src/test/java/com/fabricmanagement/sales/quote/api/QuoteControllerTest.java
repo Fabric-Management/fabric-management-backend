@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
-import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
@@ -33,7 +32,6 @@ class QuoteControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private QuoteService quoteService;
-  @MockitoBean private QuoteApprovalService quoteApprovalService;
   @MockitoBean private QuoteMapper quoteMapper;
   @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 
@@ -67,6 +65,7 @@ class QuoteControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
 
-    verify(quoteService, never()).addQuoteLine(eq(quoteId), any(AddQuoteLineRequest.class));
+    verify(quoteService, never())
+        .addQuoteLine(eq(quoteId), any(AddQuoteLineRequest.class), any(UUID.class));
   }
 }

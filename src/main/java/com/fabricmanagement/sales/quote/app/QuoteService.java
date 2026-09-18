@@ -68,6 +68,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -93,20 +95,17 @@ public class QuoteService {
   private final StockUnitSoftHoldPort stockUnitSoftHoldPort;
   private final BatchLotQuantityIntentPort batchLotQuantityIntentPort;
   private final DefaultOwnerPolicy defaultOwnerPolicy;
+  private final QuoteAccessPolicy accessPolicy;
 
+  /** Test-support entry retained for the legacy service suite; production HTTP reads are scoped. */
   @Transactional(readOnly = true)
-  public Page<Quote> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
-  }
-
-  @Transactional(readOnly = true)
-  public Page<QuoteResponse> findAllResponses(Pageable pageable) {
+  Page<QuoteResponse> findAllResponses(Pageable pageable) {
     return findAllResponses(null, null, pageable);
   }
 
+  /** Test-support entry retained for the legacy service suite; production HTTP reads are scoped. */
   @Transactional(readOnly = true)
-  public Page<QuoteResponse> findAllResponses(QuoteStatus status, String query, Pageable pageable) {
+  Page<QuoteResponse> findAllResponses(QuoteStatus status, String query, Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
     String normalizedQuery = normalizeSearchQuery(query);
     Page<Quote> page = findQuotePage(tenantId, status, normalizedQuery, pageable);
@@ -123,7 +122,38 @@ public class QuoteService {
   }
 
   @Transactional(readOnly = true)
-  public QuoteStatusCountsResponse getStatusCounts() {
+  public Page<QuoteResponse> findAllResponses(
+      QuoteStatus status, String query, Pageable pageable, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    String normalizedQuery = normalizeSearchQuery(query);
+    Specification<Quote> restriction =
+        accessPolicy
+            .readRestriction(tenantId, currentUserId)
+            .and(activeQuote())
+            .and(withStatus(status));
+    if (normalizedQuery != null) {
+      String pattern =
+          LikePattern.literalContains(normalizedQuery).toLowerCase(java.util.Locale.ROOT);
+      List<UUID> customerIds =
+          tradingPartnerResolver.findCustomerIdsByNameContains(tenantId, normalizedQuery);
+      restriction = restriction.and(matchesSearch(pattern, customerIds));
+    }
+    Page<Quote> page = quoteRepository.findAll(restriction, pageable);
+    Map<UUID, String> customerNames =
+        tradingPartnerResolver.resolveDisplayNames(
+            tenantId,
+            page.getContent().stream()
+                .map(Quote::getCustomerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
+    Map<UUID, String> safeCustomerNames = customerNames != null ? customerNames : Map.of();
+    return page.map(quote -> toResponse(quote, safeCustomerNames));
+  }
+
+  /** Test-support entry retained for the legacy service suite; production HTTP reads are scoped. */
+  @Transactional(readOnly = true)
+  QuoteStatusCountsResponse getStatusCounts() {
     UUID tenantId = TenantContext.requireTenantId();
     Map<QuoteStatus, Long> counts = new EnumMap<>(QuoteStatus.class);
     quoteRepository
@@ -132,6 +162,19 @@ public class QuoteService {
     return QuoteStatusCountsResponse.from(counts);
   }
 
+  @Transactional(readOnly = true)
+  public QuoteStatusCountsResponse getStatusCounts(UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Specification<Quote> readable =
+        accessPolicy.readRestriction(tenantId, currentUserId).and(activeQuote());
+    Map<QuoteStatus, Long> counts = new EnumMap<>(QuoteStatus.class);
+    for (QuoteStatus status : QuoteStatus.values()) {
+      counts.put(status, quoteRepository.count(readable.and(withStatus(status))));
+    }
+    return QuoteStatusCountsResponse.from(counts);
+  }
+
+  /** Query helper used only by the package-private legacy test-support read entry points. */
   private Page<Quote> findQuotePage(
       UUID tenantId, QuoteStatus status, String normalizedQuery, Pageable pageable) {
     if (normalizedQuery == null) {
@@ -159,17 +202,25 @@ public class QuoteService {
     return trimmed.length() >= 2 ? trimmed : null;
   }
 
+  /** Test-support entry retained for the legacy service suite; production HTTP reads are scoped. */
   @Transactional(readOnly = true)
-  public Optional<Quote> findById(UUID quoteId) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
-  }
-
-  @Transactional(readOnly = true)
-  public Optional<QuoteResponse> findResponseById(UUID quoteId) {
+  Optional<QuoteResponse> findResponseById(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
+        .map(quote -> toResponse(quote, resolveCustomerName(tenantId, quote.getCustomerId())));
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<QuoteResponse> findResponseById(UUID quoteId, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Specification<Quote> readableQuote =
+        accessPolicy
+            .readRestriction(tenantId, currentUserId)
+            .and(activeQuote())
+            .and(withId(quoteId));
+    return quoteRepository
+        .findOne(readableQuote)
         .map(quote -> toResponse(quote, resolveCustomerName(tenantId, quote.getCustomerId())));
   }
 
@@ -205,7 +256,7 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote addQuoteLine(
+  Quote addQuoteLine(
       UUID quoteId, UUID productId, BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
     AddQuoteLineRequest req = new AddQuoteLineRequest();
     req.setProductId(productId);
@@ -216,7 +267,7 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote addQuoteLine(UUID quoteId, AddQuoteLineRequest req) {
+  Quote addQuoteLine(UUID quoteId, AddQuoteLineRequest req) {
     Quote quote = getActiveQuote(quoteId);
 
     assertEditable(quote, "add lines to");
@@ -275,7 +326,19 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req) {
+  public Quote addQuoteLine(UUID quoteId, AddQuoteLineRequest req, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return addQuoteLine(quoteId, req);
+  }
+
+  /** System-only entry used by the deterministic demo seed. */
+  @Transactional
+  public Quote addQuoteLineForDemoSeed(UUID quoteId, AddQuoteLineRequest req) {
+    return addQuoteLine(quoteId, req);
+  }
+
+  @Transactional
+  Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req) {
     Quote quote = getActiveQuote(quoteId);
     assertDraftIdentityEditable(quote, req);
     assertEditable(quote, "edit");
@@ -295,7 +358,13 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote updateQuoteLine(UUID quoteId, UUID lineId, UpdateQuoteLineRequest req) {
+  public Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return updateQuoteHeader(quoteId, req);
+  }
+
+  @Transactional
+  Quote updateQuoteLine(UUID quoteId, UUID lineId, UpdateQuoteLineRequest req) {
     Quote quote = getActiveQuote(quoteId);
     assertEditable(quote, "edit lines on");
 
@@ -332,7 +401,14 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote removeQuoteLine(UUID quoteId, UUID lineId) {
+  public Quote updateQuoteLine(
+      UUID quoteId, UUID lineId, UpdateQuoteLineRequest req, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return updateQuoteLine(quoteId, lineId, req);
+  }
+
+  @Transactional
+  Quote removeQuoteLine(UUID quoteId, UUID lineId) {
     Quote quote = getActiveQuote(quoteId);
     assertEditable(quote, "remove lines from");
 
@@ -345,7 +421,13 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote submitQuote(UUID quoteId) {
+  public Quote removeQuoteLine(UUID quoteId, UUID lineId, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return removeQuoteLine(quoteId, lineId);
+  }
+
+  @Transactional
+  Quote submitQuote(UUID quoteId) {
     Quote quote = getActiveQuote(quoteId);
 
     if (quote.getLines().isEmpty()) {
@@ -376,7 +458,13 @@ public class QuoteService {
   }
 
   @Transactional
-  public SendQuoteResult sendQuote(UUID quoteId, UUID contactId, boolean callerCanApprove) {
+  public Quote submitQuote(UUID quoteId, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return submitQuote(quoteId);
+  }
+
+  @Transactional
+  SendQuoteResult sendQuote(UUID quoteId, UUID contactId, boolean callerCanApprove) {
     Quote quote = getActiveQuote(quoteId);
     PartnerContact contact = requireQuoteCustomerContact(quote, contactId);
 
@@ -408,7 +496,14 @@ public class QuoteService {
   }
 
   @Transactional
-  public SendQuoteResult approveSendRequest(UUID quoteId, UUID requestId) {
+  public SendQuoteResult sendQuote(
+      UUID quoteId, UUID contactId, boolean callerCanApprove, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return sendQuote(quoteId, contactId, callerCanApprove);
+  }
+
+  @Transactional
+  SendQuoteResult approveSendRequest(UUID quoteId, UUID requestId) {
     Quote quote = getActiveQuote(quoteId);
     QuoteSendRequest request = getActiveSendRequest(quoteId, requestId);
 
@@ -432,7 +527,13 @@ public class QuoteService {
   }
 
   @Transactional
-  public QuoteSendRequest rejectSendRequest(UUID quoteId, UUID requestId, String decisionNote) {
+  public SendQuoteResult approveSendRequest(UUID quoteId, UUID requestId, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return approveSendRequest(quoteId, requestId);
+  }
+
+  @Transactional
+  QuoteSendRequest rejectSendRequest(UUID quoteId, UUID requestId, String decisionNote) {
     Quote quote = getActiveQuote(quoteId);
     QuoteSendRequest request = getActiveSendRequest(quoteId, requestId);
 
@@ -453,7 +554,14 @@ public class QuoteService {
   }
 
   @Transactional
-  public Quote reviseQuote(UUID quoteId) {
+  public QuoteSendRequest rejectSendRequest(
+      UUID quoteId, UUID requestId, String decisionNote, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return rejectSendRequest(quoteId, requestId, decisionNote);
+  }
+
+  @Transactional
+  Quote reviseQuote(UUID quoteId) {
     Quote oldQuote = getActiveQuote(quoteId);
 
     // Fix #4: Only allow revision from terminal or approval-pending states
@@ -545,11 +653,64 @@ public class QuoteService {
     return savedRevision;
   }
 
+  @Transactional
+  public Quote reviseQuote(UUID quoteId, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return reviseQuote(quoteId);
+  }
+
+  @Transactional
+  public QuoteApprovalToken generateTokenForQuote(
+      UUID quoteId, QuoteApprovalChannel channel, String sentTo, UUID currentUserId) {
+    requireWriteAccess(quoteId, currentUserId);
+    return quoteApprovalService.generateTokenForQuote(quoteId, channel, sentTo);
+  }
+
   private Quote getActiveQuote(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+  }
+
+  private Quote requireWriteAccess(UUID quoteId, UUID currentUserId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Quote quote =
+        quoteRepository
+            .findActiveHeader(tenantId, quoteId)
+            .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+    if (!accessPolicy.canWrite(tenantId, currentUserId, quote)) {
+      throw new AccessDeniedException("You do not have access to update this quote.");
+    }
+    return quote;
+  }
+
+  private Specification<Quote> activeQuote() {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("isActive"));
+  }
+
+  private Specification<Quote> withStatus(QuoteStatus status) {
+    return status == null
+        ? null
+        : (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("status"), status);
+  }
+
+  private Specification<Quote> withId(UUID quoteId) {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("id"), quoteId);
+  }
+
+  private Specification<Quote> matchesSearch(String pattern, List<UUID> customerIds) {
+    return (root, query, criteriaBuilder) -> {
+      var quoteNumber =
+          criteriaBuilder.like(
+              criteriaBuilder.lower(root.get("quoteNumber")),
+              pattern,
+              LikePattern.ESCAPE_CHARACTER);
+      if (customerIds == null || customerIds.isEmpty()) {
+        return quoteNumber;
+      }
+      return criteriaBuilder.or(quoteNumber, root.get("customerId").in(customerIds));
+    };
   }
 
   private void applyQualitySnapshot(QuoteLine line, SalesQualityGradeSnapshot qualitySnapshot) {

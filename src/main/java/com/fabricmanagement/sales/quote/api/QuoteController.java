@@ -1,9 +1,9 @@
 package com.fabricmanagement.sales.quote.api;
 
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
-import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
 import com.fabricmanagement.sales.quote.app.SendQuoteResult;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
@@ -30,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,7 +50,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuoteController {
 
   private final QuoteService quoteService;
-  private final QuoteApprovalService quoteApprovalService;
   private final QuoteMapper mapper;
   private final SpELPermissionEvaluator auth;
 
@@ -68,27 +68,30 @@ public class QuoteController {
                   "Literal quote-number or customer-name search; trimmed values shorter than two characters are ignored")
           @RequestParam(required = false)
           String q,
-      @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            PagedResponse.from(quoteService.findAllResponses(status, q, pageable))));
+      @PageableDefault(size = 20, sort = "createdAt") Pageable pageable,
+      Authentication authentication) {
+    var page = quoteService.findAllResponses(status, q, pageable, currentUserId(authentication));
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(page)));
   }
 
   @GetMapping("/status-counts")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Count active quotes by status")
-  public ResponseEntity<ApiResponse<QuoteStatusCountsResponse>> getStatusCounts() {
-    return ResponseEntity.ok(ApiResponse.success(quoteService.getStatusCounts()));
+  public ResponseEntity<ApiResponse<QuoteStatusCountsResponse>> getStatusCounts(
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(quoteService.getStatusCounts(currentUserId(authentication))));
   }
 
   @GetMapping("/{quoteId}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get a quote by ID")
-  public ResponseEntity<ApiResponse<QuoteResponse>> getQuote(@PathVariable UUID quoteId) {
+  public ResponseEntity<ApiResponse<QuoteResponse>> getQuote(
+      @PathVariable UUID quoteId, Authentication authentication) {
     return ResponseEntity.ok(
         ApiResponse.success(
             quoteService
-                .findResponseById(quoteId)
+                .findResponseById(quoteId, currentUserId(authentication))
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))));
   }
 
@@ -109,19 +112,26 @@ public class QuoteController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Add a line item to a quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> addLine(
-      @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            ApiResponse.success(quoteService.toResponse(quoteService.addQuoteLine(quoteId, req))));
+      @PathVariable UUID quoteId,
+      @Valid @RequestBody AddQuoteLineRequest req,
+      Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(
+            quoteService.addQuoteLine(quoteId, req, currentUserId(authentication)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
   }
 
   @PatchMapping("/{quoteId}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Update editable quote header fields")
   public ResponseEntity<ApiResponse<QuoteResponse>> updateQuote(
-      @PathVariable UUID quoteId, @Valid @RequestBody UpdateQuoteRequest req) {
-    return ResponseEntity.ok(
-        ApiResponse.success(quoteService.toResponse(quoteService.updateQuoteHeader(quoteId, req))));
+      @PathVariable UUID quoteId,
+      @Valid @RequestBody UpdateQuoteRequest req,
+      Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(
+            quoteService.updateQuoteHeader(quoteId, req, currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @PatchMapping("/{quoteId}/lines/{lineId}")
@@ -130,28 +140,33 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> updateLine(
       @PathVariable UUID quoteId,
       @PathVariable UUID lineId,
-      @Valid @RequestBody UpdateQuoteLineRequest req) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            quoteService.toResponse(quoteService.updateQuoteLine(quoteId, lineId, req))));
+      @Valid @RequestBody UpdateQuoteLineRequest req,
+      Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(
+            quoteService.updateQuoteLine(quoteId, lineId, req, currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @DeleteMapping("/{quoteId}/lines/{lineId}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Remove a line item from a quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> removeLine(
-      @PathVariable UUID quoteId, @PathVariable UUID lineId) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            quoteService.toResponse(quoteService.removeQuoteLine(quoteId, lineId))));
+      @PathVariable UUID quoteId, @PathVariable UUID lineId, Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(
+            quoteService.removeQuoteLine(quoteId, lineId, currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @PostMapping("/{quoteId}/submit")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Submit a quote for approval")
-  public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(@PathVariable UUID quoteId) {
-    return ResponseEntity.ok(
-        ApiResponse.success(quoteService.toResponse(quoteService.submitQuote(quoteId))));
+  public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(
+      @PathVariable UUID quoteId, Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(quoteService.submitQuote(quoteId, currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @PostMapping("/{quoteId}/send")
@@ -162,21 +177,22 @@ public class QuoteController {
       @Valid @RequestBody SendQuoteRequest req,
       Authentication authentication) {
     boolean callerCanApprove = auth.can(authentication, "sales", "approve");
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            ApiResponse.success(
-                toSendQuoteResponse(
-                    quoteService.sendQuote(quoteId, req.getContactId(), callerCanApprove))));
+    SendQuoteResponse response =
+        toSendQuoteResponse(
+            quoteService.sendQuote(
+                quoteId, req.getContactId(), callerCanApprove, currentUserId(authentication)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
   }
 
   @PostMapping("/{quoteId}/send-requests/{requestId}/approve")
   @PreAuthorize("@auth.can(authentication, 'sales', 'approve')")
   @Operation(summary = "Approve a quote send request and send the quote to the customer")
   public ResponseEntity<ApiResponse<SendQuoteResponse>> approveSendRequest(
-      @PathVariable UUID quoteId, @PathVariable UUID requestId) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            toSendQuoteResponse(quoteService.approveSendRequest(quoteId, requestId))));
+      @PathVariable UUID quoteId, @PathVariable UUID requestId, Authentication authentication) {
+    SendQuoteResponse response =
+        toSendQuoteResponse(
+            quoteService.approveSendRequest(quoteId, requestId, currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @PostMapping("/{quoteId}/send-requests/{requestId}/reject")
@@ -185,19 +201,23 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteSendRequestDto>> rejectSendRequest(
       @PathVariable UUID quoteId,
       @PathVariable UUID requestId,
-      @Valid @RequestBody RejectQuoteSendRequest req) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            QuoteSendRequestDto.from(
-                quoteService.rejectSendRequest(quoteId, requestId, req.decisionNote()))));
+      @Valid @RequestBody RejectQuoteSendRequest req,
+      Authentication authentication) {
+    QuoteSendRequestDto response =
+        QuoteSendRequestDto.from(
+            quoteService.rejectSendRequest(
+                quoteId, requestId, req.decisionNote(), currentUserId(authentication)));
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @PostMapping("/{quoteId}/revise")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new revision of a quote")
-  public ResponseEntity<ApiResponse<QuoteResponse>> reviseQuote(@PathVariable UUID quoteId) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success(quoteService.toResponse(quoteService.reviseQuote(quoteId))));
+  public ResponseEntity<ApiResponse<QuoteResponse>> reviseQuote(
+      @PathVariable UUID quoteId, Authentication authentication) {
+    QuoteResponse response =
+        quoteService.toResponse(quoteService.reviseQuote(quoteId, currentUserId(authentication)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -208,13 +228,22 @@ public class QuoteController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Generate an approval token for a quote")
   public ResponseEntity<ApiResponse<QuoteApprovalTokenDto>> generateToken(
-      @PathVariable UUID quoteId, @Valid @RequestBody GenerateQuoteTokenRequest req) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            ApiResponse.success(
-                mapper.toDto(
-                    quoteApprovalService.generateTokenForQuote(
-                        quoteId, req.getChannel(), req.getSentTo()))));
+      @PathVariable UUID quoteId,
+      @Valid @RequestBody GenerateQuoteTokenRequest req,
+      Authentication authentication) {
+    QuoteApprovalTokenDto response =
+        mapper.toDto(
+            quoteService.generateTokenForQuote(
+                quoteId, req.getChannel(), req.getSentTo(), currentUserId(authentication)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+  }
+
+  private UUID currentUserId(Authentication authentication) {
+    if (authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUserContext context) {
+      return context.userId();
+    }
+    throw new AccessDeniedException("Authenticated user context is required.");
   }
 
   private SendQuoteResponse toSendQuoteResponse(SendQuoteResult result) {

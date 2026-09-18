@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.lot.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
@@ -13,6 +14,7 @@ import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQu
 import com.fabricmanagement.production.core.batch.api.query.ProductionSalesLotQueryService.ProductionSalesPieceReference;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.dto.SalesLotDto;
+import com.fabricmanagement.sales.quote.app.QuoteScopeQueryService;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotPieceSnapshot;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSelectionRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
@@ -20,7 +22,10 @@ import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshotCodec;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,11 +36,60 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SalesLotServiceTest {
 
   @Mock private ProductionSalesLotQueryService productionLotQueryService;
+  @Mock private QuoteScopeQueryService quoteScopeQueries;
 
   @InjectMocks private SalesLotService service;
 
   private final UUID lotId = UUID.randomUUID();
   private final UUID stockUnitId = UUID.randomUUID();
+  private final UUID tenantId = UUID.randomUUID();
+  private final UUID userId = UUID.randomUUID();
+
+  @BeforeEach
+  void setUp() {
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
+  }
+
+  @AfterEach
+  void tearDown() {
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
+  }
+
+  @Test
+  void scopedLotReadKeepsTotalsAndFiltersEmbeddedQuoteIntents() {
+    UUID ownQuoteId = UUID.randomUUID();
+    UUID hiddenQuoteId = UUID.randomUUID();
+    ProductionSalesLotReference lot =
+        lot(
+            true,
+            List.of(),
+            List.of(
+                new ProductionSalesLotIntentReference(
+                    ownQuoteId, "Q-OWN", "Ada", new BigDecimal("20.000"), today()),
+                new ProductionSalesLotIntentReference(
+                    hiddenQuoteId, "Q-HIDDEN", "Lin", new BigDecimal("30.000"), today())));
+    when(productionLotQueryService.listSaleableLots(null)).thenReturn(List.of(lot));
+    when(quoteScopeQueries.findReadableQuoteIds(
+            tenantId, userId, Set.of(ownQuoteId, hiddenQuoteId)))
+        .thenReturn(Set.of(ownQuoteId));
+
+    SalesLotDto result = service.listSalesLots(null, userId).getFirst();
+
+    assertEquals(new BigDecimal("10.000"), result.softIntentQuantity());
+    assertEquals(List.of(ownQuoteId), result.intents().stream().map(i -> i.quoteId()).toList());
+  }
+
+  @Test
+  void inaccessibleQuoteLineIsTreatedLikeAnUnknownExclusion() {
+    UUID lineId = UUID.randomUUID();
+    when(quoteScopeQueries.canReadQuoteContainingLine(tenantId, userId, lineId)).thenReturn(false);
+    when(productionLotQueryService.listSaleableLots(null)).thenReturn(List.of());
+
+    service.listSalesLots(lineId, userId);
+
+    verify(productionLotQueryService).listSaleableLots(null);
+  }
 
   @Test
   void shouldMapSalesLotProjectionWithPiecesAndAdvisoryQuantities() {

@@ -93,6 +93,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteServiceTest {
@@ -115,6 +117,7 @@ class QuoteServiceTest {
   @Mock private StockUnitSoftHoldPort stockUnitSoftHoldPort;
   @Mock private BatchLotQuantityIntentPort batchLotQuantityIntentPort;
   @Mock private DefaultOwnerPolicy defaultOwnerPolicy;
+  @Mock private QuoteAccessPolicy accessPolicy;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -136,6 +139,31 @@ class QuoteServiceTest {
   @AfterEach
   void tearDown() {
     TenantContext.clear();
+  }
+
+  @Test
+  void scopedMutationDeniesBeforeLoadingOrChangingTheQuote() {
+    when(quoteRepository.findActiveHeader(tenantId, quoteId)).thenReturn(Optional.of(quote));
+    when(accessPolicy.canWrite(tenantId, userId, quote)).thenReturn(false);
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> quoteService.updateQuoteHeader(quoteId, new UpdateQuoteRequest(), userId));
+
+    verify(quoteRepository, never()).save(any());
+  }
+
+  @Test
+  void outOfScopeDetailMatchesMissingWithoutLoadingQuoteRelations() {
+    Specification<Quote> restriction =
+        (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+    when(accessPolicy.readRestriction(tenantId, userId)).thenReturn(restriction);
+    when(quoteRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+    assertEquals(Optional.empty(), quoteService.findResponseById(quoteId, userId));
+
+    verify(quoteRepository).findOne(any(Specification.class));
+    verify(tradingPartnerResolver, never()).resolveDisplayNames(any(), any());
   }
 
   @Test

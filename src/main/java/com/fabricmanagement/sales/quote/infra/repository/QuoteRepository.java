@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.quote.infra.repository;
 
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -9,16 +10,44 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface QuoteRepository extends JpaRepository<Quote, UUID> {
+public interface QuoteRepository
+    extends JpaRepository<Quote, UUID>, JpaSpecificationExecutor<Quote> {
 
   @EntityGraph(attributePaths = "lines")
   Optional<Quote> findByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
+
+  @Query(
+      """
+      SELECT q FROM Quote q
+      WHERE q.tenantId = :tenantId AND q.id = :id AND q.isActive = true
+      """)
+  Optional<Quote> findActiveHeader(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+  @Query(
+      """
+      SELECT q FROM Quote q JOIN q.lines line
+      WHERE q.tenantId = :tenantId
+        AND line.id = :lineId
+        AND line.isActive = true
+        AND q.isActive = true
+      """)
+  Optional<Quote> findActiveHeaderByLineId(
+      @Param("tenantId") UUID tenantId, @Param("lineId") UUID lineId);
+
+  @Query(
+      """
+      SELECT q FROM Quote q
+      WHERE q.tenantId = :tenantId AND q.id IN :ids AND q.isActive = true
+      """)
+  List<Quote> findActiveHeadersByIds(
+      @Param("tenantId") UUID tenantId, @Param("ids") Collection<UUID> ids);
 
   Optional<Quote> findByTenantIdAndQuoteNumberAndIsActiveTrue(UUID tenantId, String quoteNumber);
 

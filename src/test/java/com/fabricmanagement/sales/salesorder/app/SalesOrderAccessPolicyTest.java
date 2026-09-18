@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.sales.common.app.SalesAccessScopeResolver;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,9 @@ class SalesOrderAccessPolicyTest {
 
   @BeforeEach
   void setUp() {
-    policy = new SalesOrderAccessPolicy(permissionEvaluator, userQueryService);
+    policy =
+        new SalesOrderAccessPolicy(
+            new SalesAccessScopeResolver(permissionEvaluator, userQueryService));
     lenient()
         .when(userQueryService.findPermissionIdentity(TENANT_ID, TARGET_USER_ID))
         .thenReturn(Optional.of(new PermissionIdentity("WORKER", List.of("SALES"))));
