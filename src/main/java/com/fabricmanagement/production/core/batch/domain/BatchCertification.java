@@ -44,6 +44,11 @@ public class BatchCertification extends BaseEntity {
   @Builder.Default
   private BatchCertificationScope scope = BatchCertificationScope.BATCH;
 
+  /** Nullable for legacy rows; an unclassified record cannot produce a positive comparison. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "certificate_kind", length = 30)
+  private BatchCertificateKind certificateKind;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "partner_certification_id")
   private TradingPartnerCertification partnerCertification;

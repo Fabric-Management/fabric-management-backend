@@ -13,7 +13,13 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacet;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacetValue;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileBasis;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -186,5 +192,70 @@ class SalesOrderRuleEngineTest {
     DraftProductionOrderCommand cmd = cmdCaptor.getValue();
     assertThat(cmd.certificationReq()).isEqualTo("GOTS");
     assertThat(cmd.originReq()).isEqualTo("TR");
+  }
+
+  @Test
+  void typedProfileSuppliesRecipeConvenienceFieldsWithoutLegacyModuleSpecs() {
+    Instant decidedAt = Instant.parse("2026-09-18T10:00:00Z");
+    UUID actor = UUID.randomUUID();
+    RequirementFacet certification =
+        new RequirementFacet(
+            RequirementFacet.Kind.CERTIFICATION,
+            "GOTS",
+            RequirementFacet.State.BOUNDED,
+            RequirementFacet.Comparison.ALL,
+            new RequirementFacetValue.Certification(
+                List.of(new RequirementFacetValue.CertificateRef("GOTS", "SCOPE"))),
+            decisionBasis(actor, decidedAt));
+    RequirementFacet origin =
+        new RequirementFacet(
+            RequirementFacet.Kind.ORIGIN,
+            "YARN_SPUN",
+            RequirementFacet.State.BOUNDED,
+            RequirementFacet.Comparison.SET_MEMBERSHIP,
+            new RequirementFacetValue.Origin(
+                RequirementFacetValue.OriginSubject.YARN_SPUN,
+                java.util.Set.of("TR"),
+                null,
+                RequirementFacetValue.MixtureRule.ALL_ORIGINS_ALLOWED),
+            decisionBasis(actor, decidedAt));
+    RequirementProfileInput input =
+        new RequirementProfileInput(
+            new RequirementProfileBasis(
+                RequirementProfileBasis.Kind.LINE_EXPLICIT,
+                productId,
+                null,
+                null,
+                null,
+                actor,
+                decidedAt,
+                "customer-contract"),
+            "typed-v1",
+            "sales-req-v1",
+            java.util.Set.of(certification.identity(), origin.identity()),
+            List.of(certification, origin),
+            List.of(),
+            List.of());
+    line.attachRequirementProfile(
+        RequirementProfileSnapshot.resolve(UUID.randomUUID(), 1, input, null, false));
+    when(lineRepository.findBySalesOrderIdAndLineStatusAndIsActiveTrue(
+            orderId, SalesOrderLineStatus.PENDING))
+        .thenReturn(List.of(line));
+    when(historyQuery.findDefaultRecipeForProduct(tenantId, productId, "GOTS", "TR"))
+        .thenReturn(Optional.of(recipeId));
+
+    ruleEngine.processConfirmedOrder(order);
+
+    verify(productionOrderPort).requestDraftProductionOrder(cmdCaptor.capture());
+    assertThat(cmdCaptor.getValue().certificationReq()).isEqualTo("GOTS");
+    assertThat(cmdCaptor.getValue().originReq()).isEqualTo("TR");
+  }
+
+  private RequirementFacet.DecisionBasis decisionBasis(UUID actor, Instant decidedAt) {
+    return new RequirementFacet.DecisionBasis(
+        RequirementFacet.DecisionBasis.Source.CUSTOMER_INSTRUCTION,
+        "customer-contract",
+        actor,
+        decidedAt);
   }
 }

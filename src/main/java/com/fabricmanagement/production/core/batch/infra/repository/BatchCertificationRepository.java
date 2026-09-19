@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.core.batch.infra.repository;
 
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertification;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationScope;
 import java.time.LocalDate;
@@ -17,6 +18,13 @@ public interface BatchCertificationRepository extends JpaRepository<BatchCertifi
 
   List<BatchCertification> findByBatch_IdAndIsActiveTrue(UUID batchId);
 
+  @Query(
+      "SELECT bc FROM BatchCertification bc "
+          + "JOIN FETCH bc.certification "
+          + "WHERE bc.tenantId = :tenantId AND bc.batch.id IN :batchIds AND bc.isActive = true")
+  List<BatchCertification> findEvidenceByTenantAndBatchIds(
+      @Param("tenantId") UUID tenantId, @Param("batchIds") List<UUID> batchIds);
+
   /**
    * Loads batch certifications with associations in one query to avoid N+1 when mapping to DTOs.
    */
@@ -31,12 +39,13 @@ public interface BatchCertificationRepository extends JpaRepository<BatchCertifi
       @Param("batchId") UUID batchId);
 
   /**
-   * Active batch certifications for the same (batch, cert, scope, partner, org). Optional excludeId
-   * to skip one record (e.g. when updating). Used for date-range overlap check.
+   * Active batch certifications for the same (batch, cert, kind, scope, partner, org). Optional
+   * excludeId skips one record during update. Used for date-range overlap checks.
    */
   @Query(
       "SELECT bc FROM BatchCertification bc "
           + "WHERE bc.batch.id = :batchId AND bc.certification.id = :certId AND bc.scope = :scope "
+          + "AND ((:certificateKind IS NULL AND bc.certificateKind IS NULL) OR bc.certificateKind = :certificateKind) "
           + "AND bc.isActive = true "
           + "AND ((:partnerId IS NULL AND bc.partnerCertification IS NULL) OR (bc.partnerCertification IS NOT NULL AND bc.partnerCertification.id = :partnerId)) "
           + "AND ((:orgId IS NULL AND bc.orgCertification IS NULL) OR (bc.orgCertification IS NOT NULL AND bc.orgCertification.id = :orgId)) "
@@ -45,6 +54,7 @@ public interface BatchCertificationRepository extends JpaRepository<BatchCertifi
       @Param("batchId") UUID batchId,
       @Param("certId") UUID certId,
       @Param("scope") BatchCertificationScope scope,
+      @Param("certificateKind") BatchCertificateKind certificateKind,
       @Param("partnerId") UUID partnerId,
       @Param("orgId") UUID orgId,
       @Param("excludeId") UUID excludeId);

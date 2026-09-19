@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
@@ -38,6 +39,10 @@ public class UpdateSalesOrderLineRequest {
 
   @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> moduleSpecs;
+
+  /** Null preserves the current profile; UNSPECIFIED facet values perform explicit clears. */
+  @Schema(description = "Typed requirement profile update; omitted value preserves current profile")
+  private RequirementProfileInput requirementProfile;
 
   @AssertTrue(message = "Either productId or productDesc must be provided")
   public boolean isProductOrDescPresent() {

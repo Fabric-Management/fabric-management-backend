@@ -57,6 +57,7 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
+            null,
             new SalesOrderAccessPolicy(
                 new SalesAccessScopeResolver(permissionEvaluator, userQueryService)));
   }

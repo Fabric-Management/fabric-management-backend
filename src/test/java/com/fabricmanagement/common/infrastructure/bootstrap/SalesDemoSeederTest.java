@@ -105,6 +105,7 @@ class SalesDemoSeederTest {
                 lines,
                 mock(SalesOrderRuleEngine.class),
                 null,
+                null,
                 mock(DomainEventPublisher.class),
                 null,
                 approval,

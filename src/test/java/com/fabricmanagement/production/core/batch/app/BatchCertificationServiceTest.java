@@ -1,6 +1,8 @@
 package com.fabricmanagement.production.core.batch.app;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +14,7 @@ import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertification;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.core.batch.dto.AddBatchCertificationRequest;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -87,7 +91,7 @@ class BatchCertificationServiceTest {
     when(fiberCertificationQueryService.findActiveEntityById(CERT_ID))
         .thenReturn(Optional.of(cert));
     when(certificationRepository.findActiveByBatchAndCertAndScopeAndPartnerAndOrgExcludingId(
-            BATCH_ID, CERT_ID, BatchCertificationScope.BATCH, null, null, null))
+            BATCH_ID, CERT_ID, BatchCertificationScope.BATCH, null, null, null, null))
         .thenReturn(List.of(existing));
 
     AddBatchCertificationRequest request =
@@ -96,5 +100,40 @@ class BatchCertificationServiceTest {
     assertThatThrownBy(() -> batchCertificationService.add(BATCH_ID, request))
         .isInstanceOf(BatchCertificationOverlapException.class)
         .hasMessageContaining("overlaps with the given dates");
+  }
+
+  @Test
+  void add_persistsCertificateKindSeparatelyFromCoverageScope() {
+    Batch batch = mock(Batch.class);
+    when(batch.getId()).thenReturn(BATCH_ID);
+    FiberCertification cert = mock(FiberCertification.class);
+    when(cert.getId()).thenReturn(CERT_ID);
+    when(batchRepository.findByIdAndTenantId(BATCH_ID, TENANT_ID)).thenReturn(Optional.of(batch));
+    when(fiberCertificationQueryService.findActiveEntityById(CERT_ID))
+        .thenReturn(Optional.of(cert));
+    when(certificationRepository.findActiveByBatchAndCertAndScopeAndPartnerAndOrgExcludingId(
+            BATCH_ID,
+            CERT_ID,
+            BatchCertificationScope.FACILITY,
+            BatchCertificateKind.SCOPE,
+            null,
+            null,
+            null))
+        .thenReturn(List.of());
+    when(certificationRepository.save(any(BatchCertification.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    AddBatchCertificationRequest request =
+        AddBatchCertificationRequest.builder()
+            .certificationId(CERT_ID)
+            .scope(BatchCertificationScope.FACILITY)
+            .certificateKind(BatchCertificateKind.SCOPE)
+            .build();
+
+    batchCertificationService.add(BATCH_ID, request);
+
+    ArgumentCaptor<BatchCertification> captured = ArgumentCaptor.forClass(BatchCertification.class);
+    org.mockito.Mockito.verify(certificationRepository).save(captured.capture());
+    assertThat(captured.getValue().getScope()).isEqualTo(BatchCertificationScope.FACILITY);
+    assertThat(captured.getValue().getCertificateKind()).isEqualTo(BatchCertificateKind.SCOPE);
   }
 }

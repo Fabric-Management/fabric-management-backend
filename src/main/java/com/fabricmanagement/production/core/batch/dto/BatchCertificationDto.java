@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.core.batch.dto;
 
 import com.fabricmanagement.product.fiber.dto.FiberCertificationDto;
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertification;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationScope;
@@ -23,6 +24,7 @@ public class BatchCertificationDto {
   private UUID certificationId;
   private FiberCertificationDto certification;
   private BatchCertificationScope scope;
+  private BatchCertificateKind certificateKind;
   private UUID partnerCertificationId;
   private UUID orgCertificationId;
   private String certNumber;
@@ -57,6 +59,7 @@ public class BatchCertificationDto {
                 ? FiberCertificationDto.from(entity.getCertification())
                 : null)
         .scope(entity.getScope())
+        .certificateKind(entity.getCertificateKind())
         .partnerCertificationId(
             entity.getPartnerCertification() != null
                 ? entity.getPartnerCertification().getId()

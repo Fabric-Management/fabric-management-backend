@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.core.batch.dto;
 
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationChangeReason;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
@@ -21,6 +22,8 @@ public class UpdateBatchCertificationRequest {
 
   @NotNull(message = "Change reason is required")
   private BatchCertificationChangeReason changeReason;
+
+  private BatchCertificateKind certificateKind;
 
   private String certNumber;
   private LocalDate validFrom;

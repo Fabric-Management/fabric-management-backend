@@ -8,6 +8,8 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacet;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacetValue;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import java.util.List;
 import java.util.Locale;
@@ -182,6 +184,37 @@ public class SalesOrderRuleEngine {
   }
 
   private String extractSpecField(SalesOrderLine line, String fieldName) {
+    RequirementFacet.Kind facetKind =
+        "certificationReq".equals(fieldName)
+            ? RequirementFacet.Kind.CERTIFICATION
+            : RequirementFacet.Kind.ORIGIN;
+    if (line.getRequirementProfileSnapshot() != null) {
+      String typed =
+          line.getRequirementProfileSnapshot().facets().stream()
+              .filter(facet -> facet.kind() == facetKind)
+              .filter(facet -> facet.state() == RequirementFacet.State.BOUNDED)
+              .map(RequirementFacet::value)
+              .filter(java.util.Objects::nonNull)
+              .map(
+                  value -> {
+                    if (value instanceof RequirementFacetValue.Certification certification
+                        && !certification.certificates().isEmpty()) {
+                      return certification.certificates().getFirst().scheme();
+                    }
+                    if (value instanceof RequirementFacetValue.Origin origin
+                        && !origin.allowedCountries().isEmpty()) {
+                      return origin.allowedCountries().stream().sorted().findFirst().orElse(null);
+                    }
+                    return null;
+                  })
+              .filter(java.util.Objects::nonNull)
+              .map(value -> value.strip().toUpperCase(Locale.ROOT))
+              .findFirst()
+              .orElse(null);
+      if (typed != null) {
+        return typed;
+      }
+    }
     if (line.getModuleSpecs() != null && line.getModuleSpecs().containsKey(fieldName)) {
       Object value = line.getModuleSpecs().get(fieldName);
       return value instanceof String s && !s.isBlank() ? s.strip().toUpperCase(Locale.ROOT) : null;

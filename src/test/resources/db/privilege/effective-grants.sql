@@ -45,6 +45,7 @@ classified_relations AS (
                WHEN 'flowboard.routing_failure_alert' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'production.quality_decision' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'production.quality_decision_unit' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'sales_ord.requirement_profile_version' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_cover_evidence' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_cover_evidence_stream' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales.customer_commercial_assignment' THEN 'CLOSE_ONCE_LEDGER'
