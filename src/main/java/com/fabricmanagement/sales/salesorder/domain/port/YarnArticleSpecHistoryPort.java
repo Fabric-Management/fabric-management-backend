@@ -23,6 +23,11 @@ public interface YarnArticleSpecHistoryPort {
           || recordedAt == null) {
         throw new IllegalArgumentException("Complete yarn specification history snapshot required");
       }
+      specification = specification.deepCopy();
+    }
+
+    public JsonNode specification() {
+      return specification.deepCopy();
     }
   }
 }
