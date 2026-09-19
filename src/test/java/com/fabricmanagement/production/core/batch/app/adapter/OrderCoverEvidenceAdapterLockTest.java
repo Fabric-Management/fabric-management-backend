@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 
 class OrderCoverEvidenceAdapterLockTest {
   @Test
-  void nativeLockTablesTrackEntityMappingsAndUseOnlyFourOrderedBulkReads() {
+  void nativeLockTablesTrackEntityMappingsAndUseOnlyFiveOrderedBulkReads() {
     UUID tenant = UUID.randomUUID();
     TenantContext.setCurrentTenantId(tenant);
     try {
@@ -50,9 +50,12 @@ class OrderCoverEvidenceAdapterLockTest {
               mock(StockUnitRepository.class),
               mock(BatchLotQuantityIntentRepository.class),
               mock(BatchReservationRepository.class),
+              mock(BatchCertificationRepository.class),
+              List.of(),
               mock(QualityGradeQueryService.class),
               mock(ProductEvidenceQueryService.class),
-              manager);
+              manager,
+              java.time.Clock.systemUTC());
       var requirements =
           new Requirements(
               tenant,
@@ -80,7 +83,8 @@ class OrderCoverEvidenceAdapterLockTest {
               expectedSql(Batch.class, "product_id"),
               expectedSql(StockUnit.class, "batch_id"),
               expectedSql(BatchLotQuantityIntent.class, "batch_id"),
-              expectedSql(BatchReservation.class, "batch_id"));
+              expectedSql(BatchReservation.class, "batch_id"),
+              expectedSql(BatchCertification.class, "batch_id"));
       verify(manager).flush();
       verify(manager, never()).refresh(any(), any(LockModeType.class));
       verify(manager, never()).clear();

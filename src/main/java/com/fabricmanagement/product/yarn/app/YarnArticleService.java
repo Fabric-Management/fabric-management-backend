@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class YarnArticleService {
+public class YarnArticleService implements YarnArticleSpecHistoryQuery {
 
   private final YarnArticleRepository articleRepository;
   private final YarnArticleAuditRepository auditRepository;
@@ -353,6 +353,7 @@ public class YarnArticleService {
   }
 
   @Transactional(readOnly = true)
+  @Override
   public YarnArticleHistorySnapshotDto historyVersion(UUID articleId, int specVersion) {
     UUID tenantId = TenantContext.requireTenantId();
     requireArticle(articleId, tenantId);

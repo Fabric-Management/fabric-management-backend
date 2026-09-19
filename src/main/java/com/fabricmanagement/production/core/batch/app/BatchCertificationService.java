@@ -10,6 +10,7 @@ import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertification;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationScope;
@@ -108,6 +109,7 @@ public class BatchCertificationService {
         batch.getId(),
         certification.getId(),
         scope,
+        request.getCertificateKind(),
         partnerId,
         orgId,
         null,
@@ -121,6 +123,7 @@ public class BatchCertificationService {
             .batch(batch)
             .certification(certification)
             .scope(scope)
+            .certificateKind(request.getCertificateKind())
             .partnerCertification(partnerCert)
             .orgCertification(orgCert)
             .certNumber(request.getCertNumber())
@@ -179,7 +182,13 @@ public class BatchCertificationService {
       UUID orgId = sc.getOrgCertification() != null ? sc.getOrgCertification().getId() : null;
       List<BatchCertification> existingOnTarget =
           certificationRepository.findActiveByBatchAndCertAndScopeAndPartnerAndOrgExcludingId(
-              target.getId(), certId, sc.getScope(), partnerId, orgId, null);
+              target.getId(),
+              certId,
+              sc.getScope(),
+              sc.getCertificateKind(),
+              partnerId,
+              orgId,
+              null);
       for (BatchCertification existing : existingOnTarget) {
         if (rangesOverlap(
             sc.getValidFrom(), sc.getValidUntil(),
@@ -220,6 +229,7 @@ public class BatchCertificationService {
     return AddBatchCertificationRequest.builder()
         .certificationId(sc.getCertification().getId())
         .scope(sc.getScope())
+        .certificateKind(sc.getCertificateKind())
         .partnerCertificationId(
             sc.getPartnerCertification() != null ? sc.getPartnerCertification().getId() : null)
         .orgCertificationId(
@@ -352,8 +362,8 @@ public class BatchCertificationService {
   }
 
   /**
-   * Ensures no active batch certification for the same (batch, cert, scope, partner, org) has a
-   * validity period overlapping with the given range. Throws 409 if overlap found.
+   * Ensures no active batch certification for the same (batch, cert, kind, scope, partner, org) has
+   * a validity period overlapping with the given range. Scope and document kind are independent.
    *
    * @param excludeId when updating, the id of the record being updated; when adding, null
    */
@@ -361,6 +371,7 @@ public class BatchCertificationService {
       UUID batchId,
       UUID certId,
       BatchCertificationScope scope,
+      BatchCertificateKind certificateKind,
       UUID partnerId,
       UUID orgId,
       UUID excludeId,
@@ -368,7 +379,7 @@ public class BatchCertificationService {
       LocalDate newValidUntil) {
     List<BatchCertification> existing =
         certificationRepository.findActiveByBatchAndCertAndScopeAndPartnerAndOrgExcludingId(
-            batchId, certId, scope, partnerId, orgId, excludeId);
+            batchId, certId, scope, certificateKind, partnerId, orgId, excludeId);
     for (BatchCertification bc : existing) {
       if (rangesOverlap(newValidFrom, newValidUntil, bc.getValidFrom(), bc.getValidUntil())) {
         throw new BatchCertificationOverlapException(
@@ -453,6 +464,9 @@ public class BatchCertificationService {
 
     entity.setIsAutoFilled(false);
     entity.setChangeReason(request.getChangeReason());
+    if (request.getCertificateKind() != null) {
+      entity.setCertificateKind(request.getCertificateKind());
+    }
     if (request.getCertNumber() != null) {
       entity.setCertNumber(request.getCertNumber());
     }
@@ -479,6 +493,7 @@ public class BatchCertificationService {
         batch.getId(),
         entity.getCertification().getId(),
         entity.getScope(),
+        entity.getCertificateKind(),
         partnerId,
         orgId,
         entity.getId(),

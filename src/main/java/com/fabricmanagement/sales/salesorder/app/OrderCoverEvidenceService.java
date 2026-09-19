@@ -156,6 +156,7 @@ public class OrderCoverEvidenceService {
                 line -> {
                   boolean untyped =
                       line.getModuleSpecs() != null && !line.getModuleSpecs().isEmpty();
+                  var profile = line.getRequirementProfileSnapshot();
                   var values =
                       new RequirementValues(
                           line.getModuleSpecs(),
@@ -171,9 +172,14 @@ public class OrderCoverEvidenceService {
                       line.getCreatedAt(),
                       line.getRequestedQty(),
                       line.getUnit(),
-                      false,
-                      untyped ? "UNTYPED_REQUIREMENTS" : "REQUIREMENT_COMPLETENESS_UNKNOWN",
-                      OrderCoverFingerprint.of(values),
+                      profile != null && profile.complete(),
+                      profile == null
+                          ? (untyped ? "UNTYPED_REQUIREMENTS" : "REQUIREMENT_COMPLETENESS_UNKNOWN")
+                          : (profile.complete()
+                              ? null
+                              : String.join(",", profile.incompleteReasons())),
+                      profile == null ? OrderCoverFingerprint.of(values) : profile.fingerprint(),
+                      RequirementEvidenceProfileMapper.toPort(profile),
                       new Source(
                           "SALES_ORDER_LINE",
                           line.getId(),

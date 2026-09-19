@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
@@ -37,6 +38,9 @@ public class SalesOrderLineRequest {
 
   @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> moduleSpecs;
+
+  @Schema(description = "Typed, traceable order-line requirement profile input")
+  private RequirementProfileInput requirementProfile;
 
   /**
    * Validates that at least one of productId or productDesc is provided. Triggered automatically by

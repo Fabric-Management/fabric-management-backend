@@ -4,10 +4,13 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint;
 import com.fabricmanagement.product.core.app.ProductEvidenceQueryService;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
+import com.fabricmanagement.production.core.batch.app.BatchCertificateEvidencePolicy;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.app.StockAvailabilityQueryService;
 import com.fabricmanagement.production.core.batch.domain.*;
+import com.fabricmanagement.production.core.batch.domain.attributes.FiberAttributes;
 import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.core.batch.dto.StockAvailabilityDtos;
 import com.fabricmanagement.production.core.batch.infra.repository.*;
@@ -19,6 +22,8 @@ import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto.SourceKno
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.OptimisticLockException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -51,9 +56,12 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
   private final StockUnitRepository units;
   private final BatchLotQuantityIntentRepository intents;
   private final BatchReservationRepository reservations;
+  private final BatchCertificationRepository certifications;
+  private final List<BatchCertificateEvidencePolicy> certificatePolicies;
   private final QualityGradeQueryService grades;
   private final ProductEvidenceQueryService products;
   private final EntityManager entityManager;
+  private final Clock clock;
 
   @Override
   public Inputs inspect(Requirements requirements) {
@@ -62,6 +70,7 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
 
   private Inputs inspect(Requirements requirements, LockedRows locked) {
     requireTenant(requirements);
+    LocalDate certificateEvaluationDate = LocalDate.now(clock);
     if (requirements.productIds().isEmpty())
       return new Inputs(
           requirements.lines().stream()
@@ -95,11 +104,16 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
             ? List.of()
             : reservations.findByTenantIdAndBatchIdInAndIsActiveTrueOrderById(
                 requirements.tenantId(), ids);
+    List<BatchCertification> lotCertifications =
+        ids.isEmpty()
+            ? List.of()
+            : certifications.findEvidenceByTenantAndBatchIds(requirements.tenantId(), ids);
     if (locked != null) {
       requireVersions(population, locked.batches());
       requireVersions(stockUnits, locked.units());
       requireVersions(lotIntents, locked.intents());
       requireVersions(lotReservations, locked.reservations());
+      requireVersions(lotCertifications, locked.certifications());
     }
     var gradeEvidence =
         grades
@@ -121,6 +135,9 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
         lotIntents.stream().collect(Collectors.groupingBy(BatchLotQuantityIntent::getBatchId));
     var reservationsByBatch =
         lotReservations.stream().collect(Collectors.groupingBy(BatchReservation::getBatchId));
+    var certificationsByBatch =
+        lotCertifications.stream()
+            .collect(Collectors.groupingBy(certification -> certification.getBatch().getId()));
 
     List<Lot> result =
         population.stream()
@@ -192,6 +209,40 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
                                       reservation.getReferenceId(),
                                       null,
                                       null)));
+                  certificationsByBatch
+                      .getOrDefault(batch.getId(), List.of())
+                      .forEach(
+                          certification ->
+                              facts.add(
+                                  new SourceFact(
+                                      source("BATCH_CERTIFICATION", certification),
+                                      certificationState(certification),
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      certification.getCertification().getId(),
+                                      null,
+                                      null)));
+                  certificatePolicies.stream()
+                      .sorted(Comparator.comparing(BatchCertificateEvidencePolicy::policyId))
+                      .forEach(
+                          policy ->
+                              facts.add(
+                                  new SourceFact(
+                                      certificatePolicySource(policy),
+                                      policy.policyId()
+                                          + ":"
+                                          + policy.policyVersion()
+                                          + ":"
+                                          + certificateEvaluationDate,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null)));
                   pieces.stream()
                       .map(StockUnit::getQualityGradeId)
                       .filter(Objects::nonNull)
@@ -227,13 +278,20 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
                   facts.sort(
                       Comparator.comparing((SourceFact fact) -> fact.source().type())
                           .thenComparing(fact -> fact.source().id().toString()));
-                  return classify(
+                  Lot base =
+                      classify(
+                          batch,
+                          availabilityLots.get(batch.getId()),
+                          pieces,
+                          facts,
+                          gradeReferences,
+                          productReferences.get(batch.getProductId()));
+                  return withLineSuitabilities(
                       batch,
-                      availabilityLots.get(batch.getId()),
-                      pieces,
-                      facts,
-                      gradeReferences,
-                      productReferences.get(batch.getProductId()));
+                      base,
+                      requirements.lines(),
+                      certificationsByBatch.getOrDefault(batch.getId(), List.of()),
+                      certificateEvaluationDate);
                 })
             .toList();
 
@@ -449,9 +507,11 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
                         || reasons.contains("QUALITY_GRADE_UNKNOWN")
                         || reasons.contains("QUALITY_GRADE_SOURCE_CHANGED")
                     ? ComparisonResult.UNKNOWN
-                    : reasons.contains("NON_SALEABLE_GRADE") || eligibility == Eligibility.EXCLUDED
+                    : eligibility == Eligibility.EXCLUDED
                         ? ComparisonResult.EXCLUDED
-                        : ComparisonResult.MATCH,
+                        : eligibility == Eligibility.UNKNOWN
+                            ? ComparisonResult.UNKNOWN
+                            : ComparisonResult.MATCH,
                 sources),
             new Comparison(
                 "COMMITMENT_SCOPE",
@@ -475,6 +535,297 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
         CanonicalJsonFingerprint.of(facts, Set.of("observedAt")));
   }
 
+  private Lot withLineSuitabilities(
+      Batch batch,
+      Lot base,
+      List<OrderCoverEvidencePort.Requirement> requirements,
+      List<BatchCertification> batchCertifications,
+      LocalDate certificateEvaluationDate) {
+    List<LineSuitability> assessments =
+        requirements.stream()
+            .filter(requirement -> Objects.equals(requirement.productId(), batch.getProductId()))
+            .map(
+                requirement ->
+                    assessForLine(
+                        batch, base, requirement, batchCertifications, certificateEvaluationDate))
+            .toList();
+    return new Lot(
+        base.lotId(),
+        base.productId(),
+        base.unit(),
+        base.physicalFree(),
+        base.suitableFree(),
+        base.eligibility(),
+        base.reasons(),
+        base.sources(),
+        base.facts(),
+        base.comparisons(),
+        assessments,
+        base.sourceFingerprint());
+  }
+
+  private LineSuitability assessForLine(
+      Batch batch,
+      Lot base,
+      OrderCoverEvidencePort.Requirement requirement,
+      List<BatchCertification> batchCertifications,
+      LocalDate certificateEvaluationDate) {
+    if (requirement.profile() == null) {
+      return new LineSuitability(
+          requirement.lineId(), base.eligibility(), base.reasons(), base.comparisons());
+    }
+    if (base.eligibility() == Eligibility.EXCLUDED) {
+      return new LineSuitability(
+          requirement.lineId(), base.eligibility(), base.reasons(), base.comparisons());
+    }
+
+    List<Comparison> comparisons = new ArrayList<>(base.comparisons());
+    LinkedHashSet<String> reasons = new LinkedHashSet<>(base.reasons());
+    requirement
+        .profile()
+        .facets()
+        .forEach(
+            facet ->
+                comparisons.add(
+                    compareFacet(
+                        batch,
+                        base,
+                        facet,
+                        batchCertifications,
+                        certificateEvaluationDate,
+                        reasons)));
+    requirement
+        .profile()
+        .unsupportedConstraints()
+        .forEach(
+            constraint -> {
+              reasons.add("UNMODELLED_REQUIREMENT:" + constraint);
+              comparisons.add(
+                  new Comparison(
+                      "UNMODELLED_SPEC:" + constraint, ComparisonResult.UNKNOWN, List.of()));
+            });
+
+    Eligibility result =
+        comparisons.stream().anyMatch(row -> row.result() == ComparisonResult.EXCLUDED)
+            ? Eligibility.EXCLUDED
+            : comparisons.stream().anyMatch(row -> row.result() == ComparisonResult.UNKNOWN)
+                ? Eligibility.UNKNOWN
+                : Eligibility.ELIGIBLE;
+    return new LineSuitability(
+        requirement.lineId(), result, List.copyOf(reasons), List.copyOf(comparisons));
+  }
+
+  private Comparison compareFacet(
+      Batch batch,
+      Lot base,
+      Facet facet,
+      List<BatchCertification> batchCertifications,
+      LocalDate certificateEvaluationDate,
+      Set<String> reasons) {
+    String dimension = "REQUIREMENT_" + facet.identity();
+    if (facet.state() == FacetState.UNCONSTRAINED) {
+      return new Comparison(dimension, ComparisonResult.MATCH, List.of());
+    }
+    if (facet.state() == FacetState.UNSPECIFIED) {
+      reasons.add("REQUIREMENT_UNSPECIFIED:" + facet.identity());
+      return new Comparison(dimension, ComparisonResult.UNKNOWN, List.of());
+    }
+    if (facet.kind() == FacetKind.COLOUR_IDENTITY) {
+      UUID requiredColour = facet.colourId();
+      if (requiredColour == null || batch.getColorId() == null) {
+        reasons.add("COLOUR_IDENTITY_UNKNOWN");
+        return new Comparison(dimension, ComparisonResult.UNKNOWN, batchSources(base));
+      }
+      if (!requiredColour.equals(batch.getColorId())) {
+        reasons.add("COLOUR_IDENTITY_MISMATCH");
+        return new Comparison(dimension, ComparisonResult.EXCLUDED, batchSources(base));
+      }
+      return new Comparison(dimension, ComparisonResult.MATCH, batchSources(base));
+    }
+    if (facet.kind() == FacetKind.CERTIFICATION) {
+      return compareCertification(
+          batch,
+          facet,
+          facet.certificates(),
+          batchCertifications,
+          certificateEvaluationDate,
+          reasons);
+    }
+    if (facet.kind() == FacetKind.FIBRE_GRADE || facet.kind() == FacetKind.FIBRE_SHADE) {
+      return compareFiberAttribute(batch, base, facet, reasons);
+    }
+
+    // SALES-REQ-1 deliberately has no accepted lot policy for GOTS and no evidence owner for the
+    // remaining bounded facets. Presence of source records must never be promoted to MATCH here.
+    reasons.add("FACET_EVIDENCE_UNKNOWN:" + facet.identity());
+    return new Comparison(dimension, ComparisonResult.UNKNOWN, List.of());
+  }
+
+  private Comparison compareFiberAttribute(
+      Batch batch, Lot base, Facet facet, Set<String> reasons) {
+    String dimension = "REQUIREMENT_" + facet.identity();
+    String reasonPrefix = facet.kind() == FacetKind.FIBRE_GRADE ? "FIBRE_GRADE" : "FIBRE_SHADE";
+    if (batch.getProductType() != ProductType.FIBER) {
+      reasons.add(reasonPrefix + "_EVIDENCE_NOT_APPLICABLE");
+      return new Comparison(dimension, ComparisonResult.UNKNOWN, batchSources(base));
+    }
+    FiberAttributes attributes = FiberAttributes.from(batch.getAttributes());
+    String actual = facet.kind() == FacetKind.FIBRE_GRADE ? attributes.grade() : attributes.shade();
+    if (actual == null || actual.isBlank()) {
+      reasons.add(reasonPrefix + "_UNKNOWN");
+      return new Comparison(dimension, ComparisonResult.UNKNOWN, batchSources(base));
+    }
+    String normalized = actual.strip().toUpperCase(Locale.ROOT);
+    boolean match =
+        switch (facet.rule()) {
+          case EXACT, ANY, SET_MEMBERSHIP -> facet.categories().contains(normalized);
+          case ALL -> facet.categories().size() == 1 && facet.categories().contains(normalized);
+          default -> false;
+        };
+    if (!match) {
+      reasons.add(reasonPrefix + "_MISMATCH");
+    }
+    return new Comparison(
+        dimension, match ? ComparisonResult.MATCH : ComparisonResult.EXCLUDED, batchSources(base));
+  }
+
+  private Comparison compareCertification(
+      Batch batch,
+      Facet facet,
+      List<CertificateRequirement> required,
+      List<BatchCertification> batchCertifications,
+      LocalDate certificateEvaluationDate,
+      Set<String> reasons) {
+    List<CertificateKindResult> results =
+        required.stream()
+            .map(
+                reference ->
+                    assessCertificateKind(
+                        batch, reference, batchCertifications, certificateEvaluationDate))
+            .toList();
+    ComparisonResult result;
+    if (facet.rule() == FacetRule.ALL) {
+      result =
+          results.stream().anyMatch(row -> row.result() == ComparisonResult.EXCLUDED)
+              ? ComparisonResult.EXCLUDED
+              : results.stream().anyMatch(row -> row.result() == ComparisonResult.UNKNOWN)
+                  ? ComparisonResult.UNKNOWN
+                  : ComparisonResult.MATCH;
+    } else {
+      result =
+          results.stream().anyMatch(row -> row.result() == ComparisonResult.MATCH)
+              ? ComparisonResult.MATCH
+              : results.stream().anyMatch(row -> row.result() == ComparisonResult.UNKNOWN)
+                  ? ComparisonResult.UNKNOWN
+                  : ComparisonResult.EXCLUDED;
+    }
+    if (result == ComparisonResult.UNKNOWN) {
+      reasons.add("FACET_EVIDENCE_UNKNOWN:" + facet.identity());
+    } else if (result == ComparisonResult.EXCLUDED) {
+      reasons.add("CERTIFICATE_REQUIREMENT_MISMATCH:" + facet.identity());
+    }
+    List<Source> sources =
+        results.stream()
+            .flatMap(row -> row.sources().stream())
+            .distinct()
+            .sorted(
+                Comparator.comparing(Source::type).thenComparing(source -> source.id().toString()))
+            .toList();
+    return new Comparison("REQUIREMENT_" + facet.identity(), result, sources);
+  }
+
+  private CertificateKindResult assessCertificateKind(
+      Batch batch,
+      CertificateRequirement required,
+      List<BatchCertification> batchCertifications,
+      LocalDate certificateEvaluationDate) {
+    BatchCertificateKind kind;
+    try {
+      kind = BatchCertificateKind.valueOf(required.certificateKind());
+    } catch (IllegalArgumentException invalidKind) {
+      return new CertificateKindResult(ComparisonResult.UNKNOWN, List.of());
+    }
+    List<BatchCertificateEvidencePolicy> supportedPolicies =
+        certificatePolicies.stream()
+            .filter(candidate -> candidate.supports(required.scheme(), kind))
+            .toList();
+    if (supportedPolicies.isEmpty()) {
+      return new CertificateKindResult(ComparisonResult.UNKNOWN, List.of());
+    }
+    if (supportedPolicies.size() > 1) {
+      throw new BatchDomainException(
+          "More than one certificate evidence policy claims " + required.scheme() + "/" + kind,
+          "BATCH_CERTIFICATE_POLICY_AMBIGUOUS",
+          500);
+    }
+    BatchCertificateEvidencePolicy policy = supportedPolicies.getFirst();
+    BatchCertificateEvidencePolicy.Assessment assessment =
+        policy.assess(
+            batch, required.scheme(), kind, batchCertifications, certificateEvaluationDate);
+    if (assessment.outcome() != BatchCertificateEvidencePolicy.Outcome.UNKNOWN
+        && assessment.evidence().isEmpty()) {
+      throw new BatchDomainException(
+          "Certificate policy produced a conclusive result without evidence",
+          "BATCH_CERTIFICATE_POLICY_INVALID_RESULT",
+          500);
+    }
+    if (assessment.evidence().stream().anyMatch(row -> !batchCertifications.contains(row))) {
+      throw new BatchDomainException(
+          "Certificate policy returned evidence outside the evaluated lot",
+          "BATCH_CERTIFICATE_POLICY_INVALID_EVIDENCE",
+          500);
+    }
+    ComparisonResult result =
+        switch (assessment.outcome()) {
+          case MATCH -> ComparisonResult.MATCH;
+          case EXCLUDED -> ComparisonResult.EXCLUDED;
+          case UNKNOWN -> ComparisonResult.UNKNOWN;
+        };
+    List<Source> sources =
+        new ArrayList<>(
+            assessment.evidence().stream()
+                .sorted(Comparator.comparing(row -> row.getId().toString()))
+                .map(certification -> source("BATCH_CERTIFICATION", certification))
+                .toList());
+    sources.add(certificatePolicySource(policy));
+    return new CertificateKindResult(result, List.copyOf(sources));
+  }
+
+  private Source certificatePolicySource(BatchCertificateEvidencePolicy policy) {
+    return new Source(
+        "CERTIFICATE_EVIDENCE_POLICY",
+        UUID.nameUUIDFromBytes(
+            (policy.policyId() + ":" + policy.policyVersion())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+        null,
+        null,
+        null,
+        SourceKnowledge.VERIFIED,
+        null);
+  }
+
+  private record CertificateKindResult(ComparisonResult result, List<Source> sources) {}
+
+  private List<Source> batchSources(Lot lot) {
+    return lot.sources().stream().filter(source -> "BATCH".equals(source.type())).toList();
+  }
+
+  private String certificationState(BatchCertification certification) {
+    return String.join(
+        ":",
+        certification.getCertification().getCertificationCode(),
+        certification.getCertificateKind() == null
+            ? "UNCLASSIFIED"
+            : certification.getCertificateKind().name(),
+        certification.getScope().name(),
+        certification.getValidFrom() == null
+            ? "NO_VALID_FROM"
+            : certification.getValidFrom().toString(),
+        certification.getValidUntil() == null
+            ? "NO_VALID_UNTIL"
+            : certification.getValidUntil().toString());
+  }
+
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public Inputs lockAndInspect(Requirements requirements) {
@@ -492,7 +843,8 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
             batchVersions,
             lockRows("stock_unit", "batch_id", ids),
             lockRows("batch_lot_quantity_intent", "batch_id", ids),
-            lockRows("production_execution_batch_reservation", "batch_id", ids));
+            lockRows("production_execution_batch_reservation", "batch_id", ids),
+            lockRows("production_execution_batch_certification", "batch_id", ids));
     return inspect(requirements, locked);
   }
 
@@ -530,7 +882,8 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
       Map<UUID, Long> batches,
       Map<UUID, Long> units,
       Map<UUID, Long> intents,
-      Map<UUID, Long> reservations) {}
+      Map<UUID, Long> reservations,
+      Map<UUID, Long> certifications) {}
 
   private static Source source(String type, BaseEntity entity) {
     return new Source(

@@ -6,32 +6,49 @@ import static org.mockito.Mockito.*;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.product.color.domain.Color;
+import com.fabricmanagement.product.color.infra.repository.ColorRepository;
 import com.fabricmanagement.product.core.app.ProductEvidenceQueryService;
 import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
+import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
+import com.fabricmanagement.product.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.product.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.product.qualitygrade.infra.repository.QualityGradeRepository;
+import com.fabricmanagement.production.core.batch.app.BatchCertificateEvidencePolicy;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.app.StockAvailabilityQueryService;
 import com.fabricmanagement.production.core.batch.domain.*;
 import com.fabricmanagement.production.core.batch.infra.repository.*;
 import com.fabricmanagement.production.core.stockunit.domain.*;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.sales.salesorder.app.RequirementEvidenceProfileMapper;
 import com.fabricmanagement.sales.salesorder.domain.OrderCoverEvidenceEvaluator;
 import com.fabricmanagement.sales.salesorder.domain.OrderCoverFingerprint;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort.*;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacet;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacetValue;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileBasis;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto.Suitability;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.OptimisticLockException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -39,6 +56,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Transactional
+@Import(OrderCoverEvidenceAdapterIT.CertificatePolicyTestConfig.class)
 class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   @Autowired private OrderCoverEvidenceAdapter adapter;
   @Autowired private StockAvailabilityQueryService availability;
@@ -48,8 +66,11 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   @Autowired private BatchRepository batches;
   @Autowired private StockUnitRepository units;
   @Autowired private BatchReservationRepository reservations;
+  @Autowired private BatchCertificationRepository certifications;
+  @Autowired private ColorRepository colors;
   @Autowired private ProductRepository products;
   @Autowired private QualityGradeRepository grades;
+  @Autowired private FiberCertificationRepository fiberCertifications;
   @Autowired private TenantRepository tenants;
   @Autowired private EntityManager entityManager;
   @Autowired private PlatformTransactionManager transactionManager;
@@ -136,6 +157,84 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     var after = adapter.inspect(requirements(product, "80", "M")).lots().getFirst();
     assertThat(after.suitableFree()).isEqualByComparingTo("100");
     assertThat(after.sourceFingerprint()).isNotEqualTo(before.sourceFingerprint());
+
+    UUID card = color();
+    batch.assignColor(card);
+    batches.saveAndFlush(batch);
+    Requirement colourRequirement =
+        profiledRequirement(UUID.randomUUID(), product, colourProfile(card));
+    Lot profiled =
+        adapter
+            .inspect(
+                new Requirements(
+                    tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(colourRequirement)))
+            .lots()
+            .getFirst();
+    assertThat(profiled.eligibility()).isEqualTo(Eligibility.ELIGIBLE);
+    assertThat(profiled.suitableFree()).isEqualByComparingTo("100");
+    assertThat(profiled.suitabilityFor(colourRequirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.ELIGIBLE);
+  }
+
+  @Test
+  void fiberGradeAndShadeUseLotAttributesAndPreserveMissingEvidenceAsUnknown() {
+    Product product = product(ProductType.FIBER, "KG");
+    Batch matching = batch(product, BatchStatus.AVAILABLE);
+    matching.setAttributes(Map.of("fiber_grade", "A_GRADE", "fiber_shade", "OPTICAL_WHITE"));
+    batches.saveAndFlush(matching);
+    piece(matching, grade(ProductType.FIBER, true, 1), null);
+
+    Batch gradeMismatch = batch(product, BatchStatus.AVAILABLE);
+    gradeMismatch.setAttributes(Map.of("fiber_grade", "B_GRADE", "fiber_shade", "OPTICAL_WHITE"));
+    batches.saveAndFlush(gradeMismatch);
+    piece(gradeMismatch, grade(ProductType.FIBER, true, 2), null);
+
+    Batch shadeMismatch = batch(product, BatchStatus.AVAILABLE);
+    shadeMismatch.setAttributes(Map.of("fiber_grade", "A_GRADE", "fiber_shade", "NATURAL"));
+    batches.saveAndFlush(shadeMismatch);
+    piece(shadeMismatch, grade(ProductType.FIBER, true, 3), null);
+
+    Batch missing = batch(product, BatchStatus.AVAILABLE);
+    piece(missing, grade(ProductType.FIBER, true, 4), null);
+
+    RequirementFacet gradeFacet =
+        new RequirementFacet(
+            RequirementFacet.Kind.FIBRE_GRADE,
+            null,
+            RequirementFacet.State.BOUNDED,
+            RequirementFacet.Comparison.SET_MEMBERSHIP,
+            new RequirementFacetValue.Categorical(Set.of("a_grade")),
+            decisionBasis());
+    RequirementFacet shadeFacet =
+        new RequirementFacet(
+            RequirementFacet.Kind.FIBRE_SHADE,
+            null,
+            RequirementFacet.State.BOUNDED,
+            RequirementFacet.Comparison.EXACT,
+            new RequirementFacetValue.Categorical(Set.of("optical_white")),
+            decisionBasis());
+    Requirement requirement =
+        profiledRequirement(
+            UUID.randomUUID(), product, profile(List.of(gradeFacet, shadeFacet)), "5");
+    Map<UUID, Lot> lots =
+        adapter
+            .inspect(
+                new Requirements(
+                    tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(requirement)))
+            .lots()
+            .stream()
+            .collect(Collectors.toMap(Lot::lotId, Function.identity()));
+
+    assertThat(lots.get(matching.getId()).suitabilityFor(requirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.ELIGIBLE);
+    assertThat(lots.get(gradeMismatch.getId()).suitabilityFor(requirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lots.get(shadeMismatch.getId()).suitabilityFor(requirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lots.get(missing.getId()).suitabilityFor(requirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
+    assertThat(lots.get(missing.getId()).suitabilityFor(requirement.lineId()).reasons())
+        .contains("FIBRE_GRADE_UNKNOWN", "FIBRE_SHADE_UNKNOWN");
   }
 
   @Test
@@ -283,6 +382,207 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void sameProductLotIsMatchedPerLineAndUnsupportedCertificationStaysUnknown() {
+    Product product = product();
+    UUID cardX = color();
+    UUID cardY = color();
+    Batch batch = batch(product, BatchStatus.AVAILABLE);
+    batch.assignColor(cardX);
+    piece(batch, grade(true, 1), "100");
+    FiberCertification gotsCertification =
+        fiberCertifications.saveAndFlush(
+            FiberCertification.builder()
+                .certificationCode("GOTS")
+                .certificationName("GOTS fixture")
+                .build());
+    certifications.saveAndFlush(
+        BatchCertification.builder()
+            .batch(batch)
+            .certification(gotsCertification)
+            .scope(BatchCertificationScope.FACILITY)
+            .certificateKind(BatchCertificateKind.SCOPE)
+            .validFrom(java.time.LocalDate.of(2026, 1, 1))
+            .validUntil(java.time.LocalDate.of(2027, 1, 1))
+            .build());
+    certifications.saveAndFlush(
+        BatchCertification.builder()
+            .batch(batch)
+            .certification(gotsCertification)
+            .scope(BatchCertificationScope.BATCH)
+            .certificateKind(BatchCertificateKind.TRANSACTION)
+            .validFrom(java.time.LocalDate.of(2026, 1, 1))
+            .build());
+
+    Requirement matching =
+        profiledRequirement(
+            UUID.fromString("00000000-0000-0000-0000-000000000001"), product, colourProfile(cardX));
+    Requirement different =
+        profiledRequirement(
+            UUID.fromString("00000000-0000-0000-0000-000000000002"), product, colourProfile(cardY));
+    Requirement gotsRequirement =
+        profiledRequirement(
+            UUID.fromString("00000000-0000-0000-0000-000000000003"),
+            product,
+            certificationProfile("GOTS"));
+    Requirements requirements =
+        new Requirements(
+            tenantId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            0,
+            List.of(matching, different, gotsRequirement));
+
+    var inputs = adapter.inspect(requirements);
+    var evidence = OrderCoverEvidenceEvaluator.evaluate(requirements, inputs);
+    var byLine =
+        evidence.stream().collect(Collectors.toMap(line -> line.lineId(), Function.identity()));
+
+    assertThat(byLine.get(matching.lineId()).suitability()).isEqualTo(Suitability.EXACT);
+    assertThat(byLine.get(different.lineId()).suitability()).isEqualTo(Suitability.NO_MATCH);
+    assertThat(byLine.get(gotsRequirement.lineId()).suitability()).isEqualTo(Suitability.UNKNOWN);
+    assertThat(byLine.get(gotsRequirement.lineId()).controlReasons())
+        .contains("FACET_EVIDENCE_UNKNOWN:CERTIFICATION:GOTS");
+    assertThat(inputs.lots().getFirst().facts())
+        .filteredOn(fact -> fact.source().type().equals("BATCH_CERTIFICATION"))
+        .hasSize(2);
+  }
+
+  @Test
+  void acceptedFixtureCertificatePolicyEvaluatesSetsWithoutOpeningTheGotsBoundary() {
+    Product product = product();
+    FiberCertification fixture =
+        fiberCertifications.saveAndFlush(
+            FiberCertification.builder()
+                .certificationCode("FIXTURE_CERT")
+                .certificationName("Accepted certificate-policy fixture")
+                .build());
+    FiberCertification unsupportedFixture =
+        fiberCertifications.saveAndFlush(
+            FiberCertification.builder()
+                .certificationCode("UNSUPPORTED_FIXTURE_CERT")
+                .certificationName("Certificate fixture without an accepted policy")
+                .build());
+    Batch renewed = eligibleBatch(product);
+    certificate(renewed, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2001-01-01");
+    certificate(renewed, fixture, BatchCertificateKind.SCOPE, "2001-01-02", "2100-01-01");
+    Batch expired = eligibleBatch(product);
+    certificate(expired, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2001-01-01");
+    Batch unclassified = eligibleBatch(product);
+    certificate(unclassified, fixture, null, "2000-01-01", "2100-01-01");
+    Batch absent = eligibleBatch(product);
+    Batch expiredWithoutPolicy = eligibleBatch(product);
+    certificate(
+        expiredWithoutPolicy,
+        unsupportedFixture,
+        BatchCertificateKind.SCOPE,
+        "2000-01-01",
+        "2001-01-01");
+    Batch mixed = eligibleBatch(product);
+    certificate(mixed, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2100-01-01");
+    certificate(mixed, fixture, BatchCertificateKind.TRANSACTION, "2000-01-01", "2001-01-01");
+
+    Requirement scope =
+        profiledRequirement(
+            UUID.randomUUID(),
+            product,
+            certificationProfile("FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE"));
+    Requirement all =
+        profiledRequirement(
+            UUID.randomUUID(),
+            product,
+            certificationProfile(
+                "FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE", "TRANSACTION"));
+    Requirement unsupportedScope =
+        profiledRequirement(
+            UUID.randomUUID(),
+            product,
+            certificationProfile(
+                "UNSUPPORTED_FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE"));
+    Requirement any =
+        profiledRequirement(
+            UUID.randomUUID(),
+            product,
+            certificationProfile(
+                "FIXTURE_CERT", RequirementFacet.Comparison.ANY, "SCOPE", "TRANSACTION"));
+    Requirements requirements =
+        new Requirements(
+            tenantId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            0,
+            List.of(scope, all, any, unsupportedScope));
+
+    Map<UUID, Lot> lots =
+        adapter.inspect(requirements).lots().stream()
+            .collect(Collectors.toMap(Lot::lotId, Function.identity()));
+
+    assertThat(lots.get(renewed.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.ELIGIBLE);
+    assertThat(lots.get(expired.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lots.get(unclassified.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
+    assertThat(lots.get(absent.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
+    assertThat(
+            lots.get(expiredWithoutPolicy.getId())
+                .suitabilityFor(unsupportedScope.lineId())
+                .eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
+    assertThat(lots.get(mixed.getId()).suitabilityFor(all.lineId()).eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lots.get(mixed.getId()).suitabilityFor(any.lineId()).eligibility())
+        .isEqualTo(Eligibility.ELIGIBLE);
+  }
+
+  @Test
+  void fictionalFabricFixtureIsCompleteWhileMissingLotEvidenceKeepsSuitabilityUnknown() {
+    Product product = product();
+    UUID cardX = color();
+    Batch batch = batch(product, BatchStatus.AVAILABLE);
+    batch.assignColor(cardX);
+    piece(batch, grade(true, 1), "6000");
+    Requirement requirement =
+        profiledRequirement(UUID.randomUUID(), product, fabricFixtureProfile(cardX), "5000");
+    Requirements requirements =
+        new Requirements(tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(requirement));
+
+    assertThat(requirement.profile().complete()).isTrue();
+
+    var evidence =
+        OrderCoverEvidenceEvaluator.evaluate(requirements, adapter.inspect(requirements))
+            .getFirst();
+
+    assertThat(evidence.suitability()).isEqualTo(Suitability.UNKNOWN);
+    assertThat(evidence.controlReasons())
+        .contains(
+            "FACET_EVIDENCE_UNKNOWN:WIDTH:FINISHED_OPEN",
+            "FACET_EVIDENCE_UNKNOWN:WEIGHT:FINISHED",
+            "FACET_EVIDENCE_UNKNOWN:SHADE_APPROVAL:BULK_LOT",
+            "FACET_EVIDENCE_UNKNOWN:CERTIFICATION:GOTS")
+        .doesNotContain("REQUIREMENT_COMPLETENESS_UNKNOWN");
+  }
+
+  @Test
+  void knownFacetMismatchExcludesEvenWhenBaseLotEvidenceIsUnknown() {
+    Product product = product();
+    Batch batch = batch(product, BatchStatus.AVAILABLE);
+    batch.assignColor(color());
+    Requirement requirement =
+        profiledRequirement(UUID.randomUUID(), product, colourProfile(color()));
+    Requirements requirements =
+        new Requirements(tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(requirement));
+
+    Lot lot = adapter.inspect(requirements).lots().getFirst();
+
+    assertThat(lot.eligibility()).isEqualTo(Eligibility.UNKNOWN);
+    assertThat(lot.suitabilityFor(requirement.lineId()).eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lot.suitabilityFor(requirement.lineId()).reasons())
+        .contains("COLOUR_IDENTITY_MISMATCH");
+  }
+
+  @Test
   void differingGradeReferencePopulationReturnsUnknownInsteadOfNullPointerException() {
     Product product = product();
     Batch batch = batch(product, BatchStatus.AVAILABLE);
@@ -296,9 +596,12 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
             units,
             intents,
             reservations,
+            org.mockito.Mockito.mock(BatchCertificationRepository.class),
+            List.of(),
             missingReferences,
             productReferences,
-            entityManager);
+            entityManager,
+            java.time.Clock.systemUTC());
     var row = subject.inspect(requirements(product, "80", "M")).lots().getFirst();
     assertThat(row.eligibility()).isEqualTo(Eligibility.UNKNOWN);
     assertThat(row.suitableFree()).isNull();
@@ -422,7 +725,11 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   }
 
   private Product product() {
-    Product product = Product.create(ProductType.FABRIC, "M");
+    return product(ProductType.FABRIC, "M");
+  }
+
+  private Product product(ProductType productType, String unit) {
+    Product product = Product.create(productType, unit);
     product.setTenantId(tenantId);
     return products.saveAndFlush(product);
   }
@@ -431,10 +738,10 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     var batch =
         Batch.builder()
             .productId(product.getId())
-            .productType(ProductType.FABRIC)
+            .productType(product.getProductType())
             .batchCode("EVID-" + UUID.randomUUID().toString().substring(0, 8))
             .quantity(new BigDecimal("200"))
-            .unit("M")
+            .unit(product.getUnit())
             .reservedQuantity(BigDecimal.ZERO)
             .consumedQuantity(BigDecimal.ZERO)
             .wasteQuantity(BigDecimal.ZERO)
@@ -446,10 +753,14 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   }
 
   private QualityGrade grade(boolean saleable, int rank) {
+    return grade(ProductType.FABRIC, saleable, rank);
+  }
+
+  private QualityGrade grade(ProductType productType, boolean saleable, int rank) {
     return grades.saveAndFlush(
         QualityGrade.create(
             tenantId,
-            ProductType.FABRIC,
+            productType,
             "E" + UUID.randomUUID().toString().substring(0, 6),
             "Evidence grade",
             rank,
@@ -461,14 +772,22 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   }
 
   private StockUnit piece(Batch batch, QualityGrade grade, String metres) {
+    PackageType packageType =
+        switch (batch.getProductType()) {
+          case FIBER -> PackageType.BALE;
+          case YARN -> PackageType.CONE;
+          case FABRIC -> PackageType.ROLL;
+          case CHEMICAL -> PackageType.DRUM;
+          case CONSUMABLE -> PackageType.CARTON;
+        };
     var piece =
         StockUnit.create(
             tenantId,
             batch.getId(),
-            ProductType.FABRIC,
+            batch.getProductType(),
             "EVID-" + UUID.randomUUID(),
             null,
-            PackageType.ROLL,
+            packageType,
             new BigDecimal("10"),
             null,
             "KG",
@@ -479,6 +798,13 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     if (metres != null) piece.recordLength(new BigDecimal(metres), "M");
     if (grade != null) piece.changeGrade(grade.getId());
     return units.saveAndFlush(piece);
+  }
+
+  private UUID color() {
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    return colors
+        .saveAndFlush(Color.create(tenantId, "EVID-" + suffix, "Evidence colour", null))
+        .getId();
   }
 
   private Requirements requirements(Product product, String quantity, String unit) {
@@ -495,5 +821,284 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
             "test",
             null);
     return new Requirements(tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(line));
+  }
+
+  private Requirement profiledRequirement(
+      UUID lineId, Product product, RequirementProfileInput input) {
+    return profiledRequirement(lineId, product, input, "80");
+  }
+
+  private Requirement profiledRequirement(
+      UUID lineId, Product product, RequirementProfileInput input, String requested) {
+    UUID profileId = UUID.randomUUID();
+    RequirementProfileSnapshot profile =
+        RequirementProfileSnapshot.resolve(profileId, 1, input, null, false);
+    return new Requirement(
+        lineId,
+        0,
+        product.getId(),
+        Instant.EPOCH,
+        new BigDecimal(requested),
+        product.getUnit(),
+        profile.complete(),
+        null,
+        profile.fingerprint(),
+        RequirementEvidenceProfileMapper.toPort(profile),
+        null);
+  }
+
+  private RequirementProfileInput colourProfile(UUID colourId) {
+    return profile(
+        new RequirementFacet(
+            RequirementFacet.Kind.COLOUR_IDENTITY,
+            "card",
+            RequirementFacet.State.BOUNDED,
+            RequirementFacet.Comparison.EXACT,
+            new RequirementFacetValue.ColourIdentity(colourId),
+            decisionBasis()));
+  }
+
+  private RequirementProfileInput certificationProfile(String scheme) {
+    return certificationProfile(scheme, RequirementFacet.Comparison.ALL, "SCOPE", "TRANSACTION");
+  }
+
+  private RequirementProfileInput certificationProfile(
+      String scheme, RequirementFacet.Comparison comparison, String... kinds) {
+    return profile(
+        new RequirementFacet(
+            RequirementFacet.Kind.CERTIFICATION,
+            scheme,
+            RequirementFacet.State.BOUNDED,
+            comparison,
+            new RequirementFacetValue.Certification(
+                Arrays.stream(kinds)
+                    .map(kind -> new RequirementFacetValue.CertificateRef(scheme, kind))
+                    .toList()),
+            decisionBasis()));
+  }
+
+  private Batch eligibleBatch(Product product) {
+    Batch batch = batch(product, BatchStatus.AVAILABLE);
+    piece(batch, grade(true, 1), "100");
+    return batch;
+  }
+
+  private BatchCertification certificate(
+      Batch batch,
+      FiberCertification certification,
+      BatchCertificateKind kind,
+      String validFrom,
+      String validUntil) {
+    return certifications.saveAndFlush(
+        BatchCertification.builder()
+            .batch(batch)
+            .certification(certification)
+            .scope(BatchCertificationScope.BATCH)
+            .certificateKind(kind)
+            .validFrom(LocalDate.parse(validFrom))
+            .validUntil(LocalDate.parse(validUntil))
+            .build());
+  }
+
+  private RequirementProfileInput fabricFixtureProfile(UUID colourId) {
+    RequirementFacet.DecisionBasis basis = decisionBasis();
+    RequirementFacet.DecisionBasis authorisedOpen =
+        new RequirementFacet.DecisionBasis(
+            RequirementFacet.DecisionBasis.Source.AUTHORISED_DECISION,
+            "FIXTURE-FABRIC-01-origin-open",
+            UUID.randomUUID(),
+            Instant.parse("2026-09-18T10:00:00Z"));
+    List<RequirementFacet> facets =
+        List.of(
+            new RequirementFacet(
+                RequirementFacet.Kind.WIDTH,
+                "finished_open",
+                RequirementFacet.State.BOUNDED,
+                RequirementFacet.Comparison.MINIMUM,
+                new RequirementFacetValue.Width(
+                    new RequirementFacetValue.NumericBounds(
+                        RequirementFacetValue.BoundType.MIN,
+                        null,
+                        new BigDecimal("150.0"),
+                        null,
+                        true,
+                        false,
+                        "cm"),
+                    RequirementFacetValue.WidthForm.OPEN,
+                    RequirementFacetValue.MaterialState.FINISHED),
+                basis),
+            new RequirementFacet(
+                RequirementFacet.Kind.WEIGHT,
+                "finished",
+                RequirementFacet.State.BOUNDED,
+                RequirementFacet.Comparison.RANGE,
+                new RequirementFacetValue.Weight(
+                    new RequirementFacetValue.NumericBounds(
+                        RequirementFacetValue.BoundType.RANGE,
+                        null,
+                        new BigDecimal("174.6"),
+                        new BigDecimal("185.4"),
+                        true,
+                        true,
+                        "g/m²")),
+                basis),
+            new RequirementFacet(
+                RequirementFacet.Kind.COLOUR_IDENTITY,
+                "card",
+                RequirementFacet.State.BOUNDED,
+                RequirementFacet.Comparison.EXACT,
+                new RequirementFacetValue.ColourIdentity(colourId),
+                basis),
+            new RequirementFacet(
+                RequirementFacet.Kind.SHADE_APPROVAL,
+                "bulk_lot",
+                RequirementFacet.State.BOUNDED,
+                RequirementFacet.Comparison.EXACT,
+                new RequirementFacetValue.ShadeApproval(
+                    true, RequirementFacetValue.ApprovalKind.BULK_LOT),
+                basis),
+            new RequirementFacet(
+                RequirementFacet.Kind.CERTIFICATION,
+                "GOTS",
+                RequirementFacet.State.BOUNDED,
+                RequirementFacet.Comparison.ALL,
+                new RequirementFacetValue.Certification(
+                    List.of(
+                        new RequirementFacetValue.CertificateRef("GOTS", "SCOPE"),
+                        new RequirementFacetValue.CertificateRef("GOTS", "TRANSACTION"))),
+                basis),
+            new RequirementFacet(
+                RequirementFacet.Kind.ORIGIN,
+                "fabric_made",
+                RequirementFacet.State.UNCONSTRAINED,
+                RequirementFacet.Comparison.NONE,
+                null,
+                authorisedOpen),
+            new RequirementFacet(
+                RequirementFacet.Kind.YARN_COUNT,
+                null,
+                RequirementFacet.State.UNCONSTRAINED,
+                RequirementFacet.Comparison.NONE,
+                null,
+                authorisedOpen),
+            new RequirementFacet(
+                RequirementFacet.Kind.YARN_TWIST,
+                null,
+                RequirementFacet.State.UNCONSTRAINED,
+                RequirementFacet.Comparison.NONE,
+                null,
+                authorisedOpen),
+            new RequirementFacet(
+                RequirementFacet.Kind.YARN_CONSTRUCTION,
+                null,
+                RequirementFacet.State.UNCONSTRAINED,
+                RequirementFacet.Comparison.NONE,
+                null,
+                authorisedOpen));
+    Instant decidedAt = Instant.parse("2026-09-18T10:00:00Z");
+    UUID actor = basis.actorId();
+    return new RequirementProfileInput(
+        new RequirementProfileBasis(
+            RequirementProfileBasis.Kind.LINE_EXPLICIT,
+            null,
+            null,
+            null,
+            null,
+            actor,
+            decidedAt,
+            "FIXTURE-FABRIC-01"),
+        "FABRIC_LINE_EXPLICIT_V1",
+        "SALES_REQ_1_RESOLUTION_V1",
+        facets.stream().map(RequirementFacet::identity).collect(Collectors.toSet()),
+        facets,
+        List.of(),
+        List.of());
+  }
+
+  private RequirementProfileInput profile(RequirementFacet facet) {
+    return profile(List.of(facet));
+  }
+
+  private RequirementProfileInput profile(List<RequirementFacet> facets) {
+    Instant decidedAt = Instant.parse("2026-09-18T10:00:00Z");
+    UUID actor = UUID.randomUUID();
+    return new RequirementProfileInput(
+        new RequirementProfileBasis(
+            RequirementProfileBasis.Kind.LINE_EXPLICIT,
+            null,
+            null,
+            null,
+            null,
+            actor,
+            decidedAt,
+            "fixture-contract"),
+        "fixture-v1",
+        "sales-req-v1",
+        facets.stream().map(RequirementFacet::identity).collect(Collectors.toSet()),
+        facets,
+        List.of(),
+        List.of());
+  }
+
+  private RequirementFacet.DecisionBasis decisionBasis() {
+    return new RequirementFacet.DecisionBasis(
+        RequirementFacet.DecisionBasis.Source.CUSTOMER_INSTRUCTION,
+        "fixture-contract",
+        UUID.randomUUID(),
+        Instant.parse("2026-09-18T10:00:00Z"));
+  }
+
+  @TestConfiguration
+  static class CertificatePolicyTestConfig {
+    @Bean
+    BatchCertificateEvidencePolicy acceptedFixtureCertificatePolicy() {
+      return new BatchCertificateEvidencePolicy() {
+        @Override
+        public String policyId() {
+          return "SALES_REQ_1_ACCEPTED_FIXTURE";
+        }
+
+        @Override
+        public String policyVersion() {
+          return "1";
+        }
+
+        @Override
+        public boolean supports(String scheme, BatchCertificateKind certificateKind) {
+          return "FIXTURE_CERT".equals(scheme)
+              && Set.of(BatchCertificateKind.SCOPE, BatchCertificateKind.TRANSACTION)
+                  .contains(certificateKind);
+        }
+
+        @Override
+        public Assessment assess(
+            Batch batch,
+            String scheme,
+            BatchCertificateKind certificateKind,
+            List<BatchCertification> records,
+            LocalDate evaluationDate) {
+          List<BatchCertification> schemeRecords =
+              records.stream()
+                  .filter(row -> scheme.equals(row.getCertification().getCertificationCode()))
+                  .toList();
+          if (schemeRecords.isEmpty()) return new Assessment(Outcome.UNKNOWN, List.of());
+          List<BatchCertification> typed =
+              schemeRecords.stream()
+                  .filter(row -> row.getCertificateKind() == certificateKind)
+                  .toList();
+          if (typed.isEmpty()) return new Assessment(Outcome.UNKNOWN, schemeRecords);
+          boolean valid =
+              typed.stream()
+                  .filter(row -> row.getScope() == BatchCertificationScope.BATCH)
+                  .anyMatch(
+                      row ->
+                          (row.getValidFrom() == null
+                                  || !row.getValidFrom().isAfter(evaluationDate))
+                              && (row.getValidUntil() == null
+                                  || !row.getValidUntil().isBefore(evaluationDate)));
+          return new Assessment(valid ? Outcome.MATCH : Outcome.EXCLUDED, typed);
+        }
+      };
+    }
   }
 }

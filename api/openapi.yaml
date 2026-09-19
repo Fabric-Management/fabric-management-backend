@@ -48493,6 +48493,11 @@ components:
       properties:
         certNumber:
           type: string
+        certificateKind:
+          type: string
+          enum:
+          - SCOPE
+          - TRANSACTION
         certificationId:
           type: string
           format: uuid
@@ -54200,6 +54205,11 @@ components:
           type: string
         certNumberAtCompletion:
           type: string
+        certificateKind:
+          type: string
+          enum:
+          - SCOPE
+          - TRANSACTION
         certification:
           $ref: "#/components/schemas/FiberCertificationDto"
         certificationId:
@@ -54695,6 +54705,32 @@ components:
         message:
           type: string
           description: Warning details
+    Categorical:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          values:
+            type: array
+            items:
+              type: string
+            uniqueItems: true
+    CertificateRef:
+      type: object
+      properties:
+        certificateKind:
+          type: string
+        scheme:
+          type: string
+    Certification:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          certificates:
+            type: array
+            items:
+              $ref: "#/components/schemas/CertificateRef"
     CertificationSummary:
       type: object
       properties:
@@ -55124,6 +55160,14 @@ components:
       - matchedExternalName
       - matchedIsPrimary
       - primaryExternalCode
+    ColourIdentity:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          colorId:
+            type: string
+            format: uuid
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -55541,6 +55585,14 @@ components:
         varianceDirection:
           type: string
           description: OVERRUN | SAVING | ON_TARGET (±2%) | NO_DATA
+    CountrySetReference:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+          format: int32
     CreateAddressRequest:
       type: object
       properties:
@@ -58111,6 +58163,23 @@ components:
           - BOTTLENECKS
           - ANALYTICS
           - TIME_TRACKING_SUMMARY
+    DecisionBasis:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        reference:
+          type: string
+        source:
+          type: string
+          enum:
+          - SPEC_VERSION
+          - CUSTOMER_INSTRUCTION
+          - AUTHORISED_DECISION
     DepartmentDto:
       type: object
       properties:
@@ -60331,6 +60400,28 @@ components:
           format: date-time
         title:
           type: string
+    NumericBounds:
+      type: object
+      properties:
+        boundType:
+          type: string
+          enum:
+          - EXACT
+          - MIN
+          - MAX
+          - RANGE
+        exact:
+          type: number
+        maximum:
+          type: number
+        maximumInclusive:
+          type: boolean
+        minimum:
+          type: number
+        minimumInclusive:
+          type: boolean
+        unit:
+          type: string
     OfflineMetadata:
       type: object
       properties:
@@ -60640,10 +60731,28 @@ components:
           type: string
           format: uuid
     Origin:
-      type: object
-      properties:
-        type:
-          type: string
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          allowedCountries:
+            type: array
+            items:
+              type: string
+            uniqueItems: true
+          countrySet:
+            $ref: "#/components/schemas/CountrySetReference"
+          mixtureRule:
+            type: string
+            enum:
+            - SINGLE_ORIGIN
+            - ALL_ORIGINS_ALLOWED
+          originSubject:
+            type: string
+            enum:
+            - FIBRE_GROWN
+            - YARN_SPUN
+            - FABRIC_MADE
     OverrideStatusRequest:
       type: object
       properties:
@@ -64657,6 +64766,176 @@ components:
           format: int32
         reversalMovement:
           type: number
+    RequirementDeviation:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        facetIdentity:
+          type: string
+        reference:
+          type: string
+    RequirementFacet:
+      type: object
+      properties:
+        comparison:
+          type: string
+          enum:
+          - EXACT
+          - MINIMUM
+          - MAXIMUM
+          - RANGE
+          - ALL
+          - ANY
+          - SET_MEMBERSHIP
+          - NONE
+        decisionBasis:
+          $ref: "#/components/schemas/DecisionBasis"
+        kind:
+          type: string
+          enum:
+          - CERTIFICATION
+          - ORIGIN
+          - COLOUR_IDENTITY
+          - SHADE_APPROVAL
+          - WIDTH
+          - WEIGHT
+          - YARN_COUNT
+          - YARN_TWIST
+          - YARN_CONSTRUCTION
+          - FIBRE_GRADE
+          - FIBRE_SHADE
+        nominalValue:
+          $ref: "#/components/schemas/RequirementFacetValue"
+        qualifier:
+          type: string
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          $ref: "#/components/schemas/RequirementFacetValue"
+    RequirementFacetValue:
+      discriminator:
+        propertyName: valueType
+      oneOf:
+      - $ref: "#/components/schemas/Certification"
+      - $ref: "#/components/schemas/Origin"
+      - $ref: "#/components/schemas/ColourIdentity"
+      - $ref: "#/components/schemas/ShadeApproval"
+      - $ref: "#/components/schemas/Width"
+      - $ref: "#/components/schemas/Weight"
+      - $ref: "#/components/schemas/YarnCount"
+      - $ref: "#/components/schemas/YarnTwist"
+      - $ref: "#/components/schemas/YarnConstruction"
+      - $ref: "#/components/schemas/Categorical"
+      properties:
+        valueType:
+          type: string
+      required:
+      - valueType
+    RequirementProfileBasis:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        decisionReference:
+          type: string
+        kind:
+          type: string
+          enum:
+          - SPEC_VERSION
+          - LINE_EXPLICIT
+          - AUTHORISED_DECISION
+        productId:
+          type: string
+          format: uuid
+        referenceId:
+          type: string
+          format: uuid
+        specificationKind:
+          type: string
+        specificationVersion:
+          type: integer
+          format: int32
+    RequirementProfileInput:
+      type: object
+      properties:
+        basis:
+          $ref: "#/components/schemas/RequirementProfileBasis"
+        deviations:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequirementDeviation"
+        facets:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequirementFacet"
+        resolutionRuleVersion:
+          type: string
+        scope:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        scopeVersion:
+          type: string
+        unmodelledConstraints:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnmodelledSpecConstraint"
+    RequirementProfileSnapshot:
+      type: object
+      properties:
+        basis:
+          $ref: "#/components/schemas/RequirementProfileBasis"
+        complete:
+          type: boolean
+        deviations:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequirementDeviation"
+        facets:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequirementFacet"
+        fingerprint:
+          type: string
+        incompleteReasons:
+          type: array
+          items:
+            type: string
+        pinnedSource:
+          $ref: "#/components/schemas/JsonNode"
+        profileId:
+          type: string
+          format: uuid
+        profileVersion:
+          type: integer
+          format: int32
+        resolutionRuleVersion:
+          type: string
+        scope:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        scopeVersion:
+          type: string
+        unmodelledConstraints:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnmodelledSpecConstraint"
     ReserveRequest:
       type: object
       properties:
@@ -65333,6 +65612,9 @@ components:
         requestedQty:
           type: number
           minimum: 0.001
+        requirementProfile:
+          $ref: "#/components/schemas/RequirementProfileInput"
+          description: "Typed, traceable order-line requirement profile input"
         unit:
           type: string
         unitPrice:
@@ -65378,6 +65660,8 @@ components:
           format: uuid
         requestedQty:
           type: number
+        requirementProfile:
+          $ref: "#/components/schemas/RequirementProfileSnapshot"
         salesOrderId:
           type: string
           format: uuid
@@ -65583,6 +65867,19 @@ components:
           $ref: "#/components/schemas/QuoteSendRequestDto"
       required:
       - result
+    ShadeApproval:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          approvalKind:
+            type: string
+            enum:
+            - LAB_DIP
+            - BULK_LOT
+            - EITHER
+          required:
+            type: boolean
     ShipmentDto:
       type: object
       properties:
@@ -65795,6 +66092,16 @@ components:
             format: double
             description: Twist per inch (TPI)
             example: 22.5
+    SpinningSystem:
+      type: object
+      properties:
+        code:
+          type: string
+        family:
+          type: string
+        id:
+          type: string
+          format: uuid
     SplitBatchRequest:
       type: object
       properties:
@@ -66053,6 +66360,65 @@ components:
       required:
       - reason
       - targetLocationId
+    SubValueInteger:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          type: integer
+          format: int32
+    SubValueNumericBounds:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          $ref: "#/components/schemas/NumericBounds"
+    SubValueSetString:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+    SubValueSpinningSystem:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          $ref: "#/components/schemas/SpinningSystem"
+    SubValueString:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - BOUNDED
+          - UNCONSTRAINED
+          - UNSPECIFIED
+        value:
+          type: string
     SubcontractOrderResponse:
       type: object
       properties:
@@ -67149,6 +67515,38 @@ components:
           type: string
       required:
       - newLocationId
+    TwistStage:
+      type: object
+      properties:
+        direction:
+          $ref: "#/components/schemas/SubValueString"
+        sequence:
+          type: integer
+          format: int32
+        stage:
+          type: string
+        turnsPerMetre:
+          $ref: "#/components/schemas/SubValueNumericBounds"
+    UnmodelledSpecConstraint:
+      type: object
+      properties:
+        field:
+          type: string
+        meaning:
+          type: string
+        reason:
+          type: string
+        sourceValue:
+          $ref: "#/components/schemas/JsonNode"
+        status:
+          type: string
+          enum:
+          - RESOLVED_UNSUPPORTED
+          - MISSING_SOURCE_VALUE
+          - AMBIGUOUS_MEANING
+          - NOT_APPLICABLE
+        unitOrVocabulary:
+          type: string
     UnrealizedFxCurrencyDto:
       type: object
       properties:
@@ -67262,6 +67660,11 @@ components:
       properties:
         certNumber:
           type: string
+        certificateKind:
+          type: string
+          enum:
+          - SCOPE
+          - TRANSACTION
         certifyingBodyRef:
           type: string
         changeReason:
@@ -67904,6 +68307,10 @@ components:
         requestedQty:
           type: number
           minimum: 0.001
+        requirementProfile:
+          $ref: "#/components/schemas/RequirementProfileInput"
+          description: Typed requirement profile update; omitted value preserves current
+            profile
         unit:
           type: string
         unitPrice:
@@ -69042,6 +69449,13 @@ components:
             type: string
             description: Weft yarn information
             example: Ne 30/1 Cotton
+    Weight:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          bounds:
+            $ref: "#/components/schemas/NumericBounds"
     WhatsAppCapabilityDto:
       type: object
       properties:
@@ -69060,6 +69474,23 @@ components:
             $ref: "#/components/schemas/Entry"
         object:
           type: string
+    Width:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          bounds:
+            $ref: "#/components/schemas/NumericBounds"
+          form:
+            type: string
+            enum:
+            - OPEN
+            - TUBULAR
+          materialState:
+            type: string
+            enum:
+            - FINISHED
+            - GREIGE
     WorkOrderConsumptionResponse:
       type: object
       properties:
@@ -69919,6 +70350,36 @@ components:
           - FRICTION
         uid:
           type: string
+    YarnConstruction:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          features:
+            $ref: "#/components/schemas/SubValueSetString"
+          foldCount:
+            $ref: "#/components/schemas/SubValueInteger"
+          spinningSystem:
+            $ref: "#/components/schemas/SubValueSpinningSystem"
+          structureType:
+            $ref: "#/components/schemas/SubValueString"
+    YarnCount:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          context:
+            type: string
+          countBasis:
+            type: string
+          originalSystem:
+            type: string
+          originalValue:
+            type: number
+          resultantTex:
+            type: number
+          resultantTexRule:
+            $ref: "#/components/schemas/NumericBounds"
     YarnDuplicateCandidateDto:
       type: object
       description: Advisory same-canonical-key article candidate
@@ -70279,6 +70740,15 @@ components:
       - recordedAt
       - sourceKind
       - sourceRecordId
+    YarnTwist:
+      allOf:
+      - $ref: "#/components/schemas/RequirementFacetValue"
+      - type: object
+        properties:
+          stages:
+            type: array
+            items:
+              $ref: "#/components/schemas/TwistStage"
     YarnUnlinkedOpenDocumentsDto:
       type: object
       description: Advisory counts of open yarn documents without a product link

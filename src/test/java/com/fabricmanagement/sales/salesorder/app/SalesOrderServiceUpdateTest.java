@@ -22,6 +22,9 @@ import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileBasis;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
@@ -56,6 +59,7 @@ class SalesOrderServiceUpdateTest {
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private ApprovalPort approvalPort;
   @Mock private SalesOrderAccessPolicy accessPolicy;
+  @Mock private RequirementProfileService requirementProfileService;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
@@ -451,6 +455,59 @@ class SalesOrderServiceUpdateTest {
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Line not found");
+  }
+
+  @Test
+  void updateOrder_profiledLineContextCannotChangeWhileKeepingTheStoredProfile() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+    SalesOrderLine existing = mock(SalesOrderLine.class);
+    UUID lineId = UUID.randomUUID();
+    UUID productId = UUID.randomUUID();
+    RequirementProfileSnapshot profile = mock(RequirementProfileSnapshot.class);
+    when(existing.getId()).thenReturn(lineId);
+    when(existing.getProductId()).thenReturn(productId);
+    when(existing.getModuleType()).thenReturn(ModuleType.FABRIC);
+    when(existing.getRequirementProfileSnapshot()).thenReturn(profile);
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(existing));
+    UpdateSalesOrderLineRequest line = updateLineRequest(lineId, ModuleType.YARN);
+    line.setProductId(productId);
+
+    assertThatThrownBy(
+            () ->
+                salesOrderService.updateOrder(orderId, currentUserId, updateRequest(List.of(line))))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("requires a new requirement profile basis");
+  }
+
+  @Test
+  void updateOrder_profiledLineContextChangeRejectsTheSameBasis() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+    SalesOrderLine existing = mock(SalesOrderLine.class);
+    UUID lineId = UUID.randomUUID();
+    UUID productId = UUID.randomUUID();
+    RequirementProfileSnapshot profile = mock(RequirementProfileSnapshot.class);
+    RequirementProfileBasis basis = mock(RequirementProfileBasis.class);
+    RequirementProfileInput requestedProfile = mock(RequirementProfileInput.class);
+    when(existing.getId()).thenReturn(lineId);
+    when(existing.getProductId()).thenReturn(productId);
+    when(existing.getModuleType()).thenReturn(ModuleType.FABRIC);
+    when(existing.getRequirementProfileSnapshot()).thenReturn(profile);
+    when(profile.basis()).thenReturn(basis);
+    when(requestedProfile.basis()).thenReturn(basis);
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(existing));
+    UpdateSalesOrderLineRequest line = updateLineRequest(lineId, ModuleType.YARN);
+    line.setProductId(productId);
+    line.setRequirementProfile(requestedProfile);
+
+    assertThatThrownBy(
+            () ->
+                salesOrderService.updateOrder(orderId, currentUserId, updateRequest(List.of(line))))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("full re-resolution from a new basis");
   }
 
   private UpdateSalesOrderRequest updateRequest(List<UpdateSalesOrderLineRequest> lines) {

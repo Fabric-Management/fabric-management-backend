@@ -79,7 +79,7 @@ public final class OrderCoverEvidenceEvaluator {
     if (demand != null) sources.addAll(demand.sources());
     lots.forEach(lot -> sources.addAll(lot.sources()));
     LinkedHashSet<String> reasons = new LinkedHashSet<>();
-    lots.forEach(lot -> reasons.addAll(lot.reasons()));
+    lots.forEach(lot -> reasons.addAll(lot.suitabilityFor(line.lineId()).reasons()));
     if (demand != null && demand.reason() != null) reasons.add(demand.reason());
     String unknown = null;
     if (line.productId() == null) unknown = "PRODUCT_REQUIREMENT_MISSING";
@@ -90,10 +90,11 @@ public final class OrderCoverEvidenceEvaluator {
               : line.incompleteReason();
     else if (demand == null || demand.quantity() == null)
       unknown = demand == null ? "PRIMARY_MEASURE_UNKNOWN" : demand.reason();
-    else if (lots.stream().anyMatch(lot -> lot.eligibility() == Eligibility.UNKNOWN))
+    else if (lots.stream()
+        .anyMatch(lot -> lot.suitabilityFor(line.lineId()).eligibility() == Eligibility.UNKNOWN))
       unknown = "SUITABILITY_EVIDENCE_UNKNOWN";
     else if (lots.stream()
-        .filter(lot -> lot.eligibility() == Eligibility.ELIGIBLE)
+        .filter(lot -> lot.suitabilityFor(line.lineId()).eligibility() == Eligibility.ELIGIBLE)
         .anyMatch(lot -> !java.util.Objects.equals(lot.unit(), demand.unit())))
       unknown = "INCOMPATIBLE_PRIMARY_UNITS";
 
@@ -126,7 +127,7 @@ public final class OrderCoverEvidenceEvaluator {
       throw new IllegalArgumentException("Requested quantity must be positive");
     List<Lot> eligible =
         lots.stream()
-            .filter(lot -> lot.eligibility() == Eligibility.ELIGIBLE)
+            .filter(lot -> lot.suitabilityFor(line.lineId()).eligibility() == Eligibility.ELIGIBLE)
             .filter(lot -> lot.suitableFree().signum() > 0)
             .toList();
     BigDecimal suitableFree =

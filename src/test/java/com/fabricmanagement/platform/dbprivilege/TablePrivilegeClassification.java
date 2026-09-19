@@ -26,6 +26,7 @@ final class TablePrivilegeClassification {
     entries.put("flowboard.routing_failure_alert", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.quality_decision", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("production.quality_decision_unit", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("sales_ord.requirement_profile_version", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_cover_evidence", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_cover_evidence_stream", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales.customer_commercial_assignment", TablePrivilegeClass.CLOSE_ONCE_LEDGER);

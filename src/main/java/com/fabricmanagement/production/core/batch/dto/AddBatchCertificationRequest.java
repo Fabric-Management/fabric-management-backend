@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.core.batch.dto;
 
+import com.fabricmanagement.production.core.batch.domain.BatchCertificateKind;
 import com.fabricmanagement.production.core.batch.domain.BatchCertificationScope;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ public class AddBatchCertificationRequest {
   private UUID certificationId;
 
   private BatchCertificationScope scope;
+  private BatchCertificateKind certificateKind;
   private UUID partnerCertificationId;
   private UUID orgCertificationId;
   private String certNumber;

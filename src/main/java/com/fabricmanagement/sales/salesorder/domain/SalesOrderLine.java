@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -94,6 +95,25 @@ public class SalesOrderLine extends BaseEntity {
     this.unitPrice = price;
   }
 
+  public void attachRequirementProfile(RequirementProfileSnapshot snapshot) {
+    if (snapshot == null) {
+      throw new IllegalArgumentException("Requirement profile snapshot is required");
+    }
+    if (requirementProfileId != null && !requirementProfileId.equals(snapshot.profileId())) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "A sales-order line cannot change requirement profile identity");
+    }
+    if (requirementProfileVersion != null
+        && snapshot.profileVersion() <= requirementProfileVersion) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Requirement profile version must increase");
+    }
+    requirementProfileId = snapshot.profileId();
+    requirementProfileVersion = snapshot.profileVersion();
+    requirementProfileFingerprint = snapshot.fingerprint();
+    requirementProfileSnapshot = snapshot;
+  }
+
   public String getCurrency() {
     return unitPrice != null && unitPrice.getCurrency() != null
         ? unitPrice.getCurrency().getCurrencyCode()
@@ -126,6 +146,26 @@ public class SalesOrderLine extends BaseEntity {
   @Type(JsonType.class)
   @Column(name = "module_specs", columnDefinition = "jsonb")
   private Map<String, Object> moduleSpecs;
+
+  // ── Typed requirement profile ─────────────────────────────────────────────
+
+  @Column(name = "requirement_profile_id")
+  @Setter(AccessLevel.NONE)
+  private UUID requirementProfileId;
+
+  @Column(name = "requirement_profile_version")
+  @Setter(AccessLevel.NONE)
+  private Integer requirementProfileVersion;
+
+  @Column(name = "requirement_profile_fingerprint", length = 64)
+  @Setter(AccessLevel.NONE)
+  private String requirementProfileFingerprint;
+
+  /** Current snapshot; historical versions are retained in the append-only profile table. */
+  @Type(JsonType.class)
+  @Column(name = "requirement_profile_snapshot", columnDefinition = "jsonb")
+  @Setter(AccessLevel.NONE)
+  private RequirementProfileSnapshot requirementProfileSnapshot;
 
   // ── Status & Recipe ───────────────────────────────────────────────────────
 

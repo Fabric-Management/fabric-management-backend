@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -27,6 +28,8 @@ public class SalesOrderLineResponse {
 
   @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   Map<String, Object> moduleSpecs;
+
+  RequirementProfileSnapshot requirementProfile;
 
   SalesOrderLineStatus lineStatus;
   UUID recipeId;

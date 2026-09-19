@@ -8,6 +8,10 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.*;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort.*;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacet;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileBasis;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
 import java.math.BigDecimal;
@@ -366,11 +370,12 @@ class OrderCoverEvidenceServiceTest {
         .thenReturn(List.of(line));
     var stream = OrderCoverEvidenceStream.create(tenant, order, caseId);
     when(streams.lockScope(tenant, caseId)).thenReturn(Optional.empty(), Optional.of(stream));
+    List<Requirements> inspected = new ArrayList<>();
     when(port.inspect(any()))
         .thenAnswer(
             call -> {
               Requirements requirements = call.getArgument(0);
-              assertThat(requirements.lines().getFirst().complete()).isFalse();
+              inspected.add(requirements);
               return inputs(requirements.lines(), List.of(lot(1, "100", Eligibility.ELIGIBLE)));
             });
     List<OrderCoverEvidence> saved = new ArrayList<>();
@@ -402,11 +407,22 @@ class OrderCoverEvidenceServiceTest {
     assertThat(rebuilt.inputFingerprint()).isEqualTo(first.inputFingerprint());
     assertThat(first.lines().getFirst().blockingReasons())
         .contains("REQUIREMENT_COMPLETENESS_UNKNOWN");
+    assertThat(inspected.getFirst().lines().getFirst().complete()).isFalse();
     line.setModuleSpecs(Map.of("width", 160));
     var changed = service.refresh(order, caseId);
     assertThat(changed.inputFingerprint()).isNotEqualTo(first.inputFingerprint());
     assertThat(changed.lines().getFirst().blockingReasons()).contains("UNTYPED_REQUIREMENTS");
-    assertThat(saved).hasSize(3);
+    line.setModuleSpecs(null);
+    RequirementProfileSnapshot typed = completeProfile();
+    line.attachRequirementProfile(typed);
+    var resolved = service.refresh(order, caseId);
+    Requirement typedRequirement = inspected.getLast().lines().getFirst();
+    assertThat(typedRequirement.complete()).isTrue();
+    assertThat(typedRequirement.profile())
+        .isEqualTo(RequirementEvidenceProfileMapper.toPort(typed));
+    assertThat(typedRequirement.requirementFingerprint()).isEqualTo(typed.fingerprint());
+    assertThat(resolved.lines().getFirst().suitability()).isEqualTo(Suitability.EXACT);
+    assertThat(saved).hasSize(4);
   }
 
   @Test
@@ -507,6 +523,40 @@ class OrderCoverEvidenceServiceTest {
     var manager = mock(PlatformTransactionManager.class);
     when(manager.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
     return manager;
+  }
+
+  private RequirementProfileSnapshot completeProfile() {
+    UUID actor = UUID.randomUUID();
+    RequirementFacet origin =
+        new RequirementFacet(
+            RequirementFacet.Kind.ORIGIN,
+            "fabric_made",
+            RequirementFacet.State.UNCONSTRAINED,
+            RequirementFacet.Comparison.NONE,
+            null,
+            new RequirementFacet.DecisionBasis(
+                RequirementFacet.DecisionBasis.Source.AUTHORISED_DECISION,
+                "service-fixture",
+                actor,
+                now));
+    RequirementProfileInput input =
+        new RequirementProfileInput(
+            new RequirementProfileBasis(
+                RequirementProfileBasis.Kind.AUTHORISED_DECISION,
+                product,
+                null,
+                null,
+                null,
+                actor,
+                now,
+                "service-fixture"),
+            "FIXTURE_V1",
+            "SALES_REQ_1_RESOLUTION_V1",
+            Set.of(origin.identity()),
+            List.of(origin),
+            List.of(),
+            List.of());
+    return RequirementProfileSnapshot.resolve(UUID.randomUUID(), 1, input, null, false);
   }
 
   private Requirement requirement(int id, String quantity, boolean complete) {

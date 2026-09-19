@@ -66,6 +66,7 @@ public class SalesOrderService {
   private final SalesOrderLineRepository lineRepository;
   private final SalesOrderRuleEngine ruleEngine;
   private final ModuleSpecsValidator moduleSpecsValidator;
+  private final RequirementProfileService requirementProfileService;
   private final DomainEventPublisher domainEventPublisher;
   private final DocumentNumberGenerator documentNumberGenerator;
   private final ApprovalPort approvalPort;
@@ -148,6 +149,15 @@ public class SalesOrderService {
                   })
               .toList();
       savedLines = lineRepository.saveAll(lines);
+      for (int index = 0; index < savedLines.size(); index++) {
+        SalesOrderLineRequest lineRequest = request.getLines().get(index);
+        if (lineRequest.getRequirementProfile() != null) {
+          requirementProfileService.apply(
+              savedLines.get(index),
+              lineRequest.getRequirementProfile(),
+              lineRequest.getModuleSpecs());
+        }
+      }
     }
 
     // Get partner details for response
@@ -214,8 +224,6 @@ public class SalesOrderService {
     // 4b. Update existing + create new lines
     List<SalesOrderLine> syncedLines = new ArrayList<>();
     for (UpdateSalesOrderLineRequest lineReq : request.getLines()) {
-      moduleSpecsValidator.validate(lineReq);
-
       if (lineReq.getId() != null) {
         // Update existing
         SalesOrderLine existing =
@@ -223,12 +231,24 @@ public class SalesOrderService {
                 .filter(l -> l.getId().equals(lineReq.getId()))
                 .findFirst()
                 .orElseThrow(() -> new OrderDomainException("Line not found: " + lineReq.getId()));
+        validateRequirementProfileContextChange(existing, lineReq);
+        moduleSpecsValidator.validate(lineReq, existing.getRequirementProfileSnapshot());
         updateLineFromRequest(existing, lineReq, currency);
+        if (lineReq.getRequirementProfile() != null) {
+          requirementProfileService.apply(
+              existing, lineReq.getRequirementProfile(), lineReq.getModuleSpecs());
+        }
         syncedLines.add(existing);
       } else {
         // Create new
+        moduleSpecsValidator.validate(lineReq);
         SalesOrderLine newLine = mapUpdateLineRequestToEntity(lineReq, order.getId(), currency);
-        syncedLines.add(lineRepository.save(newLine));
+        SalesOrderLine persistedLine = lineRepository.save(newLine);
+        if (lineReq.getRequirementProfile() != null) {
+          requirementProfileService.apply(
+              persistedLine, lineReq.getRequirementProfile(), lineReq.getModuleSpecs());
+        }
+        syncedLines.add(persistedLine);
       }
     }
 
@@ -287,6 +307,28 @@ public class SalesOrderService {
         existingLines.size() - incomingLineIds.size());
 
     return SalesOrderDto.from(saved, partner, lineResponses);
+  }
+
+  private void validateRequirementProfileContextChange(
+      SalesOrderLine existing, UpdateSalesOrderLineRequest requested) {
+    var current = existing.getRequirementProfileSnapshot();
+    if (current == null) {
+      return;
+    }
+    boolean contextChanged =
+        !Objects.equals(existing.getProductId(), requested.getProductId())
+            || existing.getModuleType() != requested.getModuleType();
+    if (!contextChanged) {
+      return;
+    }
+    if (requested.getRequirementProfile() == null) {
+      throw new OrderDomainException(
+          "Changing a profiled line's product or module type requires a new requirement profile basis");
+    }
+    if (current.basis().equals(requested.getRequirementProfile().basis())) {
+      throw new OrderDomainException(
+          "Changing a profiled line's product or module type requires full re-resolution from a new basis");
+    }
   }
 
   private void updateLineFromRequest(
@@ -957,6 +999,7 @@ public class SalesOrderService {
         .currency(line.getCurrency())
         .moduleType(line.getModuleType())
         .moduleSpecs(line.getModuleSpecs())
+        .requirementProfile(line.getRequirementProfileSnapshot())
         .lineStatus(line.getLineStatus())
         .recipeId(line.getRecipeId())
         .build();
