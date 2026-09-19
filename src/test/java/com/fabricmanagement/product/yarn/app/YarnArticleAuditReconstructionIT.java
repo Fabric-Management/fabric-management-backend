@@ -83,6 +83,20 @@ class YarnArticleAuditReconstructionIT extends YarnArticleIntegrationSupport {
                 .path("articleSpecVersion")
                 .asInt())
         .isEqualTo(3);
+    assertThat(
+            service
+                .historyVersion(article.getId(), 3)
+                .specAfter()
+                .path("sourceDesignation")
+                .asText())
+        .isEqualTo("22 tex supplier");
+    assertThat(
+            service
+                .historyVersion(article.getId(), 1)
+                .specAfter()
+                .path("sourceDesignation")
+                .asText())
+        .isEqualTo("20 tex");
   }
 
   @Test

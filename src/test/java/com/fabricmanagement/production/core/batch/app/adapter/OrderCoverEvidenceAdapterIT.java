@@ -17,7 +17,6 @@ import com.fabricmanagement.product.fiber.infra.repository.FiberCertificationRep
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.product.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.product.qualitygrade.infra.repository.QualityGradeRepository;
-import com.fabricmanagement.production.core.batch.app.BatchCertificateEvidencePolicy;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.app.StockAvailabilityQueryService;
 import com.fabricmanagement.production.core.batch.domain.*;
@@ -67,6 +66,7 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   @Autowired private StockUnitRepository units;
   @Autowired private BatchReservationRepository reservations;
   @Autowired private BatchCertificationRepository certifications;
+  @Autowired private FixtureBatchCertificateEvidencePolicy fixtureCertificatePolicy;
   @Autowired private ColorRepository colors;
   @Autowired private ProductRepository products;
   @Autowired private QualityGradeRepository grades;
@@ -78,6 +78,7 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
 
   @BeforeEach
   void tenantContext() {
+    fixtureCertificatePolicy.clearDeclarations();
     tenantId = tenant();
     TenantContext.setCurrentTenantId(tenantId);
     TenantContext.setCurrentUserId(UUID.randomUUID());
@@ -439,6 +440,7 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
 
     assertThat(byLine.get(matching.lineId()).suitability()).isEqualTo(Suitability.EXACT);
     assertThat(byLine.get(different.lineId()).suitability()).isEqualTo(Suitability.NO_MATCH);
+    assertThat(gotsRequirement.complete()).isTrue();
     assertThat(byLine.get(gotsRequirement.lineId()).suitability()).isEqualTo(Suitability.UNKNOWN);
     assertThat(byLine.get(gotsRequirement.lineId()).controlReasons())
         .contains("FACET_EVIDENCE_UNKNOWN:CERTIFICATION:GOTS");
@@ -453,64 +455,118 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     FiberCertification fixture =
         fiberCertifications.saveAndFlush(
             FiberCertification.builder()
-                .certificationCode("FIXTURE_CERT")
+                .certificationCode(FixtureBatchCertificateEvidencePolicy.SCHEME)
                 .certificationName("Accepted certificate-policy fixture")
                 .build());
-    FiberCertification unsupportedFixture =
-        fiberCertifications.saveAndFlush(
-            FiberCertification.builder()
-                .certificationCode("UNSUPPORTED_FIXTURE_CERT")
-                .certificationName("Certificate fixture without an accepted policy")
-                .build());
+
     Batch renewed = eligibleBatch(product);
-    certificate(renewed, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2001-01-01");
-    certificate(renewed, fixture, BatchCertificateKind.SCOPE, "2001-01-02", "2100-01-01");
-    Batch expired = eligibleBatch(product);
-    certificate(expired, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2001-01-01");
-    Batch unclassified = eligibleBatch(product);
-    certificate(unclassified, fixture, null, "2000-01-01", "2100-01-01");
-    Batch absent = eligibleBatch(product);
-    Batch expiredWithoutPolicy = eligibleBatch(product);
     certificate(
-        expiredWithoutPolicy,
-        unsupportedFixture,
+        renewed,
+        fixture,
         BatchCertificateKind.SCOPE,
+        BatchCertificationScope.FACILITY,
         "2000-01-01",
         "2001-01-01");
+    certificate(
+        renewed,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.FACILITY,
+        "2001-01-02",
+        "2100-01-01");
+
+    Batch expiredAuthoritative = eligibleBatch(product);
+    certificate(
+        expiredAuthoritative,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.FACILITY,
+        "2000-01-01",
+        "2001-01-01");
+    fixtureCertificatePolicy.declareAuthoritative(expiredAuthoritative);
+
+    Batch expiredIncomplete = eligibleBatch(product);
+    certificate(
+        expiredIncomplete,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.FACILITY,
+        "2000-01-01",
+        "2001-01-01");
+
+    Batch outOfCoverageAuthoritative = eligibleBatch(product);
+    certificate(
+        outOfCoverageAuthoritative,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.BATCH,
+        "2000-01-01",
+        "2100-01-01");
+    fixtureCertificatePolicy.declareAuthoritative(outOfCoverageAuthoritative);
+
+    Batch outOfCoverageIncomplete = eligibleBatch(product);
+    certificate(
+        outOfCoverageIncomplete,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.BATCH,
+        "2000-01-01",
+        "2100-01-01");
+
+    Batch unclassified = eligibleBatch(product);
+    certificate(
+        unclassified, fixture, null, BatchCertificationScope.FACILITY, "2000-01-01", "2100-01-01");
+    fixtureCertificatePolicy.declareAuthoritative(unclassified);
+
+    Batch absent = eligibleBatch(product);
+    fixtureCertificatePolicy.declareAuthoritative(absent);
+
     Batch mixed = eligibleBatch(product);
-    certificate(mixed, fixture, BatchCertificateKind.SCOPE, "2000-01-01", "2100-01-01");
-    certificate(mixed, fixture, BatchCertificateKind.TRANSACTION, "2000-01-01", "2001-01-01");
+    certificate(
+        mixed,
+        fixture,
+        BatchCertificateKind.SCOPE,
+        BatchCertificationScope.FACILITY,
+        "2000-01-01",
+        "2100-01-01");
+    certificate(
+        mixed,
+        fixture,
+        BatchCertificateKind.TRANSACTION,
+        BatchCertificationScope.BATCH,
+        "2000-01-01",
+        "2001-01-01");
+    fixtureCertificatePolicy.declareAuthoritative(mixed);
 
     Requirement scope =
         profiledRequirement(
             UUID.randomUUID(),
             product,
-            certificationProfile("FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE"));
+            certificationProfile(
+                FixtureBatchCertificateEvidencePolicy.SCHEME,
+                RequirementFacet.Comparison.ALL,
+                "SCOPE"));
     Requirement all =
         profiledRequirement(
             UUID.randomUUID(),
             product,
             certificationProfile(
-                "FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE", "TRANSACTION"));
-    Requirement unsupportedScope =
-        profiledRequirement(
-            UUID.randomUUID(),
-            product,
-            certificationProfile(
-                "UNSUPPORTED_FIXTURE_CERT", RequirementFacet.Comparison.ALL, "SCOPE"));
+                FixtureBatchCertificateEvidencePolicy.SCHEME,
+                RequirementFacet.Comparison.ALL,
+                "SCOPE",
+                "TRANSACTION"));
     Requirement any =
         profiledRequirement(
             UUID.randomUUID(),
             product,
             certificationProfile(
-                "FIXTURE_CERT", RequirementFacet.Comparison.ANY, "SCOPE", "TRANSACTION"));
+                FixtureBatchCertificateEvidencePolicy.SCHEME,
+                RequirementFacet.Comparison.ANY,
+                "SCOPE",
+                "TRANSACTION"));
     Requirements requirements =
         new Requirements(
-            tenantId,
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            0,
-            List.of(scope, all, any, unsupportedScope));
+            tenantId, UUID.randomUUID(), UUID.randomUUID(), 0, List.of(scope, all, any));
 
     Map<UUID, Lot> lots =
         adapter.inspect(requirements).lots().stream()
@@ -518,16 +574,21 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
 
     assertThat(lots.get(renewed.getId()).suitabilityFor(scope.lineId()).eligibility())
         .isEqualTo(Eligibility.ELIGIBLE);
-    assertThat(lots.get(expired.getId()).suitabilityFor(scope.lineId()).eligibility())
+    assertThat(lots.get(expiredAuthoritative.getId()).suitabilityFor(scope.lineId()).eligibility())
         .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(lots.get(expiredIncomplete.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
+    assertThat(
+            lots.get(outOfCoverageAuthoritative.getId())
+                .suitabilityFor(scope.lineId())
+                .eligibility())
+        .isEqualTo(Eligibility.EXCLUDED);
+    assertThat(
+            lots.get(outOfCoverageIncomplete.getId()).suitabilityFor(scope.lineId()).eligibility())
+        .isEqualTo(Eligibility.UNKNOWN);
     assertThat(lots.get(unclassified.getId()).suitabilityFor(scope.lineId()).eligibility())
         .isEqualTo(Eligibility.UNKNOWN);
     assertThat(lots.get(absent.getId()).suitabilityFor(scope.lineId()).eligibility())
-        .isEqualTo(Eligibility.UNKNOWN);
-    assertThat(
-            lots.get(expiredWithoutPolicy.getId())
-                .suitabilityFor(unsupportedScope.lineId())
-                .eligibility())
         .isEqualTo(Eligibility.UNKNOWN);
     assertThat(lots.get(mixed.getId()).suitabilityFor(all.lineId()).eligibility())
         .isEqualTo(Eligibility.EXCLUDED);
@@ -887,13 +948,14 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
       Batch batch,
       FiberCertification certification,
       BatchCertificateKind kind,
+      BatchCertificationScope scope,
       String validFrom,
       String validUntil) {
     return certifications.saveAndFlush(
         BatchCertification.builder()
             .batch(batch)
             .certification(certification)
-            .scope(BatchCertificationScope.BATCH)
+            .scope(scope)
             .certificateKind(kind)
             .validFrom(LocalDate.parse(validFrom))
             .validUntil(LocalDate.parse(validUntil))
@@ -1051,54 +1113,8 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   @TestConfiguration
   static class CertificatePolicyTestConfig {
     @Bean
-    BatchCertificateEvidencePolicy acceptedFixtureCertificatePolicy() {
-      return new BatchCertificateEvidencePolicy() {
-        @Override
-        public String policyId() {
-          return "SALES_REQ_1_ACCEPTED_FIXTURE";
-        }
-
-        @Override
-        public String policyVersion() {
-          return "1";
-        }
-
-        @Override
-        public boolean supports(String scheme, BatchCertificateKind certificateKind) {
-          return "FIXTURE_CERT".equals(scheme)
-              && Set.of(BatchCertificateKind.SCOPE, BatchCertificateKind.TRANSACTION)
-                  .contains(certificateKind);
-        }
-
-        @Override
-        public Assessment assess(
-            Batch batch,
-            String scheme,
-            BatchCertificateKind certificateKind,
-            List<BatchCertification> records,
-            LocalDate evaluationDate) {
-          List<BatchCertification> schemeRecords =
-              records.stream()
-                  .filter(row -> scheme.equals(row.getCertification().getCertificationCode()))
-                  .toList();
-          if (schemeRecords.isEmpty()) return new Assessment(Outcome.UNKNOWN, List.of());
-          List<BatchCertification> typed =
-              schemeRecords.stream()
-                  .filter(row -> row.getCertificateKind() == certificateKind)
-                  .toList();
-          if (typed.isEmpty()) return new Assessment(Outcome.UNKNOWN, schemeRecords);
-          boolean valid =
-              typed.stream()
-                  .filter(row -> row.getScope() == BatchCertificationScope.BATCH)
-                  .anyMatch(
-                      row ->
-                          (row.getValidFrom() == null
-                                  || !row.getValidFrom().isAfter(evaluationDate))
-                              && (row.getValidUntil() == null
-                                  || !row.getValidUntil().isBefore(evaluationDate)));
-          return new Assessment(valid ? Outcome.MATCH : Outcome.EXCLUDED, typed);
-        }
-      };
+    FixtureBatchCertificateEvidencePolicy acceptedFixtureCertificatePolicy() {
+      return new FixtureBatchCertificateEvidencePolicy();
     }
   }
 }

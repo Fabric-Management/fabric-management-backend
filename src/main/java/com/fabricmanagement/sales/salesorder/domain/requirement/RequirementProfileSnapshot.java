@@ -29,7 +29,24 @@ public record RequirementProfileSnapshot(
     facets = List.copyOf(facets);
     unmodelledConstraints = List.copyOf(unmodelledConstraints);
     deviations = List.copyOf(deviations);
+    pinnedSource = pinnedSource == null ? null : pinnedSource.deepCopy();
     incompleteReasons = List.copyOf(incompleteReasons);
+  }
+
+  public JsonNode pinnedSource() {
+    return pinnedSource == null ? null : pinnedSource.deepCopy();
+  }
+
+  /** Rebuild input from the persisted basis, resolved values and recorded deviations. */
+  public RequirementProfileInput reproductionInput() {
+    return new RequirementProfileInput(
+        basis,
+        scopeVersion,
+        resolutionRuleVersion,
+        scope,
+        facets,
+        unmodelledConstraints,
+        deviations);
   }
 
   public static RequirementProfileSnapshot resolve(

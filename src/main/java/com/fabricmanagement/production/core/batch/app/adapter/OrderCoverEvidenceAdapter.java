@@ -759,9 +759,16 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
           500);
     }
     BatchCertificateEvidencePolicy policy = supportedPolicies.getFirst();
+    BatchCertificateEvidencePolicy.EvidenceSet evidenceSet =
+        policy.evidenceSet(batch, required.scheme(), kind, batchCertifications);
+    if (evidenceSet.records().stream().anyMatch(row -> !batchCertifications.contains(row))) {
+      throw new BatchDomainException(
+          "Certificate policy received evidence outside the evaluated lot",
+          "BATCH_CERTIFICATE_POLICY_INVALID_EVIDENCE",
+          500);
+    }
     BatchCertificateEvidencePolicy.Assessment assessment =
-        policy.assess(
-            batch, required.scheme(), kind, batchCertifications, certificateEvaluationDate);
+        policy.assess(batch, required.scheme(), kind, evidenceSet, certificateEvaluationDate);
     if (assessment.outcome() != BatchCertificateEvidencePolicy.Outcome.UNKNOWN
         && assessment.evidence().isEmpty()) {
       throw new BatchDomainException(
@@ -769,7 +776,7 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
           "BATCH_CERTIFICATE_POLICY_INVALID_RESULT",
           500);
     }
-    if (assessment.evidence().stream().anyMatch(row -> !batchCertifications.contains(row))) {
+    if (assessment.evidence().stream().anyMatch(row -> !evidenceSet.records().contains(row))) {
       throw new BatchDomainException(
           "Certificate policy returned evidence outside the evaluated lot",
           "BATCH_CERTIFICATE_POLICY_INVALID_EVIDENCE",

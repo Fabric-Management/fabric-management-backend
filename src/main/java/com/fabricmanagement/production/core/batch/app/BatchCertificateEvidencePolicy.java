@@ -20,17 +20,39 @@ public interface BatchCertificateEvidencePolicy {
 
   boolean supports(String scheme, BatchCertificateKind certificateKind);
 
+  /**
+   * Supplies the lot-owned certificate record set together with its completeness declaration.
+   *
+   * <p>The conservative default is deliberately non-authoritative: record absence, expiry or
+   * incompatible coverage cannot prove exclusion until the evidence owner explicitly declares that
+   * the set is complete for the evaluated lot. A future production policy may obtain that
+   * declaration from its evidence-owner record; SALES-REQ-1 registers no production policy.
+   */
+  default EvidenceSet evidenceSet(
+      Batch batch,
+      String scheme,
+      BatchCertificateKind certificateKind,
+      List<BatchCertification> records) {
+    return new EvidenceSet(records, false);
+  }
+
   Assessment assess(
       Batch batch,
       String scheme,
       BatchCertificateKind certificateKind,
-      List<BatchCertification> records,
+      EvidenceSet evidenceSet,
       LocalDate evaluationDate);
 
   enum Outcome {
     MATCH,
     EXCLUDED,
     UNKNOWN
+  }
+
+  record EvidenceSet(List<BatchCertification> records, boolean authoritative) {
+    public EvidenceSet {
+      records = records == null ? List.of() : List.copyOf(records);
+    }
   }
 
   record Assessment(Outcome outcome, List<BatchCertification> evidence) {

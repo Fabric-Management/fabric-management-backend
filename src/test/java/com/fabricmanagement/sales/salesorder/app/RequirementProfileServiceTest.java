@@ -20,7 +20,10 @@ import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfi
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.infra.repository.RequirementProfileVersionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -333,7 +336,8 @@ class RequirementProfileServiceTest {
   }
 
   @Test
-  void deviationOverridesPinnedNominalAndReproducesFromTheSameBasis() {
+  void deviationOverridesPinnedNominalAndReproducesByteIdenticallyAfterTheLiveSpecChanges()
+      throws Exception {
     UUID articleId = UUID.randomUUID();
     UUID productId = UUID.randomUUID();
     UUID actor = UUID.randomUUID();
@@ -354,10 +358,10 @@ class RequirementProfileServiceTest {
     source.putArray("twistStages");
     source.putArray("constructionFeatures");
     source.putArray("structureComponents");
-    when(yarnHistory.historyVersion(articleId, 3))
-        .thenReturn(
-            new YarnArticleSpecHistoryPort.Snapshot(
-                articleId, 3, source, actor, Instant.parse("2026-09-18T09:00:00Z")));
+    YarnArticleSpecHistoryPort.Snapshot pinnedHistory =
+        new YarnArticleSpecHistoryPort.Snapshot(
+            articleId, 3, source, actor, Instant.parse("2026-09-18T09:00:00Z"));
+    when(yarnHistory.historyVersion(articleId, 3)).thenReturn(pinnedHistory);
     RequirementFacet.DecisionBasis decision =
         new RequirementFacet.DecisionBasis(
             RequirementFacet.DecisionBasis.Source.CUSTOMER_INSTRUCTION,
@@ -406,6 +410,17 @@ class RequirementProfileServiceTest {
                     effectiveCount.identity(), "customer-deviation-7", actor, decidedAt)));
 
     RequirementProfileSnapshot first = service.apply(line, input, Map.of());
+    ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    byte[] persistedBytes = mapper.writeValueAsBytes(first);
+    RequirementProfileSnapshot persisted =
+        mapper.readValue(persistedBytes, RequirementProfileSnapshot.class);
+
+    // Simulate the mutable article moving to a later specification. The version-3 history object
+    // and the resolved profile must retain their own defensive snapshots.
+    source.put("articleSpecVersion", 4);
+    source.put("originalCountValue", "99");
+    source.put("resultantLinearDensityTex", "99");
+
     SalesOrderLine reproducedLine =
         SalesOrderLine.builder()
             .productId(productId)
@@ -413,7 +428,8 @@ class RequirementProfileServiceTest {
             .unit("KG")
             .build();
     ReflectionTestUtils.setField(reproducedLine, "id", UUID.randomUUID());
-    RequirementProfileSnapshot reproduced = service.apply(reproducedLine, input, Map.of());
+    RequirementProfileSnapshot reproduced =
+        service.apply(reproducedLine, persisted.reproductionInput(), Map.of());
 
     RequirementFacet resolved =
         first.facets().stream()
@@ -424,8 +440,36 @@ class RequirementProfileServiceTest {
         .isEqualByComparingTo("30");
     assertThat(((RequirementFacetValue.YarnCount) resolved.value()).resultantTex())
         .isEqualByComparingTo("32");
+    assertThat(first.deviations())
+        .containsExactly(
+            new RequirementDeviation(
+                effectiveCount.identity(), "customer-deviation-7", actor, decidedAt));
+    assertThat(first.pinnedSource().path("resultantLinearDensityTex").asText()).isEqualTo("30");
+    assertThat(reproduced.pinnedSource().path("resultantLinearDensityTex").asText())
+        .isEqualTo("30");
+    ObjectNode exposedCopy = (ObjectNode) first.pinnedSource();
+    exposedCopy.put("resultantLinearDensityTex", "77");
+    assertThat(first.pinnedSource().path("resultantLinearDensityTex").asText()).isEqualTo("30");
     assertThat(reproduced.fingerprint()).isEqualTo(first.fingerprint());
     assertThat(reproduced.facets()).isEqualTo(first.facets());
+    RequirementProfileSnapshot reproducedWithPersistedIdentity =
+        new RequirementProfileSnapshot(
+            persisted.profileId(),
+            persisted.profileVersion(),
+            reproduced.basis(),
+            reproduced.scopeVersion(),
+            reproduced.resolutionRuleVersion(),
+            reproduced.scope(),
+            reproduced.facets(),
+            reproduced.unmodelledConstraints(),
+            reproduced.deviations(),
+            reproduced.pinnedSource(),
+            reproduced.complete(),
+            reproduced.incompleteReasons(),
+            reproduced.fingerprint());
+    assertThat(mapper.writeValueAsBytes(reproducedWithPersistedIdentity))
+        .containsExactly(persistedBytes);
+    verify(yarnHistory, org.mockito.Mockito.times(2)).historyVersion(articleId, 3);
   }
 
   @Test

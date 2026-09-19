@@ -4,6 +4,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.fabricmanagement.production.core.batch.app.BatchCertificateEvidencePolicy;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,13 @@ class OrderCoverEvidenceArchTest {
             resideInAPackage("com.fabricmanagement.sales..")
                 .and(resideOutsideOfPackage("com.fabricmanagement.sales.salesorder.domain.port.."))
                 .and(resideOutsideOfPackage("com.fabricmanagement.sales.salesorder.dto..")))
+        .check(classes);
+    noClasses()
+        .that()
+        .resideInAPackage("com.fabricmanagement..")
+        .should()
+        .implement(BatchCertificateEvidencePolicy.class)
+        .because("SALES-REQ-1 keeps every real certificate scheme UNKNOWN in production")
         .check(classes);
   }
 }
