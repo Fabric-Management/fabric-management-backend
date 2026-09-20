@@ -104,7 +104,9 @@ class TaskTransitionReplayIT extends AbstractIntegrationTest {
             fixture.task().getVersion() + 1);
 
     assertThatThrownBy(() -> inContext(fixture, () -> orchestrator.execute(command)))
-        .isInstanceOf(jakarta.persistence.OptimisticLockException.class);
+        .isInstanceOfSatisfying(
+            com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException.class,
+            failure -> assertThat(failure.getErrorCode()).isEqualTo("TASK_VERSION_CONFLICT"));
     assertThat(
             inContext(
                 fixture,

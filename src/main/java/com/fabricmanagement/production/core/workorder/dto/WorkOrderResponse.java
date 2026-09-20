@@ -21,11 +21,15 @@ public record WorkOrderResponse(
     String workOrderNumber,
     UUID recipeId,
     UUID outputProductId,
+    String productCode,
     WorkOrderModuleType moduleType,
     WorkOrderProductionSpecs productionSpecs,
     UUID tradingPartnerId,
     UUID salesOrderId,
     UUID salesOrderLineId,
+    UUID requirementProfileId,
+    Integer requirementProfileVersion,
+    com.fasterxml.jackson.databind.JsonNode requirementProfileSnapshot,
     FulfillmentType fulfillmentType,
     UUID fulfillmentId,
     BigDecimal plannedQty,
@@ -69,11 +73,15 @@ public record WorkOrderResponse(
         .workOrderNumber(workOrder.getWorkOrderNumber())
         .recipeId(workOrder.getRecipeId())
         .outputProductId(workOrder.getOutputProductId())
+        .productCode(workOrder.getProductCode())
         .moduleType(workOrder.getModuleType())
         .productionSpecs(workOrder.getProductionSpecs())
         .tradingPartnerId(workOrder.getTradingPartnerId())
         .salesOrderId(workOrder.getSalesOrderId())
         .salesOrderLineId(workOrder.getSalesOrderLineId())
+        .requirementProfileId(workOrder.getRequirementProfileId())
+        .requirementProfileVersion(workOrder.getRequirementProfileVersion())
+        .requirementProfileSnapshot(workOrder.getRequirementProfileSnapshot())
         .fulfillmentType(workOrder.getFulfillmentType())
         .fulfillmentId(workOrder.getFulfillmentId())
         .plannedQty(workOrder.getPlannedQty())

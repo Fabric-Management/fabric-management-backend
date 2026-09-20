@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Synchronizes the authoritative unresolved subject set while retaining row history. */
 @Service
@@ -36,5 +37,13 @@ public class TaskAffectedSubjectService {
         .filter(subject -> !existing.containsKey(subject))
         .map(subject -> TaskAffectedSubject.create(taskId, subject.type(), subject.id()))
         .forEach(repository::save);
+  }
+
+  @Transactional(readOnly = true)
+  public Set<TaskSubject> current(UUID taskId) {
+    return repository.findAllByTaskId(taskId).stream()
+        .filter(row -> Boolean.TRUE.equals(row.getIsActive()))
+        .map(row -> new TaskSubject(row.getSubjectType(), row.getSubjectId()))
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 }

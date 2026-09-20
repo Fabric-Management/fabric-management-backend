@@ -339,6 +339,7 @@ class OrderCoverEvidenceServiceTest {
   @Test
   void liveLoaderKeepsEmptySpecsUnknownAndRebuildAppendsWithoutEditingHistory() {
     TenantContext.setCurrentTenantId(tenant);
+    TenantContext.setCurrentUserId(UUID.randomUUID());
     var orders = mock(SalesOrderRepository.class);
     var lines = mock(SalesOrderLineRepository.class);
     var streams = mock(OrderCoverEvidenceStreamRepository.class);
@@ -352,7 +353,8 @@ class OrderCoverEvidenceServiceTest {
             snapshots,
             port,
             Clock.fixed(now, ZoneOffset.UTC),
-            transactions());
+            transactions(),
+            mock(OrderCoverObjectAccess.class));
     var salesOrder = SalesOrder.builder().build();
     salesOrder.setId(order);
     salesOrder.setTenantId(tenant);
@@ -435,13 +437,21 @@ class OrderCoverEvidenceServiceTest {
   @Test
   void historicalLookupAlwaysIncludesAuthenticatedTenantAndOrder() {
     TenantContext.setCurrentTenantId(tenant);
+    TenantContext.setCurrentUserId(UUID.randomUUID());
     var repository = mock(OrderCoverEvidenceRepository.class);
     UUID evidenceId = UUID.randomUUID();
     when(repository.findByTenantIdAndSalesOrderIdAndId(tenant, order, evidenceId))
         .thenReturn(Optional.empty());
     var service =
         new OrderCoverEvidenceService(
-            null, null, null, repository, null, Clock.systemUTC(), transactions());
+            null,
+            null,
+            null,
+            repository,
+            null,
+            Clock.systemUTC(),
+            transactions(),
+            mock(OrderCoverObjectAccess.class));
     assertThatThrownBy(() -> service.read(order, evidenceId))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class);
     verify(repository).findByTenantIdAndSalesOrderIdAndId(tenant, order, evidenceId);
@@ -450,6 +460,7 @@ class OrderCoverEvidenceServiceTest {
   @Test
   void serializationFailureRollsBackAndRetriesInFreshBoundedTransaction() {
     TenantContext.setCurrentTenantId(tenant);
+    TenantContext.setCurrentUserId(UUID.randomUUID());
     var streams = mock(OrderCoverEvidenceStreamRepository.class);
     var orders = mock(SalesOrderRepository.class);
     var lines = mock(SalesOrderLineRepository.class);
@@ -479,7 +490,8 @@ class OrderCoverEvidenceServiceTest {
             snapshots,
             port,
             Clock.fixed(now, ZoneOffset.UTC),
-            transactions);
+            transactions,
+            mock(OrderCoverObjectAccess.class));
     assertThat(service.refresh(order, caseId).revision()).isEqualTo(1);
     verify(transactions, times(2))
         .getTransaction(
@@ -498,11 +510,19 @@ class OrderCoverEvidenceServiceTest {
   @Test
   void retryIsBoundedAndDoesNotRetryBusinessFailures() {
     TenantContext.setCurrentTenantId(tenant);
+    TenantContext.setCurrentUserId(UUID.randomUUID());
     var streams = mock(OrderCoverEvidenceStreamRepository.class);
     var transactions = transactions();
     var service =
         new OrderCoverEvidenceService(
-            null, null, streams, null, null, Clock.systemUTC(), transactions);
+            null,
+            null,
+            streams,
+            null,
+            null,
+            Clock.systemUTC(),
+            transactions,
+            mock(OrderCoverObjectAccess.class));
     when(streams.lockScope(tenant, caseId))
         .thenThrow(
             new CannotSerializeTransactionException("retry", new SQLException("race", "40001")));

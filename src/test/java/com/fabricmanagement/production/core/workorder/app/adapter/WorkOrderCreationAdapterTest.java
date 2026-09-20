@@ -9,8 +9,13 @@ import com.fabricmanagement.production.core.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.core.workorder.dto.CreateWorkOrderRequest;
 import com.fabricmanagement.production.core.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileBasis;
+import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -87,5 +92,69 @@ class WorkOrderCreationAdapterTest {
 
     assertThat(captured.certificationReq()).isNull();
     assertThat(captured.originReq()).isNull();
+  }
+
+  @Test
+  void carriesImmutableRequirementProfileBindingIntoTheDraftRequest() {
+    UUID orderId = UUID.randomUUID();
+    UUID productId = UUID.randomUUID();
+    UUID profileId = UUID.randomUUID();
+    UUID actorId = UUID.randomUUID();
+    RequirementProfileSnapshot profile =
+        new RequirementProfileSnapshot(
+            profileId,
+            3,
+            new RequirementProfileBasis(
+                RequirementProfileBasis.Kind.LINE_EXPLICIT,
+                productId,
+                null,
+                null,
+                null,
+                actorId,
+                Instant.parse("2026-09-19T12:00:00Z"),
+                "customer instruction"),
+            "v1",
+            "v1",
+            Set.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            true,
+            List.of(),
+            "fingerprint");
+    DraftProductionOrderCommand command =
+        new DraftProductionOrderCommand(
+            null,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            BigDecimal.TEN,
+            "M",
+            "GBP",
+            null,
+            null,
+            null,
+            orderId,
+            productId,
+            profileId,
+            3,
+            profile,
+            "FABRIC-001");
+    WorkOrderCreationAdapter profileAdapter =
+        new WorkOrderCreationAdapter(
+            workOrderService,
+            new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules());
+    when(workOrderService.createWorkOrder(any(CreateWorkOrderRequest.class)))
+        .thenReturn(WorkOrderResponse.builder().id(UUID.randomUUID()).build());
+
+    profileAdapter.requestDraftProductionOrder(command);
+
+    verify(workOrderService).createWorkOrder(requestCaptor.capture());
+    assertThat(requestCaptor.getValue().salesOrderId()).isEqualTo(orderId);
+    assertThat(requestCaptor.getValue().outputProductId()).isEqualTo(productId);
+    assertThat(requestCaptor.getValue().requirementProfileId()).isEqualTo(profileId);
+    assertThat(requestCaptor.getValue().requirementProfileVersion()).isEqualTo(3);
+    assertThat(requestCaptor.getValue().requirementProfileSnapshot()).isNotNull();
+    assertThat(requestCaptor.getValue().productCode()).isEqualTo("FABRIC-001");
   }
 }

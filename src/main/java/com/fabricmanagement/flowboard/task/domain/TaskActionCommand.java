@@ -9,7 +9,8 @@ public record TaskActionCommand(
     String idempotencyKey,
     String actionKey,
     String payloadFingerprint,
-    long expectedVersion) {
+    long expectedVersion,
+    TaskActionPayload payload) {
   public TaskActionCommand {
     if (taskId == null
         || actorId == null
@@ -22,5 +23,15 @@ public record TaskActionCommand(
         || expectedVersion < 0) {
       throw new IllegalArgumentException("Task action command envelope is invalid");
     }
+  }
+
+  public TaskActionCommand(
+      UUID taskId,
+      UUID actorId,
+      String idempotencyKey,
+      String actionKey,
+      String payloadFingerprint,
+      long expectedVersion) {
+    this(taskId, actorId, idempotencyKey, actionKey, payloadFingerprint, expectedVersion, null);
   }
 }

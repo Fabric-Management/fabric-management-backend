@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
+import com.fabricmanagement.sales.salesorder.app.OrderCoverEnrolmentService;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
@@ -96,6 +97,9 @@ class SalesDemoSeederTest {
               assertThat((UUID) invocation.getArgument(1)).isEqualTo(SystemUser.ID);
               return approvalRequired;
             });
+    OrderCoverEnrolmentService enrolment = mock(OrderCoverEnrolmentService.class);
+    when(enrolment.decide(any(), any()))
+        .thenReturn(com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.LEGACY);
     SalesOrderService realConfirmation =
         spy(
             new SalesOrderService(
@@ -110,7 +114,11 @@ class SalesDemoSeederTest {
                 null,
                 approval,
                 null,
-                mock(SalesOrderAccessPolicy.class)));
+                mock(SalesOrderAccessPolicy.class),
+                mock(
+                    com.fabricmanagement.sales.salesorder.infra.repository
+                        .OrderCoverActivationRepository.class),
+                enrolment));
     // Isolate creation only; seedFor invokes the real demo entry and shared approval flow.
     doAnswer(
             invocation -> {

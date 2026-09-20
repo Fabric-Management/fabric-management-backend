@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -13,6 +14,7 @@ import com.fabricmanagement.production.core.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.core.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import java.math.BigDecimal;
@@ -101,6 +103,25 @@ class WorkOrderSalesEventListenerTest {
     listener.onSalesOrderConfirmed(event);
 
     verify(workOrderService).createFromSalesOrderLine(any(), any(), any());
+  }
+
+  @Test
+  void governedConfirmationCreatesNoWorkOrderAndDoesNotClaimLegacyListenerWork() {
+    SalesOrderConfirmedEvent event =
+        new SalesOrderConfirmedEvent(
+            tenantId,
+            orderId,
+            "SO-124",
+            UUID.randomUUID(),
+            "Customer",
+            BigDecimal.ONE,
+            "KG",
+            LocalDate.now(),
+            List.of(),
+            OrderCoverRegime.GOVERNED);
+    listener.onSalesOrderConfirmed(event);
+    verifyNoInteractions(workOrderService);
+    verifyNoInteractions(idempotentHandler);
   }
 
   @Test

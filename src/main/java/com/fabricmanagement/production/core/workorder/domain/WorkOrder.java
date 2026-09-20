@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.core.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.core.workorder.domain.specs.GenericProductionSpecs;
 import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -58,6 +59,16 @@ public class WorkOrder extends BaseEntity {
 
   @Column(name = "sales_order_line_id")
   private UUID salesOrderLineId;
+
+  @Column(name = "requirement_profile_id")
+  private UUID requirementProfileId;
+
+  @Column(name = "requirement_profile_version")
+  private Integer requirementProfileVersion;
+
+  @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
+  @Column(name = "requirement_profile_snapshot", columnDefinition = "jsonb")
+  private JsonNode requirementProfileSnapshot;
 
   @Column(name = "certification_req", length = 50)
   private String certificationReq;

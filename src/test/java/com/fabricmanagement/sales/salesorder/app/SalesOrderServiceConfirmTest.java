@@ -54,6 +54,12 @@ class SalesOrderServiceConfirmTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private SalesOrderAccessPolicy accessPolicy;
 
+  @Mock
+  private com.fabricmanagement.sales.salesorder.infra.repository.OrderCoverActivationRepository
+      orderCoverActivationRepository;
+
+  @Mock private OrderCoverEnrolmentService orderCoverEnrolmentService;
+
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrderConfirmedEvent> eventCaptor;
@@ -74,6 +80,9 @@ class SalesOrderServiceConfirmTest {
                 org.mockito.ArgumentMatchers.eq(userId),
                 any(SalesOrder.class)))
         .thenReturn(true);
+    org.mockito.Mockito.lenient()
+        .when(orderCoverEnrolmentService.decide(any(), any()))
+        .thenReturn(com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.LEGACY);
   }
 
   @AfterEach
@@ -100,6 +109,25 @@ class SalesOrderServiceConfirmTest {
     ReflectionTestUtils.setField(line, "requestedQty", qty);
     ReflectionTestUtils.setField(line, "isActive", true);
     return line;
+  }
+
+  @Test
+  void governedConfirmationSkipsLegacyRuleEngineAndPublishesGovernedEvent() {
+    SalesOrder order = createDraftOrder();
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of());
+    when(orderCoverEnrolmentService.decide(order, List.of()))
+        .thenReturn(com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.GOVERNED);
+
+    salesOrderService.confirmOrder(orderId, userId);
+
+    verify(ruleEngine, never()).processConfirmedOrder(any());
+    verify(domainEventPublisher).publish(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().getCoverRegime())
+        .isEqualTo(com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.GOVERNED);
   }
 
   @Test

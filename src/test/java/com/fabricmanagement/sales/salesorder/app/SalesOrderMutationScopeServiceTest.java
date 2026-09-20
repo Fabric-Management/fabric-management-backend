@@ -59,7 +59,9 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             new SalesOrderAccessPolicy(
-                new SalesAccessScopeResolver(permissionEvaluator, userQueryService)));
+                new SalesAccessScopeResolver(permissionEvaluator, userQueryService)),
+            null,
+            null);
   }
 
   @AfterEach

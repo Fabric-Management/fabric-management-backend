@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Internal service until 5b-3 supplies real case lifecycle and the guarded HTTP surface. */
+/** Builds and reads order-cover evidence behind grant and subject-scope checks. */
 @Service
 @RequiredArgsConstructor
 public class OrderCoverEvidenceService {
@@ -32,18 +32,19 @@ public class OrderCoverEvidenceService {
   private final OrderCoverEvidencePort production;
   private final Clock clock;
   private final PlatformTransactionManager transactionManager;
+  private final OrderCoverObjectAccess objectAccess;
 
   @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'read') and @auth.can(authentication, 'sales',"
-          + " 'read') and @auth.hasScope(authentication, 'sales', 'read', 'ORGANIZATION')")
+      "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','read')")
   public OrderCoverEvidenceDto refresh(UUID orderId, UUID caseId) {
+    objectAccess.readable(orderId, requireActor());
     return appendWithRetry(orderId, caseId, false);
   }
 
   @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'write') and @auth.can(authentication, 'sales',"
-          + " 'write') and @auth.hasScope(authentication, 'sales', 'write', 'ORGANIZATION')")
+      "@auth.can(authentication,'flowboard','write') and @auth.can(authentication,'sales','write')")
   public OrderCoverEvidenceDto rebuild(UUID orderId, UUID caseId) {
+    objectAccess.assertWritable(orderId, requireActor());
     return appendWithRetry(orderId, caseId, true);
   }
 
@@ -108,21 +109,23 @@ public class OrderCoverEvidenceService {
     return evidence.saveAndFlush(snapshot).toDto();
   }
 
-  @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'read') and @auth.can(authentication, 'sales',"
-          + " 'read') and @auth.hasScope(authentication, 'sales', 'read', 'ORGANIZATION')")
   @Transactional(readOnly = true)
+  @PreAuthorize(
+      "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','read')")
   public OrderCoverEvidenceDto read(UUID orderId, UUID evidenceId) {
+    objectAccess.readable(orderId, requireActor());
     return load(orderId, evidenceId).toDto();
+  }
+
+  private static UUID requireActor() {
+    return Objects.requireNonNull(
+        TenantContext.getCurrentUserId(), "Authenticated actor is required");
   }
 
   /**
    * Caller locks task/order/case/lines first. Existing production rows stay locked until its
    * commit. A matching fingerprint is necessary, but does not prove atomic stock commitment (5b-3).
    */
-  @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'write') and @auth.can(authentication, 'sales',"
-          + " 'write') and @auth.hasScope(authentication, 'sales', 'write', 'ORGANIZATION')")
   @Transactional(propagation = Propagation.MANDATORY)
   public Revalidation revalidate(UUID orderId, UUID evidenceId) {
     var previous = load(orderId, evidenceId);

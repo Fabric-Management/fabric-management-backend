@@ -8,6 +8,7 @@ import com.fabricmanagement.production.core.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.core.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.core.workorder.dto.IncomingSalesOrderLine;
 import com.fabricmanagement.production.core.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import java.util.List;
@@ -38,6 +39,7 @@ public class WorkOrderSalesEventListener {
       backoff = @Backoff(delay = 200, multiplier = 2))
   @ApplicationModuleListener
   public void onSalesOrderConfirmed(SalesOrderConfirmedEvent event) {
+    if (event.getCoverRegime() == OrderCoverRegime.GOVERNED) return;
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () ->

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
@@ -53,6 +54,10 @@ class WorkOrderServiceTest {
   @Mock private TenantFacade tenantFacade;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private WorkOrderProductionCompletionService workOrderProductionCompletionService;
+
+  @Mock
+  private com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock
+      fulfilmentLock;
 
   @InjectMocks private WorkOrderService workOrderService;
 
@@ -164,6 +169,8 @@ class WorkOrderServiceTest {
     CreateWorkOrderRequest request =
         CreateWorkOrderRequest.builder()
             .recipeId(UUID.randomUUID())
+            .salesOrderLineId(salesOrderLineId)
+            .productCode("FABRIC-001")
             .plannedQty(BigDecimal.TEN)
             .unit("KG")
             .certificationReq("GOTS")
@@ -184,6 +191,38 @@ class WorkOrderServiceTest {
 
     assertThat(response.certificationReq()).isEqualTo("GOTS");
     assertThat(response.originReq()).isEqualTo("TR");
+    assertThat(response.status()).isEqualTo(WorkOrderStatus.DRAFT);
+    assertThat(response.productCode()).isEqualTo("FABRIC-001");
+    verify(fulfilmentLock).lock(tenantId, salesOrderLineId);
+    verifyNoInteractions(approvalPort, domainEventPublisher);
+  }
+
+  @Test
+  void legacyEventCreationTakesTheSameLineFulfilmentLockBeforeInspectingWorkOrders() {
+    WorkOrder existing =
+        WorkOrder.builder()
+            .workOrderNumber("WO-existing")
+            .status(WorkOrderStatus.APPROVED)
+            .plannedQty(BigDecimal.ONE)
+            .unit("KG")
+            .build();
+    when(workOrderRepository.findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
+            tenantId, salesOrderLineId))
+        .thenReturn(List.of(existing));
+
+    workOrderService.createFromSalesOrderLine(
+        tenantId,
+        UUID.randomUUID(),
+        new com.fabricmanagement.production.core.workorder.dto.IncomingSalesOrderLine(
+            salesOrderLineId, "FABRIC-001", BigDecimal.ONE, "KG", null));
+
+    var ordered = org.mockito.Mockito.inOrder(fulfilmentLock, workOrderRepository);
+    ordered.verify(fulfilmentLock).lock(tenantId, salesOrderLineId);
+    ordered
+        .verify(workOrderRepository)
+        .findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
+            tenantId, salesOrderLineId);
+    verifyNoInteractions(approvalPort, domainEventPublisher);
   }
 
   @Test

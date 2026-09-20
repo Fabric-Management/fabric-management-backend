@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
@@ -26,6 +27,7 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
   private final String unit;
   private final LocalDate requestedDeliveryDate;
   private final java.util.List<SalesOrderLineSnapshot> lines;
+  private final OrderCoverRegime coverRegime;
 
   public record SalesOrderLineSnapshot(
       UUID lineId,
@@ -44,7 +46,8 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
       BigDecimal totalQuantity,
       String unit,
       LocalDate requestedDeliveryDate,
-      java.util.List<SalesOrderLineSnapshot> lines) {
+      java.util.List<SalesOrderLineSnapshot> lines,
+      OrderCoverRegime coverRegime) {
     super(tenantId, "SalesOrderConfirmed");
     this.salesOrderId = salesOrderId;
     this.orderNumber = orderNumber;
@@ -54,6 +57,30 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
     this.unit = unit;
     this.requestedDeliveryDate = requestedDeliveryDate;
     this.lines = lines != null ? lines : java.util.Collections.emptyList();
+    this.coverRegime = coverRegime != null ? coverRegime : OrderCoverRegime.LEGACY;
+  }
+
+  public SalesOrderConfirmedEvent(
+      UUID tenantId,
+      UUID salesOrderId,
+      String orderNumber,
+      UUID customerId,
+      String customerName,
+      BigDecimal totalQuantity,
+      String unit,
+      LocalDate requestedDeliveryDate,
+      java.util.List<SalesOrderLineSnapshot> lines) {
+    this(
+        tenantId,
+        salesOrderId,
+        orderNumber,
+        customerId,
+        customerName,
+        totalQuantity,
+        unit,
+        requestedDeliveryDate,
+        lines,
+        OrderCoverRegime.LEGACY);
   }
 
   @JsonCreator
@@ -70,7 +97,8 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
       @JsonProperty("totalQuantity") BigDecimal totalQuantity,
       @JsonProperty("unit") String unit,
       @JsonProperty("requestedDeliveryDate") LocalDate requestedDeliveryDate,
-      @JsonProperty("lines") java.util.List<SalesOrderLineSnapshot> lines) {
+      @JsonProperty("lines") java.util.List<SalesOrderLineSnapshot> lines,
+      @JsonProperty("coverRegime") OrderCoverRegime coverRegime) {
     super(
         eventId,
         tenantId,
@@ -85,5 +113,6 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
     this.unit = unit;
     this.requestedDeliveryDate = requestedDeliveryDate;
     this.lines = lines != null ? lines : java.util.Collections.emptyList();
+    this.coverRegime = coverRegime != null ? coverRegime : OrderCoverRegime.LEGACY;
   }
 }

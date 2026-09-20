@@ -46,6 +46,22 @@ import org.hibernate.annotations.Type;
 @AllArgsConstructor
 public class SalesOrder extends BaseEntity {
 
+  @Column(name = "creation_seq", insertable = false, updatable = false)
+  private Long creationSeq;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "cover_regime", length = 20)
+  @Setter(AccessLevel.NONE)
+  private OrderCoverRegime coverRegime;
+
+  public void decideCoverRegime(OrderCoverRegime regime) {
+    if (regime == null) throw new IllegalArgumentException("Order-cover regime is required");
+    if (coverRegime != null && coverRegime != regime) {
+      throw new OrderDomainException("Order-cover regime is immutable", 409);
+    }
+    coverRegime = regime;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // TradingPartner Reference (Faz 1.5)
   // ═══════════════════════════════════════════════════════════════════════════
