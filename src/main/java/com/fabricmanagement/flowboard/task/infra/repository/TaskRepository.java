@@ -17,6 +17,13 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
   java.util.Optional<Task> findByTenantIdAndGenerationKeyAndIsActiveTrueAndClosedAtIsNull(
       UUID tenantId, String generationKey);
 
+  java.util.Optional<Task>
+      findByTenantIdAndEntityTypeAndEntityIdAndTaskTypeAndIsActiveTrueAndClosedAtIsNull(
+          UUID tenantId,
+          String entityType,
+          UUID entityId,
+          com.fabricmanagement.flowboard.task.domain.TaskType taskType);
+
   /**
    * Board'daki tüm aktif task'ları priorityScore'a göre sıralı getirir. Kanban view için
    * kullanılır.

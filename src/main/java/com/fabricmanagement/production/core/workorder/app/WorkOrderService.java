@@ -5,6 +5,7 @@ import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
+import com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.tenant.api.facade.TenantFacade;
@@ -62,6 +63,7 @@ public class WorkOrderService {
   private final TenantFacade tenantFacade;
   private final DocumentNumberGenerator documentNumberGenerator;
   private final WorkOrderProductionCompletionService workOrderProductionCompletionService;
+  private final SalesOrderLineFulfilmentLock fulfilmentLock;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -133,6 +135,9 @@ public class WorkOrderService {
   /** Creates a new work order in DRAFT state. */
   @Transactional
   public WorkOrderResponse createWorkOrder(WorkOrderRequest request) {
+    if (request.salesOrderLineId() != null) {
+      fulfilmentLock.lock(TenantContext.requireTenantId(), request.salesOrderLineId());
+    }
     WorkOrder workOrder =
         WorkOrder.builder()
             .workOrderNumber(generateWorkOrderNumber())
@@ -175,6 +180,9 @@ public class WorkOrderService {
   @Transactional
   public WorkOrderResponse createWorkOrder(
       com.fabricmanagement.production.core.workorder.dto.CreateWorkOrderRequest request) {
+    if (request.salesOrderLineId() != null) {
+      fulfilmentLock.lock(TenantContext.requireTenantId(), request.salesOrderLineId());
+    }
     java.time.Instant deadlineInstant =
         request.deadline() != null
             ? request.deadline().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
@@ -187,11 +195,16 @@ public class WorkOrderService {
 
     WorkOrder workOrder =
         WorkOrder.builder()
+            .salesOrderId(request.salesOrderId())
             .workOrderNumber(generateWorkOrderNumber())
             .recipeId(request.recipeId())
             .outputProductId(request.outputProductId())
+            .productCode(request.productCode())
             .tradingPartnerId(request.tradingPartnerId())
             .salesOrderLineId(request.salesOrderLineId())
+            .requirementProfileId(request.requirementProfileId())
+            .requirementProfileVersion(request.requirementProfileVersion())
+            .requirementProfileSnapshot(request.requirementProfileSnapshot())
             .fulfillmentType(fulfillmentType)
             .plannedQty(request.plannedQty())
             .unit(request.unit())
@@ -218,12 +231,21 @@ public class WorkOrderService {
     return mapToResponse(saved);
   }
 
+  public boolean hasActiveProduction(UUID tenantId, UUID salesOrderLineId) {
+    return workOrderRepository.existsByTenantIdAndSalesOrderLineIdAndIsActiveTrueAndStatusNotIn(
+        tenantId,
+        salesOrderLineId,
+        java.util.List.of(WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED));
+  }
+
   /** Creates a WorkOrder from a SalesOrderLine snapshot published in an event. */
   @Transactional
   public void createFromSalesOrderLine(
       UUID tenantId,
       UUID salesOrderId,
       com.fabricmanagement.production.core.workorder.dto.IncomingSalesOrderLine line) {
+
+    fulfilmentLock.lock(tenantId, line.lineId());
 
     List<WorkOrder> existingForLine =
         workOrderRepository.findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(

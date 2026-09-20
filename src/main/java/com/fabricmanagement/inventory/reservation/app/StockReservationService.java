@@ -1,5 +1,6 @@
 package com.fabricmanagement.inventory.reservation.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.inventory.common.exception.IwmDomainException;
 import com.fabricmanagement.inventory.reservation.domain.StockReservation;
@@ -28,6 +29,7 @@ public class StockReservationService {
   private final StockReservationRepository repository;
   private final StockReservationEngine engine;
   private final ApplicationEventPublisher eventPublisher;
+  private final SalesOrderLineFulfilmentLock fulfilmentLock;
 
   @Transactional(readOnly = true)
   public List<LotSuggestion> getFifoSuggestions(UUID productId, BigDecimal requiredQty) {
@@ -45,6 +47,7 @@ public class StockReservationService {
       BigDecimal qtyReserved) {
 
     UUID tenantId = TenantContext.requireTenantId();
+    fulfilmentLock.lock(tenantId, salesOrderLineId);
 
     StockReservation reservation =
         new StockReservation(

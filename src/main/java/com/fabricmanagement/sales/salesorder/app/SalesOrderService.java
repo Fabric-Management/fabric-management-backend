@@ -72,6 +72,10 @@ public class SalesOrderService {
   private final ApprovalPort approvalPort;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
   private final SalesOrderAccessPolicy accessPolicy;
+  private final com.fabricmanagement.sales.salesorder.infra.repository
+          .OrderCoverActivationRepository
+      orderCoverActivationRepository;
+  private final OrderCoverEnrolmentService orderCoverEnrolmentService;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -114,6 +118,7 @@ public class SalesOrderService {
 
     OrderTotals totals = OrderTotals.of(total, tax, discount);
 
+    orderCoverActivationRepository.lockForOrderInsert(tenantId);
     SalesOrder order =
         SalesOrder.builder()
             .tradingPartnerId(tradingPartnerId)
@@ -631,14 +636,18 @@ public class SalesOrderService {
 
     log.info("Sales order confirmed: uid={}", saved.getUid());
 
-    // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
-    ruleEngine.processConfirmedOrder(saved);
-
     TradingPartnerDto partner =
         partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
 
     List<SalesOrderLine> orderLines =
         lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId());
+
+    com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime coverRegime =
+        orderCoverEnrolmentService.decide(saved, orderLines);
+    orderRepository.save(saved);
+    if (coverRegime == com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.LEGACY) {
+      ruleEngine.processConfirmedOrder(saved);
+    }
 
     BigDecimal totalQuantity =
         orderLines.stream()
@@ -676,7 +685,8 @@ public class SalesOrderService {
             totalQuantity,
             unit,
             saved.getRequestedDeliveryDate(),
-            snapshotLines));
+            snapshotLines,
+            coverRegime));
 
     List<SalesOrderLineResponse> lineResponses =
         orderLines.stream().map(this::mapLineToResponse).toList();

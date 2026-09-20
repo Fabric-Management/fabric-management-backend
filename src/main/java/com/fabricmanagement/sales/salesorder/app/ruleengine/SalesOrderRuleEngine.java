@@ -172,7 +172,15 @@ public class SalesOrderRuleEngine {
             line.getCurrency(),
             order.getDeadline(),
             certificationReq,
-            originReq);
+            originReq,
+            order.getId(),
+            line.getProductId(),
+            line.getRequirementProfileId(),
+            line.getRequirementProfileVersion(),
+            line.getRequirementProfileSnapshot(),
+            line.getProductDesc() != null
+                ? line.getProductDesc()
+                : "PRODUCT_" + line.getProductId());
 
     UUID workOrderId = productionOrderPort.requestDraftProductionOrder(cmd);
     log.info(

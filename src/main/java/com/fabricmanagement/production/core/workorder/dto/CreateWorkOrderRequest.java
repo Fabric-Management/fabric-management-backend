@@ -4,6 +4,7 @@ import com.fabricmanagement.production.core.workorder.domain.FulfillmentType;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.core.workorder.domain.specs.GenericProductionSpecs;
 import com.fabricmanagement.production.core.workorder.domain.specs.WorkOrderProductionSpecs;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -23,14 +24,20 @@ import lombok.Builder;
  */
 @Builder
 public record CreateWorkOrderRequest(
+    UUID salesOrderId,
+    String productCode,
     UUID recipeId,
-    @NotNull @Schema(description = "Output product UUID") UUID outputProductId,
+    @Schema(description = "Output product UUID; null for a truthful free-text order line")
+        UUID outputProductId,
     @NotNull @Schema(description = "Production module type (e.g. WEAVING, DYEING)")
         WorkOrderModuleType moduleType,
     @NotNull @Schema(description = "Module-specific production specifications")
         WorkOrderProductionSpecs productionSpecs,
     UUID tradingPartnerId,
     UUID salesOrderLineId,
+    UUID requirementProfileId,
+    Integer requirementProfileVersion,
+    JsonNode requirementProfileSnapshot,
     FulfillmentType fulfillmentType,
     @NotNull(message = "Planned quantity is mandatory")
         @DecimalMin(value = "0.01", message = "Planned quantity must be greater than zero")

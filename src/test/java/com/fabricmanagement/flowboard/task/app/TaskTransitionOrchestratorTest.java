@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import com.fabricmanagement.flowboard.task.domain.DomainTaskActionResult;
 import com.fabricmanagement.flowboard.task.domain.ModuleType;
 import com.fabricmanagement.flowboard.task.domain.Priority;
@@ -20,8 +21,8 @@ import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptClaimRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionAttemptRepository;
+import com.fabricmanagement.flowboard.task.infra.repository.TaskTransitionTransactionGuard;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskVersionLockRepository;
-import jakarta.persistence.OptimisticLockException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -52,6 +53,7 @@ class TaskTransitionOrchestratorTest {
   @Mock private TaskTransitionAttemptRepository attemptRepository;
   @Mock private TaskTransitionAttemptClaimRepository attemptClaimRepository;
   @Mock private TaskAffectedSubjectService affectedSubjectService;
+  @Mock private TaskTransitionTransactionGuard transactionGuard;
 
   @BeforeEach
   void setUp() {
@@ -72,13 +74,45 @@ class TaskTransitionOrchestratorTest {
     when(attemptRepository.findByTenantIdAndActorIdAndIdempotencyKey(
             TENANT_ID, ACTOR_ID, command.idempotencyKey()))
         .thenReturn(Optional.of(attempt));
+    when(taskRepository.findById(command.taskId())).thenReturn(Optional.of(governedTask(4L)));
+    when(affectedSubjectService.current(command.taskId())).thenReturn(Set.of());
 
     var result = orchestrator(List.of()).execute(command);
 
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.ACCEPTED);
     assertThat(result.replayed()).isTrue();
+    assertThat(result.taskVersion()).isEqualTo(4L);
+    verify(taskRepository).findById(command.taskId());
+    verify(taskVersionLockRepository, never()).forceIncrementNow(any());
+    var ordered = org.mockito.Mockito.inOrder(transactionGuard, attemptRepository);
+    ordered.verify(transactionGuard).setBoundedLockTimeout();
+    ordered
+        .verify(attemptRepository)
+        .findByTenantIdAndActorIdAndIdempotencyKey(TENANT_ID, ACTOR_ID, command.idempotencyKey());
+  }
+
+  @Test
+  void sameIdempotencyKeyWithDifferentPayloadFingerprintIsAConflict() {
+    TaskActionCommand original = command(2);
+    TaskTransitionAttempt attempt = TaskTransitionAttempt.claim(original);
+    attempt.completeAccepted("ORDER_COVER_RESULT", UUID.randomUUID(), Instant.now());
+    TaskActionCommand changed =
+        new TaskActionCommand(
+            original.taskId(),
+            original.actorId(),
+            original.idempotencyKey(),
+            original.actionKey(),
+            "b".repeat(64),
+            original.expectedVersion());
+    when(attemptRepository.findByTenantIdAndActorIdAndIdempotencyKey(
+            TENANT_ID, ACTOR_ID, original.idempotencyKey()))
+        .thenReturn(Optional.of(attempt));
+
+    assertThatThrownBy(() -> orchestrator(List.of()).execute(changed))
+        .isInstanceOfSatisfying(
+            FlowBoardDomainException.class,
+            failure -> assertThat(failure.getErrorCode()).isEqualTo("IDEMPOTENCY_CONFLICT"));
     verify(taskRepository, never()).findById(any());
-    verify(taskVersionLockRepository, never()).forceIncrement(any());
   }
 
   @Test
@@ -89,7 +123,9 @@ class TaskTransitionOrchestratorTest {
     when(taskRepository.findById(command.taskId())).thenReturn(Optional.of(task));
 
     assertThatThrownBy(() -> orchestrator(List.of()).execute(command))
-        .isInstanceOf(OptimisticLockException.class)
+        .isInstanceOfSatisfying(
+            FlowBoardDomainException.class,
+            failure -> assertThat(failure.getErrorCode()).isEqualTo("TASK_VERSION_CONFLICT"))
         .hasMessageContaining("expected=2 actual=3");
   }
 
@@ -120,7 +156,41 @@ class TaskTransitionOrchestratorTest {
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.REJECTED_BUSINESS);
     assertThat(result.rejectionCode()).isEqualTo("STOCK_UNKNOWN");
     verify(taskRepository, never()).save(any());
-    verify(taskVersionLockRepository, never()).forceIncrement(any());
+    verify(taskVersionLockRepository, never()).forceIncrementNow(any());
+  }
+
+  @Test
+  void concurrentVersionChangeDuringTheWriteStaysRetryableAndRecordsNoAttempt() {
+    Task task = governedTask(2L);
+    TaskActionCommand command = command(2);
+    Set<TaskSubject> remainingSubjects = Set.of(new TaskSubject("TEST_SCOPE", UUID.randomUUID()));
+    DomainTaskAction acceptingAction =
+        new DomainTaskAction() {
+          public String actionKey() {
+            return "SETTLE_ORDER_COVER";
+          }
+
+          public boolean supports(Task candidate) {
+            return true;
+          }
+
+          public DomainTaskActionResult execute(Task candidate, TaskActionCommand ignored) {
+            return new DomainTaskActionResult.Accepted(
+                "ORDER_COVER_RESULT", UUID.randomUUID(), remainingSubjects);
+          }
+        };
+    stubWinningClaim(command);
+    when(taskRepository.findById(command.taskId())).thenReturn(Optional.of(task));
+    when(taskVersionLockRepository.forceIncrementNow(task))
+        .thenThrow(
+            new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                Task.class, command.taskId()));
+
+    // A lost race must reach TaskTransitionExecutor as an optimistic-lock failure so the whole
+    // transaction can be retried; typing it here would make a transient conflict look terminal.
+    assertThatThrownBy(() -> orchestrator(List.of(acceptingAction)).execute(command))
+        .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+    verify(attemptRepository, never()).save(any());
   }
 
   @ParameterizedTest
@@ -149,10 +219,26 @@ class TaskTransitionOrchestratorTest {
     stubWinningClaim(command);
     when(taskRepository.findById(command.taskId())).thenReturn(Optional.of(task));
     when(attemptRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    if (partial) {
+      when(taskVersionLockRepository.forceIncrementNow(task))
+          .thenAnswer(
+              invocation -> {
+                task.setVersion(3L);
+                return 3L;
+              });
+    } else {
+      when(taskRepository.saveAndFlush(task))
+          .thenAnswer(
+              invocation -> {
+                task.setVersion(3L);
+                return task;
+              });
+    }
 
     var result = orchestrator(List.of(acceptingAction)).execute(command);
 
     assertThat(result.outcome()).isEqualTo(TaskTransitionOutcome.ACCEPTED);
+    assertThat(result.taskVersion()).isEqualTo(3L);
     if (partial) {
       assertThat(task.getClosedAt()).isNull();
       assertThat(task.getStatus())
@@ -162,9 +248,14 @@ class TaskTransitionOrchestratorTest {
       assertThat(task.getStatus())
           .isEqualTo(com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE);
     }
-    verify(taskVersionLockRepository).forceIncrement(task);
+    if (partial) {
+      verify(taskVersionLockRepository).forceIncrementNow(task);
+      verify(taskRepository, never()).saveAndFlush(any());
+    } else {
+      verify(taskVersionLockRepository, never()).forceIncrementNow(any());
+      verify(taskRepository).saveAndFlush(task);
+    }
     verify(affectedSubjectService).synchronize(task.getId(), remainingSubjects);
-    verify(taskRepository).save(task);
   }
 
   @Test
@@ -189,7 +280,8 @@ class TaskTransitionOrchestratorTest {
         new TaskWorkflowRegistry(),
         affectedSubjectService,
         provider,
-        Clock.fixed(Instant.parse("2026-09-15T12:00:00Z"), ZoneOffset.UTC));
+        Clock.fixed(Instant.parse("2026-09-15T12:00:00Z"), ZoneOffset.UTC),
+        transactionGuard);
   }
 
   private void stubWinningClaim(TaskActionCommand command) {

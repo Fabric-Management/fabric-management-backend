@@ -36,6 +36,8 @@ tags:
   name: Inventory Balance
 - description: Cash flow forecasting operations
   name: Finance - Cash Flow
+- description: Governed task transitions for order-cover decisions
+  name: FlowBoard — Decision Tasks
 - description: IWM Warehouse Location Management API
   name: IWM Location
 - description: Recurring task templates
@@ -189,6 +191,8 @@ tags:
   name: Health
 - description: Subscription operations
   name: Subscription
+- description: "Order-cover case, evidence and decision receipts"
+  name: Sales Orders — Cover
 - description: Fabric A I operations
   name: Fabric A I
 - description: Recipe operations
@@ -21909,6 +21913,82 @@ paths:
       summary: Update task status — with WIP control
       tags:
       - FlowBoard — Task
+  /api/v1/flowboard/tasks/{taskId}/transitions:
+    post:
+      operationId: transitionDecisionTask
+      parameters:
+      - in: path
+        name: taskId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionTransitionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDecisionTransitionResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - FlowBoard — Decision Tasks
   /api/v1/flowboard/templates:
     get:
       operationId: getAllTemplates
@@ -41701,6 +41781,222 @@ paths:
       summary: Self-service signup
       tags:
       - Public Signup
+  /api/v1/sales-orders/{orderId}/cover:
+    get:
+      operationId: getOrderCoverCase
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderCoverDetail"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Sales Orders — Cover
+  /api/v1/sales-orders/{orderId}/cover/evidence:
+    post:
+      operationId: refreshOrderCoverEvidence
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderCoverEvidence"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Sales Orders — Cover
+  /api/v1/sales-orders/{orderId}/cover/results/{resultId}:
+    get:
+      operationId: getOrderCoverResult
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: resultId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderCoverResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Sales Orders — Cover
   /api/v1/sales/colors:
     get:
       operationId: listSalesColors
@@ -49544,6 +49840,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseDecisionTransitionResult:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DecisionTransitionResult"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDepartmentDto:
       type: object
       properties:
@@ -51568,6 +51882,60 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/OnboardingStatusResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderCoverDetail:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderCoverDetail"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderCoverEvidence:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderCoverEvidence"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderCoverResult:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderCoverResult"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -55355,6 +55723,46 @@ components:
       - plannedQuantityKg
       - productId
       - workOrderId
+    ConfirmProductionCoverPayload:
+      type: object
+      additionalProperties: false
+      properties:
+        caseId:
+          type: string
+          format: uuid
+        evidenceId:
+          type: string
+          format: uuid
+        evidenceRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        lineIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 0
+        note:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          minLength: 0
+        rationale:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          minLength: 0
+      required:
+      - caseId
+      - evidenceId
+      - evidenceRevision
+      - lineIds
+      - note
+      - rationale
     ConsumeFromStockUnitRequest:
       type: object
       properties:
@@ -58163,6 +58571,35 @@ components:
           - BOTTLENECKS
           - ANALYTICS
           - TIME_TRACKING_SUMMARY
+    DecisionAssignment:
+      type: object
+      properties:
+        bucket:
+          type: string
+          enum:
+          - MINE
+          - DEPARTMENT
+          - UNASSIGNED
+          - WAITING
+        departmentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        directAssigneeIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        holderDisplay:
+          type:
+          - string
+          - "null"
+      required:
+      - bucket
+      - departmentIds
+      - directAssigneeIds
+      - holderDisplay
     DecisionBasis:
       type: object
       properties:
@@ -58180,6 +58617,202 @@ components:
           - SPEC_VERSION
           - CUSTOMER_INSTRUCTION
           - AUTHORISED_DECISION
+    DecisionBlockedReason:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+          - OUTSIDE_ROUTING_POOL
+          - ASSIGNED_ELSEWHERE
+          - UNASSIGNED
+          - EVIDENCE_UNKNOWN
+          - EVIDENCE_CHANGED
+          - CASE_CLOSED
+          - UNSUPPORTED_ROUTE
+        messageKey:
+          type: string
+        parameters:
+          $ref: "#/components/schemas/DecisionReasonParameters"
+      required:
+      - code
+      - messageKey
+      - parameters
+    DecisionCapability:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - CONFIRM_PRODUCTION_COVER
+          - OPEN_CONTROL
+        allowed:
+          type: boolean
+        evaluatedAt:
+          type: string
+          format: date-time
+        needsApproval:
+          type: boolean
+        reason:
+          type: "null"
+          $ref: "#/components/schemas/DecisionBlockedReason"
+        requiredPermissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionKey"
+        routesTo:
+          type: "null"
+          $ref: "#/components/schemas/DecisionRouteTarget"
+      required:
+      - action
+      - allowed
+      - evaluatedAt
+      - needsApproval
+      - reason
+      - requiredPermissions
+      - routesTo
+    DecisionReasonParameters:
+      type: object
+      properties:
+        currentTaskVersion:
+          type:
+          - integer
+          - "null"
+          format: int64
+          minimum: 0
+        requiredPermission:
+          type: "null"
+          $ref: "#/components/schemas/PermissionKey"
+      required:
+      - currentTaskVersion
+      - requiredPermission
+    DecisionResultRef:
+      type: object
+      properties:
+        accessibleHref:
+          type:
+          - string
+          - "null"
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+          - ORDER_COVER_RESULT
+          - WORK_ORDER
+          - TASK
+      required:
+      - accessibleHref
+      - id
+      - type
+    DecisionRouteTarget:
+      type: object
+      properties:
+        accessibleHref:
+          type:
+          - string
+          - "null"
+        id:
+          type:
+          - string
+          - "null"
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - USER
+          - DEPARTMENT
+          - SYSTEM
+        labelKey:
+          type:
+          - string
+          - "null"
+      required:
+      - accessibleHref
+      - id
+      - kind
+      - labelKey
+    DecisionSubjectRef:
+      type: object
+      properties:
+        accessibleHref:
+          type:
+          - string
+          - "null"
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        type:
+          type: string
+          enum:
+          - SALES_ORDER
+      required:
+      - accessibleHref
+      - id
+      - number
+      - type
+    DecisionTransitionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum:
+          - CONFIRM_PRODUCTION_COVER
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        idempotencyKey:
+          type: string
+          format: uuid
+        payload:
+          $ref: "#/components/schemas/ConfirmProductionCoverPayload"
+      required:
+      - action
+      - expectedVersion
+      - idempotencyKey
+      - payload
+    DecisionTransitionResult:
+      type: object
+      properties:
+        remainingLineIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        replayed:
+          type: boolean
+        result:
+          $ref: "#/components/schemas/OrderCoverResult"
+        taskId:
+          type: string
+          format: uuid
+        taskState:
+          type: string
+          enum:
+          - BACKLOG
+          - TODO
+          - IN_PROGRESS
+          - IN_REVIEW
+          - DONE
+          - BLOCKED
+          - CANCELLED
+        taskVersion:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - remainingLineIds
+      - replayed
+      - result
+      - taskId
+      - taskState
+      - taskVersion
     DepartmentDto:
       type: object
       properties:
@@ -60498,6 +61131,362 @@ components:
           type: string
       required:
       - productType
+    OrderCoverCase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        latestEvidenceId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        salesOrderId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - OPEN
+          - PARTIALLY_SETTLED
+          - SETTLED
+          - CANCELLED
+        taskId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        taskVersion:
+          type:
+          - integer
+          - "null"
+          format: int64
+          minimum: 0
+        unresolvedLineIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - id
+      - latestEvidenceId
+      - revision
+      - salesOrderId
+      - state
+      - taskId
+      - taskVersion
+      - unresolvedLineIds
+    OrderCoverCompetingAllocation:
+      type: object
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        quantity:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+      required:
+      - lineId
+      - quantity
+    OrderCoverDetail:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionCapability"
+        assignment:
+          $ref: "#/components/schemas/DecisionAssignment"
+        case:
+          $ref: "#/components/schemas/OrderCoverCase"
+        evidence:
+          type: "null"
+          $ref: "#/components/schemas/OrderCoverEvidence"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverResult"
+        subject:
+          $ref: "#/components/schemas/DecisionSubjectRef"
+      required:
+      - actions
+      - assignment
+      - case
+      - evidence
+      - results
+      - subject
+    OrderCoverEvidence:
+      type: object
+      properties:
+        caseId:
+          type: string
+          format: uuid
+        computedAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        inputFingerprint:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverLineEvidence"
+        orderVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        ruleVersion:
+          type: string
+      required:
+      - caseId
+      - computedAt
+      - id
+      - inputFingerprint
+      - lines
+      - orderVersion
+      - revision
+      - ruleVersion
+    OrderCoverLineEvidence:
+      type: object
+      properties:
+        blockingReasons:
+          type: array
+          items:
+            type: string
+        competingAllocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverCompetingAllocation"
+        controlReasons:
+          type: array
+          items:
+            type: string
+        lineId:
+          type: string
+          format: uuid
+        lineVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        productId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        remainingSuitableFree:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+          description: "Suitable stock after earlier line suggestions, before this\
+            \ line's own suggestion"
+        requested:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+        shortfall:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverSource"
+        suitability:
+          type: string
+          enum:
+          - EXACT
+          - AMBIGUOUS
+          - NO_MATCH
+          - UNKNOWN
+        suitableFree:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+          description: Suitable free stock before suggestions to other order lines;
+            not capped by demand
+      required:
+      - blockingReasons
+      - competingAllocations
+      - controlReasons
+      - lineId
+      - lineVersion
+      - productId
+      - remainingSuitableFree
+      - requested
+      - shortfall
+      - sources
+      - suitability
+      - suitableFree
+    OrderCoverLineResult:
+      type: object
+      properties:
+        downstream:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionResultRef"
+        lineId:
+          type: string
+          format: uuid
+        outcome:
+          type: string
+          enum:
+          - STOCK
+          - MAKE_TO_ORDER
+        quantity:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+        requirementProfileId:
+          type: string
+          format: uuid
+        requirementProfileVersion:
+          type: integer
+          format: int32
+          minimum: 1
+        suitabilityAtDecision:
+          type: string
+          enum:
+          - EXACT
+          - AMBIGUOUS
+          - NO_MATCH
+          - UNKNOWN
+      required:
+      - downstream
+      - lineId
+      - outcome
+      - quantity
+      - requirementProfileId
+      - requirementProfileVersion
+      - suitabilityAtDecision
+    OrderCoverQuantity:
+      type: object
+      properties:
+        reasonCode:
+          type:
+          - string
+          - "null"
+        state:
+          type: string
+          enum:
+          - KNOWN
+          - ESTIMATE
+          - UNKNOWN
+        unit:
+          type:
+          - string
+          - "null"
+        value:
+          type:
+          - string
+          - "null"
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+      required:
+      - reasonCode
+      - state
+      - unit
+      - value
+    OrderCoverResult:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        actorKind:
+          type: string
+          enum:
+          - USER
+          - SYSTEM
+        caseId:
+          type: string
+          format: uuid
+        caseRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        evidenceId:
+          type: string
+          format: uuid
+        evidenceRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        id:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverLineResult"
+        policyKey:
+          type:
+          - string
+          - "null"
+        rationale:
+          type:
+          - string
+          - "null"
+        recordedAt:
+          type: string
+          format: date-time
+        supersedesResultId:
+          type:
+          - string
+          - "null"
+          format: uuid
+      required:
+      - actorId
+      - actorKind
+      - caseId
+      - caseRevision
+      - evidenceId
+      - evidenceRevision
+      - id
+      - lines
+      - policyKey
+      - rationale
+      - recordedAt
+      - supersedesResultId
+    OrderCoverSource:
+      type: object
+      properties:
+        accessibleHref:
+          type:
+          - string
+          - "null"
+        id:
+          type: string
+          format: uuid
+        knowledge:
+          type: string
+          enum:
+          - VERIFIED
+          - UNKNOWN
+          - CONTRADICTED
+        observedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        recordedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        revision:
+          type:
+          - integer
+          - "null"
+          format: int64
+        type:
+          type: string
+      required:
+      - accessibleHref
+      - id
+      - knowledge
+      - observedAt
+      - recordedAt
+      - revision
+      - type
     OrderMarginDto:
       type: object
       properties:
@@ -69712,6 +70701,8 @@ components:
           type: string
         plannedQty:
           type: number
+        productCode:
+          type: string
         productionSpecs:
           oneOf:
           - $ref: "#/components/schemas/DyeingProductionSpecs"
@@ -69723,6 +70714,14 @@ components:
         recipeId:
           type: string
           format: uuid
+        requirementProfileId:
+          type: string
+          format: uuid
+        requirementProfileSnapshot:
+          $ref: "#/components/schemas/JsonNode"
+        requirementProfileVersion:
+          type: integer
+          format: int32
         salesOrderId:
           type: string
           format: uuid

@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "schemas": {
-    "ConfirmProductionCoverPayload": "caseId; evidenceId; evidenceRevision; lineIds:UUID[]; note?",
+    "ConfirmProductionCoverPayload": "caseId; evidenceId; evidenceRevision; lineIds:UUID[]; rationale?; note?",
     "DecisionAssignment": "bucket: MINE/DEPARTMENT/UNASSIGNED/WAITING; directAssigneeIds[]; departmentIds[]; holderDisplay? (redacted if inaccessible)",
     "DecisionBlockedReason": "code: PERMISSION_DENIED/OUTSIDE_ROUTING_POOL/ASSIGNED_ELSEWHERE/UNASSIGNED/EVIDENCE_UNKNOWN/EVIDENCE_CHANGED/CASE_CLOSED/UNSUPPORTED_ROUTE; messageKey; parameters:DecisionReasonParameters",
     "DecisionCapability": "action; allowed:boolean; reason:DecisionBlockedReason?; routesTo:DecisionRouteTarget?; needsApproval:boolean; evaluatedAt; requiredPermissions:PermissionKey[]",
@@ -18,9 +18,9 @@
     "OrderCoverDetail": "case:OrderCoverCase; subject; assignment; evidence:OrderCoverEvidence?; actions:DecisionCapability[]; results:OrderCoverResult[]",
     "OrderCoverEvidence": "id; caseId; revision; orderVersion; computedAt; inputFingerprint; ruleVersion; lines:OrderCoverLineEvidence[]",
     "OrderCoverLineEvidence": "lineId; lineVersion; productId?; requested:OrderCoverQuantity; suitableFree:OrderCoverQuantity; remainingSuitableFree:OrderCoverQuantity; shortfall:OrderCoverQuantity; suitability: EXACT/AMBIGUOUS/NO_MATCH/UNKNOWN; competingAllocations:OrderCoverCompetingAllocation[]; controlReasons[]; sources[]; blockingReasons[]",
-    "OrderCoverLineResult": "lineId; outcome: STOCK/MAKE_TO_ORDER; quantity:OrderCoverQuantity (KNOWN only); downstream:DecisionResultRef[]",
+    "OrderCoverLineResult": "lineId; outcome: STOCK/MAKE_TO_ORDER; quantity:OrderCoverQuantity (KNOWN only); suitabilityAtDecision: EXACT/AMBIGUOUS/NO_MATCH/UNKNOWN; requirementProfileId; requirementProfileVersion; downstream:DecisionResultRef[]",
     "OrderCoverQuantity": "state: KNOWN/ESTIMATE/UNKNOWN; value?; unit?; reasonCode?",
-    "OrderCoverResult": "id; caseId; caseRevision; actorId; actorKind: USER/SYSTEM; policyKey?; recordedAt; evidenceId; evidenceRevision; lines:OrderCoverLineResult[]; supersedesResultId? (null in v1)",
+    "OrderCoverResult": "id; caseId; caseRevision; actorId; actorKind: USER/SYSTEM; policyKey?; rationale?; recordedAt; evidenceId; evidenceRevision; lines:OrderCoverLineResult[]; supersedesResultId? (null in v1)",
     "OrderCoverSource": "type; id; revision?; observedAt?; recordedAt?; knowledge: VERIFIED/UNKNOWN/CONTRADICTED; accessibleHref?"
   },
   "source": "docs/frontend/evidence/fe-arch-5a/contract.md"

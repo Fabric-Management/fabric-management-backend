@@ -33,6 +33,8 @@ import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderComp
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
+import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseOpenedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +58,28 @@ class DomainEventSerializationTest {
 
   @Autowired private EventSerializer eventSerializer;
   @Autowired private ObjectMapper objectMapper;
+
+  @Test
+  void salesOrderConfirmationSerializedBeforeCutoverDefaultsToLegacy() throws Exception {
+    var event =
+        new SalesOrderConfirmedEvent(
+            uuid(),
+            uuid(),
+            "SO-OLD",
+            uuid(),
+            "Customer",
+            BigDecimal.ONE,
+            "kg",
+            LocalDate.of(2026, 1, 1),
+            List.of(),
+            OrderCoverRegime.GOVERNED);
+    var oldPayload =
+        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.valueToTree(event);
+    oldPayload.remove("coverRegime");
+    assertThat(
+            objectMapper.treeToValue(oldPayload, SalesOrderConfirmedEvent.class).getCoverRegime())
+        .isEqualTo(OrderCoverRegime.LEGACY);
+  }
 
   @Test
   void legacyGoodsReceiptEventWithoutNewFieldsDeserializesWithNulls() throws Exception {
@@ -186,6 +210,14 @@ class DomainEventSerializationTest {
                         new BigDecimal("12.50"),
                         "kg",
                         LocalDate.of(2026, 1, 15))))),
+        event(
+            new OrderCoverCaseOpenedEvent(
+                tenantId,
+                uuid(),
+                uuid(),
+                "SO-2",
+                LocalDate.of(2026, 1, 20),
+                java.util.Set.of(uuid()))),
         event(
             new WorkOrderApprovedEvent(
                 tenantId,

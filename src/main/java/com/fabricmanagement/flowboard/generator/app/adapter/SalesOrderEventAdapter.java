@@ -3,6 +3,7 @@ package com.fabricmanagement.flowboard.generator.app.adapter;
 import com.fabricmanagement.flowboard.generator.app.StockControlEngine;
 import com.fabricmanagement.flowboard.generator.app.StockControlEngine.StockDecision;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ public class SalesOrderEventAdapter implements DomainEventAdapter<SalesOrderConf
   @Override
   public List<TaskType> determineTaskTypes(
       SalesOrderConfirmedEvent event, List<TaskType> activeTemplateTaskTypes) {
+    if (event.getCoverRegime() == OrderCoverRegime.GOVERNED) return List.of();
     // SalesOrder için özel kural: StockControlEngine devreye girer
     List<StockDecision> decisions = stockControlEngine.analyze(event);
     return decisions.stream().map(StockDecision::taskType).toList();

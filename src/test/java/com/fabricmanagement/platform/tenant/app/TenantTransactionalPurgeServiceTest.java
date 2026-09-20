@@ -332,6 +332,22 @@ class TenantTransactionalPurgeServiceTest {
   }
 
   @Test
+  void shouldDeleteOrderCoverLedgerInForeignKeySafeOrder() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("sales_ord.order_cover_case_line"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_result"));
+    assertThat(tables.indexOf("sales_ord.order_cover_line_result"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_result"));
+    assertThat(tables.indexOf("sales_ord.order_cover_result"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_evidence"));
+    assertThat(tables.indexOf("sales_ord.order_cover_evidence_stream"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_case"));
+    assertThat(tables.indexOf("sales_ord.order_cover_case"))
+        .isLessThan(tables.indexOf("sales_ord.sales_order"));
+  }
+
+  @Test
   void shouldDeleteExternalPartnerOrganizationsAndOnlyUnreferencedRegistryRows() {
     stubSystemTransaction();
     when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(TENANT_ID))).thenReturn(true);

@@ -59,6 +59,12 @@ class SalesOrderServiceCreateTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private TenantReportingCurrencyPort reportingCurrencyPort;
 
+  @Mock
+  private com.fabricmanagement.sales.salesorder.infra.repository.OrderCoverActivationRepository
+      orderCoverActivationRepository;
+
+  @Mock private OrderCoverEnrolmentService orderCoverEnrolmentService;
+
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrder> orderCaptor;
@@ -96,6 +102,19 @@ class SalesOrderServiceCreateTest {
     assertThat(savedOrder.getTotals().getTotalAmount().getAmount()).isEqualByComparingTo("40.00");
     assertThat(savedOrder.getTotals().getTaxAmount().getAmount()).isEqualByComparingTo("5.00");
     assertThat(savedOrder.getTotals().getDiscountAmount().getAmount()).isEqualByComparingTo("1.00");
+  }
+
+  @Test
+  void createOrderTakesTenantActivationLockBeforePersistingTheOrder() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of());
+    stubSuccessfulCreate();
+
+    salesOrderService.createOrder(request);
+
+    var ordered = org.mockito.Mockito.inOrder(orderCoverActivationRepository, orderRepository);
+    ordered.verify(orderCoverActivationRepository).lockForOrderInsert(tenantId);
+    ordered.verify(orderRepository).save(any(SalesOrder.class));
   }
 
   @Test

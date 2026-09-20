@@ -29,6 +29,11 @@ final class TablePrivilegeClassification {
     entries.put("sales_ord.requirement_profile_version", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_cover_evidence", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_cover_evidence_stream", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.order_cover_activation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("sales_ord.order_cover_case", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.order_cover_case_line", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.order_cover_result", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("sales_ord.order_cover_line_result", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales.customer_commercial_assignment", TablePrivilegeClass.CLOSE_ONCE_LEDGER);
     entries.put(
         "production.production_execution_batch_color_archive",
