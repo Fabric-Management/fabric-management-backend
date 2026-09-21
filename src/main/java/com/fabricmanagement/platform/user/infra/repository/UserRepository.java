@@ -21,6 +21,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+  boolean existsByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
+
   /**
    * Find user by contact value via Contact entity (new system - recommended).
    *

@@ -101,6 +101,12 @@ public class UserService implements UserFacade {
 
   @Override
   @Transactional(readOnly = true)
+  public boolean isActive(UUID tenantId, UUID userId) {
+    return userQueryService.isActive(tenantId, userId);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public boolean contactExists(String contactValue) {
     return userQueryService.contactExists(contactValue);
   }

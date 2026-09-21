@@ -125,6 +125,11 @@ public class UserQueryService {
   }
 
   @Transactional(readOnly = true)
+  public boolean isActive(UUID tenantId, UUID userId) {
+    return userRepository.existsByTenantIdAndIdAndIsActiveTrue(tenantId, userId);
+  }
+
+  @Transactional(readOnly = true)
   public Optional<PermissionIdentity> findPermissionIdentity(UUID tenantId, UUID userId) {
     return userRepository
         .findByIdWithPermissionData(tenantId, userId)

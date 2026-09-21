@@ -12,6 +12,8 @@ public interface OrderCoverCaseRepository extends JpaRepository<OrderCoverCase, 
 
   Optional<OrderCoverCase> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  Optional<OrderCoverCase> findByTenantIdAndTaskId(UUID tenantId, UUID taskId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select c from OrderCoverCase c where c.tenantId=:tenantId and c.id=:id")
   Optional<OrderCoverCase> lock(@Param("tenantId") UUID tenantId, @Param("id") UUID id);

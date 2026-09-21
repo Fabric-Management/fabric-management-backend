@@ -72,6 +72,9 @@ public interface UserFacade {
    */
   boolean exists(UUID tenantId, UUID userId);
 
+  /** Check whether a user currently belongs to the tenant and is active. */
+  boolean isActive(UUID tenantId, UUID userId);
+
   /**
    * Check if contact value is already registered.
    *

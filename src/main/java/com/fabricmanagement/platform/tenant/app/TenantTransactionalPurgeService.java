@@ -34,6 +34,7 @@ public class TenantTransactionalPurgeService {
       "app.requirement_profile_purge_tenant";
   private static final String ORDER_COVER_RESULT_PURGE_SETTING =
       "app.order_cover_result_purge_tenant";
+  private static final String DECISION_FOLLOW_PURGE_SETTING = "app.decision_follow_purge_tenant";
 
   /**
    * Users removed by a demo purge: template-seeded users, plus users anchored to an
@@ -177,6 +178,8 @@ public class TenantTransactionalPurgeService {
           "procurement.subcontract_order",
           "procurement.purchase_order_line",
           "procurement.purchase_order",
+          "flowboard.decision_follow_suppression",
+          "flowboard.decision_follow",
           "sales_ord.order_cover_case_line",
           "sales_ord.order_cover_line_result",
           "sales_ord.order_cover_result",
@@ -316,6 +319,11 @@ public class TenantTransactionalPurgeService {
         "SELECT set_config(?, ?, true)",
         String.class,
         ORDER_COVER_RESULT_PURGE_SETTING,
+        tenantId.toString());
+    jdbc.queryForObject(
+        "SELECT set_config(?, ?, true)",
+        String.class,
+        DECISION_FOLLOW_PURGE_SETTING,
         tenantId.toString());
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {

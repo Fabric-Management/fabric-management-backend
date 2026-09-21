@@ -13,9 +13,16 @@ import lombok.Getter;
  */
 @Getter
 public class TaskAssignedEvent extends DomainEvent {
+  public enum Origin {
+    TASK_SERVICE,
+    ROUTING_EVALUATION
+  }
+
   private final UUID taskId;
+  private final UUID assignmentId;
   private final UUID assignedUserId;
   private final UUID assignedByUserId;
+  private final Origin origin;
 
   @JsonCreator
   public TaskAssignedEvent(
@@ -25,8 +32,10 @@ public class TaskAssignedEvent extends DomainEvent {
       @JsonProperty("occurredAt") Instant occurredAt,
       @JsonProperty("correlationId") String correlationId,
       @JsonProperty("taskId") UUID taskId,
+      @JsonProperty("assignmentId") UUID assignmentId,
       @JsonProperty("assignedUserId") UUID assignedUserId,
-      @JsonProperty("assignedByUserId") UUID assignedByUserId) {
+      @JsonProperty("assignedByUserId") UUID assignedByUserId,
+      @JsonProperty("origin") Origin origin) {
     super(
         eventId,
         tenantId,
@@ -34,14 +43,36 @@ public class TaskAssignedEvent extends DomainEvent {
         occurredAt,
         correlationId);
     this.taskId = taskId;
+    this.assignmentId = assignmentId;
     this.assignedUserId = assignedUserId;
     this.assignedByUserId = assignedByUserId;
+    this.origin = origin != null ? origin : Origin.TASK_SERVICE;
   }
 
-  public TaskAssignedEvent(UUID tenantId, UUID taskId, UUID assignedUserId, UUID assignedByUserId) {
+  public TaskAssignedEvent(
+      UUID tenantId, UUID taskId, UUID assignmentId, UUID assignedUserId, UUID assignedByUserId) {
+    this(tenantId, taskId, assignmentId, assignedUserId, assignedByUserId, Origin.TASK_SERVICE);
+  }
+
+  public TaskAssignedEvent(
+      UUID tenantId,
+      UUID taskId,
+      UUID assignmentId,
+      UUID assignedUserId,
+      UUID assignedByUserId,
+      Origin origin) {
     super(tenantId, "TASK_ASSIGNED");
     this.taskId = taskId;
+    this.assignmentId = assignmentId;
     this.assignedUserId = assignedUserId;
     this.assignedByUserId = assignedByUserId;
+    this.origin = origin != null ? origin : Origin.TASK_SERVICE;
+  }
+
+  /**
+   * Deserialisation/source compatibility for publications created before assignment IDs existed.
+   */
+  public TaskAssignedEvent(UUID tenantId, UUID taskId, UUID assignedUserId, UUID assignedByUserId) {
+    this(tenantId, taskId, null, assignedUserId, assignedByUserId);
   }
 }

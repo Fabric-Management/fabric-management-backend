@@ -8,5 +8,7 @@ public interface OrderCoverResultRepository extends JpaRepository<OrderCoverResu
   Optional<OrderCoverResult> findByTenantIdAndSalesOrderIdAndId(
       UUID tenantId, UUID orderId, UUID id);
 
+  Optional<OrderCoverResult> findByTenantIdAndCaseIdAndId(UUID tenantId, UUID caseId, UUID id);
+
   List<OrderCoverResult> findAllByTenantIdAndCaseIdOrderByRecordedAtAsc(UUID tenantId, UUID caseId);
 }
