@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.sales.salesorder.domain.*;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverCapabilityPort;
+import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverFollowQueryPort;
 import com.fabricmanagement.sales.salesorder.dto.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
 import java.time.Clock;
@@ -15,8 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class OrderCoverQueryService {
+public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
   private final OrderCoverObjectAccess objectAccess;
+  private final SalesOrderRepository orders;
   private final OrderCoverCaseRepository cases;
   private final OrderCoverCaseLineRepository caseLines;
   private final OrderCoverEvidenceRepository evidence;
@@ -28,6 +30,30 @@ public class OrderCoverQueryService {
   @Transactional(readOnly = true)
   public void assertReadable(UUID orderId, UUID actorId) {
     readableOrder(orderId, actorId);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<UUID> caseForTask(UUID tenantId, UUID taskId) {
+    return cases.findByTenantIdAndTaskId(tenantId, taskId).map(OrderCoverCase::getId);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<UUID> orderCreator(UUID tenantId, UUID caseId) {
+    return cases
+        .findByTenantIdAndId(tenantId, caseId)
+        .flatMap(value -> orders.findByTenantIdAndId(tenantId, value.getSalesOrderId()))
+        .map(SalesOrder::getCreatedBy);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<SettlementSource> settlement(UUID tenantId, UUID caseId, UUID resultId) {
+    return results
+        .findByTenantIdAndCaseIdAndId(tenantId, caseId, resultId)
+        .map(
+            value -> new SettlementSource(value.getId(), value.getActorId(), value.getActorKind()));
   }
 
   @Transactional(readOnly = true)

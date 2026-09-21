@@ -349,13 +349,18 @@ public class TaskService {
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
 
     var assignee = TaskAssignee.assignToUser(taskId, userId, assignedBy);
-    assigneeRepo.save(assignee);
+    TaskAssignee savedAssignee = assigneeRepo.save(assignee);
 
     // [AUT5 FIX] Task atama bildirimi — Domain Event yayınlanıyor
     // [O1 FIX] assignedByUserId artık dışarıdan alınıyor — kim atadığı bilgisi korunuyor.
     UUID assignedByUserId = (assignedBy == AssignedBy.SYSTEM) ? SystemUser.ID : requestedByUserId;
     eventPublisher.publish(
-        new TaskAssignedEvent(TenantContext.requireTenantId(), taskId, userId, assignedByUserId));
+        new TaskAssignedEvent(
+            TenantContext.requireTenantId(),
+            taskId,
+            savedAssignee.getId(),
+            userId,
+            assignedByUserId));
 
     log.info("Task assigned: taskId={} userId={} assignedBy={}", taskId, userId, assignedBy);
   }

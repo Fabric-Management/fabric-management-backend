@@ -9,7 +9,9 @@ import com.fabricmanagement.flowboard.routing.domain.exception.RoutingException;
 import com.fabricmanagement.flowboard.routing.domain.port.in.GovernedTaskRoutingPort;
 import com.fabricmanagement.flowboard.routing.infra.repository.RoutingRepository;
 import com.fabricmanagement.flowboard.task.domain.*;
+import com.fabricmanagement.flowboard.task.domain.event.TaskAssignedEvent;
 import com.fabricmanagement.flowboard.task.infra.repository.*;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -84,7 +86,15 @@ public class RoutingEvaluationService implements GovernedTaskRoutingPort {
               id -> {
                 var assignment = TaskAssignee.assignToUser(taskId, id, AssignedBy.SYSTEM);
                 assignment.setTenantId(tenantId);
-                assignees.save(assignment);
+                TaskAssignee saved = assignees.save(assignment);
+                events.publish(
+                    new TaskAssignedEvent(
+                        tenantId,
+                        taskId,
+                        saved.getId(),
+                        id,
+                        SystemUser.ID,
+                        TaskAssignedEvent.Origin.ROUTING_EVALUATION));
               });
     }
     var open = repository.openFailures(tenantId, taskId);

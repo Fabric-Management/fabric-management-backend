@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.*;
+import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseChangedEvent;
 import com.fabricmanagement.sales.salesorder.domain.port.*;
 import com.fabricmanagement.sales.salesorder.dto.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
@@ -176,6 +177,13 @@ public class OrderCoverService implements OrderCoverCommandPort {
             .collect(Collectors.toCollection(LinkedHashSet::new));
     coverCase.settle(remaining.isEmpty(), clock.instant());
     cases.save(coverCase);
+    events.publish(
+        new OrderCoverCaseChangedEvent(
+            tenantId,
+            coverCase.getId(),
+            coverCase.getRevision(),
+            coverCase.getState(),
+            result.getId()));
     return new Decision.Accepted(result.getId(), remaining);
   }
 
@@ -223,6 +231,9 @@ public class OrderCoverService implements OrderCoverCommandPort {
     var value = cases.lockByOrder(tenantId, orderId).orElseThrow();
     value.cancel(clock.instant());
     cases.save(value);
+    events.publish(
+        new OrderCoverCaseChangedEvent(
+            tenantId, value.getId(), value.getRevision(), value.getState(), null));
     return value.getId();
   }
 
@@ -237,6 +248,13 @@ public class OrderCoverService implements OrderCoverCommandPort {
         coverCase -> {
           coverCase.cancel(clock.instant());
           cases.save(coverCase);
+          events.publish(
+              new OrderCoverCaseChangedEvent(
+                  tenantId,
+                  coverCase.getId(),
+                  coverCase.getRevision(),
+                  coverCase.getState(),
+                  null));
         });
     return value.map(OrderCoverCase::getId);
   }

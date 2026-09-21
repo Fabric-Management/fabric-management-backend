@@ -5,6 +5,7 @@ import com.fabricmanagement.flowboard.automation.domain.AutomationContext;
 import com.fabricmanagement.flowboard.automation.domain.AutomationTriggerType;
 import com.fabricmanagement.flowboard.common.websocket.BoardWebSocketEventType;
 import com.fabricmanagement.flowboard.common.websocket.BoardWebSocketPublisher;
+import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.flowboard.task.domain.event.TaskAssignedEvent;
 import com.fabricmanagement.flowboard.task.domain.event.TaskChecklistCompletedEvent;
 import com.fabricmanagement.flowboard.task.domain.event.TaskCreatedEvent;
@@ -84,6 +85,13 @@ public class TaskEventListener {
         .findById(event.getTaskId())
         .ifPresent(
             task -> {
+              // Governed ORDER_COVER routing did not publish this event before DECISION-FOLLOW-1.
+              // Its durable event feeds follow/projection listeners, but must not newly execute
+              // legacy board automations or emit a WebSocket side effect for system routing.
+              if (task.getTaskType() == TaskType.ORDER_COVER
+                  && event.getOrigin() == TaskAssignedEvent.Origin.ROUTING_EVALUATION) {
+                return;
+              }
               // 1. Hızlı işlem: WS yayını
               wsPublisher.publish(
                   task.getBoardId(),

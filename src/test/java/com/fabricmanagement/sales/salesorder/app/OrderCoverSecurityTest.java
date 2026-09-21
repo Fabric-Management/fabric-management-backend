@@ -32,6 +32,7 @@ class OrderCoverSecurityTest {
     var service =
         new OrderCoverQueryService(
             new OrderCoverObjectAccess(orders, access),
+            orders,
             mock(OrderCoverCaseRepository.class),
             mock(OrderCoverCaseLineRepository.class),
             mock(OrderCoverEvidenceRepository.class),
@@ -69,6 +70,7 @@ class OrderCoverSecurityTest {
     OrderCoverQueryService service =
         new OrderCoverQueryService(
             access,
+            mock(SalesOrderRepository.class),
             cases,
             mock(OrderCoverCaseLineRepository.class),
             mock(OrderCoverEvidenceRepository.class),

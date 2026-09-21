@@ -209,6 +209,12 @@ class TenantTransactionalPurgeServiceTest {
         .update(
             contains("DELETE FROM sales.quote_send_request WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
+        .queryForObject(
+            "SELECT set_config(?, ?, true)",
+            String.class,
+            "app.decision_follow_purge_tenant",
+            TENANT_ID.toString());
+    verify(jdbc)
         .update(
             contains("DELETE FROM production.production_execution_batch_override_log log"),
             eq(TENANT_ID));
@@ -334,6 +340,11 @@ class TenantTransactionalPurgeServiceTest {
   @Test
   void shouldDeleteOrderCoverLedgerInForeignKeySafeOrder() {
     List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("flowboard.decision_follow_suppression"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_case"));
+    assertThat(tables.indexOf("flowboard.decision_follow"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_case"));
 
     assertThat(tables.indexOf("sales_ord.order_cover_case_line"))
         .isLessThan(tables.indexOf("sales_ord.order_cover_result"));

@@ -14,6 +14,7 @@ import com.fabricmanagement.finance.invoice.domain.event.InvoiceDisputedEvent;
 import com.fabricmanagement.finance.invoice.domain.event.InvoiceOverdueEvent;
 import com.fabricmanagement.finance.payment.domain.PaymentDirection;
 import com.fabricmanagement.finance.payment.domain.event.PaymentReceivedEvent;
+import com.fabricmanagement.flowboard.task.domain.event.TaskAssignedEvent;
 import com.fabricmanagement.human.core.employee.domain.event.EmployeeTerminatedEvent;
 import com.fabricmanagement.logistics.shipment.domain.event.ShipmentLineConfirmedEvent;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalApprovedEvent;
@@ -33,7 +34,9 @@ import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderComp
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
+import com.fabricmanagement.sales.salesorder.domain.OrderCoverCaseState;
 import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
+import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseChangedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseOpenedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
@@ -143,6 +146,38 @@ class DomainEventSerializationTest {
     assertThat(restored.getItems().get(0).lengthUnit()).isEqualTo("CM");
   }
 
+  @Test
+  void taskAssignmentRoundTripPreservesAssignmentAndOrigin() {
+    UUID assignmentId = uuid();
+    var original =
+        new TaskAssignedEvent(
+            uuid(),
+            uuid(),
+            assignmentId,
+            uuid(),
+            uuid(),
+            TaskAssignedEvent.Origin.ROUTING_EVALUATION);
+
+    TaskAssignedEvent restored =
+        eventSerializer.deserialize(eventSerializer.serialize(original), TaskAssignedEvent.class);
+
+    assertThat(restored.getAssignmentId()).isEqualTo(assignmentId);
+    assertThat(restored.getOrigin()).isEqualTo(TaskAssignedEvent.Origin.ROUTING_EVALUATION);
+  }
+
+  @Test
+  void taskAssignmentSerializedBeforeOriginsDefaultsToTaskService() throws Exception {
+    var original = new TaskAssignedEvent(uuid(), uuid(), uuid(), uuid(), uuid());
+    var legacyPayload =
+        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.valueToTree(original);
+    legacyPayload.remove("origin");
+
+    TaskAssignedEvent restored = objectMapper.treeToValue(legacyPayload, TaskAssignedEvent.class);
+
+    assertThat(restored.getOrigin()).isEqualTo(TaskAssignedEvent.Origin.TASK_SERVICE);
+    assertThat(restored.getAssignmentId()).isEqualTo(original.getAssignmentId());
+  }
+
   @ParameterizedTest(name = "{0}")
   @MethodSource("idempotentHandlerConsumedEvents")
   void idempotentHandlerConsumedEventRoundTripPreservesDomainEventEnvelope(
@@ -218,6 +253,10 @@ class DomainEventSerializationTest {
                 "SO-2",
                 LocalDate.of(2026, 1, 20),
                 java.util.Set.of(uuid()))),
+        event(
+            new OrderCoverCaseChangedEvent(
+                tenantId, uuid(), 2, OrderCoverCaseState.PARTIALLY_SETTLED, uuid())),
+        event(new TaskAssignedEvent(tenantId, uuid(), uuid(), uuid(), uuid())),
         event(
             new WorkOrderApprovedEvent(
                 tenantId,
