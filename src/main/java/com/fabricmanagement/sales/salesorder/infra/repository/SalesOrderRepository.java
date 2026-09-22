@@ -4,6 +4,7 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,8 @@ public interface SalesOrderRepository
   // ═══════════════════════════════════════════════════════════════════════════
 
   Optional<SalesOrder> findByTenantIdAndId(UUID tenantId, UUID id);
+
+  List<SalesOrder> findAllByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
   @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
   @Query("select o from SalesOrder o where o.tenantId=:tenantId and o.id=:id")

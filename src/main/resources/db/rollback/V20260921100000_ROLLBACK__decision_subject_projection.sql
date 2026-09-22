@@ -1,0 +1,1 @@
+DROP TABLE flowboard.decision_subject_projection;

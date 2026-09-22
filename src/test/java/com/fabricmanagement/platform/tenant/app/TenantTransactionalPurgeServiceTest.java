@@ -341,6 +341,10 @@ class TenantTransactionalPurgeServiceTest {
   void shouldDeleteOrderCoverLedgerInForeignKeySafeOrder() {
     List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
 
+    assertThat(tables.indexOf("flowboard.decision_subject_projection"))
+        .isLessThan(tables.indexOf("flowboard.task"));
+    assertThat(tables.indexOf("flowboard.decision_subject_projection"))
+        .isLessThan(tables.indexOf("sales_ord.order_cover_case"));
     assertThat(tables.indexOf("flowboard.decision_follow_suppression"))
         .isLessThan(tables.indexOf("sales_ord.order_cover_case"));
     assertThat(tables.indexOf("flowboard.decision_follow"))

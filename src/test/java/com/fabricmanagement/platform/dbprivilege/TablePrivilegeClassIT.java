@@ -61,6 +61,10 @@ class TablePrivilegeClassIT {
   private static final String CASE = "aaaaaaaa-3000-4000-8000-000000000002";
   private static final String STREAM = "aaaaaaaa-3000-4000-8000-000000000003";
   private static final String EVIDENCE = "aaaaaaaa-3000-4000-8000-000000000004";
+  private static final String DECISION_PROJECTION = "aaaaaaaa-4000-4000-8000-000000000001";
+  private static final String DECISION_CASE = "aaaaaaaa-4000-4000-8000-000000000002";
+  private static final String OTHER_DECISION_PROJECTION = "bbbbbbbb-4000-4000-8000-000000000001";
+  private static final String OTHER_DECISION_CASE = "bbbbbbbb-4000-4000-8000-000000000002";
 
   private static final String CATALOGUE_QUERY =
       """
@@ -321,6 +325,50 @@ class TablePrivilegeClassIT {
         assertSqlState(
             connection,
             "DELETE FROM sales_ord.order_cover_evidence_stream WHERE id = '" + STREAM + "'",
+            "42501");
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  void decisionProjectionForcesTenantRlsForTheApplicationRole() throws SQLException {
+    try (Connection owner = ownerConnection(FULL_POSTGRES);
+        Statement statement = owner.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                """
+                select relrowsecurity, relforcerowsecurity
+                from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                where n.nspname='flowboard' and c.relname='decision_subject_projection'
+                """)) {
+      assertThat(result.next()).isTrue();
+      assertThat(result.getBoolean("relrowsecurity")).isTrue();
+      assertThat(result.getBoolean("relforcerowsecurity")).isTrue();
+    }
+
+    try (Connection connection = appConnection()) {
+      connection.setAutoCommit(false);
+      try (Statement statement = connection.createStatement()) {
+        try (ResultSet rows =
+            statement.executeQuery(
+                "select case_id from flowboard.decision_subject_projection where case_id in ('"
+                    + DECISION_CASE
+                    + "','"
+                    + OTHER_DECISION_CASE
+                    + "') order by case_id")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getString(1)).isEqualTo(DECISION_CASE);
+          assertThat(rows.next()).isFalse();
+        }
+        assertSqlState(
+            connection,
+            decisionProjectionInsert(
+                "bbbbbbbb-4000-4000-8000-000000000003",
+                OTHER_TENANT,
+                "bbbbbbbb-4000-4000-8000-000000000004",
+                "DB-PRIV-DSP-CROSS"),
             "42501");
       } finally {
         connection.rollback();
@@ -1046,6 +1094,12 @@ class TablePrivilegeClassIT {
             """
                 .formatted(EVIDENCE, TENANT, CASE, ORDER, "a".repeat(64)));
         statement.execute(
+            decisionProjectionInsert(
+                DECISION_PROJECTION, TENANT, DECISION_CASE, "DB-PRIV-DSP-TENANT"));
+        statement.execute(
+            decisionProjectionInsert(
+                OTHER_DECISION_PROJECTION, OTHER_TENANT, OTHER_DECISION_CASE, "DB-PRIV-DSP-OTHER"));
+        statement.execute(
             """
             INSERT INTO sales.customer_commercial_assignment
               (id, tenant_id, uid, customer_id, representative_id, valid_from, source,
@@ -1069,6 +1123,20 @@ class TablePrivilegeClassIT {
         DriverManager.getConnection(FULL_POSTGRES.getJdbcUrl(), "fabric_app", "app_test");
     setTenant(connection);
     return connection;
+  }
+
+  private static String decisionProjectionInsert(
+      String id, String tenantId, String caseId, String uid) {
+    return """
+        insert into flowboard.decision_subject_projection
+          (id,tenant_id,uid,created_at,updated_at,is_active,version,case_id,kind,
+           subject_type,subject_id,subject_number,case_state,case_revision,
+           unresolved_line_count,case_opened_at,verdict_code,projected_at)
+        values ('%s','%s','%s',now(),now(),true,0,'%s','ORDER_COVER',
+                'SALES_ORDER',gen_random_uuid(),'DB-PRIV-ORDER','OPEN',1,0,now(),
+                'NO_EVIDENCE',now())
+        """
+        .formatted(id, tenantId, uid, caseId);
   }
 
   private static Connection systemConnection() throws SQLException {

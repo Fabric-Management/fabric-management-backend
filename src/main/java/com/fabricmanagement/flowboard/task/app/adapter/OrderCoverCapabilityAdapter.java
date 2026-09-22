@@ -3,6 +3,7 @@ package com.fabricmanagement.flowboard.task.app.adapter;
 import com.fabricmanagement.flowboard.routing.app.RoutingEligibilityService;
 import com.fabricmanagement.flowboard.routing.domain.*;
 import com.fabricmanagement.flowboard.routing.infra.repository.RoutingRepository;
+import com.fabricmanagement.flowboard.task.domain.OrderCoverActionEvaluator;
 import com.fabricmanagement.flowboard.task.infra.repository.*;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverCapabilityPort;
 import java.util.*;
@@ -17,27 +18,43 @@ public class OrderCoverCapabilityAdapter implements OrderCoverCapabilityPort {
   private final RoutingRepository routing;
   private final RoutingEligibilityService eligibility;
 
-  public Snapshot evaluate(UUID tenant, UUID orderId, UUID taskId, UUID actor) {
+  public Snapshot evaluate(
+      UUID tenant,
+      UUID orderId,
+      UUID taskId,
+      UUID actor,
+      boolean caseOpen,
+      boolean actionableEvidence) {
+    if (!caseOpen) return new Snapshot(null, null, List.of(), false, "CASE_CLOSED");
+    if (taskId == null) return new Snapshot(null, null, List.of(), false, "UNASSIGNED");
     var task = tasks.findById(taskId).filter(t -> tenant.equals(t.getTenantId())).orElse(null);
     if (task == null) return new Snapshot(null, null, List.of(), false, "CASE_CLOSED");
+    var assignments = assignees.findAllByTaskIdAndIsActiveTrue(taskId);
     List<UUID> direct =
-        assignees.findAllByTaskIdAndIsActiveTrue(taskId).stream().map(a -> a.getUserId()).toList();
-    var pool = routing.pool(tenant, RoutingPoolKey.ORDER_COVER).orElse(null);
-    boolean member =
-        pool != null
-            && routing.members(tenant, pool.id()).stream()
-                .anyMatch(m -> m.active() && m.userId().equals(actor));
+        assignments.stream().map(a -> a.getUserId()).filter(Objects::nonNull).toList();
     var user = eligibility.user(tenant, actor);
-    var reasons = eligibility.eligibility(tenant, orderId, user, member);
-    String blocked =
-        reasons.stream().anyMatch(reason -> reason != RoutingReason.NOT_A_MEMBER)
-            ? "PERMISSION_DENIED"
-            : reasons.contains(RoutingReason.NOT_A_MEMBER)
-                ? "OUTSIDE_ROUTING_POOL"
-                : direct.isEmpty()
-                    ? "UNASSIGNED"
-                    : !direct.contains(actor) ? "ASSIGNED_ELSEWHERE" : null;
+    var candidacy = eligibility.candidacy(tenant, user);
+    boolean candidate = candidacy.isEmpty();
+    boolean member = candidate && routing.isActiveMember(tenant, RoutingPoolKey.ORDER_COVER, actor);
+    boolean writeScopeAllowed =
+        candidate && member && eligibility.writeScopeAllowed(tenant, orderId, actor);
+    var result =
+        OrderCoverActionEvaluator.evaluate(
+            new OrderCoverActionEvaluator.Inputs(
+                true,
+                true,
+                candidate,
+                member,
+                writeScopeAllowed,
+                !assignments.isEmpty(),
+                direct,
+                actor,
+                actionableEvidence));
     return new Snapshot(
-        task.getVersion(), task.getStatus().name(), direct, blocked == null, blocked);
+        task.getVersion(),
+        task.getStatus().name(),
+        direct,
+        result.allowed(),
+        result.blockedReason());
   }
 }

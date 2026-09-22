@@ -89,6 +89,22 @@ public class RoutingRepository {
         poolId);
   }
 
+  public boolean isActiveMember(UUID tenant, RoutingPoolKey key, UUID userId) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            """
+            SELECT EXISTS (
+              SELECT 1 FROM flowboard.routing_pool p
+              JOIN flowboard.routing_pool_member m
+                ON m.tenant_id=p.tenant_id AND m.pool_id=p.id
+              WHERE p.tenant_id=? AND p.pool_key=? AND m.user_id=? AND m.active)
+            """,
+            Boolean.class,
+            tenant,
+            key.name(),
+            userId));
+  }
+
   public Pool configure(UUID tenant, RoutingPoolKey key, Pool previous, Set<UUID> members) {
     RoutingPool header;
     if (previous == null) {

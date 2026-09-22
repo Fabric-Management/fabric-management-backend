@@ -10,6 +10,8 @@ public interface OrderCoverCaseLineRepository extends JpaRepository<OrderCoverCa
   List<OrderCoverCaseLine> findAllByTenantIdAndCaseIdOrderBySalesOrderLineId(
       UUID tenantId, UUID caseId);
 
+  List<OrderCoverCaseLine> findAllByTenantIdAndCaseIdIn(UUID tenantId, Collection<UUID> caseIds);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       "select l from OrderCoverCaseLine l where l.tenantId=:tenantId and l.caseId=:caseId order by l.salesOrderLineId")

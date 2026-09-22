@@ -1,7 +1,9 @@
 package com.fabricmanagement.sales.salesorder.app.port.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -61,8 +63,8 @@ class FlowBoardSalesOrderWriteScopeAdapterTest {
   void ownScopeAllowsOwnOrderAndDeniesAnotherUsersOrder() {
     freshScope(DataScope.OWN);
 
-    assertThat(evaluate(order(TENANT, TARGET))).isTrue();
-    assertThat(evaluate(order(TENANT, OUTSIDER))).isFalse();
+    assertThat(evaluate(order(TENANT, TARGET), true)).isTrue();
+    assertThat(evaluate(order(TENANT, OUTSIDER), false)).isFalse();
   }
 
   @Test
@@ -71,31 +73,28 @@ class FlowBoardSalesOrderWriteScopeAdapterTest {
     when(users.findActiveUserIdsByDepartmentCodes(TENANT, Set.of("SALES")))
         .thenReturn(Set.of(COLLEAGUE));
 
-    assertThat(evaluate(order(TENANT, TARGET))).isTrue();
-    assertThat(evaluate(order(TENANT, COLLEAGUE))).isTrue();
-    assertThat(evaluate(order(TENANT, OUTSIDER))).isFalse();
+    assertThat(evaluate(order(TENANT, TARGET), true)).isTrue();
+    assertThat(evaluate(order(TENANT, COLLEAGUE), true)).isTrue();
+    assertThat(evaluate(order(TENANT, OUTSIDER), false)).isFalse();
   }
 
   @Test
   void ownAndDepartmentDenyUnknownCreator() {
     SalesOrder order = order(TENANT, null);
-    when(orders.findByTenantIdAndId(TENANT, order.getId())).thenReturn(Optional.of(order));
     freshScope(DataScope.OWN);
-    assertThat(adapter.isAllowed(TENANT, TARGET, order.getId())).isFalse();
+    assertThat(evaluate(order, false)).isFalse();
 
     freshScope(DataScope.DEPARTMENT);
     when(users.findActiveUserIdsByDepartmentCodes(TENANT, Set.of("SALES")))
         .thenReturn(Set.of(COLLEAGUE));
-    assertThat(adapter.isAllowed(TENANT, TARGET, order.getId())).isFalse();
+    assertThat(evaluate(order, false)).isFalse();
   }
 
   @Test
   void missingAndOtherTenantOrdersAreNotAllowed() {
+    freshScope(DataScope.GLOBAL);
     UUID missing = UUID.randomUUID();
     UUID otherTenantOrder = UUID.randomUUID();
-    when(orders.findByTenantIdAndId(TENANT, missing)).thenReturn(Optional.empty());
-    when(orders.findByTenantIdAndId(TENANT, otherTenantOrder)).thenReturn(Optional.empty());
-
     assertThat(adapter.isAllowed(TENANT, TARGET, missing)).isFalse();
     assertThat(adapter.isAllowed(TENANT, TARGET, otherTenantOrder)).isFalse();
   }
@@ -106,20 +105,34 @@ class FlowBoardSalesOrderWriteScopeAdapterTest {
     TenantContext.setCurrentUserId(SystemUser.ID);
     freshScope(DataScope.OWN);
 
-    assertThat(evaluate(order(TENANT, OUTSIDER))).isFalse();
+    assertThat(evaluate(order(TENANT, OUTSIDER), false)).isFalse();
   }
 
   @Test
   void tenantBoundaryIsStillAppliedByTheSalesPolicy() {
+    freshScope(DataScope.GLOBAL);
     SalesOrder otherTenantOrder = order(OTHER_TENANT, TARGET);
-    when(orders.findByTenantIdAndId(TENANT, otherTenantOrder.getId()))
-        .thenReturn(Optional.of(otherTenantOrder));
-
     assertThat(adapter.isAllowed(TENANT, TARGET, otherTenantOrder.getId())).isFalse();
   }
 
-  private boolean evaluate(SalesOrder order) {
-    when(orders.findByTenantIdAndId(TENANT, order.getId())).thenReturn(Optional.of(order));
+  @Test
+  void batchScopeUsesOneRepositoryQueryForManyOrders() {
+    freshScope(DataScope.GLOBAL);
+    List<SalesOrder> batch =
+        java.util.stream.IntStream.range(0, 100)
+            .mapToObj(ignored -> order(TENANT, TARGET))
+            .toList();
+    when(orders.findAll(any(org.springframework.data.jpa.domain.Specification.class)))
+        .thenReturn(batch);
+    assertThat(
+            adapter.allowedOrderIds(TENANT, TARGET, batch.stream().map(SalesOrder::getId).toList()))
+        .hasSize(100);
+    verify(orders).findAll(any(org.springframework.data.jpa.domain.Specification.class));
+  }
+
+  private boolean evaluate(SalesOrder order, boolean admittedByCombinedSpecification) {
+    when(orders.findAll(any(org.springframework.data.jpa.domain.Specification.class)))
+        .thenReturn(admittedByCombinedSpecification ? List.of(order) : List.of());
     return adapter.isAllowed(TENANT, TARGET, order.getId());
   }
 

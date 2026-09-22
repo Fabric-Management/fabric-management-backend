@@ -73,6 +73,7 @@ public class TenantTransactionalPurgeService {
           "flowboard.task_checklist",
           "flowboard.task_label_assignment",
           "flowboard.task_assignee",
+          "flowboard.decision_subject_projection",
           "flowboard.task_reminder",
           "flowboard.task_relation",
           "flowboard.escalation_log",

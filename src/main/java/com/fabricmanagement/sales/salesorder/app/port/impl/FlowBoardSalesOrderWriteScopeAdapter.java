@@ -4,8 +4,9 @@ import com.fabricmanagement.flowboard.routing.domain.port.out.SalesOrderWriteSco
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy.PermissionFreshness;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
-import java.util.UUID;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 /** Sales-owned implementation of FlowBoard's order write-scope boundary. */
@@ -17,13 +18,20 @@ public class FlowBoardSalesOrderWriteScopeAdapter implements SalesOrderWriteScop
   private final SalesOrderAccessPolicy accessPolicy;
 
   @Override
-  public boolean isAllowed(UUID tenantId, UUID userId, UUID orderId) {
-    if (tenantId == null || userId == null || orderId == null) {
-      return false;
-    }
+  public Set<UUID> allowedOrderIds(UUID tenantId, UUID userId, Collection<UUID> orderIds) {
+    if (tenantId == null || userId == null || orderIds == null || orderIds.isEmpty())
+      return Set.of();
+    if (orderIds.size() > 100)
+      throw new IllegalArgumentException("At most 100 order ids are allowed");
+    Specification<com.fabricmanagement.sales.salesorder.domain.SalesOrder> selected =
+        (root, query, builder) -> root.get("id").in(orderIds);
     return orderRepository
-        .findByTenantIdAndId(tenantId, orderId)
-        .map(order -> accessPolicy.canWrite(tenantId, userId, order, PermissionFreshness.FRESH))
-        .orElse(false);
+        .findAll(
+            accessPolicy
+                .writeRestriction(tenantId, userId, PermissionFreshness.FRESH)
+                .and(selected))
+        .stream()
+        .map(com.fabricmanagement.sales.salesorder.domain.SalesOrder::getId)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 }

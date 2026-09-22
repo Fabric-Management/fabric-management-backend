@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.*;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort;
@@ -354,7 +355,8 @@ class OrderCoverEvidenceServiceTest {
             port,
             Clock.fixed(now, ZoneOffset.UTC),
             transactions(),
-            mock(OrderCoverObjectAccess.class));
+            mock(OrderCoverObjectAccess.class),
+            mock(DomainEventPublisher.class));
     var salesOrder = SalesOrder.builder().build();
     salesOrder.setId(order);
     salesOrder.setTenantId(tenant);
@@ -451,7 +453,8 @@ class OrderCoverEvidenceServiceTest {
             null,
             Clock.systemUTC(),
             transactions(),
-            mock(OrderCoverObjectAccess.class));
+            mock(OrderCoverObjectAccess.class),
+            mock(DomainEventPublisher.class));
     assertThatThrownBy(() -> service.read(order, evidenceId))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class);
     verify(repository).findByTenantIdAndSalesOrderIdAndId(tenant, order, evidenceId);
@@ -491,7 +494,8 @@ class OrderCoverEvidenceServiceTest {
             port,
             Clock.fixed(now, ZoneOffset.UTC),
             transactions,
-            mock(OrderCoverObjectAccess.class));
+            mock(OrderCoverObjectAccess.class),
+            mock(DomainEventPublisher.class));
     assertThat(service.refresh(order, caseId).revision()).isEqualTo(1);
     verify(transactions, times(2))
         .getTransaction(
@@ -522,7 +526,8 @@ class OrderCoverEvidenceServiceTest {
             null,
             Clock.systemUTC(),
             transactions,
-            mock(OrderCoverObjectAccess.class));
+            mock(OrderCoverObjectAccess.class),
+            mock(DomainEventPublisher.class));
     when(streams.lockScope(tenant, caseId))
         .thenThrow(
             new CannotSerializeTransactionException("retry", new SQLException("race", "40001")));
