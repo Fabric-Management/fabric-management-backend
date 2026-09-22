@@ -13,6 +13,7 @@ import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
+import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,7 @@ public class UserService implements UserFacade {
   private final UserOnboardingService userOnboardingService;
   private final UserProfileService userProfileService;
   private final UserRepository userRepository;
+  private final UserDepartmentRepository userDepartmentRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final DomainEventPublisher eventPublisher;
 
@@ -103,6 +105,13 @@ public class UserService implements UserFacade {
   @Transactional(readOnly = true)
   public boolean isActive(UUID tenantId, UUID userId) {
     return userQueryService.isActive(tenantId, userId);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.Set<UUID> departmentIds(UUID tenantId, UUID userId) {
+    return java.util.Set.copyOf(
+        userDepartmentRepository.findActiveDepartmentIdsByTenantIdAndUserId(tenantId, userId));
   }
 
   @Override

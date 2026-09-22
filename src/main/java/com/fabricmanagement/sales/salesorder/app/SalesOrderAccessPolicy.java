@@ -29,8 +29,17 @@ public class SalesOrderAccessPolicy {
   }
 
   public Specification<SalesOrder> readRestriction(UUID tenantId, UUID userId) {
-    AccessScope accessScope =
-        resolveAccessScope(tenantId, userId, "read", PermissionFreshness.CACHED);
+    return restriction(tenantId, userId, "read", PermissionFreshness.CACHED);
+  }
+
+  public Specification<SalesOrder> writeRestriction(
+      UUID tenantId, UUID userId, PermissionFreshness freshness) {
+    return restriction(tenantId, userId, "write", freshness);
+  }
+
+  private Specification<SalesOrder> restriction(
+      UUID tenantId, UUID userId, String action, PermissionFreshness freshness) {
+    AccessScope accessScope = resolveAccessScope(tenantId, userId, action, freshness);
     return (root, query, criteriaBuilder) -> {
       var tenantPredicate = criteriaBuilder.equal(root.get("tenantId"), tenantId);
       if (accessScope.scope() == null) {

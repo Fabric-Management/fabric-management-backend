@@ -6,6 +6,7 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.sales.salesorder.domain.*;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverCapabilityPort;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverFollowQueryPort;
+import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverProjectionPort.VerdictCode;
 import com.fabricmanagement.sales.salesorder.dto.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
 import java.time.Clock;
@@ -73,11 +74,6 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
             .toList();
     var latest =
         evidence.findFirstByTenantIdAndCaseIdOrderByRevisionDesc(tenant, coverCase.getId());
-    var capability =
-        coverCase.getTaskId() == null
-            ? null
-            : capabilities.evaluate(tenant, orderId, coverCase.getTaskId(), actorId);
-    List<UUID> direct = capability == null ? List.of() : capability.directAssigneeIds();
     var resultDtos =
         results.findAllByTenantIdAndCaseIdOrderByRecordedAtAsc(tenant, coverCase.getId()).stream()
             .map(
@@ -89,21 +85,14 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
         coverCase.getState() == OrderCoverCaseState.OPEN
             || coverCase.getState() == OrderCoverCaseState.PARTIALLY_SETTLED;
     boolean hasActionableEvidence =
-        latest
-            .map(
-                snapshot ->
-                    snapshot.getLines().stream()
-                        .filter(line -> unresolved.contains(line.lineId()))
-                        .anyMatch(OrderCoverQueryService::hasCompleteRequirement))
-            .orElse(false);
-    String blockedReason =
-        !open
-            ? "CASE_CLOSED"
-            : capability == null
-                ? "UNASSIGNED"
-                : !capability.allowed()
-                    ? capability.blockedReason()
-                    : !hasActionableEvidence ? "EVIDENCE_UNKNOWN" : null;
+        OrderCoverVerdictEvaluator.evaluate(
+                coverCase.getState(), Set.copyOf(unresolved), latest.orElse(null))
+            == VerdictCode.ACTIONABLE;
+    var capability =
+        capabilities.evaluate(
+            tenant, orderId, coverCase.getTaskId(), actorId, open, hasActionableEvidence);
+    List<UUID> direct = capability.directAssigneeIds();
+    String blockedReason = capability.blockedReason();
     return new OrderCoverDetail(
         new OrderCoverCaseDto(
             coverCase.getId(),
@@ -111,7 +100,7 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
             coverCase.getRevision(),
             coverCase.getState(),
             coverCase.getTaskId(),
-            capability == null ? null : capability.taskVersion(),
+            capability.taskVersion(),
             unresolved,
             latest.map(OrderCoverEvidence::getId).orElse(null)),
         new OrderCoverDetail.DecisionSubjectRef(
@@ -138,7 +127,8 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
                     : new OrderCoverDetail.DecisionBlockedReason(
                         OrderCoverDetail.DecisionBlockedReasonCode.valueOf(blockedReason),
                         "decision.blocked." + blockedReason.toLowerCase(),
-                        new OrderCoverDetail.DecisionReasonParameters(null, null)),
+                        new OrderCoverDetail.DecisionReasonParameters(
+                            null, capability.taskVersion())),
                 null,
                 false,
                 clock.instant(),
@@ -159,15 +149,5 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
 
   private SalesOrder readableOrder(UUID orderId, UUID actorId) {
     return objectAccess.readable(orderId, actorId);
-  }
-
-  private static boolean hasCompleteRequirement(OrderCoverEvidenceDto.Line line) {
-    return line.blockingReasons().stream()
-        .noneMatch(
-            reason ->
-                reason.equals("REQUIREMENT_COMPLETENESS_UNKNOWN")
-                    || reason.contains("UNTYPED_REQUIREMENTS")
-                    || reason.contains("UNSPECIFIED:")
-                    || reason.contains("UNRESOLVED_SPEC:"));
   }
 }

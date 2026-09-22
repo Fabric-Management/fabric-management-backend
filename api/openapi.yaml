@@ -153,6 +153,8 @@ tags:
   name: Approval Request
 - description: Physical stock unit lifecycle management
   name: StockUnit
+- description: Scoped decision queue and projection repair
+  name: FlowBoard Decisions
 - description: Procurement Purchase Order API
   name: Purchase Order
 - description: Partner portal user management
@@ -5318,7 +5320,7 @@ paths:
       - Department
   /api/v1/common/notifications:
     get:
-      operationId: list_7
+      operationId: list_8
       parameters:
       - in: query
         name: pageRequest
@@ -20609,6 +20611,239 @@ paths:
           description: Internal Server Error
       tags:
       - FlowBoard — Dashboard
+  /api/v1/flowboard/decisions:
+    get:
+      operationId: list_7
+      parameters:
+      - in: query
+        name: bucket
+        required: false
+        schema:
+          type: string
+          default: MINE
+          enum:
+          - MINE
+          - DEPARTMENT
+          - UNASSIGNED
+          - WAITING
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - in: query
+        name: parameters
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseDecisionQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List the caller's scoped decision queue
+      tags:
+      - FlowBoard Decisions
+  /api/v1/flowboard/decisions/projection/rebuild:
+    post:
+      operationId: rebuild
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionProjectionRebuildRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDecisionProjectionRebuildResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Rebuild selected or all order-cover decision projections
+      tags:
+      - FlowBoard Decisions
+  /api/v1/flowboard/decisions/summary:
+    get:
+      operationId: summary
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDecisionQueueSummary"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Count the caller's decision buckets
+      tags:
+      - FlowBoard Decisions
   /api/v1/flowboard/performance/leaderboard:
     get:
       operationId: getLeaderboard
@@ -49840,6 +50075,42 @@ components:
           type: array
           items:
             type: string
+    ApiResponseDecisionProjectionRebuildResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DecisionProjectionRebuildResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseDecisionQueueSummary:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DecisionQueueSummary"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDecisionTransitionResult:
       type: object
       properties:
@@ -52098,6 +52369,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseColorPartnerRefDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseDecisionQueueItem:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseDecisionQueueItem"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -58672,6 +58961,150 @@ components:
       - reason
       - requiredPermissions
       - routesTo
+    DecisionProjectionRebuildRequest:
+      type: object
+      properties:
+        caseIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 0
+    DecisionProjectionRebuildResponse:
+      type: object
+      properties:
+        inserted:
+          type: integer
+          format: int64
+          minimum: 0
+        orphaned:
+          type: integer
+          format: int64
+          minimum: 0
+        scanned:
+          type: integer
+          format: int64
+          minimum: 0
+        unchanged:
+          type: integer
+          format: int64
+          minimum: 0
+        updated:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - inserted
+      - orphaned
+      - scanned
+      - unchanged
+      - updated
+    DecisionQueueItem:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionCapability"
+        assignment:
+          $ref: "#/components/schemas/DecisionAssignment"
+        createdAt:
+          type: string
+          format: date-time
+        detailHref:
+          type: string
+        dueDate:
+          type:
+          - string
+          - "null"
+          format: date
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - ORDER_COVER
+        priority:
+          type: string
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - CRITICAL
+        projectedAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - OPEN
+          - WAITING
+        subject:
+          $ref: "#/components/schemas/DecisionSubjectRef"
+        taskId:
+          type: string
+          format: uuid
+        taskVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        verdictCode:
+          type: string
+          enum:
+          - ACTIONABLE
+          - EVIDENCE_UNKNOWN
+          - NO_EVIDENCE
+          - CASE_CLOSED
+      required:
+      - actions
+      - assignment
+      - createdAt
+      - detailHref
+      - dueDate
+      - id
+      - kind
+      - priority
+      - projectedAt
+      - state
+      - subject
+      - taskId
+      - taskVersion
+      - verdictCode
+    DecisionQueueSummary:
+      type: object
+      properties:
+        computedAt:
+          type: string
+          format: date-time
+        departmentCount:
+          type: integer
+          format: int64
+          minimum: 0
+        mineCount:
+          type: integer
+          format: int64
+          minimum: 0
+        stale:
+          type: boolean
+        unassignedCount:
+          type:
+          - integer
+          - "null"
+          format: int64
+          minimum: 0
+        waitingCount:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - computedAt
+      - departmentCount
+      - mineCount
+      - stale
+      - unassignedCount
+      - waitingCount
     DecisionReasonParameters:
       type: object
       properties:
@@ -61943,6 +62376,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ColorPartnerRefDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseDecisionQueueItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionQueueItem"
         first:
           type: boolean
         last:

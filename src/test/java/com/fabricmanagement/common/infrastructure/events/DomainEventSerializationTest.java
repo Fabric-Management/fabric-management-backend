@@ -38,6 +38,7 @@ import com.fabricmanagement.sales.salesorder.domain.OrderCoverCaseState;
 import com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime;
 import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseChangedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseOpenedEvent;
+import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverEvidenceRevisedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -256,6 +257,7 @@ class DomainEventSerializationTest {
         event(
             new OrderCoverCaseChangedEvent(
                 tenantId, uuid(), 2, OrderCoverCaseState.PARTIALLY_SETTLED, uuid())),
+        event(new OrderCoverEvidenceRevisedEvent(tenantId, uuid(), uuid(), 2)),
         event(new TaskAssignedEvent(tenantId, uuid(), uuid(), uuid(), uuid())),
         event(
             new WorkOrderApprovedEvent(

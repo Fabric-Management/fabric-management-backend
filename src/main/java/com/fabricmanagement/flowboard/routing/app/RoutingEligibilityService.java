@@ -39,4 +39,8 @@ public class RoutingEligibilityService {
       reasons.add(RoutingReason.OUTSIDE_SALES_WRITE_SCOPE);
     return List.copyOf(reasons);
   }
+
+  public boolean writeScopeAllowed(UUID tenantId, UUID orderId, UUID userId) {
+    return salesScope.isAllowed(tenantId, userId, orderId);
+  }
 }

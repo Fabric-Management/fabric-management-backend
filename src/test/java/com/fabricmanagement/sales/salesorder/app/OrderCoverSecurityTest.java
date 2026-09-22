@@ -64,9 +64,10 @@ class OrderCoverSecurityTest {
     OrderCoverCaseRepository cases = mock(OrderCoverCaseRepository.class);
     when(cases.findByTenantIdAndSalesOrderId(tenant, orderId)).thenReturn(Optional.of(coverCase));
     OrderCoverCapabilityPort capabilities = mock(OrderCoverCapabilityPort.class);
-    when(capabilities.evaluate(tenant, orderId, taskId, actor))
+    when(capabilities.evaluate(tenant, orderId, taskId, actor, true, false))
         .thenReturn(
-            new OrderCoverCapabilityPort.Snapshot(2L, "BACKLOG", List.of(actor), true, null));
+            new OrderCoverCapabilityPort.Snapshot(
+                2L, "BACKLOG", List.of(actor), false, "EVIDENCE_UNKNOWN"));
     OrderCoverQueryService service =
         new OrderCoverQueryService(
             access,

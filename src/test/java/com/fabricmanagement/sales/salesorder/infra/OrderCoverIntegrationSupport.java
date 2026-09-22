@@ -79,6 +79,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -312,6 +313,24 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
     lines.saveAndFlush(line);
   }
 
+  /**
+   * Waits until every event publication that mentions the case has been delivered, so a test that
+   * mutates the decision projection directly is not overwritten by a late async listener.
+   */
+  protected void awaitCaseEventsSettled(UUID caseId) {
+    await()
+        .atMost(Duration.ofSeconds(20))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForObject(
+                            "select count(*) from event_publication where serialized_event like ?"
+                                + " and completion_date is null",
+                            Integer.class,
+                            "%" + caseId + "%"))
+                    .isZero());
+  }
+
   protected Cover governed(int lineCount) {
     activation.activate();
     UUID orderId = draft(lineCount);
@@ -382,16 +401,22 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
 
   protected ResultActions postTransition(Cover cover, DecisionTransitionRequest command)
       throws Exception {
+    return performAuthenticated(
+        post("/api/v1/flowboard/tasks/{taskId}/transitions", cover.taskId())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsBytes(command)));
+  }
+
+  /** Supplies the request principal and restores the context cleared by MVC interceptors. */
+  protected ResultActions performAuthenticated(MockHttpServletRequestBuilder request)
+      throws Exception {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
     String tenantUid = TenantContext.getCurrentTenantUid();
     UUID userId = TenantContext.getCurrentUserId();
     String tenantCountry = TenantContext.getCurrentTenantCountry();
     try {
-      return mvc.perform(
-          post("/api/v1/flowboard/tasks/{taskId}/transitions", cover.taskId())
-              .contentType(MediaType.APPLICATION_JSON)
-              .content(mapper.writeValueAsBytes(command)));
+      return mvc.perform(request.principal(authentication));
     } finally {
       SecurityContextHolder.clearContext();
       TenantContext.clear();

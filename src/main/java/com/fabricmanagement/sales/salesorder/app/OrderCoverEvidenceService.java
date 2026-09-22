@@ -1,8 +1,10 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.*;
+import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverEvidenceRevisedEvent;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort;
 import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort.*;
 import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto;
@@ -33,6 +35,7 @@ public class OrderCoverEvidenceService {
   private final Clock clock;
   private final PlatformTransactionManager transactionManager;
   private final OrderCoverObjectAccess objectAccess;
+  private final DomainEventPublisher events;
 
   @PreAuthorize(
       "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','read')")
@@ -106,7 +109,10 @@ public class OrderCoverEvidenceService {
             OrderCoverEvidenceEvaluator.RULE_VERSION,
             OrderCoverEvidenceEvaluator.evaluate(requirements, inputs));
     streams.save(stream);
-    return evidence.saveAndFlush(snapshot).toDto();
+    var saved = evidence.saveAndFlush(snapshot);
+    events.publish(
+        new OrderCoverEvidenceRevisedEvent(tenantId, caseId, saved.getId(), saved.getRevision()));
+    return saved.toDto();
   }
 
   @Transactional(readOnly = true)

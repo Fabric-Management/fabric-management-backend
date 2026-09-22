@@ -4,6 +4,7 @@ import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -74,6 +75,9 @@ public interface UserFacade {
 
   /** Check whether a user currently belongs to the tenant and is active. */
   boolean isActive(UUID tenantId, UUID userId);
+
+  /** Current department memberships for scope-sensitive work queues. */
+  Set<UUID> departmentIds(UUID tenantId, UUID userId);
 
   /**
    * Check if contact value is already registered.

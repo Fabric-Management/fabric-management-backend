@@ -196,6 +196,9 @@ public class OrderCoverService implements OrderCoverCommandPort {
       throw new IllegalStateException("A closed order-cover case cannot accept a task");
     value.attachTask(taskId);
     cases.save(value);
+    events.publish(
+        new OrderCoverCaseChangedEvent(
+            tenantId, value.getId(), value.getRevision(), value.getState(), null));
   }
 
   @Override
