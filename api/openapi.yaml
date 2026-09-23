@@ -59038,15 +59038,17 @@ components:
         needsApproval:
           type: boolean
         reason:
-          type: "null"
-          $ref: "#/components/schemas/DecisionBlockedReason"
+          anyOf:
+          - $ref: "#/components/schemas/DecisionBlockedReason"
+          - type: "null"
         requiredPermissions:
           type: array
           items:
             $ref: "#/components/schemas/PermissionKey"
         routesTo:
-          type: "null"
-          $ref: "#/components/schemas/DecisionRouteTarget"
+          anyOf:
+          - $ref: "#/components/schemas/DecisionRouteTarget"
+          - type: "null"
       required:
       - action
       - allowed
@@ -59209,8 +59211,9 @@ components:
           format: int64
           minimum: 0
         requiredPermission:
-          type: "null"
-          $ref: "#/components/schemas/PermissionKey"
+          anyOf:
+          - $ref: "#/components/schemas/PermissionKey"
+          - type: "null"
       required:
       - currentTaskVersion
       - requiredPermission
@@ -61743,8 +61746,9 @@ components:
         case:
           $ref: "#/components/schemas/OrderCoverCase"
         evidence:
-          type: "null"
-          $ref: "#/components/schemas/OrderCoverEvidence"
+          anyOf:
+          - $ref: "#/components/schemas/OrderCoverEvidence"
+          - type: "null"
         lines:
           type: array
           items:
@@ -61839,8 +61843,9 @@ components:
       type: object
       properties:
         blockReason:
-          type: "null"
-          $ref: "#/components/schemas/OrderCoverLineBlockReason"
+          anyOf:
+          - $ref: "#/components/schemas/OrderCoverLineBlockReason"
+          - type: "null"
         evidenceId:
           type:
           - string
@@ -61862,8 +61867,9 @@ components:
           format: int32
           minimum: 1
         productionQuantity:
-          type: "null"
-          $ref: "#/components/schemas/OrderCoverQuantity"
+          anyOf:
+          - $ref: "#/components/schemas/OrderCoverQuantity"
+          - type: "null"
         rationaleRequiredIfSelected:
           type: boolean
         selectable:
@@ -62083,8 +62089,9 @@ components:
         rationaleRequired:
           type: boolean
         rejection:
-          type: "null"
-          $ref: "#/components/schemas/OrderCoverSelectionPreviewRejection"
+          anyOf:
+          - $ref: "#/components/schemas/OrderCoverSelectionPreviewRejection"
+          - type: "null"
       required:
       - accepted
       - lines
@@ -64508,8 +64515,9 @@ components:
           format: uuid
           description: Batch/lot identifier
         colour:
-          type: "null"
-          $ref: "#/components/schemas/ProductionStockAvailabilityColour"
+          anyOf:
+          - $ref: "#/components/schemas/ProductionStockAvailabilityColour"
+          - type: "null"
           description: Batch colour; null for explicitly colourless stock
         free:
           type: number
@@ -64660,8 +64668,9 @@ components:
       description: Selectable pieces grouped by quality grade
       properties:
         grade:
-          type: "null"
-          $ref: "#/components/schemas/ProductionStockAvailabilityQualityGrade"
+          anyOf:
+          - $ref: "#/components/schemas/ProductionStockAvailabilityQualityGrade"
+          - type: "null"
           description: Quality grade; null represents UNASSIGNED pieces
         kg:
           type:
@@ -66007,8 +66016,9 @@ components:
           format: uuid
           description: Inactive retained code to reactivate as the sole primary
         newPrimaryCode:
-          type: "null"
-          $ref: "#/components/schemas/ColorPartnerCodeInput"
+          anyOf:
+          - $ref: "#/components/schemas/ColorPartnerCodeInput"
+          - type: "null"
           description: New code to create as the sole primary
     ReactivateColorPartnerRefWithExistingCodeRequest:
       type: object
@@ -72444,8 +72454,9 @@ components:
           - CHOSEN
           - DISMISSED
         resolvedCandidate:
-          type: "null"
-          $ref: "#/components/schemas/YarnReconciliationResolvedCandidateDto"
+          anyOf:
+          - $ref: "#/components/schemas/YarnReconciliationResolvedCandidateDto"
+          - type: "null"
         status:
           type: string
           enum:
