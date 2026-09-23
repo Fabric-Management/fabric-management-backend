@@ -134,8 +134,12 @@ class YarnArticleApiOpenApiTest {
     if (type instanceof List<?> types && types.contains("null")) {
       return true;
     }
-    Object oneOf = schema.get("oneOf");
-    return oneOf instanceof List<?> variants
+    return hasNullArm(schema.get("oneOf")) || hasNullArm(schema.get("anyOf"));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static boolean hasNullArm(Object composition) {
+    return composition instanceof List<?> variants
         && variants.stream()
             .filter(Map.class::isInstance)
             .map(value -> (Map<String, Object>) value)
