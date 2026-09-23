@@ -6,7 +6,6 @@ import com.fabricmanagement.sales.salesorder.domain.event.OrderCoverCaseChangedE
 import com.fabricmanagement.sales.salesorder.domain.port.*;
 import com.fabricmanagement.sales.salesorder.dto.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.*;
 import java.util.function.Function;
@@ -83,36 +82,19 @@ public class OrderCoverService implements OrderCoverCommandPort {
       OrderCoverCaseLine scopeLine = scope.get(lineId);
       SalesOrderLine line = orderLines.get(lineId);
       OrderCoverEvidenceDto.Line lineEvidence = evidenceLines.get(lineId);
-      if (scopeLine == null || line == null || lineEvidence == null || !scopeLine.unresolved())
-        return rejected("LINE_NOT_OPEN");
-      var profile = line.getRequirementProfileSnapshot();
-      if (profile == null || !profile.complete())
-        return rejected(
-            profile == null
-                ? "REQUIREMENT_COMPLETENESS_UNKNOWN"
-                : profile.incompleteReasons().isEmpty()
-                    ? "REQUIREMENT_COMPLETENESS_UNKNOWN"
-                    : String.join(",", profile.incompleteReasons()));
-      if (line.getLineStatus() != SalesOrderLineStatus.PENDING
-          && line.getLineStatus() != SalesOrderLineStatus.RECIPE_ASSIGNED)
-        return rejected("LINE_ALREADY_FULFILLED");
-      BigDecimal unresolved =
-          line.getRequestedQty()
-              .subtract(line.getShippedQty() == null ? BigDecimal.ZERO : line.getShippedQty());
-      if (unresolved.signum() <= 0) return rejected("LINE_ALREADY_FULFILLED");
-      if (reservations.hasActiveReservation(lineId)) return rejected("ACTIVE_RESERVATION_EXISTS");
-      if (production.hasActiveProduction(tenantId, lineId))
-        return rejected("ACTIVE_PRODUCTION_EXISTS");
-      plans.add(new Plan(scopeLine, line, lineEvidence, unresolved));
+      var assessment =
+          OrderCoverLinePlanner.assess(
+              scopeLine,
+              line,
+              lineEvidence,
+              () -> reservations.hasActiveReservation(lineId),
+              () -> production.hasActiveProduction(tenantId, lineId));
+      if (!assessment.selectable()) return rejected(LegacyRejectionCode.of(assessment));
+      plans.add(new Plan(scopeLine, line, lineEvidence, assessment));
     }
     boolean rationaleRequired =
-        plans.stream()
-            .anyMatch(
-                plan -> {
-                  var shortfall = plan.evidence().shortfall();
-                  return shortfall.state() != OrderCoverEvidenceDto.Knowledge.KNOWN
-                      || new BigDecimal(shortfall.value()).signum() <= 0;
-                });
+        OrderCoverLinePlanner.assessSelection(plans.stream().map(Plan::assessment).toList())
+            .rationaleRequired();
     if (rationaleRequired && (payload.rationale() == null || payload.rationale().isBlank()))
       return rejected("RATIONALE_REQUIRED");
 
@@ -138,7 +120,7 @@ public class OrderCoverService implements OrderCoverCommandPort {
                   line.getRecipeId(),
                   order.getTradingPartnerId(),
                   line.getId(),
-                  plan.quantity(),
+                  plan.assessment().productionQuantity(),
                   line.getUnit(),
                   line.getCurrency(),
                   order.getDeadline(),
@@ -149,7 +131,7 @@ public class OrderCoverService implements OrderCoverCommandPort {
                   profile.profileId(),
                   profile.profileVersion(),
                   profile,
-                  productCode(line)));
+                  OrderCoverDisplay.productCode(line)));
       if (line.getRecipeId() == null)
         events.publish(
             new com.fabricmanagement.common.domain.event.production
@@ -160,7 +142,7 @@ public class OrderCoverService implements OrderCoverCommandPort {
               tenantId,
               result.getId(),
               line.getId(),
-              plan.quantity(),
+              plan.assessment().productionQuantity(),
               line.getUnit(),
               plan.evidence().suitability(),
               profile.profileId(),
@@ -262,17 +244,6 @@ public class OrderCoverService implements OrderCoverCommandPort {
     return value.map(OrderCoverCase::getId);
   }
 
-  /**
-   * Same fallback the confirmation event uses, except that a free-text line (no product) never
-   * yields the literal "PRODUCT_null": without a description the draft simply carries no code.
-   */
-  private static String productCode(SalesOrderLine line) {
-    if (line.getProductDesc() != null && !line.getProductDesc().isBlank()) {
-      return line.getProductDesc();
-    }
-    return line.getProductId() != null ? "PRODUCT_" + line.getProductId() : null;
-  }
-
   private static Decision.Rejected rejected(String code) {
     return new Decision.Rejected(code, "Order-cover precondition failed");
   }
@@ -331,5 +302,5 @@ public class OrderCoverService implements OrderCoverCommandPort {
       OrderCoverCaseLine scope,
       SalesOrderLine line,
       OrderCoverEvidenceDto.Line evidence,
-      BigDecimal quantity) {}
+      OrderCoverLinePlanner.LineAssessment assessment) {}
 }

@@ -150,6 +150,24 @@ class DecisionQueueServiceTest {
   }
 
   @Test
+  void queueItemUsesTheCanonicalFrontendOrderAndDecisionRoutes() {
+    arrangeCaller();
+    when(routing.isActiveMember(tenant, RoutingPoolKey.ORDER_COVER, caller)).thenReturn(true);
+    DecisionQueueRepository.Row row = row();
+    when(repository.page(
+            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(20)))
+        .thenReturn(new DecisionQueueRepository.PageSlice(List.of(row), 1));
+    when(writes.allowedOrderIds(tenant, caller, List.of(row.orderId())))
+        .thenReturn(Set.of(row.orderId()));
+
+    var item =
+        service.list(tenant, caller, DecisionQueueBucket.MINE, 0, 20).getContent().getFirst();
+
+    assertThat(item.subject().accessibleHref()).isEqualTo("/sales/" + row.orderId());
+    assertThat(item.detailHref()).isEqualTo("/decisions/order-cover/" + row.orderId());
+  }
+
+  @Test
   void freshnessListenersMatchEveryDecisionListenerAndTaskCreationListener() {
     Set<String> derived =
         new ClassFileImporter()

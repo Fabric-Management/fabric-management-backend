@@ -36,9 +36,12 @@ class OrderCoverSecurityTest {
             mock(OrderCoverCaseRepository.class),
             mock(OrderCoverCaseLineRepository.class),
             mock(OrderCoverEvidenceRepository.class),
+            mock(SalesOrderLineRepository.class),
             mock(OrderCoverResultRepository.class),
             mock(OrderCoverLineResultRepository.class),
             mock(com.fabricmanagement.sales.salesorder.domain.port.OrderCoverCapabilityPort.class),
+            mock(com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReservationPort.class),
+            mock(com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort.class),
             Clock.systemUTC());
     assertThatThrownBy(() -> service.assertReadable(orderId, actor))
         .isInstanceOf(NotFoundException.class)
@@ -75,9 +78,12 @@ class OrderCoverSecurityTest {
             cases,
             mock(OrderCoverCaseLineRepository.class),
             mock(OrderCoverEvidenceRepository.class),
+            mock(SalesOrderLineRepository.class),
             mock(OrderCoverResultRepository.class),
             mock(OrderCoverLineResultRepository.class),
             capabilities,
+            mock(com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReservationPort.class),
+            mock(com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort.class),
             Clock.systemUTC());
 
     var action = service.detail(orderId, actor).actions().getFirst();

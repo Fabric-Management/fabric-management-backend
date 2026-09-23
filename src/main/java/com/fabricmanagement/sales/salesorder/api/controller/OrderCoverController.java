@@ -7,6 +7,7 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.sales.salesorder.app.*;
 import com.fabricmanagement.sales.salesorder.dto.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.*;
 import java.util.concurrent.*;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class OrderCoverController {
   private final OrderCoverQueryService query;
   private final OrderCoverEvidenceService evidence;
+  private final OrderCoverPreviewService preview;
   private final com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator
       permissions;
   private final ConcurrentMap<String, Long> refreshes = new ConcurrentHashMap<>();
@@ -29,10 +31,19 @@ public class OrderCoverController {
   public OrderCoverController(
       OrderCoverQueryService query,
       OrderCoverEvidenceService evidence,
+      OrderCoverPreviewService preview,
       com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator permissions) {
     this.query = query;
     this.evidence = evidence;
+    this.preview = preview;
     this.permissions = permissions;
+  }
+
+  @PostMapping("/preview")
+  public ResponseEntity<ApiResponse<OrderCoverSelectionPreview>> previewOrderCoverSelection(
+      @PathVariable UUID orderId, @Valid @RequestBody OrderCoverSelectionPreviewRequest request) {
+    assertReadGrants();
+    return ResponseEntity.ok(ApiResponse.success(preview.preview(orderId, actor(), request)));
   }
 
   @GetMapping

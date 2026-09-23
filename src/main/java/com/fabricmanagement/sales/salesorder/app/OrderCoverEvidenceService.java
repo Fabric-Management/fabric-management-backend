@@ -98,7 +98,7 @@ public class OrderCoverEvidenceService {
     String fingerprint = fingerprint(requirements, inputs);
     var latest = evidence.findFirstByTenantIdAndCaseIdOrderByRevisionDesc(tenantId, caseId);
     if (!force && latest.isPresent() && latest.get().getInputFingerprint().equals(fingerprint))
-      return latest.get().toDto();
+      return display(latest.get().toDto(), tenantId, orderId);
     var snapshot =
         OrderCoverEvidence.create(
             requirements,
@@ -112,7 +112,7 @@ public class OrderCoverEvidenceService {
     var saved = evidence.saveAndFlush(snapshot);
     events.publish(
         new OrderCoverEvidenceRevisedEvent(tenantId, caseId, saved.getId(), saved.getRevision()));
-    return saved.toDto();
+    return display(saved.toDto(), tenantId, orderId);
   }
 
   @Transactional(readOnly = true)
@@ -120,7 +120,7 @@ public class OrderCoverEvidenceService {
       "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','read')")
   public OrderCoverEvidenceDto read(UUID orderId, UUID evidenceId) {
     objectAccess.readable(orderId, requireActor());
-    return load(orderId, evidenceId).toDto();
+    return display(load(orderId, evidenceId).toDto(), TenantContext.requireTenantId(), orderId);
   }
 
   private static UUID requireActor() {
@@ -141,12 +141,29 @@ public class OrderCoverEvidenceService {
     return new Revalidation(previous.getInputFingerprint().equals(fingerprint), fingerprint);
   }
 
+  @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+  public Revalidation revalidateLockless(UUID orderId, UUID evidenceId) {
+    var previous = load(orderId, evidenceId);
+    var requirements = requirements(TenantContext.requireTenantId(), orderId, previous.getCaseId());
+    var current = production.inspect(requirements);
+    String currentFingerprint = fingerprint(requirements, current);
+    return new Revalidation(
+        previous.getInputFingerprint().equals(currentFingerprint), currentFingerprint);
+  }
+
   public record Revalidation(boolean matches, String inputFingerprint) {}
 
   private OrderCoverEvidence load(UUID orderId, UUID evidenceId) {
     return evidence
         .findByTenantIdAndSalesOrderIdAndId(TenantContext.requireTenantId(), orderId, evidenceId)
         .orElseThrow(() -> new OrderDomainException("Order-cover evidence not found", 404));
+  }
+
+  private OrderCoverEvidenceDto display(OrderCoverEvidenceDto value, UUID tenantId, UUID orderId) {
+    return OrderCoverDisplay.enrich(
+        value,
+        lines.findByTenantIdAndSalesOrderIdAndIsActiveTrueOrderByCreatedAtAscIdAsc(
+            tenantId, orderId));
   }
 
   private Requirements requirements(UUID tenantId, UUID orderId, UUID caseId) {

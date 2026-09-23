@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.decision.app;
 
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
+import com.fabricmanagement.common.infrastructure.web.AppRoutes;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.flowboard.decision.domain.DecisionQueueBucket;
 import com.fabricmanagement.flowboard.decision.dto.*;
@@ -163,7 +164,7 @@ public class DecisionQueueService {
             false,
             clock.instant(),
             List.of(PermissionKey.FLOWBOARD_WRITE, PermissionKey.SALES_WRITE));
-    String orderHref = "/sales/orders/" + row.orderId();
+    String orderHref = AppRoutes.salesOrder(row.orderId());
     return new DecisionQueueItem(
         row.caseId(),
         DecisionQueueItem.Kind.ORDER_COVER,
@@ -185,7 +186,7 @@ public class DecisionQueueService {
             : DecisionQueueItem.State.OPEN,
         DecisionVerdictCode.valueOf(row.verdictCode()),
         List.of(action),
-        orderHref + "/cover");
+        AppRoutes.orderCoverDecision(row.orderId()));
   }
 
   private void assertActive(UUID tenant, UUID caller) {

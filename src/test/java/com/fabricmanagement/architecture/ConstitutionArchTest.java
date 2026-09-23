@@ -16,6 +16,9 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -51,6 +54,36 @@ class ConstitutionArchTest {
         new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.fabricmanagement");
+  }
+
+  @Test
+  void frontendRouteLiteralsAreCentralizedInAppRoutes() throws Exception {
+    List<Path> roots =
+        List.of(
+            Path.of("src/main/java/com/fabricmanagement/flowboard/decision/app"),
+            Path.of("src/main/java/com/fabricmanagement/flowboard/task/app"),
+            Path.of("src/main/java/com/fabricmanagement/sales/salesorder/app"));
+    var violations = new TreeSet<String>();
+    for (Path root : roots) {
+      try (var files = Files.walk(root)) {
+        files
+            .filter(path -> path.toString().endsWith(".java"))
+            .forEach(
+                path -> {
+                  try {
+                    String source = Files.readString(path);
+                    if (source.matches("(?s).*\"/(sales|decisions|flowboard)[^\"]*\".*")) {
+                      violations.add(path.toString());
+                    }
+                  } catch (java.io.IOException failure) {
+                    throw new java.io.UncheckedIOException(failure);
+                  }
+                });
+      }
+    }
+    assertThat(violations)
+        .as("Frontend route literals must be built by common.infrastructure.web.AppRoutes")
+        .isEmpty();
   }
 
   @Test

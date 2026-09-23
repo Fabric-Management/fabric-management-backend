@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -52,6 +53,7 @@ import com.fabricmanagement.sales.salesorder.app.OrderCoverActivationService;
 import com.fabricmanagement.sales.salesorder.app.OrderCoverEvidenceService;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.*;
+import com.fabricmanagement.sales.salesorder.domain.port.OrderCoverEvidencePort;
 import com.fabricmanagement.sales.salesorder.domain.requirement.*;
 import com.fabricmanagement.sales.salesorder.dto.ConfirmProductionCoverPayload;
 import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto;
@@ -84,9 +86,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Committed fixtures and real Spring transaction boundaries. Evidence, permission evaluation,
- * production creation and receipt persistence are never replaced by mocks. The routing event
- * listener is paused deliberately so pool edits can be tested before asynchronous repair.
+ * Committed fixtures and real Spring transaction boundaries. Permission evaluation, production
+ * creation and receipt persistence are never replaced by mocks. Focused evidence scenarios spy the
+ * authoritative port with complete inputs. The routing event listener is paused deliberately so
+ * pool edits can be tested before asynchronous repair.
  */
 @AutoConfigureMockMvc(addFilters = false)
 @ResourceLock("sales-order-creation-sequence")
@@ -120,6 +123,7 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
   @MockitoSpyBean protected DomainEventPublisher events;
   @MockitoSpyBean protected ApprovalPort approval;
   @MockitoSpyBean protected WorkOrderService production;
+  @MockitoSpyBean protected OrderCoverEvidencePort evidenceSource;
   protected JdbcTemplate jdbc;
   protected UUID tenant;
   protected UUID board;
@@ -452,6 +456,66 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
                       false));
           return new ReservationStock(location.getId(), product.getId());
         });
+  }
+
+  protected OrderCoverEvidencePort.Inputs knownEvidence(
+      Cover cover, String requested, String suitableFree) {
+    UUID productId =
+        tx(() -> products.saveAndFlush(Product.create(ProductType.FABRIC, "kg")).getId());
+    tx(
+        () -> {
+          var line = lines.findById(cover.lineIds().getFirst()).orElseThrow();
+          line.setProductId(productId);
+          line.setRequestedQty(new BigDecimal(requested));
+          lines.saveAndFlush(line);
+          return null;
+        });
+    var inputs =
+        new OrderCoverEvidencePort.Inputs(
+            List.of(
+                new OrderCoverEvidencePort.Demand(
+                    cover.lineIds().getFirst(), new BigDecimal(requested), "kg", null)),
+            List.of(
+                new OrderCoverEvidencePort.Lot(
+                    UUID.randomUUID(),
+                    productId,
+                    "kg",
+                    new BigDecimal(suitableFree),
+                    new BigDecimal(suitableFree),
+                    OrderCoverEvidencePort.Eligibility.ELIGIBLE,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    "known-evidence-" + suffix)));
+    stubEvidenceInputs(inputs);
+    return inputs;
+  }
+
+  /**
+   * Stubs the evidence port on the Mockito spy itself. The injected bean is the Spring proxy around
+   * the spy, and {@code lockAndInspect} is {@code @Transactional(MANDATORY)}: stubbing through the
+   * proxy runs the transaction advice before Mockito sees the call and fails outside a transaction,
+   * leaving an unfinished stubbing that breaks the following tests.
+   */
+  protected void stubEvidenceInputs(OrderCoverEvidencePort.Inputs inputs) {
+    OrderCoverEvidencePort target = AopTestUtils.getUltimateTargetObject(evidenceSource);
+    doReturn(inputs).when(target).inspect(any(OrderCoverEvidencePort.Requirements.class));
+    doReturn(inputs).when(target).lockAndInspect(any(OrderCoverEvidencePort.Requirements.class));
+  }
+
+  /**
+   * Deactivates one grant of the user's role after setup, e.g. after pool membership was accepted.
+   */
+  protected void revoke(User user, String grant) {
+    String[] key = grant.split(":");
+    jdbc.update(
+        "update common_user.permission_template set is_active=false where tenant_id=? and"
+            + " role_code=? and resource=? and action=?",
+        tenant,
+        user.getRole().getRoleCode(),
+        key[0],
+        key[1]);
   }
 
   protected long taskVersion(Cover cover) {

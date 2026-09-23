@@ -11,8 +11,10 @@ import com.fabricmanagement.flowboard.task.app.OrderCoverTaskResolver;
 import com.fabricmanagement.flowboard.task.app.TaskTransitionExecutor;
 import com.fabricmanagement.flowboard.task.dto.DecisionTransitionRequest;
 import com.fabricmanagement.sales.salesorder.app.OrderCoverEvidenceService;
+import com.fabricmanagement.sales.salesorder.app.OrderCoverPreviewService;
 import com.fabricmanagement.sales.salesorder.app.OrderCoverQueryService;
 import com.fabricmanagement.sales.salesorder.dto.ConfirmProductionCoverPayload;
+import com.fabricmanagement.sales.salesorder.dto.OrderCoverSelectionPreviewRequest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -29,12 +31,33 @@ class OrderCoverControllerSecurityTest {
   void missingReadGrantReturnsNotFoundBeforeLoadingTheCoverCase() {
     OrderCoverQueryService query = mock(OrderCoverQueryService.class);
     OrderCoverEvidenceService evidence = mock(OrderCoverEvidenceService.class);
-    var controller = new OrderCoverController(query, evidence, mock(SpELPermissionEvaluator.class));
+    OrderCoverPreviewService preview = mock(OrderCoverPreviewService.class);
+    var controller =
+        new OrderCoverController(query, evidence, preview, mock(SpELPermissionEvaluator.class));
 
     assertThatThrownBy(() -> controller.getOrderCoverCase(UUID.randomUUID()))
         .isInstanceOf(NotFoundException.class)
         .hasMessage("Sales order not found");
-    verifyNoInteractions(query, evidence);
+    verifyNoInteractions(query, evidence, preview);
+  }
+
+  @Test
+  void previewUsesTheSameReadGrantBoundaryAsTheDetail() {
+    OrderCoverQueryService query = mock(OrderCoverQueryService.class);
+    OrderCoverEvidenceService evidence = mock(OrderCoverEvidenceService.class);
+    OrderCoverPreviewService preview = mock(OrderCoverPreviewService.class);
+    var controller =
+        new OrderCoverController(query, evidence, preview, mock(SpELPermissionEvaluator.class));
+
+    assertThatThrownBy(
+            () ->
+                controller.previewOrderCoverSelection(
+                    UUID.randomUUID(),
+                    new OrderCoverSelectionPreviewRequest(
+                        UUID.randomUUID(), 1, List.of(UUID.randomUUID()))))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Sales order not found");
+    verifyNoInteractions(query, evidence, preview);
   }
 
   @Test

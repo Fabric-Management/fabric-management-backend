@@ -17,7 +17,14 @@ public record OrderCoverDetail(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         OrderCoverEvidenceDto evidence,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DecisionCapability> actions,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OrderCoverLineDecision> lines,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OrderCoverResultDto> results) {
+  public OrderCoverDetail {
+    actions = List.copyOf(actions);
+    lines = List.copyOf(lines);
+    results = List.copyOf(results);
+  }
+
   @Schema(name = "DecisionSubjectRef")
   @JsonInclude(JsonInclude.Include.ALWAYS)
   public record DecisionSubjectRef(

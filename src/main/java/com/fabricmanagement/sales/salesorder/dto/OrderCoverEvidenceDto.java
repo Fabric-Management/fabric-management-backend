@@ -57,9 +57,17 @@ public record OrderCoverEvidenceDto(
   }
 
   @Schema(name = "OrderCoverCompetingAllocation")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
   public record CompetingAllocation(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID lineId,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Quantity quantity) {
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Quantity quantity,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, minimum = "1")
+          Integer lineNumber,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String label) {
+    public CompetingAllocation(UUID lineId, Quantity quantity) {
+      this(lineId, quantity, null, null);
+    }
+
     public CompetingAllocation {
       Objects.requireNonNull(lineId);
       Objects.requireNonNull(quantity);

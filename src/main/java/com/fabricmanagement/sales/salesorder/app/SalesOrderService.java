@@ -401,7 +401,8 @@ public class SalesOrderService {
               // Load embedded lines for detail view
               List<SalesOrderLineResponse> lineResponses =
                   lineRepository
-                      .findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId())
+                      .findByTenantIdAndSalesOrderIdAndIsActiveTrueOrderByCreatedAtAscIdAsc(
+                          tenantId, order.getId())
                       .stream()
                       .map(this::mapLineToResponse)
                       .toList();
