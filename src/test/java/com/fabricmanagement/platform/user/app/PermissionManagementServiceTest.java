@@ -20,6 +20,7 @@ import com.fabricmanagement.platform.user.dto.UpdatePermissionTemplateRequest;
 import com.fabricmanagement.platform.user.infra.repository.PermissionOverrideRepository;
 import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,27 @@ class PermissionManagementServiceTest {
   @Mock private PermissionEvaluator evaluator;
   @Mock private UserQueryService users;
   @InjectMocks private PermissionManagementService service;
+
+  @Test
+  void activeOverridesCanBeListedAcrossTheTenantWithoutAUserFilter() {
+    PermissionOverride override =
+        PermissionOverride.builder()
+            .userId(USER)
+            .resource("finance")
+            .action("read")
+            .dataScope(null)
+            .build();
+    override.setTenantId(TENANT);
+    when(overrides.findActiveOverrides(TENANT, null)).thenReturn(List.of(override));
+
+    var result = service.getActiveOverrides(TENANT, null);
+
+    assertThat(result).hasSize(1);
+    assertThat(result.getFirst().getUserId()).isEqualTo(USER);
+    assertThat(result.getFirst().getResource()).isEqualTo("finance");
+    assertThat(result.getFirst().getDataScope()).isNull();
+    verify(overrides).findActiveOverrides(TENANT, null);
+  }
 
   @Test
   void everyCataloguedPairIsAcceptedByBothWriteBoundaries() {
