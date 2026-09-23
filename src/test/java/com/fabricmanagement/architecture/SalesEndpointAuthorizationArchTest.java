@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(58)
+        .hasSize(59)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(58);
+    assertThat(expected).hasSize(59);
   }
 
   @Test
@@ -238,7 +238,9 @@ class SalesEndpointAuthorizationArchTest {
         "OrderCoverController",
         Category.TRANSACTIONAL_READ,
         "getOrderCoverCase",
-        "getOrderCoverResult");
+        "getOrderCoverResult",
+        // POST only because the selection is a body; it reads and writes nothing (DETAIL-2 §4).
+        "previewOrderCoverSelection");
     add(result, "OrderCoverController", Category.MUTATION, "refreshOrderCoverEvidence");
     add(
         result,

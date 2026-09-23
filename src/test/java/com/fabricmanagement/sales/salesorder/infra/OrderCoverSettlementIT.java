@@ -255,13 +255,17 @@ class OrderCoverSettlementIT extends OrderCoverIntegrationSupport {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("COVER_PRECONDITION_FAILED"));
     assertThat(
-            jdbc.queryForObject(
-                "select rejection_message from flowboard.task_transition_attempt where tenant_id=?"
-                    + " and idempotency_key=?",
-                String.class,
+            jdbc.queryForMap(
+                "select outcome,rejection_code,rejection_message from"
+                    + " flowboard.task_transition_attempt where tenant_id=? and idempotency_key=?",
                 tenant,
                 key.toString()))
-        .contains("UNSPECIFIED:WIDTH");
+        .containsEntry("outcome", "REJECTED_BUSINESS")
+        .containsEntry("rejection_code", "COVER_PRECONDITION_FAILED")
+        .hasEntrySatisfying(
+            "rejection_message",
+            message -> assertThat((String) message).contains("UNSPECIFIED:WIDTH"));
+    assertThat(attempts(key)).isEqualTo(1);
     assertNoSettlement();
   }
 

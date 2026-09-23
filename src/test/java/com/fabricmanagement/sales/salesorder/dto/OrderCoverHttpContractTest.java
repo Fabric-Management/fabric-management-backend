@@ -17,6 +17,8 @@ class OrderCoverHttpContractTest {
     schemas.putAll(ModelConverters.getInstance().readAll(OrderCoverDetail.class));
     schemas.putAll(ModelConverters.getInstance().readAll(OrderCoverResultDto.class));
     schemas.putAll(ModelConverters.getInstance().readAll(ConfirmProductionCoverPayload.class));
+    schemas.putAll(ModelConverters.getInstance().readAll(OrderCoverSelectionPreviewRequest.class));
+    schemas.putAll(ModelConverters.getInstance().readAll(OrderCoverSelectionPreview.class));
     assertRequired(
         schemas,
         "DecisionTransitionRequest",
@@ -52,7 +54,46 @@ class OrderCoverHttpContractTest {
         "assignment",
         "evidence",
         "actions",
+        "lines",
         "results");
+    assertRequired(
+        schemas,
+        "OrderCoverLineDecision",
+        "lineId",
+        "lineNumber",
+        "label",
+        "unit",
+        "evidenceId",
+        "evidenceRevision",
+        "selectable",
+        "blockReason",
+        "productionQuantity",
+        "rationaleRequiredIfSelected");
+    assertRequired(
+        schemas, "OrderCoverLineBlockReason", "code", "incompleteReasons", "caseReasonCode");
+    assertRequired(
+        schemas, "OrderCoverSelectionPreviewRequest", "evidenceId", "evidenceRevision", "lineIds");
+    assertRequired(
+        schemas,
+        "OrderCoverSelectionPreview",
+        "accepted",
+        "rejection",
+        "lines",
+        "rationaleRequired");
+    assertRequired(
+        schemas,
+        "OrderCoverSelectionPreviewRejection",
+        "code",
+        "lineId",
+        "incompleteReasons",
+        "caseReasonCode");
+    assertRequired(
+        schemas,
+        "OrderCoverSelectionPreviewLine",
+        "lineId",
+        "lineNumber",
+        "label",
+        "productionQuantity");
     assertRequired(
         schemas,
         "ConfirmProductionCoverPayload",

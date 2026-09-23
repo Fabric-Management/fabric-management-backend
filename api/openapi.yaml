@@ -42156,6 +42156,82 @@ paths:
           description: Internal Server Error
       tags:
       - Sales Orders — Cover
+  /api/v1/sales-orders/{orderId}/cover/preview:
+    post:
+      operationId: previewOrderCoverSelection
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCoverSelectionPreviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderCoverSelectionPreview"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Sales Orders — Cover
   /api/v1/sales-orders/{orderId}/cover/results/{resultId}:
     get:
       operationId: getOrderCoverResult
@@ -52220,6 +52296,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseOrderCoverSelectionPreview:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderCoverSelectionPreview"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseOrganizationAddressDto:
       type: object
       properties:
@@ -61617,13 +61711,25 @@ components:
     OrderCoverCompetingAllocation:
       type: object
       properties:
+        label:
+          type:
+          - string
+          - "null"
         lineId:
           type: string
           format: uuid
+        lineNumber:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
         quantity:
           $ref: "#/components/schemas/OrderCoverQuantity"
       required:
+      - label
       - lineId
+      - lineNumber
       - quantity
     OrderCoverDetail:
       type: object
@@ -61639,6 +61745,10 @@ components:
         evidence:
           type: "null"
           $ref: "#/components/schemas/OrderCoverEvidence"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverLineDecision"
         results:
           type: array
           items:
@@ -61650,6 +61760,7 @@ components:
       - assignment
       - case
       - evidence
+      - lines
       - results
       - subject
     OrderCoverEvidence:
@@ -61689,6 +61800,87 @@ components:
       - orderVersion
       - revision
       - ruleVersion
+    OrderCoverLineBlockReason:
+      type: object
+      properties:
+        caseReasonCode:
+          type:
+          - string
+          - "null"
+          enum:
+          - PERMISSION_DENIED
+          - OUTSIDE_ROUTING_POOL
+          - ASSIGNED_ELSEWHERE
+          - UNASSIGNED
+          - EVIDENCE_UNKNOWN
+          - EVIDENCE_CHANGED
+          - CASE_CLOSED
+          - UNSUPPORTED_ROUTE
+        code:
+          type: string
+          enum:
+          - LINE_NOT_OPEN
+          - NO_EVIDENCE
+          - REQUIREMENT_COMPLETENESS_UNKNOWN
+          - REQUIREMENT_INCOMPLETE
+          - LINE_ALREADY_FULFILLED
+          - ACTIVE_RESERVATION_EXISTS
+          - ACTIVE_PRODUCTION_EXISTS
+          - ACTION_NOT_ALLOWED
+        incompleteReasons:
+          type: array
+          items:
+            type: string
+      required:
+      - caseReasonCode
+      - code
+      - incompleteReasons
+    OrderCoverLineDecision:
+      type: object
+      properties:
+        blockReason:
+          type: "null"
+          $ref: "#/components/schemas/OrderCoverLineBlockReason"
+        evidenceId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        evidenceRevision:
+          type:
+          - integer
+          - "null"
+          format: int64
+          minimum: 1
+        label:
+          type: string
+        lineId:
+          type: string
+          format: uuid
+        lineNumber:
+          type: integer
+          format: int32
+          minimum: 1
+        productionQuantity:
+          type: "null"
+          $ref: "#/components/schemas/OrderCoverQuantity"
+        rationaleRequiredIfSelected:
+          type: boolean
+        selectable:
+          type: boolean
+        unit:
+          type: string
+      required:
+      - blockReason
+      - evidenceId
+      - evidenceRevision
+      - label
+      - lineId
+      - lineNumber
+      - productionQuantity
+      - rationaleRequiredIfSelected
+      - selectable
+      - unit
     OrderCoverLineEvidence:
       type: object
       properties:
@@ -61879,6 +62071,107 @@ components:
       - rationale
       - recordedAt
       - supersedesResultId
+    OrderCoverSelectionPreview:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderCoverSelectionPreviewLine"
+        rationaleRequired:
+          type: boolean
+        rejection:
+          type: "null"
+          $ref: "#/components/schemas/OrderCoverSelectionPreviewRejection"
+      required:
+      - accepted
+      - lines
+      - rationaleRequired
+      - rejection
+    OrderCoverSelectionPreviewLine:
+      type: object
+      properties:
+        label:
+          type: string
+        lineId:
+          type: string
+          format: uuid
+        lineNumber:
+          type: integer
+          format: int32
+          minimum: 1
+        productionQuantity:
+          $ref: "#/components/schemas/OrderCoverQuantity"
+      required:
+      - label
+      - lineId
+      - lineNumber
+      - productionQuantity
+    OrderCoverSelectionPreviewRejection:
+      type: object
+      properties:
+        caseReasonCode:
+          type:
+          - string
+          - "null"
+          enum:
+          - PERMISSION_DENIED
+          - OUTSIDE_ROUTING_POOL
+          - ASSIGNED_ELSEWHERE
+          - UNASSIGNED
+          - EVIDENCE_UNKNOWN
+          - EVIDENCE_CHANGED
+          - CASE_CLOSED
+          - UNSUPPORTED_ROUTE
+        code:
+          type: string
+          enum:
+          - LINE_NOT_OPEN
+          - NO_EVIDENCE
+          - REQUIREMENT_COMPLETENESS_UNKNOWN
+          - REQUIREMENT_INCOMPLETE
+          - LINE_ALREADY_FULFILLED
+          - ACTIVE_RESERVATION_EXISTS
+          - ACTIVE_PRODUCTION_EXISTS
+          - ACTION_NOT_ALLOWED
+        incompleteReasons:
+          type: array
+          items:
+            type: string
+        lineId:
+          type:
+          - string
+          - "null"
+          format: uuid
+      required:
+      - caseReasonCode
+      - code
+      - incompleteReasons
+      - lineId
+    OrderCoverSelectionPreviewRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        evidenceId:
+          type: string
+          format: uuid
+        evidenceRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        lineIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 0
+      required:
+      - evidenceId
+      - evidenceRevision
+      - lineIds
     OrderCoverSource:
       type: object
       properties:

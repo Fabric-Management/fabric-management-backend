@@ -13,7 +13,7 @@ public interface PermissionOverrideRepository extends JpaRepository<PermissionOv
 
   @Query(
       "SELECT po FROM PermissionOverride po WHERE po.tenantId = :tenantId "
-          + "AND po.userId = :userId AND po.isActive = true "
+          + "AND (:userId IS NULL OR po.userId = :userId) AND po.isActive = true "
           + "AND (po.expiresAt IS NULL OR po.expiresAt > CURRENT_TIMESTAMP)")
   List<PermissionOverride> findActiveOverrides(
       @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);

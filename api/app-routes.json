@@ -1,0 +1,7 @@
+[ {
+  "name" : "salesOrder",
+  "template" : "/sales/{orderId}"
+}, {
+  "name" : "orderCoverDecision",
+  "template" : "/decisions/order-cover/{orderId}"
+} ]

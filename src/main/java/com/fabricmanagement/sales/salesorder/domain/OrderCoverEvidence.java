@@ -9,6 +9,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -54,7 +55,7 @@ public class OrderCoverEvidence extends BaseEntity {
 
   @Type(JsonType.class)
   @Column(name = "lines", nullable = false, updatable = false, columnDefinition = "jsonb")
-  private java.util.List<OrderCoverEvidenceDto.Line> lines;
+  private List<PersistedLine> storedLines;
 
   public static OrderCoverEvidence create(
       Requirements requirements,
@@ -63,7 +64,7 @@ public class OrderCoverEvidence extends BaseEntity {
       Instant now,
       String fingerprint,
       String ruleVersion,
-      java.util.List<OrderCoverEvidenceDto.Line> lines) {
+      List<OrderCoverEvidenceDto.Line> lines) {
     var result = new OrderCoverEvidence();
     result.setTenantId(requirements.tenantId());
     result.caseId = requirements.caseId();
@@ -75,13 +76,81 @@ public class OrderCoverEvidence extends BaseEntity {
     result.ruleVersion = ruleVersion;
     result.requirements = requirements;
     result.inputs = inputs;
-    result.lines = java.util.List.copyOf(lines);
+    result.storedLines = lines.stream().map(PersistedLine::from).toList();
     return result;
+  }
+
+  public List<OrderCoverEvidenceDto.Line> getLines() {
+    return storedLines.stream().map(PersistedLine::toDto).toList();
   }
 
   public OrderCoverEvidenceDto toDto() {
     return new OrderCoverEvidenceDto(
-        getId(), caseId, revision, orderVersion, computedAt, inputFingerprint, ruleVersion, lines);
+        getId(),
+        caseId,
+        revision,
+        orderVersion,
+        computedAt,
+        inputFingerprint,
+        ruleVersion,
+        getLines());
+  }
+
+  /** Persisted evidence facts deliberately exclude read-time competing-line display metadata. */
+  public record PersistedLine(
+      UUID lineId,
+      long lineVersion,
+      UUID productId,
+      OrderCoverEvidenceDto.Quantity requested,
+      OrderCoverEvidenceDto.Quantity suitableFree,
+      OrderCoverEvidenceDto.Quantity remainingSuitableFree,
+      OrderCoverEvidenceDto.Quantity shortfall,
+      OrderCoverEvidenceDto.Suitability suitability,
+      List<PersistedCompetingAllocation> competingAllocations,
+      List<String> controlReasons,
+      List<OrderCoverEvidenceDto.Source> sources,
+      List<String> blockingReasons) {
+    static PersistedLine from(OrderCoverEvidenceDto.Line line) {
+      return new PersistedLine(
+          line.lineId(),
+          line.lineVersion(),
+          line.productId(),
+          line.requested(),
+          line.suitableFree(),
+          line.remainingSuitableFree(),
+          line.shortfall(),
+          line.suitability(),
+          line.competingAllocations().stream().map(PersistedCompetingAllocation::from).toList(),
+          line.controlReasons(),
+          line.sources(),
+          line.blockingReasons());
+    }
+
+    OrderCoverEvidenceDto.Line toDto() {
+      return new OrderCoverEvidenceDto.Line(
+          lineId,
+          lineVersion,
+          productId,
+          requested,
+          suitableFree,
+          remainingSuitableFree,
+          shortfall,
+          suitability,
+          competingAllocations.stream().map(PersistedCompetingAllocation::toDto).toList(),
+          controlReasons,
+          sources,
+          blockingReasons);
+    }
+  }
+
+  public record PersistedCompetingAllocation(UUID lineId, OrderCoverEvidenceDto.Quantity quantity) {
+    static PersistedCompetingAllocation from(OrderCoverEvidenceDto.CompetingAllocation allocation) {
+      return new PersistedCompetingAllocation(allocation.lineId(), allocation.quantity());
+    }
+
+    OrderCoverEvidenceDto.CompetingAllocation toDto() {
+      return new OrderCoverEvidenceDto.CompetingAllocation(lineId, quantity);
+    }
   }
 
   @Override
