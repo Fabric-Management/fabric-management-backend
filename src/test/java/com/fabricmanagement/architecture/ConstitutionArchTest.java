@@ -1101,6 +1101,8 @@ class ConstitutionArchTest {
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
       //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
       // reconciliation
+      //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
+      // (golden-template / playground source are other tenants); explicit tenant_id filter
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -1148,6 +1150,11 @@ class ConstitutionArchTest {
               // reported an empty queue. It reads its due list as fabric_system, then processes
               // each row inside that row's own tenant context.
               .doNotHaveSimpleName("EmailOutboxService")
+              .and()
+              // TASK-TEMPLATE-TENANCY-1: reads another tenant's keyed task templates (golden or the
+              // playground source), read-only, filtered by tenant_id. Target writes stay on
+              // fabric_app (onboarding / backfill) or inside the clone's own system transaction.
+              .doNotHaveSimpleName("CatalogueSourceReader")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()

@@ -94,6 +94,9 @@ class WalkingSkeletonIT {
       conn.createStatement()
           .execute(
               "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'test'");
+      conn.createStatement()
+          .execute(
+              "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'");
     } catch (java.sql.SQLException e) {
       throw new RuntimeException("Failed to create fabric_app role", e);
     }
@@ -106,6 +109,10 @@ class WalkingSkeletonIT {
     registry.add("spring.flyway.url", postgres::getJdbcUrl);
     registry.add("spring.flyway.user", postgres::getUsername);
     registry.add("spring.flyway.password", postgres::getPassword);
+    // TASK-TEMPLATE-TENANCY-1: the catalogue backfill reads golden through the system datasource at
+    // startup; as in production, that role must bypass RLS (fabric_app would see no golden rows).
+    registry.add("application.system-datasource.username", () -> "fabric_system");
+    registry.add("application.system-datasource.password", () -> "system_test");
   }
 
   @Autowired private TradingPartnerService tradingPartnerService;

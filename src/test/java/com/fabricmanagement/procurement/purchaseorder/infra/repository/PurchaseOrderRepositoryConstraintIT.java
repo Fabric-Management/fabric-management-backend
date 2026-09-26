@@ -55,6 +55,9 @@ class PurchaseOrderRepositoryConstraintIT {
             "DO $$ BEGIN "
                 + "IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_app') THEN "
                 + "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'app_test'; "
+                + "END IF; "
+                + "IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN "
+                + "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'; "
                 + "END IF; END $$");
       }
     } catch (Exception exception) {
@@ -68,6 +71,10 @@ class PurchaseOrderRepositoryConstraintIT {
     registry.add("spring.flyway.user", postgres::getUsername);
     registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.flyway.enabled", () -> "true");
+    // TASK-TEMPLATE-TENANCY-1: the catalogue backfill reads golden through the system datasource at
+    // startup; as in production, that role must bypass RLS (fabric_app would see no golden rows).
+    registry.add("application.system-datasource.username", () -> "fabric_system");
+    registry.add("application.system-datasource.password", () -> "system_test");
   }
 
   @Autowired private PurchaseOrderRepository purchaseOrderRepository;

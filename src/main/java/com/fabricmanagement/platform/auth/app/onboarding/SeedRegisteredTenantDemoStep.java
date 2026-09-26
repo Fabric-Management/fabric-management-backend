@@ -9,7 +9,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /** Seeds registered self-service tenants with representative demo users and business data. */
-@Order(12)
+@Order(13) // After ProvisionTenantCatalogueStep (12): demo data may publish template events.
 @Component
 @RequiredArgsConstructor
 @Slf4j

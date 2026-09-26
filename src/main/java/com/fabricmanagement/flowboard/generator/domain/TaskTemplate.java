@@ -1,11 +1,13 @@
 package com.fabricmanagement.flowboard.generator.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.flowboard.generator.domain.catalogue.CatalogueSourceRow;
 import com.fabricmanagement.flowboard.task.domain.ModuleType;
 import com.fabricmanagement.flowboard.task.domain.Priority;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -78,6 +80,14 @@ public class TaskTemplate extends BaseEntity {
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
 
+  /**
+   * Catalogue identity (TASK-TEMPLATE-TENANCY-1). {@code null} = tenant-authored. Set only by the
+   * catalogue distribution ({@link #catalogueCopy}, {@link #adoptCatalogKey}); never exposed or
+   * writable through the template API, and never cleared.
+   */
+  @Column(name = "catalog_key", length = 100)
+  private String catalogKey;
+
   // =========================================================================
   // FACTORY
   // =========================================================================
@@ -133,6 +143,48 @@ public class TaskTemplate extends BaseEntity {
     this.estimatedHours = estimatedHours;
     this.autoLabels = autoLabels;
     this.checklistTemplate = checklistTemplate;
+  }
+
+  /**
+   * A tenant's active copy of a catalogue source row. Content is copied verbatim; the copy starts
+   * active. uid, tenant and audit columns are assigned by {@link BaseEntity} on persist.
+   */
+  public static TaskTemplate catalogueCopy(CatalogueSourceRow source) {
+    TaskTemplate copy =
+        create(
+            source.name(),
+            source.description(),
+            source.eventType(),
+            source.titleTemplate(),
+            TaskType.valueOf(source.taskType()),
+            source.moduleType() == null ? null : ModuleType.valueOf(source.moduleType()),
+            Priority.valueOf(source.defaultPriority()),
+            AssigneeRole.valueOf(source.defaultAssigneeRole()),
+            source.estimatedHours(),
+            source.autoLabels(),
+            source.checklistTemplate());
+    copy.catalogKey = source.catalogKey();
+    return copy;
+  }
+
+  /** R2: marks a seeded, unkeyed row as this tenant's catalogue row. Content is not touched. */
+  public void adoptCatalogKey(String key) {
+    if (this.catalogKey != null) {
+      throw new IllegalStateException(
+          "TaskTemplate " + getId() + " already carries catalogue key " + this.catalogKey);
+    }
+    this.catalogKey = key;
+  }
+
+  /**
+   * Soft delete for catalogue rows. A hard delete would let the backfill re-create the row (R1);
+   * the kept row with {@code deleted_at} set resolves to R0 instead. Both {@code is_active}
+   * mappings are written ({@code TaskTemplate} and {@link BaseEntity} map the same column).
+   */
+  public void softDelete() {
+    this.isActive = false;
+    setIsActive(false);
+    setDeletedAt(Instant.now());
   }
 
   public void deactivate() {

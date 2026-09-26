@@ -11,4 +11,14 @@
     <Match>
         <Class name="com.fabricmanagement.common.platform.dev.DevelopmentToolsController"/>
     </Match>
+    <!--
+      TASK-TEMPLATE-TENANCY-1: MD5 here is a non-cryptographic content fingerprint.
+      It must equal the PostgreSQL md5() expression used by migration
+      V20260926100100 and the INV-RECIPE-TASK-1 inventory; it guards no secret.
+      Narrowed to this one class and this one bug pattern.
+    -->
+    <Match>
+        <Class name="com.fabricmanagement.flowboard.generator.domain.catalogue.TaskTemplateCatalogue"/>
+        <Bug pattern="WEAK_MESSAGE_DIGEST_MD5"/>
+    </Match>
 </FindBugsFilter>

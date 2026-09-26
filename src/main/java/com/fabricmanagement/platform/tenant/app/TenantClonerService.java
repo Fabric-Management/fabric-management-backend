@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeede
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
+import com.fabricmanagement.platform.tenant.domain.port.TenantCatalogueProvisioningPort;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -20,8 +21,12 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TenantClonerService {
 
+  /** The tenant playground tenants are cloned from (chain: golden-template → it → playground). */
+  public static final String PLAYGROUND_SOURCE_SLUG = "nexus-fabrics";
+
   private final SystemTransactionExecutor systemTransactionExecutor;
   private final DemoTransactionSeeder demoTransactionSeeder;
+  private final TenantCatalogueProvisioningPort catalogueProvisioning;
 
   /**
    * Find the TEMPLATE tenant ID. Returns null if no template tenant exists.
@@ -462,8 +467,9 @@ public class TenantClonerService {
               //    itself provisioned from golden-template)
               var results =
                   jdbc.queryForList(
-                      "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
-                      UUID.class);
+                      "SELECT id FROM common_tenant.common_tenant WHERE slug = ? LIMIT 1",
+                      UUID.class,
+                      PLAYGROUND_SOURCE_SLUG);
               UUID templateTenantId = results.isEmpty() ? null : results.getFirst();
 
               if (templateTenantId == null) {
@@ -713,6 +719,11 @@ public class TenantClonerService {
                   "uid, country_code, primary_channel, fallback_channel, timeout_seconds, is_active",
                   templateTenantId,
                   newTenantId);
+
+              // Module-owned catalogues (TASK-TEMPLATE-TENANCY-1): joins this transaction, so a
+              // failed clone leaves no task templates behind.
+              catalogueProvisioning.provisionPlaygroundFromSource(
+                  templateTenantId, newTenantId, uid);
 
               log.info("Cloning completed for playground tenant: {}", newTenantId);
 

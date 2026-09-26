@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.tenant.app.adapter;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
+import com.fabricmanagement.platform.tenant.app.TenantClonerService;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,12 @@ public class TenantQueryAdapter implements TenantQueryPort {
   private static final String SELECT_ACTIVE =
       "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE is_active = true ORDER BY created_at DESC";
 
+  private static final String SELECT_LIVE =
+      "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE deleted_at IS NULL ORDER BY created_at";
+
+  private static final String SELECT_PLAYGROUND_SOURCE =
+      "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE slug = ? AND deleted_at IS NULL";
+
   private static final String SELECT_BY_ID =
       "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE id = ? AND is_active = true";
 
@@ -52,6 +59,29 @@ public class TenantQueryAdapter implements TenantQueryPort {
                 rs.getString("uid"),
                 rs.getString("name"),
                 rs.getString("type")));
+  }
+
+  @Override
+  public List<TenantReference> findAllLiveTenants() {
+    return systemExecutor.executeQuery(SELECT_LIVE, TenantQueryAdapter::reference);
+  }
+
+  @Override
+  public Optional<TenantReference> findPlaygroundSourceTenant() {
+    return Optional.ofNullable(
+        systemExecutor.executeQueryForObject(
+            SELECT_PLAYGROUND_SOURCE,
+            TenantQueryAdapter::reference,
+            TenantClonerService.PLAYGROUND_SOURCE_SLUG));
+  }
+
+  private static TenantReference reference(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    return new TenantReference(
+        rs.getObject("id", UUID.class),
+        rs.getString("uid"),
+        rs.getString("name"),
+        rs.getString("type"));
   }
 
   @Override

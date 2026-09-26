@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fabricmanagement.platform.auth.app.onboarding.CloneTemplatePermissionsStep;
 import com.fabricmanagement.platform.auth.app.onboarding.CloneTemplatePropertyDefinitionsStep;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingStep;
+import com.fabricmanagement.platform.auth.app.onboarding.ProvisionTenantCatalogueStep;
 import com.fabricmanagement.platform.auth.app.onboarding.PublishSelfSignupCompletedStep;
 import com.fabricmanagement.platform.auth.app.onboarding.SeedRegisteredTenantDemoStep;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
@@ -23,11 +24,16 @@ import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.testsupport.PostgresImage;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -74,6 +80,27 @@ class TenantOnboardingIntegrationTest {
   @Autowired private OrganizationRepository organizationRepository;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private List<OnboardingStep> onboardingSteps;
+
+  /** Switches the test-only last onboarding step (below) into failure. */
+  static final AtomicBoolean FAIL_AFTER_CATALOGUE = new AtomicBoolean(false);
+
+  /**
+   * A test-only step that runs after every real step, including ProvisionTenantCatalogueStep (12).
+   * It does nothing unless {@link #FAIL_AFTER_CATALOGUE} is set, so the other tests are unaffected
+   * and the step-order subsequences still hold.
+   */
+  @TestConfiguration
+  static class FailAfterCatalogueStepConfiguration {
+    @Bean
+    @Order(99)
+    OnboardingStep failAfterCatalogueStep() {
+      return context -> {
+        if (FAIL_AFTER_CATALOGUE.get()) {
+          throw new IllegalStateException("injected onboarding failure after the catalogue step");
+        }
+      };
+    }
+  }
 
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
@@ -220,6 +247,7 @@ class TenantOnboardingIntegrationTest {
         .containsSubsequence(
             CloneTemplatePermissionsStep.class,
             CloneTemplatePropertyDefinitionsStep.class,
+            ProvisionTenantCatalogueStep.class,
             SeedRegisteredTenantDemoStep.class,
             PublishSelfSignupCompletedStep.class);
   }
@@ -278,5 +306,93 @@ class TenantOnboardingIntegrationTest {
     Optional<Tenant> tenant = tenantRepository.findById(org.get().getTenantId());
     assertThat(tenant).isPresent();
     assertThat(tenant.get().getName()).isEqualTo(organizationName);
+
+    // TASK-TEMPLATE-TENANCY-1 §8.6: the real onboarding pipeline hands the tenant its own copy of
+    // every catalogue task template (one per key), so the event router can see them under RLS.
+    assertThat(
+            jdbc.queryForList(
+                "SELECT catalog_key FROM flowboard.task_template WHERE tenant_id = ?"
+                    + " AND catalog_key IS NOT NULL AND is_active AND deleted_at IS NULL",
+                String.class,
+                tenant.get().getId()))
+        .containsExactlyInAnyOrder(
+            "SALES_ORDER_CONFIRMED__PLANNING",
+            "WORK_ORDER_APPROVED__PRODUCTION",
+            "GOODS_RECEIPT_CONFIRMED__WAREHOUSE",
+            "QUOTE_SEND_REQUESTED__APPROVAL",
+            "WORK_ORDER_RECIPE_ASSIGNMENT_NEEDED__RECIPE_ASSIGNMENT");
+  }
+
+  /**
+   * TASK-TEMPLATE-TENANCY-1 §8.6, stated with its real boundary. A failure in a later onboarding
+   * step rolls back every task template the catalogue step wrote: they join the onboarding
+   * transaction.
+   *
+   * <p>It does NOT prove that no tenant row remains. {@code TenantSystemService.createTenant}
+   * commits the tenant row on the system executor's own transaction ("DUAL-TX RISK"), so a later
+   * failure leaves the tenant row behind today. That general onboarding atomicity is
+   * ONBOARD-ATOMIC-1, not this ticket; this test deliberately makes no claim about the tenant row.
+   */
+  @Test
+  @DisplayName("A later onboarding failure leaves no task templates for the attempted tenant")
+  void laterOnboardingFailureLeavesNoTaskTemplatesForTheAttemptedTenant() throws Exception {
+    doNothing()
+        .when(notificationService)
+        .sendNotificationSync(anyString(), anyString(), anyString());
+    when(emailTemplateRenderer.renderWelcome(anyString(), anyString(), anyString(), anyString()))
+        .thenReturn("Welcome email body");
+    when(emailTemplateRenderer.renderSetupPassword(
+            anyString(), anyString(), anyString(), anyString()))
+        .thenReturn("Setup password email body");
+
+    long timestamp = System.currentTimeMillis();
+    String organizationName = "Catalogue Rollback " + timestamp;
+    String body =
+        """
+                {
+                  "organizationName": "%s",
+                  "taxId": "%s",
+                  "organizationType": "WEAVER",
+                  "firstName": "Roll",
+                  "lastName": "Back",
+                  "email": "catalogue-rollback-%s@example.com",
+                  "acceptedTerms": true
+                }
+                """
+            .formatted(organizationName, "RB" + timestamp % 100000, timestamp);
+
+    int templatesBefore =
+        jdbc.queryForObject("SELECT count(*) FROM flowboard.task_template", Integer.class);
+    FAIL_AFTER_CATALOGUE.set(true);
+    try {
+      mockMvc
+          .perform(
+              post("/api/v1/public/signup")
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(
+              result -> assertThat(result.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
+    } finally {
+      FAIL_AFTER_CATALOGUE.set(false);
+    }
+
+    // Non-vacuous whatever happens to the tenant row: not one template was left anywhere.
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM flowboard.task_template", Integer.class))
+        .isEqualTo(templatesBefore);
+    List<UUID> attemptedTenants =
+        jdbc.queryForList(
+            "SELECT id FROM common_tenant.common_tenant WHERE name = ?",
+            UUID.class,
+            organizationName);
+    for (UUID tenantId : attemptedTenants) {
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM flowboard.task_template WHERE tenant_id = ?",
+                  Integer.class,
+                  tenantId))
+          .as("task templates of the rolled-back onboarding of tenant %s", tenantId)
+          .isZero();
+    }
   }
 }

@@ -22,8 +22,8 @@ public class TaskTemplateService {
 
   @Transactional(readOnly = true)
   public List<TaskTemplateDto> getAllTemplates() {
-    List<TaskTemplate> templates =
-        repository.findAll(); // using standard JPA findAll to allow managing inactive too
+    // Inactive templates stay manageable; soft-deleted (catalogue) rows are gone for the API.
+    List<TaskTemplate> templates = repository.findAllByDeletedAtIsNull();
     return mapper.toDtoList(templates);
   }
 
@@ -31,7 +31,7 @@ public class TaskTemplateService {
   public TaskTemplateDto getTemplateById(UUID id) {
     TaskTemplate template =
         repository
-            .findById(id)
+            .findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new NotFoundException("TaskTemplate not found: " + id));
     return mapper.toDto(template);
   }
@@ -63,7 +63,7 @@ public class TaskTemplateService {
   public TaskTemplateDto updateTemplate(UUID id, UpdateTaskTemplateRequest request) {
     TaskTemplate template =
         repository
-            .findById(id)
+            .findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new NotFoundException("TaskTemplate not found: " + id));
 
     String checkListJson = mapper.toJson(request.getCheckList());
@@ -96,8 +96,15 @@ public class TaskTemplateService {
   public void deleteTemplate(UUID id) {
     TaskTemplate template =
         repository
-            .findById(id)
+            .findByIdAndDeletedAtIsNull(id)
             .orElseThrow(() -> new NotFoundException("TaskTemplate not found: " + id));
+    if (template.getCatalogKey() != null) {
+      // TASK-TEMPLATE-TENANCY-1: a catalogue row is soft-deleted so the backfill sees it (R0)
+      // and never re-creates it; it is invisible to this API from now on (404).
+      template.softDelete();
+      repository.save(template);
+      return;
+    }
     repository.delete(template);
   }
 }

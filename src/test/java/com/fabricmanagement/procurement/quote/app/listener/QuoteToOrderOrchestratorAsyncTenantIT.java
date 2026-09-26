@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,9 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
             "DO $$ BEGIN "
                 + "IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_app') THEN "
                 + "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'app_test'; "
+                + "END IF; "
+                + "IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN "
+                + "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'; "
                 + "END IF; END $$");
       }
     } catch (Exception e) {
@@ -103,13 +107,18 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
     registry.add("spring.flyway.user", postgres::getUsername);
     registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.flyway.enabled", () -> "true");
+    // TASK-TEMPLATE-TENANCY-1: the catalogue backfill reads golden through the system datasource at
+    // startup; as in production, that role must bypass RLS (fabric_app would see no golden rows).
+    registry.add("application.system-datasource.username", () -> "fabric_system");
+    registry.add("application.system-datasource.password", () -> "system_test");
   }
 
   @Autowired private ApplicationEventPublisher eventPublisher;
   @Autowired private SupplierRFQRepository rfqRepository;
   @Autowired private SupplierQuoteRepository quoteRepository;
   @Autowired private TransactionTemplate transactionTemplate;
-  @Autowired private JdbcTemplate jdbcTemplate;
+  // Primary (fabric_app) datasource; the only JdbcTemplate bean is the system one (RLS-JDBC-1).
+  @Autowired private DataSource dataSource;
   @Autowired private TenantSessionBinder tenantSessionBinder;
   @MockitoSpyBean private PurchaseOrderRepository purchaseOrderRepository;
 
@@ -137,6 +146,7 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
 
   @Test
   void supplierQuoteAcceptedPublishedWithoutTenantContextCreatesPurchaseOrder() throws Exception {
+    JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
     assertThat(jdbcTemplate.queryForObject("SELECT current_user", String.class))
         .isEqualTo("fabric_app");
     Boolean bypassesRls =
