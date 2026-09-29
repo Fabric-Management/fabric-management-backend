@@ -38,7 +38,7 @@ class VerificationCodeServiceTest {
 
   @Mock private VerificationCodeRepository verificationCodeRepository;
   @Mock private PasswordEncoder passwordEncoder;
-  @Mock private VerificationCodeAttemptRecorder attemptRecorder;
+  @Mock private VerificationCodeAttemptService attemptRecorder;
 
   @InjectMocks private VerificationCodeService service;
 

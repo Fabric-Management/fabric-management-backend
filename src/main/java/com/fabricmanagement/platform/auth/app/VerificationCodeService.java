@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class VerificationCodeService {
 
   private final VerificationCodeRepository verificationCodeRepository;
-  private final VerificationCodeAttemptRecorder attemptRecorder;
+  private final VerificationCodeAttemptService attemptRecorder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${application.verification.code-length:6}")

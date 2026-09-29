@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class VerificationCodeAttemptRecorder {
+public class VerificationCodeAttemptService {
 
   private final VerificationCodeRepository verificationCodeRepository;
 
