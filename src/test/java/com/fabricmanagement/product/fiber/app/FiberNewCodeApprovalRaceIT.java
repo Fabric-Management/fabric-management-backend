@@ -1,12 +1,13 @@
 package com.fabricmanagement.product.fiber.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -16,15 +17,50 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
+/**
+ * FIBER-CATALOG-1 §6 (A09, A10) race coverage, replacing FIBER-SRC-1's tenant-ISO creation race:
+ * approval never creates ISO rows, one request has exactly one outcome, and distinct requests for a
+ * newly published code converge on the same shared ISO id.
+ */
 class FiberNewCodeApprovalRaceIT extends FiberSourceIntegrationSupport {
 
   @Test
-  void concurrentApprovalsConvergeOnOneIsoAndCreateTwoSourceVariants() throws Exception {
-    UUID tenantId = insertTenant("approval-race");
+  void concurrentApprovalsOfOneRequestProduceExactlyOneVariant() throws Exception {
+    UUID tenantId = insertTenant("same-request-race");
     UUID requester = UUID.randomUUID();
     UUID reviewer = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
-    String isoCode = randomCode();
+    UUID requestId =
+        insertPendingRequest(
+            tenantId, requester, "CO", "Recycled Cotton", "NATURAL_PLANT", MaterialSource.RECYCLED);
+
+    List<Throwable> outcomes =
+        runTogether(
+            () -> approve(tenantId, reviewer, requestId),
+            () -> approve(tenantId, reviewer, requestId));
+
+    assertThat(outcomes.stream().filter(Objects::isNull)).hasSize(1);
+    assertThat(outcomes.stream().filter(Objects::nonNull))
+        .singleElement()
+        .isInstanceOf(FiberDomainException.class)
+        .extracting("errorCode")
+        .isEqualTo("FIBER_REQUEST_INVALID_STATUS");
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fiber WHERE tenant_id = ? "
+                    + "AND material_source = 'RECYCLED'",
+                tenantId))
+        .isEqualTo(1L);
+    assertThat(count("SELECT count(*) FROM production.prod_product WHERE tenant_id = ?", tenantId))
+        .as("a rolled-back approval leaves no product behind")
+        .isEqualTo(1L);
+  }
+
+  @Test
+  void concurrentApprovalsForTwoSourcesOfAPublishedNewCodeShareOneIso() throws Exception {
+    UUID tenantId = insertTenant("two-source-race");
+    UUID requester = UUID.randomUUID();
+    UUID reviewer = UUID.randomUUID();
+    String isoCode = publishCatalogueCode(CATEGORY);
     UUID virginRequest =
         insertPendingRequest(
             tenantId, requester, isoCode, "Virgin New Fiber", CATEGORY, MaterialSource.VIRGIN);
@@ -39,90 +75,22 @@ class FiberNewCodeApprovalRaceIT extends FiberSourceIntegrationSupport {
 
     assertThat(failures).containsOnlyNulls();
     assertThat(
-            queryOne(
-                "SELECT count(*) FROM production.prod_fiber_iso_code "
-                    + "WHERE tenant_id = ? AND upper(iso_code) = ?",
-                Long.class,
-                tenantId,
-                isoCode))
+            count(
+                "SELECT count(*) FROM production.prod_fiber_iso_code WHERE iso_code = ?", isoCode))
         .isEqualTo(1L);
     assertThat(
-            queryOne(
-                "SELECT count(*) FROM production.prod_fiber f "
-                    + "JOIN production.prod_fiber_iso_code i ON i.id = f.fiber_iso_code_id "
-                    + "WHERE f.tenant_id = ? AND i.iso_code = ?",
-                Long.class,
-                tenantId,
-                isoCode))
-        .isEqualTo(2L);
+            count(
+                "SELECT count(DISTINCT fiber_iso_code_id) FROM production.prod_fiber "
+                    + "WHERE tenant_id = ?",
+                tenantId))
+        .isEqualTo(1L);
     assertThat(
-            queryOne(
-                "SELECT count(*) FROM production.production_fiber_request "
-                    + "WHERE tenant_id = ? AND iso_code = ? AND status = 'APPROVED'",
-                Long.class,
+            count(
+                "SELECT count(*) FROM production.prod_fiber WHERE tenant_id = ? "
+                    + "AND fiber_iso_code_id = ?",
                 tenantId,
-                isoCode))
+                sharedIsoId(isoCode)))
         .isEqualTo(2L);
-  }
-
-  @Test
-  void adoptedWinningIsoIsRevalidatedForFiberType() {
-    UUID tenantId = insertTenant("approval-type-race");
-    UUID requester = UUID.randomUUID();
-    UUID reviewer = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
-    insertCategory(tenantId, "NATURAL_PLANT");
-    String isoCode = randomCode();
-    UUID winningRequest =
-        insertPendingRequest(
-            tenantId, requester, isoCode, "Winning Fiber", CATEGORY, MaterialSource.VIRGIN);
-    UUID mismatchedRequest =
-        insertPendingRequest(
-            tenantId,
-            requester,
-            isoCode,
-            "Mismatched Fiber",
-            "NATURAL_PLANT",
-            MaterialSource.RECYCLED);
-    useTenant(tenantId, reviewer);
-    fiberRequestService.approve(winningRequest, reviewer);
-
-    assertThatThrownBy(() -> fiberRequestService.approve(mismatchedRequest, reviewer))
-        .isInstanceOf(FiberDomainException.class)
-        .extracting("errorCode")
-        .isEqualTo("FIBER_REQUEST_FIBER_TYPE_MISMATCH");
-  }
-
-  @Test
-  void jpaCreationAssignsDistinctTenantOwnedUidsInsteadOfDatabaseDefaults() {
-    UUID tenantId = insertTenant("iso-lifecycle");
-    UUID requester = UUID.randomUUID();
-    UUID reviewer = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
-    String firstCode = randomCode();
-    String secondCode = randomCode();
-    UUID first =
-        insertPendingRequest(
-            tenantId, requester, firstCode, "First New Fiber", CATEGORY, MaterialSource.VIRGIN);
-    UUID second =
-        insertPendingRequest(
-            tenantId, requester, secondCode, "Second New Fiber", CATEGORY, MaterialSource.RECYCLED);
-    useTenant(tenantId, reviewer);
-
-    fiberRequestService.approve(first, reviewer);
-    fiberRequestService.approve(second, reviewer);
-
-    List<String> uids =
-        systemTransactions.executeQuery(
-            "SELECT uid FROM production.prod_fiber_iso_code "
-                + "WHERE tenant_id = ? AND iso_code IN (?, ?) ORDER BY iso_code",
-            (resultSet, rowNumber) -> resultSet.getString(1),
-            tenantId,
-            firstCode,
-            secondCode);
-    assertThat(uids).hasSize(2).doesNotHaveDuplicates();
-    assertThat(uids).allMatch(uid -> uid.matches("FSRC-[A-F0-9]{8}-FISO-[A-F0-9]{8}"));
-    assertThat(uids).noneMatch(uid -> uid.equals("SYS-000-FISO-00000"));
   }
 
   private Throwable approve(UUID tenantId, UUID reviewer, UUID requestId) {
@@ -133,7 +101,7 @@ class FiberNewCodeApprovalRaceIT extends FiberSourceIntegrationSupport {
     } catch (Throwable failure) {
       return failure;
     } finally {
-      com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
+      TenantContext.clear();
     }
   }
 
@@ -163,9 +131,5 @@ class FiberNewCodeApprovalRaceIT extends FiberSourceIntegrationSupport {
       }
       return task.call();
     };
-  }
-
-  private String randomCode() {
-    return "N" + UUID.randomUUID().toString().substring(0, 7).toUpperCase();
   }
 }

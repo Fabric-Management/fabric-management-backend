@@ -1,5 +1,7 @@
 package com.fabricmanagement.product.fiber.dto;
 
+import com.fabricmanagement.product.fiber.domain.FiberQualityTargetType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -20,8 +22,27 @@ public class CreateFiberQualityStandardRequest {
 
   private Long version;
 
-  @NotNull(message = "ISO code ID is required")
+  /** Target discriminator: ISO_CODE (shared pure ISO) or FIBER (exact fibre/mixture). */
+  @NotNull(message = "Target type is required")
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      description = "ISO_CODE: send isoCodeId only. FIBER: send fiberId only")
+  private FiberQualityTargetType targetType;
+
+  /** Shared ISO code id; required for ISO_CODE, must be absent for FIBER. */
+  @Schema(
+      nullable = true,
+      description = "Required when targetType=ISO_CODE; must be absent when targetType=FIBER")
   private UUID isoCodeId;
+
+  /**
+   * Visible Fiber.id (shared/own pure or own blend); required for FIBER, absent for ISO_CODE. The
+   * backend captures the fibre's composition at creation; clients never send it.
+   */
+  @Schema(
+      nullable = true,
+      description = "Required when targetType=FIBER; must be absent when targetType=ISO_CODE")
+  private UUID fiberId;
 
   @NotBlank(message = "Standard name is required")
   @Size(max = 100, message = "Standard name must be at most 100 characters")

@@ -1,8 +1,8 @@
 package com.fabricmanagement.product.fiber.infra.repository;
 
 import com.fabricmanagement.product.fiber.domain.Fiber;
-import com.fabricmanagement.product.fiber.domain.FiberStatus;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,86 +10,91 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Repository for Fiber entity. */
+/**
+ * Repository for Fiber entity.
+ *
+ * <p>Read paths name their tenant scope explicitly: {@code {currentTenant, catalogueOwner}} for
+ * reads (FIBER-CATALOG-1), the current tenant only for writes. RLS is the second barrier.
+ */
 public interface FiberRepository extends JpaRepository<Fiber, UUID> {
 
-  /** Find fiber by tenant and ID. */
+  /** Sentinel for "exclude nothing" in {@link #findActiveBlendIdByComposition}. */
+  UUID NO_FIBER = new UUID(0L, 0L);
+
   Optional<Fiber> findByTenantIdAndId(UUID tenantId, UUID id);
 
-  boolean existsByTenantIdAndFiberIsoCode_IdAndMaterialSourceAndIsActiveTrue(
-      UUID tenantId, UUID fiberIsoCodeId, MaterialSource materialSource);
+  Optional<Fiber> findByTenantIdInAndId(Collection<UUID> tenantIds, UUID id);
+
+  /** One bulk resolution of composition components, with their shared ISO/category rows. */
+  @Query(
+      "SELECT f FROM Fiber f LEFT JOIN FETCH f.fiberIsoCode LEFT JOIN FETCH f.fiberCategory "
+          + "WHERE f.tenantId IN :tenantIds AND f.id IN :ids")
+  List<Fiber> findScopedWithReferences(
+      @Param("tenantIds") Collection<UUID> tenantIds, @Param("ids") Collection<UUID> ids);
+
+  @Query(
+      "SELECT f FROM Fiber f LEFT JOIN FETCH f.fiberIsoCode LEFT JOIN FETCH f.fiberCategory "
+          + "WHERE f.tenantId IN :tenantIds AND f.isActive = true ORDER BY f.fiberName")
+  List<Fiber> findActiveInScope(@Param("tenantIds") Collection<UUID> tenantIds);
+
+  @Query(
+      "SELECT f FROM Fiber f LEFT JOIN FETCH f.fiberIsoCode LEFT JOIN FETCH f.fiberCategory "
+          + "WHERE f.tenantId IN :tenantIds AND f.isActive = true "
+          + "AND lower(f.fiberName) LIKE lower(concat('%', :name, '%')) ORDER BY f.fiberName")
+  List<Fiber> searchActiveInScope(
+      @Param("tenantIds") Collection<UUID> tenantIds, @Param("name") String name);
+
+  @Query("SELECT f FROM Fiber f WHERE f.tenantId IN :tenantIds AND f.product.id = :productId")
+  Optional<Fiber> findInScopeByProductId(
+      @Param("tenantIds") Collection<UUID> tenantIds, @Param("productId") UUID productId);
+
+  @Query(
+      "SELECT f FROM Fiber f LEFT JOIN FETCH f.fiberIsoCode LEFT JOIN FETCH f.fiberCategory "
+          + "WHERE f.tenantId IN :tenantIds AND f.product.id IN :productIds")
+  List<Fiber> findInScopeByProductIds(
+      @Param("tenantIds") Collection<UUID> tenantIds,
+      @Param("productIds") Collection<UUID> productIds);
 
   /**
-   * Find fiber by product ID.
-   *
-   * <p>Uses product.id relationship since productId field was replaced with @ManyToOne Product.
+   * Unscoped product lookup. Not for business decisions: kept for read-model tests that verify
+   * shared rows; application code uses {@link #findInScopeByProductId}.
    */
   @Query("SELECT f FROM Fiber f WHERE f.product.id = :productId")
   Optional<Fiber> findByProductId(@Param("productId") UUID productId);
 
-  /**
-   * Find fibers by multiple product IDs (batch query for performance).
-   *
-   * <p>Used to optimize Product search when checking Fiber fiberName for multiple products.
-   */
-  @Query("SELECT f FROM Fiber f WHERE f.product.id IN :productIds")
-  List<Fiber> findByProductIdIn(@Param("productIds") List<UUID> productIds);
-
-  /** Find all active fibers for a tenant, ordered by name. */
-  @Query(
-      "SELECT f FROM Fiber f WHERE f.tenantId = :tenantId AND f.isActive = true ORDER BY f.fiberName")
-  List<Fiber> findByTenantIdAndIsActiveTrueOrderByFiberName(@Param("tenantId") UUID tenantId);
-
-  /** Find all active fibers for a tenant (unordered). */
+  /** Active rows of exactly one owner (e.g. the shared catalogue in walking-skeleton tests). */
   List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
+  /** Canonical shared pure fibre of an ISO code (the owner publishes pure, undeclared rows). */
+  @Query(
+      "SELECT f FROM Fiber f JOIN FETCH f.fiberIsoCode i "
+          + "WHERE f.tenantId = :ownerId AND upper(i.isoCode) = upper(:isoCode) "
+          + "AND f.materialSource IS NULL AND f.isActive = true")
+  Optional<Fiber> findCanonicalByIsoCode(
+      @Param("ownerId") UUID ownerId, @Param("isoCode") String isoCode);
+
+  boolean existsByTenantIdAndFiberIsoCode_IdAndMaterialSourceAndIsActiveTrue(
+      UUID tenantId, UUID fiberIsoCodeId, MaterialSource materialSource);
+
+  Optional<Fiber> findByTenantIdAndFiberIsoCode_IdAndMaterialSourceAndIsActiveTrue(
+      UUID tenantId, UUID fiberIsoCodeId, MaterialSource materialSource);
+
   /**
-   * Find all active fibers for the given tenants (e.g. current tenant + system tenant for platform
-   * seed). Used so tenant organizations can use platform organization's fiber catalog.
+   * Active tenant blend with exactly this composition (jsonb numeric, order-free equality). Pass
+   * {@code NO_FIBER} as {@code excludeId} on create; pass the updated fibre's id on update.
    */
   @Query(
-      "SELECT f FROM Fiber f WHERE f.tenantId IN :tenantIds AND f.isActive = true ORDER BY f.fiberName")
-  List<Fiber> findByTenantIdInAndIsActiveTrueOrderByFiberName(
-      @Param("tenantIds") List<UUID> tenantIds);
+      value =
+          "SELECT id FROM production.prod_fiber WHERE tenant_id = :tenantId AND is_active = TRUE "
+              + "AND composition = CAST(:compositionJson AS jsonb) "
+              + "AND id <> :excludeId LIMIT 1",
+      nativeQuery = true)
+  Optional<UUID> findActiveBlendIdByComposition(
+      @Param("tenantId") UUID tenantId,
+      @Param("compositionJson") String compositionJson,
+      @Param("excludeId") UUID excludeId);
 
-  /** Find fibers by name (case-insensitive). */
-  List<Fiber> findByTenantIdAndFiberNameContainingIgnoreCase(UUID tenantId, String fiberName);
-
-  /** Find fibers by name (case-insensitive), single tenant. */
-  List<Fiber> findByTenantIdAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
-      UUID tenantId, String fiberName);
-
-  /**
-   * Find active fibers by name across multiple tenants (e.g. current tenant + template tenant).
-   * Used so tenant organizations see both their own and platform seed fibers in search results.
-   */
-  List<Fiber> findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
-      List<UUID> tenantIds, String fiberName);
-
-  /**
-   * Find fiber by ID across multiple tenants. Returns the fiber if it belongs to any of the given
-   * tenants. Used so template fibers listed in the catalog can also be opened for detail views.
-   */
-  Optional<Fiber> findByTenantIdInAndId(List<UUID> tenantIds, UUID id);
-
-  /** Find fibers by status. */
-  List<Fiber> findByTenantIdAndStatusAndIsActiveTrue(UUID tenantId, FiberStatus status);
-
-  /** Find active fibers with product details. */
-  @Query(
-      "SELECT f FROM Fiber f "
-          + "WHERE f.tenantId = :tenantId AND f.isActive = true "
-          + "ORDER BY f.fiberName")
-  List<Fiber> findActiveFibersWithDetails(@Param("tenantId") UUID tenantId);
-
-  /**
-   * ✅ Performance: Find fibers by query (filtered search).
-   *
-   * <p>Used for AI searches to avoid loading all fibers. Searches in fiberName (case-insensitive
-   * LIKE).
-   *
-   * <p>Note: Uses existing findByTenantIdAndFiberNameContainingIgnoreCase method which already
-   * filters by query. Limit is applied in Java code.
-   */
-  // findByTenantIdAndFiberNameContainingIgnoreCase already exists and does filtered search
+  /** Transaction-scoped lock serialising create/update of one tenant composition. */
+  @Query(value = "SELECT pg_advisory_xact_lock(hashtext(:lockKey))", nativeQuery = true)
+  void acquireCompositionLock(@Param("lockKey") String lockKey);
 }

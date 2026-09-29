@@ -80,12 +80,16 @@ public class CreateBatchRequest {
   private UUID locationId;
 
   /**
-   * Optional FiberQualityStandard for QC. When null, default profile for batch's ISO code is
-   * applied. If no default exists, profile selection is skipped.
+   * Optional tenant quality profile (FIBER only). It must apply to this fibre and effective
+   * composition ({@code FIBER_QUALITY_TARGET_MISMATCH} otherwise). When null, the exact FIBER
+   * default applies, then the ISO default for a pure fibre at 100%, else none (manual review).
    */
   @Schema(
+      nullable = true,
       description =
-          "Optional ID of the quality standard to apply. If omitted, the default for the product's ISO code is used.")
+          "FIBER only. Optional profile id; must apply to the fibre and effective composition"
+              + " (409 FIBER_QUALITY_TARGET_MISMATCH). Omit to use the resolver's default; see"
+              + " POST /fiber-quality-standards/applicable")
   private UUID qualityStandardId;
 
   @Schema(description = "Additional remarks/notes")
@@ -104,13 +108,15 @@ public class CreateBatchRequest {
   private YarnAttributes yarnSpecs;
 
   /**
-   * Batch-level composition override (FIBER only). When present, stored in attributes and takes
-   * precedence over Fiber.composition. Map of baseFiberId (UUID) → percentage (BigDecimal). Omit to
-   * use Fiber default.
+   * Optional physical composition override (FIBER only), keyed by component {@code Fiber.id} (never
+   * Product ids). Validated like any composition; one pure component at exactly 100% is allowed.
+   * Omit to use the fibre definition; an explicit empty map is invalid.
    */
   @Schema(
+      nullable = true,
       description =
-          "Batch-level composition override (FIBER only). Map of Base Fiber ID to percentage. Overrides Product default.")
+          "FIBER only. Physical composition override keyed by Fiber.id; exact decimal sum 100."
+              + " Omit to use the fibre definition; an empty map is rejected")
   private Map<UUID, BigDecimal> composition;
 
   // ── Source Tracking ──

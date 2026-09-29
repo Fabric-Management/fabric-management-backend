@@ -97,24 +97,42 @@ public class FiberTestResultService {
               saved.getStockUnitId(),
               saved.getApprovalStatus(),
               TenantContext.getCurrentUserId()));
-    } else if (eval.isoCodeLabel() != null) {
+    } else if (eval.diagnosticCode() != null) {
+      String target = eval.targetLabel() != null ? eval.targetLabel() : batch.getBatchCode();
       notificationService.sendToTenantRoles(
           tenantId,
           InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
           NotificationType.BATCH_NO_QUALITY_STANDARD,
-          "No Quality Standard Defined",
+          "No Applicable Quality Standard",
           String.format(
-              "No quality standard defined for %s. Manual review required.", eval.isoCodeLabel()),
-          request.getBatchId(),
+              "%s: %s. Manual review required.", target, manualReviewReason(eval.diagnosticCode())),
+          batchId,
           "BATCH",
           NotificationDeliveryChannel.IN_APP);
       log.info(
-          "BATCH_NO_QUALITY_STANDARD notification sent: batchId={}, isoCode={}",
-          request.getBatchId(),
-          eval.isoCodeLabel());
+          "BATCH_NO_QUALITY_STANDARD notification sent: batchId={}, target={}, reason={}",
+          batchId,
+          target,
+          eval.diagnosticCode());
     }
 
     return FiberTestResultDto.from(saved);
+  }
+
+  /** Actionable wording for the manual-review notification; the code stays in the logs. */
+  private static String manualReviewReason(String diagnosticCode) {
+    if (diagnosticCode == null) {
+      return "no quality profile applies to this fibre and composition";
+    }
+    return switch (diagnosticCode) {
+      case "BATCH_COMPOSITION_UNKNOWN" ->
+          "the batch composition is unknown, so no quality profile can be matched";
+      case "FIBER_PRODUCT_NOT_FOUND" -> "the batch product has no fibre definition";
+      case "QUALITY_PROFILE_UNAVAILABLE" -> "the batch's quality profile is no longer active";
+      case "QUALITY_PROFILE_NOT_APPLICABLE" ->
+          "the batch's quality profile does not match its composition";
+      default -> "no quality profile applies to this fibre and composition";
+    };
   }
 
   @Transactional(readOnly = true)

@@ -8,8 +8,9 @@
 -- This migration provisions nexus-fabrics with reference data from
 -- golden-template so that playground cloning produces complete tenants.
 --
--- Fibers (prod_fiber, prod_product) are NOT copied — they are shared-canonical
--- and will be visible via RLS carve-out (PF4 compliance).
+-- Fibers (prod_fiber, prod_product) and the fibre reference tables (categories, ISO codes,
+-- certification schemes) are NOT copied — they are one shared catalogue read through the
+-- catalogue-owner scope (PF4, FIBER-CATALOG-1).
 --
 -- Idempotent: WHERE NOT EXISTS guards prevent duplicates on re-run or
 -- environments where nexus-fabrics already has data.
@@ -33,38 +34,9 @@ BEGIN
 
     RAISE NOTICE 'Backfilling nexus-fabrics (%) from golden-template (%)', nexus_id, template_id;
 
-    -- 1. prod_fiber_category
-    INSERT INTO production.prod_fiber_category (id, tenant_id, uid, category_code, category_name, description, is_active, created_at, updated_at, version)
-    SELECT gen_random_uuid(), nexus_id, gen_random_uuid()::varchar,
-           category_code, category_name, description, is_active, now(), now(), 0
-    FROM production.prod_fiber_category
-    WHERE tenant_id = template_id
-      AND NOT EXISTS (
-          SELECT 1 FROM production.prod_fiber_category c2
-          WHERE c2.tenant_id = nexus_id AND c2.category_code = production.prod_fiber_category.category_code
-      );
-
-    -- 2. prod_fiber_certification
-    INSERT INTO production.prod_fiber_certification (id, tenant_id, uid, certification_code, certification_name, certifying_body, description, is_active, created_at, updated_at, version)
-    SELECT gen_random_uuid(), nexus_id, gen_random_uuid()::varchar,
-           certification_code, certification_name, certifying_body, description, is_active, now(), now(), 0
-    FROM production.prod_fiber_certification
-    WHERE tenant_id = template_id
-      AND NOT EXISTS (
-          SELECT 1 FROM production.prod_fiber_certification c2
-          WHERE c2.tenant_id = nexus_id AND c2.certification_code = production.prod_fiber_certification.certification_code
-      );
-
-    -- 3. prod_fiber_iso_code
-    INSERT INTO production.prod_fiber_iso_code (id, tenant_id, uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active, created_at, updated_at, version)
-    SELECT gen_random_uuid(), nexus_id, gen_random_uuid()::varchar,
-           iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active, now(), now(), 0
-    FROM production.prod_fiber_iso_code
-    WHERE tenant_id = template_id
-      AND NOT EXISTS (
-          SELECT 1 FROM production.prod_fiber_iso_code c2
-          WHERE c2.tenant_id = nexus_id AND c2.iso_code = production.prod_fiber_iso_code.iso_code
-      );
+    -- 1-3. Fibre categories, certification schemes and ISO codes are NOT copied
+    -- (FIBER-CATALOG-1): they are one shared catalogue owned by the golden template and read
+    -- by every tenant without a tenant copy.
 
     -- 4. prod_product_attribute
     INSERT INTO production.prod_product_attribute (id, tenant_id, uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active, created_at, updated_at, version)

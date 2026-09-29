@@ -1,9 +1,10 @@
 package com.fabricmanagement.product.fiber.dto;
 
+import com.fabricmanagement.product.fiber.domain.FiberQualityTargetType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
@@ -20,8 +21,18 @@ public class UpdateFiberQualityStandardRequest {
 
   private Long version;
 
-  @NotNull(message = "ISO code ID is required")
+  /**
+   * The target cannot change ({@code FIBER_QUALITY_TARGET_IMMUTABLE}); these fields may be omitted
+   * or repeat the unchanged target. Create a new profile to retarget.
+   */
+  @Schema(nullable = true, description = "Optional; must equal the saved target type")
+  private FiberQualityTargetType targetType;
+
+  @Schema(nullable = true, description = "Optional; must equal the saved ISO target")
   private UUID isoCodeId;
+
+  @Schema(nullable = true, description = "Optional; must equal the saved fibre target")
+  private UUID fiberId;
 
   @NotBlank(message = "Standard name is required")
   @Size(max = 100, message = "Standard name must be at most 100 characters")

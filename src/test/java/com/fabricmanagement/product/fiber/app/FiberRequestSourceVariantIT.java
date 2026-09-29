@@ -3,28 +3,25 @@ package com.fabricmanagement.product.fiber.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
+import com.fabricmanagement.product.fiber.dto.CreateFiberRequestRequest;
 import com.fabricmanagement.product.fiber.dto.FiberRequestDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+/** FIBER-CATALOG-1 §6 (A09): source-variant requests against the shared catalogue. */
 class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
 
   @Test
-  void recycledPesApprovalReusesTenantIsoAndCategoryWithoutMintingReferenceRows() {
+  void recycledPesApprovalCreatesOnePrivateVariantOnTheSharedIsoWithoutReferenceRows() {
     UUID tenantId = insertTenant("pes-variant");
     UUID actorId = UUID.randomUUID();
     UUID reviewerId = UUID.randomUUID();
-    UUID categoryId = insertCategory(tenantId, CATEGORY);
-    UUID pesId = insertIso(tenantId, "PES", CATEGORY);
-    insertPureFiber(tenantId, categoryId, pesId, "Virgin Polyester", MaterialSource.VIRGIN);
-    long isoRowsBefore =
-        queryOne(
-            "SELECT count(*) FROM production.prod_fiber_iso_code "
-                + "WHERE tenant_id = ? AND upper(iso_code) = 'PES'",
-            Long.class,
-            tenantId);
+    insertPrivateVariant(tenantId, "PES", CATEGORY, "Virgin Polyester", MaterialSource.VIRGIN);
+    long sharedIsoRows =
+        count("SELECT count(*) FROM production.prod_fiber_iso_code WHERE iso_code = 'PES'");
 
     useTenant(tenantId, actorId);
     FiberRequestDto submitted =
@@ -35,39 +32,26 @@ class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
     FiberRequestDto approved = fiberRequestService.approve(submitted.getId(), reviewerId);
 
     assertThat(approved.getMaterialSource()).isEqualTo(MaterialSource.RECYCLED);
+    assertThat(count("SELECT count(*) FROM production.prod_fiber_iso_code WHERE iso_code = 'PES'"))
+        .isEqualTo(sharedIsoRows)
+        .isEqualTo(1L);
     assertThat(
-            queryOne(
-                "SELECT count(*) FROM production.prod_fiber_iso_code "
-                    + "WHERE tenant_id = ? AND upper(iso_code) = 'PES'",
-                Long.class,
-                tenantId))
-        .isEqualTo(isoRowsBefore);
-    assertThat(
-            queryOne(
+            count(
                 "SELECT count(*) FROM production.prod_fiber "
                     + "WHERE tenant_id = ? AND fiber_iso_code_id = ?",
-                Long.class,
                 tenantId,
-                pesId))
+                sharedIsoId("PES")))
         .isEqualTo(2L);
     assertThat(
-            queryOne(
-                "SELECT count(DISTINCT material_source) FROM production.prod_fiber "
-                    + "WHERE tenant_id = ? AND fiber_iso_code_id = ?",
-                Long.class,
-                tenantId,
-                pesId))
-        .isEqualTo(2L);
-    assertThat(
-            queryOne(
+            count(
                 "SELECT count(*) FROM production.prod_fiber f "
                     + "JOIN production.prod_fiber_iso_code i ON i.id = f.fiber_iso_code_id "
                     + "JOIN production.prod_fiber_category c ON c.id = f.fiber_category_id "
                     + "WHERE f.tenant_id = ? AND i.tenant_id = ? AND c.tenant_id = ?",
-                Long.class,
                 tenantId,
-                tenantId,
-                tenantId))
+                FiberCatalog.OWNER_ID,
+                FiberCatalog.OWNER_ID))
+        .as("both variants reference the shared ISO and category rows")
         .isEqualTo(2L);
     assertThat(
             queryOne(
@@ -79,12 +63,9 @@ class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
   }
 
   @Test
-  void existingCodeRequiresSourceAndKeepsItsCategoryClassification() {
+  void sharedCodeWithoutSourceIsRedundantAndTypeMismatchIsRejected() {
     UUID tenantId = insertTenant("existing-matrix");
     UUID actorId = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
-    insertCategory(tenantId, "NATURAL_PLANT");
-    insertIso(tenantId, "PES", CATEGORY);
     useTenant(tenantId, actorId);
 
     assertThatThrownBy(
@@ -95,9 +76,8 @@ class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
         .satisfies(
             failure -> {
               FiberDomainException exception = (FiberDomainException) failure;
-              assertThat(exception.getErrorCode())
-                  .isEqualTo("FIBER_REQUEST_MATERIAL_SOURCE_REQUIRED");
-              assertThat(exception.getHttpStatus()).isEqualTo(400);
+              assertThat(exception.getErrorCode()).isEqualTo("FIBER_REQUEST_DUPLICATE_CATALOG");
+              assertThat(exception.getHttpStatus()).isEqualTo(409);
             });
     assertThatThrownBy(
             () ->
@@ -111,10 +91,38 @@ class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
   }
 
   @Test
+  void existingVariantAtApprovalIsANamedConflictAndLeavesTheRequestPending() {
+    UUID tenantId = insertTenant("variant-exists");
+    UUID actorId = UUID.randomUUID();
+    UUID requestId =
+        insertPendingRequest(
+            tenantId, actorId, "CO", "Recycled Cotton", "NATURAL_PLANT", MaterialSource.RECYCLED);
+    insertPrivateVariant(
+        tenantId, "CO", "NATURAL_PLANT", "Recycled Cotton (existing)", MaterialSource.RECYCLED);
+    useTenant(tenantId, actorId);
+
+    assertThatThrownBy(() -> fiberRequestService.approve(requestId, UUID.randomUUID()))
+        .isInstanceOf(FiberDomainException.class)
+        .extracting("errorCode")
+        .isEqualTo("FIBER_REQUEST_VARIANT_EXISTS");
+    assertThat(
+            queryOne(
+                "SELECT status FROM production.production_fiber_request WHERE id = ?",
+                String.class,
+                requestId))
+        .isEqualTo("PENDING");
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fiber WHERE tenant_id = ? "
+                    + "AND material_source = 'RECYCLED'",
+                tenantId))
+        .isEqualTo(1L);
+  }
+
+  @Test
   void duplicateKeyIsNullSafeForDeclaredAndUndeclaredRequests() {
     UUID tenantId = insertTenant("duplicate-matrix");
     UUID actorId = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
     useTenant(tenantId, actorId);
     String declaredCode = randomCode();
     String undeclaredCode = randomCode();
@@ -133,17 +141,10 @@ class FiberRequestSourceVariantIT extends FiberSourceIntegrationSupport {
     assertDuplicate(tenantId, actorId, request(undeclaredCode, "Undeclared Two", CATEGORY, null));
   }
 
-  private void assertDuplicate(
-      UUID tenantId,
-      UUID actorId,
-      com.fabricmanagement.product.fiber.dto.CreateFiberRequestRequest request) {
+  private void assertDuplicate(UUID tenantId, UUID actorId, CreateFiberRequestRequest request) {
     assertThatThrownBy(() -> fiberRequestService.submit(request, tenantId, actorId))
         .isInstanceOf(FiberDomainException.class)
         .extracting("errorCode")
         .isEqualTo("FIBER_REQUEST_DUPLICATE_PENDING");
-  }
-
-  private String randomCode() {
-    return "N" + UUID.randomUUID().toString().substring(0, 7).toUpperCase();
   }
 }

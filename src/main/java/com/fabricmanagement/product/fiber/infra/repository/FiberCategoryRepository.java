@@ -7,16 +7,16 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Shared fibre categories. Every query names the catalogue owner explicitly (FIBER-CATALOG-1); RLS
+ * is a second barrier, not the only filter.
+ */
 @Repository
 public interface FiberCategoryRepository extends JpaRepository<FiberCategory, UUID> {
-  List<FiberCategory> findByIsActiveTrue();
 
-  /** Tenant-scoped active categories — prevents double rows when RLS carve-out is active. */
-  List<FiberCategory> findByTenantIdAndIsActiveTrue(UUID tenantId);
+  List<FiberCategory> findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(UUID catalogOwnerId);
 
-  /** Find by category code (e.g. NATURAL_PLANT). Used for fiber_type mapping. */
-  Optional<FiberCategory> findByCategoryCode(String categoryCode);
+  Optional<FiberCategory> findByTenantIdAndId(UUID catalogOwnerId, UUID id);
 
-  /** Exact tenant-owned category lookup used by write paths; never relies on shared-read RLS. */
-  Optional<FiberCategory> findByTenantIdAndCategoryCode(UUID tenantId, String categoryCode);
+  Optional<FiberCategory> findByTenantIdAndCategoryCode(UUID catalogOwnerId, String categoryCode);
 }

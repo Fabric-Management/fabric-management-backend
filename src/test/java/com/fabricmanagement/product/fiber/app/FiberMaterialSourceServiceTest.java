@@ -15,30 +15,29 @@ import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.app.port.FiberUsagePort;
 import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
+import com.fabricmanagement.product.fiber.domain.FiberStatus;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import com.fabricmanagement.product.fiber.domain.event.FiberMaterialSourceDeclaredEvent;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.product.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.product.fiber.dto.FiberDto;
 import com.fabricmanagement.product.fiber.dto.UpdateFiberRequest;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.product.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,23 +46,35 @@ class FiberMaterialSourceServiceTest {
 
   @Mock private FiberRepository fiberRepository;
   @Mock private ProductRepository productRepository;
-  @Mock private FiberCategoryRepository fiberCategoryRepository;
-  @Mock private FiberIsoCodeRepository fiberIsoCodeRepository;
+  @Mock private FiberReferenceQueryService referenceQueryService;
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private FiberValidationService validationService;
   @Mock private FiberUsagePort fiberUsagePort;
+  @Mock private FiberDtoAssembler dtoAssembler;
 
-  @InjectMocks private FiberService fiberService;
+  private FiberService fiberService;
+
+  @BeforeEach
+  void setUp() {
+    fiberService =
+        new FiberService(
+            fiberRepository,
+            productRepository,
+            referenceQueryService,
+            eventPublisher,
+            validationService,
+            fiberUsagePort,
+            dtoAssembler,
+            new ObjectMapper());
+  }
 
   @AfterEach
   void clearContext() {
     TenantContext.clear();
   }
 
-  @ParameterizedTest
-  @NullSource
-  @EnumSource(MaterialSource.class)
-  void directPureCreationThreadsOptionalSourceThroughThePureFactory(MaterialSource source) {
+  @Test
+  void ownerPublishesCanonicalPureFibresWithAnUndeclaredSource() {
     UUID productId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID isoId = UUID.randomUUID();
@@ -82,36 +93,60 @@ class FiberMaterialSourceServiceTest {
     isoCode.setId(isoId);
     TenantContext.restore(
         new TenantContext.TenantSnapshot(
-            TenantContext.TEMPLATE_TENANT_ID, "TEMPLATE", UUID.randomUUID(), null));
-    when(productRepository.findByTenantIdAndId(TenantContext.TEMPLATE_TENANT_ID, productId))
+            FiberCatalog.OWNER_ID, "TEMPLATE", UUID.randomUUID(), null));
+    when(productRepository.findByTenantIdAndId(FiberCatalog.OWNER_ID, productId))
         .thenReturn(Optional.of(product));
-    when(fiberRepository.findByProductId(productId)).thenReturn(Optional.empty());
-    when(fiberCategoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-    when(fiberIsoCodeRepository.findById(isoId)).thenReturn(Optional.of(isoCode));
-    when(fiberRepository.save(any(Fiber.class)))
+    when(fiberRepository.findInScopeByProductId(List.of(FiberCatalog.OWNER_ID), productId))
+        .thenReturn(Optional.empty());
+    when(referenceQueryService.findCategoryById(categoryId)).thenReturn(Optional.of(category));
+    when(referenceQueryService.findIsoCodeById(isoId)).thenReturn(Optional.of(isoCode));
+    when(fiberRepository.saveAndFlush(any(Fiber.class)))
         .thenAnswer(
             invocation -> {
               Fiber fiber = invocation.getArgument(0);
               fiber.setId(UUID.randomUUID());
-              fiber.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
+              fiber.setTenantId(FiberCatalog.OWNER_ID);
               return fiber;
             });
 
-    FiberDto created =
-        fiberService.createFiber(
-            CreateFiberRequest.builder()
-                .productId(productId)
-                .fiberCategoryId(categoryId)
-                .fiberIsoCodeId(isoId)
-                .fiberName("Polyester")
-                .materialSource(source)
-                .build());
+    fiberService.createFiber(
+        CreateFiberRequest.builder()
+            .productId(productId)
+            .fiberCategoryId(categoryId)
+            .fiberIsoCodeId(isoId)
+            .fiberName("Polyester (100%)")
+            .build());
 
-    assertThat(created.getMaterialSource()).isEqualTo(source);
+    ArgumentCaptor<Fiber> saved = ArgumentCaptor.forClass(Fiber.class);
+    verify(fiberRepository).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getMaterialSource()).isNull();
+    assertThat(saved.getValue().getFiberIsoCode()).isSameAs(isoCode);
+  }
+
+  @ParameterizedTest
+  @EnumSource(MaterialSource.class)
+  void canonicalPublicationRejectsAnyMaterialSource(MaterialSource source) {
+    TenantContext.restore(
+        new TenantContext.TenantSnapshot(
+            FiberCatalog.OWNER_ID, "TEMPLATE", UUID.randomUUID(), null));
+
+    assertThatThrownBy(
+            () ->
+                fiberService.createFiber(
+                    CreateFiberRequest.builder()
+                        .fiberName("Polyester (100%)")
+                        .fiberIsoCodeId(UUID.randomUUID())
+                        .materialSource(source)
+                        .unit("KG")
+                        .build()))
+        .isInstanceOf(FiberDomainException.class)
+        .extracting("errorCode")
+        .isEqualTo("FIBER_CANONICAL_SOURCE_FORBIDDEN");
+    verify(fiberRepository, never()).saveAndFlush(any());
   }
 
   @Test
-  void updateNullIsNoOpWhileDeclarationPublishesActorExplicitly() {
+  void updateNullIsNoOpWhileDeclarationOnAnOwnLegacyFibrePublishesActorExplicitly() {
     UUID tenantId = UUID.randomUUID();
     UUID actorId = UUID.randomUUID();
     UUID fiberId = UUID.randomUUID();
@@ -119,10 +154,12 @@ class FiberMaterialSourceServiceTest {
     when(fiber.getVersion()).thenReturn(0L);
     when(fiber.getTenantId()).thenReturn(tenantId);
     when(fiber.getId()).thenReturn(fiberId);
-    when(fiberRepository.findByTenantIdInAndId(
-            List.of(tenantId, TenantContext.TEMPLATE_TENANT_ID), fiberId))
+    when(fiber.isShared()).thenReturn(false);
+    when(fiber.getIsActive()).thenReturn(true);
+    when(fiber.getStatus()).thenReturn(FiberStatus.ACTIVE);
+    when(fiberRepository.findByTenantIdInAndId(FiberCatalog.readScope(tenantId), fiberId))
         .thenReturn(Optional.of(fiber));
-    when(fiberRepository.save(fiber)).thenReturn(fiber);
+    when(fiberRepository.saveAndFlush(fiber)).thenReturn(fiber);
     TenantContext.restore(new TenantContext.TenantSnapshot(tenantId, "TENANT", actorId, null));
 
     fiberService.updateFiber(
@@ -150,11 +187,17 @@ class FiberMaterialSourceServiceTest {
 
   @Test
   void createRejectsOneSourceForAComposition() {
+    TenantContext.setCurrentTenantId(UUID.randomUUID());
     CreateFiberRequest request =
         CreateFiberRequest.builder()
             .fiberName("Invalid Blend")
             .materialSource(MaterialSource.VIRGIN)
-            .composition(Map.of(UUID.randomUUID(), new BigDecimal("100.00")))
+            .composition(
+                Map.of(
+                    UUID.randomUUID(),
+                    new BigDecimal("60"),
+                    UUID.randomUUID(),
+                    new BigDecimal("40")))
             .build();
 
     assertThatThrownBy(() -> fiberService.createFiber(request))

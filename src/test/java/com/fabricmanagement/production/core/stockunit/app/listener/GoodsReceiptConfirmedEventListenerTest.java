@@ -19,7 +19,9 @@ import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQu
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
+import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
+import com.fabricmanagement.production.core.batch.app.FiberBatchSnapshotter;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.core.batch.domain.BatchStatus;
@@ -71,7 +73,8 @@ class GoodsReceiptConfirmedEventListenerTest {
             productFacade,
             new BatchPrimaryMeasureService(),
             eventPublisher,
-            idempotentEventHandler);
+            idempotentEventHandler,
+            new FiberBatchSnapshotter(mock(FiberQualityQueryService.class)));
     doAnswer(
             invocation -> {
               invocation.getArgument(3, Runnable.class).run();

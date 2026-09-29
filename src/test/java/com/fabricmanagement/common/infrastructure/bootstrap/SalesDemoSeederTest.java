@@ -19,7 +19,6 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
-import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.sales.salesorder.app.OrderCoverEnrolmentService;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy;
@@ -136,8 +135,8 @@ class SalesDemoSeederTest {
             })
         .when(realConfirmation)
         .createOrder(any());
-    ProductDto templateFiber = fiber();
-    when(productFacade.findByType(any(), eq(ProductType.FIBER))).thenReturn(List.of(templateFiber));
+    ProductDto sharedFiber = fiber();
+    when(productFacade.findCanonicalFiberProduct(any())).thenReturn(Optional.of(sharedFiber));
     when(tradingPartnerService.searchByName(any(), any()))
         .thenReturn(List.of(TradingPartnerDto.builder().id(UUID.randomUUID()).build()));
     SalesDemoSeeder realFlowSeeder =
@@ -160,10 +159,11 @@ class SalesDemoSeederTest {
 
   @Test
   void createsAndConfirmsOneOrderPerDemoCustomer() {
-    ProductDto fiber1 = fiber();
-    ProductDto fiber2 = fiber();
-    when(productFacade.findByType(any(), eq(ProductType.FIBER)))
-        .thenReturn(List.of(fiber1, fiber2));
+    // FIBER-CATALOG-1: exact shared cotton and polyester by ISO code, not list positions.
+    ProductDto cotton = fiber();
+    ProductDto polyester = fiber();
+    when(productFacade.findCanonicalFiberProduct("CO")).thenReturn(Optional.of(cotton));
+    when(productFacade.findCanonicalFiberProduct("PES")).thenReturn(Optional.of(polyester));
     when(tradingPartnerService.searchByName(any(), any()))
         .thenReturn(List.of(TradingPartnerDto.builder().id(UUID.randomUUID()).build()));
     when(salesOrderService.createOrder(any(CreateSalesOrderRequest.class)))
@@ -176,8 +176,8 @@ class SalesDemoSeederTest {
   }
 
   @Test
-  void skipsWhenNoTemplateFibers() {
-    when(productFacade.findByType(any(), eq(ProductType.FIBER))).thenReturn(List.of());
+  void skipsWhenTheSharedCottonOrPolyesterIsNotPublished() {
+    when(productFacade.findCanonicalFiberProduct(any())).thenReturn(Optional.empty());
 
     seeder.seedFor(TENANT_ID);
 

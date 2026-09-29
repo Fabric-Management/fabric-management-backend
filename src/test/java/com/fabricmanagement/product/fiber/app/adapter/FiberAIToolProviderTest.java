@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.ai.AIQueryNormalizer;
 import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.product.fiber.domain.FiberKind;
 import com.fabricmanagement.product.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
 import java.util.Collections;
@@ -91,5 +92,23 @@ class FiberAIToolProviderTest {
 
     // Then
     assertThat(result).contains("Organic Hemp").contains(uid);
+  }
+
+  @Test
+  void shouldDescribeABlendWithTheBackendCompositionLabelAndKind() {
+    // FIBER-CATALOG-1: exact decimals from the backend label, never rounded or inferred codes.
+    String uid = "FIB-625";
+    FiberDto blend =
+        FiberDto.builder()
+            .fiberName("CO 62.5% / PES 37.5%")
+            .uid(uid)
+            .kind(FiberKind.BLEND)
+            .compositionLabel("CO 62.5% / PES 37.5%")
+            .build();
+    when(fiberFacade.findAll()).thenReturn(List.of(blend));
+
+    String result = fiberAIToolProvider.execute(tenantId, "get_fiber_info", Map.of("fiberId", uid));
+
+    assertThat(result).contains("Composition: CO 62.5% / PES 37.5%").contains("Kind: BLEND");
   }
 }

@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeede
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
+import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort;
 import com.fabricmanagement.platform.tenant.domain.port.TenantCatalogueProvisioningPort;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class TenantClonerService {
   private final SystemTransactionExecutor systemTransactionExecutor;
   private final DemoTransactionSeeder demoTransactionSeeder;
   private final TenantCatalogueProvisioningPort catalogueProvisioning;
+  private final PlaygroundFixtureProvisioningPort playgroundFixtures;
 
   /**
    * Find the TEMPLATE tenant ID. Returns null if no template tenant exists.
@@ -365,8 +367,9 @@ public class TenantClonerService {
   }
 
   /**
-   * Clone production reference data (categories, ISO codes, certifications, attributes) from the
-   * golden-template to a target tenant.
+   * Clone tenant-owned production reference data (product attributes, yarn certifications,
+   * property/yarn system catalogues) from the golden-template to a target tenant. The shared fibre
+   * catalogue (categories, ISO codes, certification schemes) is not copied (FIBER-CATALOG-1).
    *
    * <p>Idempotent: legacy reference tables are copied only when empty; Property Registry and yarn
    * system catalogues are repaired key-by-key so a partially provisioned tenant is completed. Uses
@@ -386,27 +389,8 @@ public class TenantClonerService {
         jdbc -> {
           int tablesCloned = 0;
 
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_category",
-                  "uid, category_code, category_name, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_certification",
-                  "uid, certification_code, certification_name, certifying_body, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_iso_code",
-                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
+          // Fibre categories, ISO codes and certification schemes are one shared catalogue
+          // owned by the golden template (FIBER-CATALOG-1); they are read, never copied.
           tablesCloned +=
               cloneIfEmpty(
                   jdbc,
@@ -656,18 +640,8 @@ public class TenantClonerService {
               // 4. Clone Reference Data Tables (No internal hierarchical dependencies)
 
               // 5. PRODUCTION MASTERDATA
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_category",
-                  "uid, category_code, category_name, description, is_active",
-                  templateTenantId,
-                  newTenantId);
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_certification",
-                  "uid, certification_code, certification_name, certifying_body, description, is_active",
-                  templateTenantId,
-                  newTenantId);
+              // Fibre categories, ISO codes and certification schemes are one shared catalogue
+              // owned by the golden template (FIBER-CATALOG-1); they are read, never copied.
               cloneTableWithoutFKs(
                   jdbc,
                   "production.prod_yarn_certification",
@@ -678,13 +652,6 @@ public class TenantClonerService {
                   jdbc,
                   "production.prod_product_attribute",
                   "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
-                  templateTenantId,
-                  newTenantId);
-
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_iso_code",
-                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
                   templateTenantId,
                   newTenantId);
 
@@ -725,6 +692,10 @@ public class TenantClonerService {
               catalogueProvisioning.provisionPlaygroundFromSource(
                   templateTenantId, newTenantId, uid);
 
+              // FIBER-CATALOG-1: trusted initial-provisioning marker for the playground fibre
+              // fixtures, committed atomically with the new PLAYGROUND tenant.
+              playgroundFixtures.registerLegacyPlaygroundCreation(newTenantId);
+
               log.info("Cloning completed for playground tenant: {}", newTenantId);
 
               // We can't return the full JPA entity. The caller usually just needs the ID or simple
@@ -733,6 +704,17 @@ public class TenantClonerService {
               tenant.setId(newTenantId);
               return tenant;
             });
+
+    // Playground fibre fixtures first: dependent demo transactions refer to them. A failure
+    // leaves the marker PENDING for a retry of this same provisioning.
+    try {
+      playgroundFixtures.provisionLegacyPlayground(clonedTenant.getId());
+    } catch (RuntimeException fixtureFailure) {
+      log.error(
+          "Playground fibre fixtures failed for tenant {}; marker stays PENDING",
+          clonedTenant.getId(),
+          fixtureFailure);
+    }
 
     // Execute Seeder AFTER tenant is fully committed to DB
     demoTransactionSeeder.seedFor(clonedTenant.getId());

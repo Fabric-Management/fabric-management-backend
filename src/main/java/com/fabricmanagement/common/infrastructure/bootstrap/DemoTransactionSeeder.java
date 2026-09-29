@@ -21,6 +21,7 @@ import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,9 +29,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Component to seed a deterministic, demo-ready transactional dataset for a tenant. Uses shared
- * template fibers to create sales orders, work orders, and batches. Fully idempotent and
- * tenant-parametric.
+ * Component to seed a deterministic, demo-ready transactional dataset for a tenant. Uses the shared
+ * cotton (CO) and polyester (PES) canonical fibres, looked up by ISO code, to create sales orders,
+ * work orders, and batches. Fully idempotent and tenant-parametric. It never installs the
+ * playground fibre fixtures (FIBER-CATALOG-1); those belong to initial playground provisioning.
  */
 @Component
 @RequiredArgsConstructor
@@ -128,14 +130,18 @@ public class DemoTransactionSeeder {
       // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
       // the finance demo (seeded above) or fail playground init.
       try {
-        List<ProductDto> fibers =
-            productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
+        // FIBER-CATALOG-1: exact shared materials by ISO code (cotton, polyester), never the
+        // first entries of a product list.
+        Optional<ProductDto> cotton = productFacade.findCanonicalFiberProduct("CO");
+        Optional<ProductDto> polyester = productFacade.findCanonicalFiberProduct("PES");
 
-        if (fibers.isEmpty()) {
-          log.warn("No template fibers found. Skipping production demo for tenant: {}", tenantId);
+        if (cotton.isEmpty() || polyester.isEmpty()) {
+          log.warn(
+              "Shared CO/PES fibres not published. Skipping production demo for tenant: {}",
+              tenantId);
         } else {
-          ProductDto fiber1 = fibers.get(0);
-          ProductDto fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
+          ProductDto fiber1 = cotton.get();
+          ProductDto fiber2 = polyester.get();
 
           CreateSalesOrderRequest orderReq = new CreateSalesOrderRequest();
           orderReq.setPartnerId(customer.getId());

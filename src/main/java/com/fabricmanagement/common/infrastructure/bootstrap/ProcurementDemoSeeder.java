@@ -34,7 +34,6 @@ import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatu
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
-import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.production.core.goodsreceipt.app.GoodsReceiptService;
 import com.fabricmanagement.production.core.goodsreceipt.domain.GoodsReceiptSourceType;
@@ -51,6 +50,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -98,15 +98,22 @@ public class ProcurementDemoSeeder {
         return;
       }
 
-      List<ProductDto> fibers =
-          productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
-      if (fibers.isEmpty()) {
-        log.warn("No template fibers found; skipping procurement demo for tenant: {}", tenantId);
+      // FIBER-CATALOG-1: exact materials. The second item is the tenant's real 60% CO / 40% PES
+      // blend when playground fixtures installed one; otherwise the shared polyester, described
+      // as polyester. No private blend is ever manufactured here.
+      Optional<ProductDto> sharedCotton = productFacade.findCanonicalFiberProduct("CO");
+      Optional<ProductDto> sharedPolyester = productFacade.findCanonicalFiberProduct("PES");
+      if (sharedCotton.isEmpty() || sharedPolyester.isEmpty()) {
+        log.warn("Shared CO/PES fibres not published; skipping procurement demo: {}", tenantId);
         return;
       }
-
-      ProductDto cotton = fibers.get(0);
-      ProductDto blend = fibers.size() > 1 ? fibers.get(1) : cotton;
+      ProductDto cotton = sharedCotton.get();
+      Optional<ProductDto> realBlend =
+          productFacade.findOwnBlendOfCanonicalFibers(
+              Map.of("CO", new BigDecimal("60"), "PES", new BigDecimal("40")));
+      ProductDto blend = realBlend.orElse(sharedPolyester.get());
+      SecondFiberWording wording =
+          realBlend.isPresent() ? SecondFiberWording.BLEND : SecondFiberWording.POLYESTER;
       LocalDate today = LocalDate.now(clock);
       UUID procurementPersonaUserId = resolveProcurementPersonaUserId(tenantId);
 
@@ -194,7 +201,7 @@ public class ProcurementDemoSeeder {
 
       SupplierRFQResponse sentRfq =
           createSentPurchaseRfq(
-              chainPurchaseWo.id(), cotton, blend, anatolia.getId(), aegean.getId());
+              chainPurchaseWo.id(), cotton, blend, wording, anatolia.getId(), aegean.getId());
       createDraftPurchaseRfq(chainPurchaseWo.id(), cotton);
 
       List<SupplierRFQResponse.RfqLineResponse> rfqLines = sentRfq.getLines();
@@ -205,7 +212,8 @@ public class ProcurementDemoSeeder {
           "3.92",
           "4.18",
           "14",
-          "Aegean quote: balanced price and lead time");
+          "Aegean quote: balanced price and lead time",
+          wording);
       SupplierQuoteResponse anatoliaQuote =
           createQuote(
               sentRfq.getId(),
@@ -214,7 +222,8 @@ public class ProcurementDemoSeeder {
               "3.78",
               "4.05",
               "12",
-              "Anatolia quote: preferred quality lot");
+              "Anatolia quote: preferred quality lot",
+              wording);
 
       supplierQuoteService.startReview(anatoliaQuote.getId());
       SupplierQuoteResponse acceptedQuote =
@@ -286,13 +295,35 @@ public class ProcurementDemoSeeder {
     return workOrderService.changeStatus(created.id(), WorkOrderStatus.APPROVED);
   }
 
+  /** Honest wording for the second RFQ/quote line: a real blend, or plain shared polyester. */
+  enum SecondFiberWording {
+    BLEND("60% CO / 40% PES blend, low trash", "Low trash 60/40 blend lot"),
+    POLYESTER("Polyester staple fibre (PES)", "Polyester staple lot");
+
+    private final String rfqLine;
+    private final String quoteLine;
+
+    SecondFiberWording(String rfqLine, String quoteLine) {
+      this.rfqLine = rfqLine;
+      this.quoteLine = quoteLine;
+    }
+  }
+
   private SupplierRFQResponse createSentPurchaseRfq(
-      UUID workOrderId, ProductDto cotton, ProductDto blend, UUID supplierOne, UUID supplierTwo) {
+      UUID workOrderId,
+      ProductDto cotton,
+      ProductDto blend,
+      SecondFiberWording wording,
+      UUID supplierOne,
+      UUID supplierTwo) {
     SupplierRFQResponse rfq =
         createRfq(
             workOrderId, SupplierRFQType.PURCHASE, "Demo RFQ: cotton lots for May production");
-    rfq = addFiberRfqLine(rfq.getId(), cotton, "1400.000", "Aegean cotton, BCI, 28.5 mm staple");
-    rfq = addFiberRfqLine(rfq.getId(), blend, "1000.000", "Combed cotton blend, low trash");
+    rfq =
+        addFiberRfqLine(
+            rfq.getId(), cotton, "1400.000", "Aegean cotton, BCI, 28.5 mm staple", cottonSpecs());
+    // Cotton staple specs describe cotton only; the second line carries no invented specs.
+    rfq = addFiberRfqLine(rfq.getId(), blend, "1000.000", wording.rfqLine, null);
     addRecipient(rfq.getId(), supplierOne);
     addRecipient(rfq.getId(), supplierTwo);
     return supplierRFQService.sendRfq(rfq.getId());
@@ -302,7 +333,11 @@ public class ProcurementDemoSeeder {
     SupplierRFQResponse rfq =
         createRfq(workOrderId, SupplierRFQType.PURCHASE, "Draft RFQ: replenishment fiber options");
     addFiberRfqLine(
-        rfq.getId(), product, "650.000", "Draft line for procurement persona create flow");
+        rfq.getId(),
+        product,
+        "650.000",
+        "Draft line for procurement persona create flow",
+        cottonSpecs());
   }
 
   private SupplierRFQResponse createRfq(UUID workOrderId, SupplierRFQType type, String notes) {
@@ -316,20 +351,20 @@ public class ProcurementDemoSeeder {
   }
 
   private SupplierRFQResponse addFiberRfqLine(
-      UUID rfqId, ProductDto product, String qty, String description) {
+      UUID rfqId, ProductDto product, String qty, String description, FiberRFQSpecs specs) {
     return supplierRFQService.addLine(
         rfqId,
         new AddRfqLineRequest(
-            product.getId(),
-            description,
-            new BigDecimal(qty),
-            unit(product),
-            new FiberRFQSpecs(
-                new BigDecimal("4.20"),
-                new BigDecimal("28.50"),
-                new BigDecimal("30.50"),
-                new BigDecimal("1.20"),
-                "BCI certified, contamination controlled")));
+            product.getId(), description, new BigDecimal(qty), unit(product), specs));
+  }
+
+  private static FiberRFQSpecs cottonSpecs() {
+    return new FiberRFQSpecs(
+        new BigDecimal("4.20"),
+        new BigDecimal("28.50"),
+        new BigDecimal("30.50"),
+        new BigDecimal("1.20"),
+        "BCI certified, contamination controlled");
   }
 
   private void addRecipient(UUID rfqId, UUID tradingPartnerId) {
@@ -346,7 +381,8 @@ public class ProcurementDemoSeeder {
       String firstUnitPrice,
       String secondUnitPrice,
       String leadDays,
-      String notes) {
+      String notes,
+      SecondFiberWording wording) {
     SupplierQuoteResponse quote =
         supplierQuoteService.createQuote(
             new CreateSupplierQuoteRequest(
@@ -363,7 +399,7 @@ public class ProcurementDemoSeeder {
     supplierQuoteService.addLine(
         quote.getId(), quoteLine(rfqLines.get(0), firstUnitPrice, "Class A cotton lot"));
     supplierQuoteService.addLine(
-        quote.getId(), quoteLine(rfqLines.get(1), secondUnitPrice, "Low trash blend lot"));
+        quote.getId(), quoteLine(rfqLines.get(1), secondUnitPrice, wording.quoteLine));
     return quote;
   }
 

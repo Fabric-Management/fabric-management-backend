@@ -1,32 +1,21 @@
 package com.fabricmanagement.product.fiber.app;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.product.fiber.dto.FiberIsoCodeDto;
-import com.fabricmanagement.product.fiber.infra.repository.FiberIsoCodeRepository;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Task F1: Service for ISO code reference data with baseOnly filter.
- *
- * <p>When baseOnly=true, returns only official ISO 2076 codes (52 records). When false, returns all
- * active codes including variants.
+ * Shared ISO code reference data. {@code baseOnly=true} keeps the official-code filter, scoped to
+ * the catalogue owner like every other ISO read (FIBER-CATALOG-1).
  */
 @Service
 @RequiredArgsConstructor
 public class FiberIsoCodeService {
 
-  private final FiberIsoCodeRepository fiberIsoCodeRepository;
+  private final FiberReferenceQueryService referenceQueryService;
 
   public List<FiberIsoCodeDto> getIsoCodes(boolean baseOnly) {
-    UUID tenantId = TenantContext.requireTenantId();
-    List<FiberIsoCode> codes =
-        baseOnly
-            ? fiberIsoCodeRepository.findByIsOfficialIsoTrueAndIsActiveTrue()
-            : fiberIsoCodeRepository.findByTenantIdAndIsActiveTrue(tenantId);
-    return codes.stream().map(FiberIsoCodeDto::from).toList();
+    return referenceQueryService.listIsoCodes(baseOnly);
   }
 }

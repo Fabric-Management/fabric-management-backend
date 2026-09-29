@@ -1,11 +1,12 @@
 package com.fabricmanagement.product.fiber.app;
 
+import java.math.BigDecimal;
+
 /**
- * Fiber Module Constants.
+ * Fiber module constants.
  *
- * <p>Centralizes all configurable values for fiber business rules.
- *
- * <p><b>CRITICAL:</b> No hardcoded values in services - use these constants.
+ * <p>The component limits are current application limits kept unchanged by FIBER-CATALOG-1; they
+ * are not claimed textile standards and their business review is separate.
  */
 public final class FiberConstants {
 
@@ -13,52 +14,18 @@ public final class FiberConstants {
     throw new UnsupportedOperationException("Utility class");
   }
 
-  // =====================================================
-  // COMPOSITION VALIDATION RULES
-  // =====================================================
+  /** Minimum share of one component in a blend definition (application limit). */
+  public static final BigDecimal MIN_COMPONENT_PERCENTAGE = new BigDecimal("5");
 
-  /**
-   * Minimum percentage for a fiber component in a blend.
-   *
-   * <p>Prevents trace amounts that have no practical effect.
-   */
-  public static final double MIN_COMPONENT_PERCENTAGE = 5.0;
-
-  /**
-   * Maximum number of components allowed in a blended fiber.
-   *
-   * <p>Prevents overly complex blends that are hard to manage.
-   */
+  /** Maximum number of components in one composition (application limit). */
   public static final int MAX_BLEND_COMPONENTS = 5;
 
-  /**
-   * Tolerance for percentage sum validation (100%).
-   *
-   * <p>Allows floating-point precision differences.
-   */
-  public static final double PERCENTAGE_TOLERANCE = 0.01;
-
-  /** Expected total percentage for composition. */
-  public static final double TOTAL_PERCENTAGE = 100.0;
-
-  // =====================================================
-  // FIBER NAME VALIDATION
-  // =====================================================
+  /** Minimum number of components in a blend definition. */
+  public static final int MIN_BLEND_COMPONENTS = 2;
 
   /** Minimum length for fiber name. */
   public static final int MIN_FIBER_NAME_LENGTH = 3;
 
   /** Maximum length for fiber name. */
   public static final int MAX_FIBER_NAME_LENGTH = 255;
-
-  // =====================================================
-  // COMPOSITION COMPARISON
-  // =====================================================
-
-  /**
-   * Tolerance for composition percentage comparison.
-   *
-   * <p>Used when checking for duplicate compositions.
-   */
-  public static final double COMPOSITION_COMPARISON_TOLERANCE = 0.01;
 }

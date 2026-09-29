@@ -169,15 +169,12 @@ public class FiberAIToolProvider implements AIToolProvider {
     info.append(String.format("UID: %s\n", f.getUid()));
     info.append(String.format("Status: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
 
-    if (f.getComposition() != null && !f.getComposition().isEmpty()) {
-      info.append("\nComposition (Blended Fiber):\n");
-      f.getComposition()
-          .forEach(
-              (baseFiberId, percentage) -> {
-                Optional<FiberDto> baseFiber = fiberFacade.findById(baseFiberId);
-                String baseName = baseFiber.map(FiberDto::getFiberName).orElse("Unknown");
-                info.append(String.format("  - %s: %.2f%%\n", baseName, percentage));
-              });
+    if (f.getCompositionLabel() != null && !f.getCompositionLabel().isBlank()) {
+      // Backend label from shared ISO codes; exact decimals, no rounding, no inferred codes.
+      info.append(String.format("Composition: %s\n", f.getCompositionLabel()));
+    }
+    if (f.getKind() != null) {
+      info.append(String.format("Kind: %s\n", f.getKind()));
     }
 
     if (f.getRemarks() != null && !f.getRemarks().isBlank()) {
@@ -223,6 +220,8 @@ public class FiberAIToolProvider implements AIToolProvider {
             + "Option 2: Provide unit (e.g. 'kg') to auto-create Product with type=FIBER";
       }
 
+      // Only the platform catalogue owner publishes pure fibres; FiberService enforces this and
+      // tenants receive FIBER_PURE_CREATION_PLATFORM_ONLY (use a fiber request instead).
       if (fiberCategoryIdStr == null || fiberCategoryIdStr.isBlank()) {
         return "❌ Fiber Category ID is required.";
       }

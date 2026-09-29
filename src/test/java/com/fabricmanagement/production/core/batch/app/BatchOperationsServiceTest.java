@@ -3,6 +3,7 @@ package com.fabricmanagement.production.core.batch.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -10,11 +11,15 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
 import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchCompositionSnapshot;
 import com.fabricmanagement.production.core.batch.domain.BatchStatus;
 import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.core.batch.domain.port.WarehouseLocationPort;
 import com.fabricmanagement.production.core.batch.dto.BatchDto;
+import com.fabricmanagement.production.core.batch.dto.BlendParentRequest;
+import com.fabricmanagement.production.core.batch.dto.CreateBlendedBatchRequest;
 import com.fabricmanagement.production.core.batch.dto.OverrideStatusRequest;
 import com.fabricmanagement.production.core.batch.dto.PartialAcceptanceSplitRequest;
 import com.fabricmanagement.production.core.batch.dto.SplitBatchRequest;
@@ -24,6 +29,7 @@ import com.fabricmanagement.production.core.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +74,8 @@ class BatchOperationsServiceTest {
             stockUnitRepository,
             warehouseLocationPort,
             applicationEventPublisher,
-            qualityDecisionService);
+            qualityDecisionService,
+            new FiberBatchSnapshotter(mock(FiberQualityQueryService.class)));
   }
 
   @AfterEach
@@ -227,6 +234,102 @@ class BatchOperationsServiceTest {
             .status(BatchStatus.QUARANTINE)
             .build();
     batch.setId(SOURCE_ID);
+    batch.setTenantId(TENANT_ID);
+    return batch;
+  }
+
+  // ── Review finding 1: a physical blend records what was mixed, not the output definition ──
+
+  private static final UUID COTTON = UUID.randomUUID();
+  private static final UUID POLYESTER = UUID.randomUUID();
+
+  @Test
+  void blendedFibreBatchRecordsTheCompositionOfItsInputsNotTheOutputDefinition() {
+    // Output product is defined as 60/40, but 50% pure cotton + 50% pure polyester were mixed.
+    Batch cotton = fibreParent(Map.of(COTTON, new BigDecimal("100")));
+    Batch polyester = fibreParent(Map.of(POLYESTER, new BigDecimal("100")));
+
+    Batch child = blend(cotton, "50", polyester, "50");
+
+    assertThat(BatchCompositionSnapshot.read(child.getAttributes()))
+        .contains(Map.of(COTTON, new BigDecimal("50"), POLYESTER, new BigDecimal("50")));
+  }
+
+  @Test
+  void blendingBlendsWeightsEveryComponentExactly() {
+    Batch blend6040 =
+        fibreParent(Map.of(COTTON, new BigDecimal("60"), POLYESTER, new BigDecimal("40")));
+    Batch cotton = fibreParent(Map.of(COTTON, new BigDecimal("100")));
+
+    Batch child = blend(blend6040, "50", cotton, "50");
+
+    assertThat(BatchCompositionSnapshot.read(child.getAttributes()))
+        .contains(Map.of(COTTON, new BigDecimal("80"), POLYESTER, new BigDecimal("20")));
+  }
+
+  @Test
+  void anInputWithoutARecordedCompositionLeavesTheOutputUnknown() {
+    Batch cotton = fibreParent(Map.of(COTTON, new BigDecimal("100")));
+    Batch unknown = fibreParent(null);
+
+    Batch child = blend(cotton, "50", unknown, "50");
+
+    assertThat(BatchCompositionSnapshot.isRecorded(child.getAttributes())).isFalse();
+  }
+
+  private Batch blend(Batch first, String firstShare, Batch second, String secondShare) {
+    when(batchRepository.findByIdAndTenantId(first.getId(), TENANT_ID))
+        .thenReturn(Optional.of(first));
+    when(batchRepository.findByIdAndTenantId(second.getId(), TENANT_ID))
+        .thenReturn(Optional.of(second));
+    when(batchRepository.save(any(Batch.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(batchService.toBatchDto(any(Batch.class))).thenReturn(BatchDto.builder().build());
+
+    service.createBlendedBatch(
+        CreateBlendedBatchRequest.builder()
+            .batchCode("BLEND-1")
+            .productId(UUID.randomUUID())
+            .productType(ProductType.FIBER)
+            .quantity(new BigDecimal("20"))
+            .unit("KG")
+            .parents(
+                java.util.List.of(
+                    BlendParentRequest.builder()
+                        .parentBatchId(first.getId())
+                        .consumedQuantity(new BigDecimal("10"))
+                        .consumptionPercentage(new BigDecimal(firstShare))
+                        .build(),
+                    BlendParentRequest.builder()
+                        .parentBatchId(second.getId())
+                        .consumedQuantity(new BigDecimal("10"))
+                        .consumptionPercentage(new BigDecimal(secondShare))
+                        .build()))
+            .build());
+
+    ArgumentCaptor<Batch> saved = ArgumentCaptor.forClass(Batch.class);
+    verify(batchRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+    return saved.getAllValues().get(0);
+  }
+
+  private Batch fibreParent(Map<UUID, BigDecimal> composition) {
+    Map<String, Object> attributes = new java.util.HashMap<>();
+    if (composition != null) {
+      attributes.put(
+          BatchCompositionSnapshot.ATTRIBUTE_KEY,
+          BatchCompositionSnapshot.toAttribute(composition));
+    }
+    Batch batch =
+        Batch.builder()
+            .productId(UUID.randomUUID())
+            .productType(ProductType.FIBER)
+            .batchCode("FIB-" + UUID.randomUUID())
+            .quantity(new BigDecimal("50"))
+            .unit("KG")
+            .status(BatchStatus.AVAILABLE)
+            .attributes(attributes)
+            .build();
+    batch.setId(UUID.randomUUID());
     batch.setTenantId(TENANT_ID);
     return batch;
   }

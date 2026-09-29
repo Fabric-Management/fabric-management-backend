@@ -2,11 +2,13 @@ package com.fabricmanagement.production.quality.result.app;
 
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
-import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchCompositionSnapshot;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,19 +17,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Evaluates FiberTestResult against FiberQualityStandard for automatic QC decision.
- *
- * <p>When a FiberTestResult is added:
+ * Evaluates a FiberTestResult against the batch's applicable quality profile (FIBER-CATALOG-1).
  *
  * <ul>
- *   <li>Finds default FiberQualityStandard by batch's iso_code_id (via product → Fiber)
- *   <li>If no standard: batch stays PENDING_QC, BATCH_NO_QUALITY_STANDARD notification sent
- *   <li>If standard exists: compares all values to min/target/max:
- *       <ul>
- *         <li>All within min-max, all at target → APPROVED → AVAILABLE
- *         <li>All within min-max, one+ outside target → CONDITIONAL_ACCEPT → concession review
- *         <li>One+ outside min or max → REJECTED → QC_REJECTED
- *       </ul>
+ *   <li>The profile comes from the shared resolver applied to the batch's stored composition
+ *       snapshot: a stored profile is re-checked and never switched; without one the exact FIBER
+ *       default, then the ISO default for a pure fibre at 100%. A blend never borrows its dominant
+ *       component's ISO profile.
+ *   <li>No evaluable profile (none applies, stored one unavailable/inapplicable, or unknown
+ *       composition): the result stays PENDING for manual review with an explicit diagnostic.
+ *   <li>Otherwise all seven metrics are compared to min/target/max: all at target → APPROVED; all
+ *       within limits, one or more off target → CONDITIONAL_ACCEPT; any outside → REJECTED.
  * </ul>
  */
 @Service
@@ -39,66 +39,46 @@ public class FiberQcAutoEvaluator {
 
   private final FiberQualityQueryService fiberQualityQueryService;
 
-  /** Result of auto-evaluation. Empty optional = no standard defined (manual review). */
-  public record EvaluationResult(
-      TestApprovalStatus approvalStatus, boolean hasStandard, String isoCodeLabel) {}
-
   /**
-   * Evaluates test result against quality standard. Only runs for FIBER batches.
-   *
-   * @param result saved FiberTestResult
-   * @param batch the batch (must be FIBER type)
-   * @param tenantId tenant context
-   * @return EvaluationResult with approval status if standard exists; empty hasStandard=false if
-   *     not
+   * Result of auto-evaluation. {@code hasStandard=false} keeps the manual path; {@code
+   * diagnosticCode} then names why (e.g. NO_APPLICABLE_QUALITY_PROFILE, BATCH_COMPOSITION_UNKNOWN).
    */
+  public record EvaluationResult(
+      TestApprovalStatus approvalStatus,
+      boolean hasStandard,
+      String targetLabel,
+      String diagnosticCode) {}
+
   @Transactional(readOnly = true)
   public EvaluationResult evaluate(FiberTestResult result, Batch batch, UUID tenantId) {
     if (batch.getProductType() != ProductType.FIBER) {
       log.debug("Skipping QC auto-eval: batch productType={}", batch.getProductType());
-      return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
+      return new EvaluationResult(TestApprovalStatus.PENDING, false, null, null);
     }
 
-    Optional<Fiber> fiberOpt = fiberQualityQueryService.findByProductIdOrId(batch.getProductId());
-    if (fiberOpt.isEmpty()) {
-      log.warn("Fiber not found for productId={}, skipping QC auto-eval", batch.getProductId());
-      return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
-    }
+    Optional<Map<UUID, BigDecimal>> snapshot = BatchCompositionSnapshot.read(batch.getAttributes());
+    FiberQualityQueryService.StoredEvaluation stored =
+        fiberQualityQueryService.evaluateStored(
+            tenantId, batch.getProductId(), snapshot, batch.getQualityStandardId());
 
-    Optional<FiberQualityStandard> standardOpt;
-    UUID isoCodeId = null;
-    if (batch.getQualityStandardId() != null) {
-      standardOpt =
-          fiberQualityQueryService.findQualityStandardById(tenantId, batch.getQualityStandardId());
-    } else {
-      isoCodeId = fiberOpt.get().getFiberIsoCodeId();
-      if (isoCodeId == null) {
-        log.warn("Fiber has no iso_code_id, productId={}", batch.getProductId());
-        return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
-      }
-      standardOpt = fiberQualityQueryService.findDefaultQualityStandard(tenantId, isoCodeId);
-    }
-
-    if (standardOpt.isEmpty()) {
-      String isoCode =
-          fiberOpt.get().getFiberIsoCode() != null
-              ? fiberOpt.get().getFiberIsoCode().getIsoCode()
-              : "?";
+    if (stored.standard() == null) {
       log.info(
-          "No default quality standard for isoCodeId={} ({}), batch stays PENDING_QC",
-          isoCodeId,
-          isoCode);
-      return new EvaluationResult(TestApprovalStatus.PENDING, false, isoCode);
+          "No evaluable quality profile for batch {} ({}): {}; stays PENDING for manual review",
+          batch.getId(),
+          stored.targetLabel(),
+          stored.diagnosticCode());
+      return new EvaluationResult(
+          TestApprovalStatus.PENDING, false, stored.targetLabel(), stored.diagnosticCode());
     }
 
-    FiberQualityStandard standard = standardOpt.get();
-    String isoCodeLabel = standard.getIsoCode() != null ? standard.getIsoCode().getIsoCode() : "?";
-
+    FiberQualityStandard standard = stored.standard();
     TestApprovalStatus status = evaluateAgainstStandard(result, standard);
     log.info(
-        "QC auto-eval: batchId={}, isoCode={}, result={}", batch.getId(), isoCodeLabel, status);
-
-    return new EvaluationResult(status, true, isoCodeLabel);
+        "QC auto-eval: batchId={}, profile={}, result={}",
+        batch.getId(),
+        standard.getStandardName(),
+        status);
+    return new EvaluationResult(status, true, stored.targetLabel(), null);
   }
 
   private TestApprovalStatus evaluateAgainstStandard(

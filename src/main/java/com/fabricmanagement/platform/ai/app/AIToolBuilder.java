@@ -175,7 +175,7 @@ public class AIToolBuilder {
                 "required", List.of("productType", "unit"))),
         buildTool(
             "create_fiber",
-            "Create a new fiber. USER-FRIENDLY: If productId is not provided, Product will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
+            "Publish a canonical pure fiber in the shared platform catalogue (platform catalogue owner only; tenants request new pure fibers through a fiber request and create blends in the fiber catalogue). If productId is not provided, Product will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
             Map.of(
                 "type", "object",
                 "properties",
@@ -197,7 +197,8 @@ public class AIToolBuilder {
                         "fiberIsoCodeId",
                             Map.of(
                                 "type", "string",
-                                "description", "Fiber ISO Code ID (UUID) - required"),
+                                "description",
+                                    "Shared ISO Code ID (UUID) of the pure fiber - required"),
                         "fiberName",
                             Map.of(
                                 "type", "string",

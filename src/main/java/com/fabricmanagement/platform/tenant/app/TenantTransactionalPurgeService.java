@@ -132,6 +132,8 @@ public class TenantTransactionalPurgeService {
           "iwm.lot_end_rule",
           "iwm.return_rate_rule",
           "iwm.warehouse_location",
+          "production.playground_fixture_item",
+          "production.playground_fixture_run",
           "production.production_output_item",
           "production.production_output_record",
           "production.work_order_output",
@@ -520,6 +522,10 @@ public class TenantTransactionalPurgeService {
         tenantId);
   }
 
+  // The shared fibre catalogue (prod_fiber_category, prod_fiber_iso_code,
+  // prod_fiber_certification, canonical prod_fiber/prod_product) is owned by the golden template
+  // and never purged with a tenant (FIBER-CATALOG-1). Tenant-owned fibres and products below
+  // are deleted by tenant_id only.
   private void deleteProductReferenceRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
     delete(
@@ -555,12 +561,6 @@ public class TenantTransactionalPurgeService {
     delete(
         jdbc,
         rows,
-        "production.prod_fiber_certification",
-        "DELETE FROM production.prod_fiber_certification WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
         "production.prod_fiber_quality_standard",
         "DELETE FROM production.prod_fiber_quality_standard WHERE tenant_id = ?",
         tenantId);
@@ -575,18 +575,6 @@ public class TenantTransactionalPurgeService {
         rows,
         "production.prod_product",
         "DELETE FROM production.prod_product WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
-        "production.prod_fiber_iso_code",
-        "DELETE FROM production.prod_fiber_iso_code WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
-        "production.prod_fiber_category",
-        "DELETE FROM production.prod_fiber_category WHERE tenant_id = ?",
         tenantId);
     delete(
         jdbc,

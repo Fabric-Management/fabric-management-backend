@@ -69,12 +69,18 @@ class FiberMaterialSourceIT {
   @Test
   @Order(2)
   void databaseRejectsInvalidLiteralAndSourceOnBlend() throws SQLException {
+    // Own pure fixture: at this historical version the repeatable fibre seed is skipped
+    // (FIBER-CATALOG-1 publishes it through a later function), so the table may be empty.
+    String pureId = UUID.randomUUID().toString();
+    insertFiberFixture(POSTGRES, UUID.randomUUID(), pureId, "{}");
     assertThatThrownBy(
             () ->
                 execute(
                     POSTGRES,
                     "UPDATE production.prod_fiber SET material_source = 'USED' "
-                        + "WHERE id = (SELECT id FROM production.prod_fiber LIMIT 1)"))
+                        + "WHERE id = '"
+                        + pureId
+                        + "'::uuid"))
         .isInstanceOf(SQLException.class)
         .hasMessageContaining("chk_fiber_material_source");
 

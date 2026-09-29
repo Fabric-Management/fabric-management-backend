@@ -35,8 +35,6 @@ abstract class YarnArticleIntegrationSupport extends AbstractIntegrationTest {
     UUID actorId = UUID.randomUUID();
     UUID yarnProductId = UUID.randomUUID();
     UUID fiberProductId = UUID.randomUUID();
-    UUID categoryId = UUID.randomUUID();
-    UUID isoId = UUID.randomUUID();
     UUID fiberId = UUID.randomUUID();
     UUID spinningSystemId = UUID.randomUUID();
     UUID testMethodId = UUID.randomUUID();
@@ -64,22 +62,22 @@ abstract class YarnArticleIntegrationSupport extends AbstractIntegrationTest {
               fiberProductId,
               tenantId,
               uid("FPROD"));
-          jdbc.update(
-              "INSERT INTO production.prod_fiber_category "
-                  + "(id, tenant_id, uid, category_code, category_name, is_active) "
-                  + "VALUES (?, ?, ?, ?, 'Natural fiber', TRUE)",
-              categoryId,
-              tenantId,
-              uid("FCAT"),
-              "NATURAL_" + suffix);
-          jdbc.update(
-              "INSERT INTO production.prod_fiber_iso_code "
-                  + "(id, tenant_id, uid, iso_code, fiber_name, fiber_type, is_official_iso, is_active) "
-                  + "VALUES (?, ?, ?, ?, 'Cotton', 'NATURAL', TRUE, TRUE)",
-              isoId,
-              tenantId,
-              uid("FISO"),
-              "C" + suffix.substring(0, 6));
+          // FIBER-CATALOG-1: the tenant's private VIRGIN cotton variant references the shared
+          // CO ISO code and its shared category; reference rows are never tenant-owned.
+          UUID isoId =
+              jdbc.queryForObject(
+                  "SELECT id FROM production.prod_fiber_iso_code "
+                      + "WHERE tenant_id = ? AND iso_code = 'CO'",
+                  UUID.class,
+                  TenantContext.TEMPLATE_TENANT_ID);
+          UUID categoryId =
+              jdbc.queryForObject(
+                  "SELECT c.id FROM production.prod_fiber_category c "
+                      + "JOIN production.prod_fiber_iso_code i "
+                      + "ON i.tenant_id = c.tenant_id AND i.fiber_type = c.category_code "
+                      + "WHERE i.id = ?",
+                  UUID.class,
+                  isoId);
           jdbc.update(
               "INSERT INTO production.prod_fiber "
                   + "(id, tenant_id, uid, product_id, fiber_category_id, fiber_iso_code_id, "

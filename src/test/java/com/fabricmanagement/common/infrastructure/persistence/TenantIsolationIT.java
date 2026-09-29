@@ -133,28 +133,9 @@ class TenantIsolationIT {
               + "'{}'::jsonb, true, now(), now(), 0) "
               + "ON CONFLICT (id) DO NOTHING");
 
-      // 4. Seed test data in a tenant-scoped table (fiber category)
-      // uid constraint is now tenant-scoped: UNIQUE(tenant_id, uid).
-      // Use NOT EXISTS guard for idempotency since ON CONFLICT (uid) alone won't work.
-      stmt.execute(
-          "INSERT INTO production.prod_fiber_category "
-              + "(id, tenant_id, uid, category_code, category_name, display_order, is_active, created_at, updated_at, version) "
-              + "SELECT gen_random_uuid(), '"
-              + TENANT_A
-              + "', 'TEST-A-CAT', 'TEST_A_CAT', 'Tenant A Category', 1, true, now(), now(), 0 "
-              + "WHERE NOT EXISTS (SELECT 1 FROM production.prod_fiber_category WHERE tenant_id = '"
-              + TENANT_A
-              + "' AND uid = 'TEST-A-CAT')");
-      stmt.execute(
-          "INSERT INTO production.prod_fiber_category "
-              + "(id, tenant_id, uid, category_code, category_name, display_order, is_active, created_at, updated_at, version) "
-              + "SELECT gen_random_uuid(), '"
-              + TENANT_B
-              + "', 'TEST-B-CAT', 'TEST_B_CAT', 'Tenant B Category', 1, true, now(), now(), 0 "
-              + "WHERE NOT EXISTS (SELECT 1 FROM production.prod_fiber_category WHERE tenant_id = '"
-              + TENANT_B
-              + "' AND uid = 'TEST-B-CAT')");
-
+      // 4. Tenant-scoped test data: the production.color rows seeded below. (FIBER-CATALOG-1:
+      // the fibre category dictionary is now a shared catalogue owned by the platform, so it
+      // can no longer hold per-tenant rows.)
       stmt.execute(
           "INSERT INTO common_company.trading_partner_registry "
               + "(uid, official_name, country, verified_status, is_active, created_at, updated_at, version) "
@@ -256,8 +237,7 @@ class TenantIsolationIT {
   @DisplayName("T5-1: Tenant A context → sees only Tenant A data")
   void tenantA_seesOnlyOwnData() throws Exception {
     try (Connection conn = getAppConnection(TENANT_A)) {
-      PreparedStatement ps =
-          conn.prepareStatement("SELECT category_code FROM production.prod_fiber_category");
+      PreparedStatement ps = conn.prepareStatement("SELECT code FROM production.color");
       ResultSet rs = ps.executeQuery();
 
       List<String> codes = new ArrayList<>();
@@ -265,7 +245,7 @@ class TenantIsolationIT {
         codes.add(rs.getString(1));
       }
 
-      assertThat(codes).contains("TEST_A_CAT").doesNotContain("TEST_B_CAT");
+      assertThat(codes).contains("RLS-COLOR-A").doesNotContain("RLS-COLOR-B");
     }
   }
 
@@ -274,8 +254,7 @@ class TenantIsolationIT {
   @DisplayName("T5-2: Tenant B context → sees only Tenant B data")
   void tenantB_seesOnlyOwnData() throws Exception {
     try (Connection conn = getAppConnection(TENANT_B)) {
-      PreparedStatement ps =
-          conn.prepareStatement("SELECT category_code FROM production.prod_fiber_category");
+      PreparedStatement ps = conn.prepareStatement("SELECT code FROM production.color");
       ResultSet rs = ps.executeQuery();
 
       List<String> codes = new ArrayList<>();
@@ -283,7 +262,7 @@ class TenantIsolationIT {
         codes.add(rs.getString(1));
       }
 
-      assertThat(codes).contains("TEST_B_CAT").doesNotContain("TEST_A_CAT");
+      assertThat(codes).contains("RLS-COLOR-B").doesNotContain("RLS-COLOR-A");
     }
   }
 
@@ -296,11 +275,11 @@ class TenantIsolationIT {
               () -> {
                 PreparedStatement ps =
                     conn.prepareStatement(
-                        "INSERT INTO production.prod_fiber_category "
-                            + "(id, tenant_id, uid, category_code, category_name, display_order, "
-                            + "is_active, created_at, updated_at, version) "
-                            + "VALUES (gen_random_uuid(), ?, 'HACK-CAT', 'HACK', 'Hacked', 1, "
-                            + "true, now(), now(), 0)");
+                        "INSERT INTO production.color "
+                            + "(id, tenant_id, uid, code, name, color_type, color_family, "
+                            + "standard_status, is_active, created_at, updated_at, version) "
+                            + "VALUES (gen_random_uuid(), ?, 'HACK-COLOR', 'HACK', 'Hacked', "
+                            + "'DYED', 'BLUE', 'DRAFT', true, now(), now(), 0)");
                 ps.setObject(1, TENANT_B);
                 ps.execute();
               })
@@ -378,8 +357,7 @@ class TenantIsolationIT {
     // ownerJdbc uses the Testcontainers default user (superuser → bypasses RLS)
     Integer count =
         ownerJdbc.queryForObject(
-            "SELECT count(DISTINCT tenant_id) FROM production.prod_fiber_category "
-                + "WHERE tenant_id IN (?, ?)",
+            "SELECT count(DISTINCT tenant_id) FROM production.color " + "WHERE tenant_id IN (?, ?)",
             Integer.class,
             TENANT_A,
             TENANT_B);

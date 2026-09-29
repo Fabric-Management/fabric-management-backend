@@ -8,10 +8,7 @@ import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.platform.communication.dto.NotificationRequest;
-import com.fabricmanagement.product.core.domain.Product;
-import com.fabricmanagement.product.core.domain.ProductType;
-import com.fabricmanagement.product.core.infra.repository.ProductRepository;
-import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.product.fiber.domain.FiberRequest;
 import com.fabricmanagement.product.fiber.domain.FiberRequestStatus;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
@@ -20,12 +17,9 @@ import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.product.fiber.dto.CreateFiberRequestRequest;
 import com.fabricmanagement.product.fiber.dto.FiberRequestDto;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.product.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRequestRepository;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -40,16 +34,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Fiber request service - Handles fiber request workflow (submit, approve, reject) and sends
- * notifications.
- *
- * <p>Notification triggers:
+ * Fiber request workflow (submit, approve, reject) against the shared catalogue (FIBER-CATALOG-1;
+ * supersedes FIBER-SRC-1 R3's tenant-local ISO resolution).
  *
  * <ul>
- *   <li>onSubmit: Tenant submits → Platform admins notified (IN_APP)
- *   <li>onApprove: Platform approves → Requester tenant notified (BOTH)
- *   <li>onReject: Platform rejects → Requester tenant notified (BOTH)
+ *   <li>A shared active code with a declared source: approval creates a private pure variant that
+ *       references the shared ISO/category rows; nothing is copied.
+ *   <li>A shared active code without a source: redundant ({@code FIBER_REQUEST_DUPLICATE_CATALOG});
+ *       a pending request from before publication is fulfilled by the shared canonical fibre on
+ *       approval, without a private row.
+ *   <li>A code absent from the catalogue: stays PENDING; approval returns {@code
+ *       FIBER_CATALOG_PUBLICATION_REQUIRED} until a platform catalogue release publishes the code
+ *       and its canonical pure fibre. Approval never mints an ISO code from user text.
+ *   <li>An inactive code, a fibre-type mismatch or an incomplete publication: a named conflict.
  * </ul>
+ *
+ * <p>Notifications: submit → platform admins (IN_APP); approve/reject → requesting tenant (BOTH).
  */
 @Service
 @RequiredArgsConstructor
@@ -61,46 +61,46 @@ public class FiberRequestService {
       List.of(FiberRequestStatus.PENDING, FiberRequestStatus.APPROVED);
 
   private final FiberRequestRepository fiberRequestRepository;
-  private final FiberIsoCodeRepository fiberIsoCodeRepository;
-  private final FiberCategoryRepository fiberCategoryRepository;
-  private final ProductRepository productRepository;
+  private final FiberReferenceQueryService referenceQueryService;
   private final FiberRepository fiberRepository;
+  private final FiberSourceVariantService sourceVariantService;
   private final InAppNotificationService notificationService;
   private final TenantQueryPort tenantQueryPort;
   private final TenantSessionBinder tenantSessionBinder;
 
   /**
-   * Submit a fiber request (tenant → platform).
-   *
-   * <p>The open-request key is {@code (tenantId, isoCode, materialSource)}. An existing
-   * tenant-owned ISO row may be reused only for a declared source variant; a template-only row is
-   * reported as missing tenant reference data, while a code absent from both scopes remains a
-   * genuinely new-code request.
-   *
-   * @param request Create request
-   * @param tenantId Current tenant ID
-   * @param userId Requesting user ID
-   * @return Created fiber request
+   * Submit a fiber request (tenant → platform). The open-request key is {@code (tenantId, isoCode,
+   * materialSource)}; codes are normalised with trim + {@code Locale.ROOT} uppercase.
    */
   @Transactional
   public FiberRequestDto submit(CreateFiberRequestRequest request, UUID tenantId, UUID userId) {
-    String isoCode = request.getIsoCode().trim().toUpperCase(Locale.ROOT);
-    String fiberType = request.getFiberType().trim().toUpperCase(Locale.ROOT);
+    String isoCode = FiberReferenceQueryService.normalizeIsoCode(request.getIsoCode());
+    String fiberType = FiberReferenceQueryService.normalizeIsoCode(request.getFiberType());
     MaterialSource materialSource = request.getMaterialSource();
 
     if (fiberRequestRepository.existsActiveLogicalDuplicate(
         tenantId, isoCode, materialSource, OPEN_REQUEST_STATUSES)) {
       throw duplicateRequest(isoCode, materialSource);
     }
+    requireSharedCategory(fiberType);
 
-    IsoResolution isoResolution = classifyIsoCode(tenantId, isoCode);
-    if (isoResolution.state() == IsoResolutionState.TEMPLATE_ONLY) {
-      throw missingTenantReference("prod_fiber_iso_code", isoCode);
+    Optional<FiberIsoCode> shared = referenceQueryService.findIsoCode(isoCode);
+    if (shared.isPresent()) {
+      FiberIsoCode existing = shared.get();
+      requireActiveMatchingCode(existing, fiberType);
+      if (materialSource == null) {
+        throw new FiberDomainException(
+            "This ISO code is already in the shared catalogue",
+            "FIBER_REQUEST_DUPLICATE_CATALOG",
+            409,
+            new Object[] {existing.getIsoCode()});
+      }
+      if (sourceVariantService
+          .findActiveVariant(tenantId, existing.getId(), materialSource)
+          .isPresent()) {
+        throw FiberSourceVariantService.variantExists(existing, materialSource);
+      }
     }
-    if (isoResolution.state() == IsoResolutionState.TENANT) {
-      validateExistingCodeRequest(tenantId, isoResolution.isoCode(), fiberType, materialSource);
-    }
-    resolveTenantCategory(tenantId, fiberType);
 
     FiberRequest entity =
         FiberRequest.builder()
@@ -131,20 +131,14 @@ public class FiberRequestService {
   }
 
   /**
-   * Approve a fiber request (platform only).
-   *
-   * <p>Resolves or creates the ISO row and creates Product/Fiber in the requesting tenant's
-   * context. Material source is a declaration, not certification evidence.
-   *
-   * @param requestId Fiber request ID
-   * @param reviewedBy Platform reviewer user ID
-   * @return Updated fiber request
+   * Approve a fiber request (platform only). The request row is locked first, so one request has
+   * exactly one outcome; every failure leaves it PENDING and rolls back all rows and effects.
    */
   @Transactional
   public FiberRequestDto approve(UUID requestId, UUID reviewedBy) {
     FiberRequest request =
         fiberRequestRepository
-            .findById(requestId)
+            .findByIdForUpdate(requestId)
             .orElseThrow(
                 () ->
                     new FiberDomainException(
@@ -158,7 +152,8 @@ public class FiberRequestService {
           new Object[] {request.getStatus()});
     }
 
-    return approveInRequestTenant(request, reviewedBy);
+    FiberSourceVariantService.SharedPureReference reference = resolvePublishedCode(request);
+    return approveInRequestTenant(request, reference, reviewedBy);
   }
 
   /**
@@ -173,7 +168,7 @@ public class FiberRequestService {
   public FiberRequestDto reject(UUID requestId, String reviewNote, UUID reviewedBy) {
     FiberRequest request =
         fiberRequestRepository
-            .findById(requestId)
+            .findByIdForUpdate(requestId)
             .orElseThrow(
                 () ->
                     new FiberDomainException(
@@ -271,7 +266,10 @@ public class FiberRequestService {
   }
 
   /** Runs all approval writes with Java and PostgreSQL bound to the requesting tenant. */
-  private FiberRequestDto approveInRequestTenant(FiberRequest request, UUID reviewedBy) {
+  private FiberRequestDto approveInRequestTenant(
+      FiberRequest request,
+      FiberSourceVariantService.SharedPureReference reference,
+      UUID reviewedBy) {
     TenantReference tenant =
         tenantQueryPort
             .findById(request.getTenantId())
@@ -289,7 +287,15 @@ public class FiberRequestService {
           new TenantContext.TenantSnapshot(request.getTenantId(), tenant.uid(), reviewedBy, null));
       tenantSessionBinder.bindToCurrentSession(request.getTenantId());
 
-      createFiberFromRequest(request);
+      if (request.getMaterialSource() != null) {
+        sourceVariantService.createPrivateVariant(
+            request.getTenantId(), reference, request.getFiberName(), request.getMaterialSource());
+      } else {
+        log.info(
+            "Fiber request {} fulfilled by the shared canonical fibre for {}; no private row",
+            request.getId(),
+            reference.isoCode().getIsoCode());
+      }
 
       request.setStatus(FiberRequestStatus.APPROVED);
       request.setReviewedBy(reviewedBy);
@@ -316,114 +322,42 @@ public class FiberRequestService {
     }
   }
 
-  private void createFiberFromRequest(FiberRequest request) {
-    FiberIsoCode isoCode = resolveIsoCodeForApproval(request);
-    FiberCategory category = resolveTenantCategory(request.getTenantId(), request.getFiberType());
+  /**
+   * Re-reads the shared catalogue at approval time. The code, its category and its canonical pure
+   * fibre must all be published and active; otherwise the request stays PENDING.
+   */
+  private FiberSourceVariantService.SharedPureReference resolvePublishedCode(FiberRequest request) {
+    FiberIsoCode isoCode =
+        referenceQueryService
+            .findIsoCode(request.getIsoCode())
+            .orElseThrow(
+                () ->
+                    new FiberDomainException(
+                        "The ISO code is not in the shared catalogue yet; a platform catalogue"
+                            + " release must publish it before this request can be approved",
+                        "FIBER_CATALOG_PUBLICATION_REQUIRED",
+                        409,
+                        new Object[] {request.getIsoCode()}));
+    requireActiveMatchingCode(isoCode, request.getFiberType());
+    FiberCategory category =
+        referenceQueryService
+            .findCategory(isoCode.getFiberType())
+            .filter(found -> Boolean.TRUE.equals(found.getIsActive()))
+            .orElseThrow(() -> publicationIncomplete(isoCode));
+    if (fiberRepository
+        .findCanonicalByIsoCode(FiberCatalog.OWNER_ID, isoCode.getIsoCode())
+        .isEmpty()) {
+      throw publicationIncomplete(isoCode);
+    }
+    return new FiberSourceVariantService.SharedPureReference(isoCode, category);
+  }
 
-    Product product = productRepository.save(Product.create(ProductType.FIBER, "KG"));
-    Fiber fiber =
-        Fiber.createPureFiber(
-            product, category, isoCode, request.getFiberName(), request.getMaterialSource());
-    try {
-      fiberRepository.saveAndFlush(fiber);
-    } catch (DataIntegrityViolationException exception) {
+  private void requireActiveMatchingCode(FiberIsoCode isoCode, String requestedFiberType) {
+    if (!Boolean.TRUE.equals(isoCode.getIsActive())) {
       throw new FiberDomainException(
-          "A fiber variant with this ISO code and material source already exists",
-          "FIBER_REQUEST_VARIANT_EXISTS",
+          "The shared ISO code is inactive",
+          "FIBER_CATALOG_CODE_INACTIVE",
           409,
-          new Object[] {request.getIsoCode(), request.getMaterialSource()});
-    }
-
-    log.info(
-        "Created fiber from request: isoCode={}, productId={}, fiberId={}, tenantId={}",
-        request.getIsoCode(),
-        product.getId(),
-        fiber.getId(),
-        request.getTenantId());
-  }
-
-  private FiberIsoCode resolveIsoCodeForApproval(FiberRequest request) {
-    IsoResolution initial = classifyIsoCode(request.getTenantId(), request.getIsoCode());
-    if (initial.state() == IsoResolutionState.TEMPLATE_ONLY) {
-      throw missingTenantReference("prod_fiber_iso_code", request.getIsoCode());
-    }
-    if (initial.state() == IsoResolutionState.TENANT) {
-      validateExistingCodeRequest(
-          request.getTenantId(),
-          initial.isoCode(),
-          request.getFiberType(),
-          request.getMaterialSource());
-      return initial.isoCode();
-    }
-
-    fiberIsoCodeRepository.acquireCreationLock(request.getTenantId(), request.getIsoCode());
-    IsoResolution locked = classifyIsoCode(request.getTenantId(), request.getIsoCode());
-    if (locked.state() == IsoResolutionState.TEMPLATE_ONLY) {
-      throw missingTenantReference("prod_fiber_iso_code", request.getIsoCode());
-    }
-    if (locked.state() == IsoResolutionState.TENANT) {
-      validateExistingCodeRequest(
-          request.getTenantId(),
-          locked.isoCode(),
-          request.getFiberType(),
-          request.getMaterialSource());
-      return locked.isoCode();
-    }
-
-    FiberIsoCode created =
-        FiberIsoCode.builder()
-            .isoCode(request.getIsoCode())
-            .fiberName(request.getFiberName())
-            .fiberType(request.getFiberType())
-            .description(request.getDescription())
-            .isOfficialIso(false)
-            .build();
-    return fiberIsoCodeRepository.saveAndFlush(created);
-  }
-
-  private IsoResolution classifyIsoCode(UUID tenantId, String isoCode) {
-    Optional<FiberIsoCode> tenantRow =
-        fiberIsoCodeRepository.findByTenantIdAndIsoCodeIgnoreCase(tenantId, isoCode);
-    if (tenantRow.isPresent()) {
-      return new IsoResolution(IsoResolutionState.TENANT, tenantRow.get());
-    }
-    boolean templateExists =
-        fiberIsoCodeRepository
-            .findByTenantIdAndIsoCodeIgnoreCase(TenantContext.TEMPLATE_TENANT_ID, isoCode)
-            .isPresent();
-    return templateExists
-        ? new IsoResolution(IsoResolutionState.TEMPLATE_ONLY, null)
-        : new IsoResolution(IsoResolutionState.NEW, null);
-  }
-
-  private FiberCategory resolveTenantCategory(UUID tenantId, String categoryCode) {
-    Optional<FiberCategory> tenantRow =
-        fiberCategoryRepository.findByTenantIdAndCategoryCode(tenantId, categoryCode);
-    if (tenantRow.isPresent()) {
-      return tenantRow.get();
-    }
-    if (fiberCategoryRepository
-        .findByTenantIdAndCategoryCode(TenantContext.TEMPLATE_TENANT_ID, categoryCode)
-        .isPresent()) {
-      throw missingTenantReference("prod_fiber_category", categoryCode);
-    }
-    throw new FiberDomainException(
-        "Fiber category not found: " + categoryCode,
-        "FIBER_CATEGORY_NOT_FOUND",
-        404,
-        new Object[] {categoryCode});
-  }
-
-  private void validateExistingCodeRequest(
-      UUID tenantId,
-      FiberIsoCode isoCode,
-      String requestedFiberType,
-      MaterialSource materialSource) {
-    if (materialSource == null) {
-      throw new FiberDomainException(
-          "Material source is required for a variant of an existing ISO code",
-          "FIBER_REQUEST_MATERIAL_SOURCE_REQUIRED",
-          400,
           new Object[] {isoCode.getIsoCode()});
     }
     if (isoCode.getFiberType() == null
@@ -434,22 +368,27 @@ public class FiberRequestService {
           409,
           new Object[] {requestedFiberType, isoCode.getFiberType()});
     }
-    if (fiberRepository.existsByTenantIdAndFiberIsoCode_IdAndMaterialSourceAndIsActiveTrue(
-        tenantId, isoCode.getId(), materialSource)) {
+  }
+
+  private void requireSharedCategory(String categoryCode) {
+    if (referenceQueryService
+        .findCategory(categoryCode)
+        .filter(found -> Boolean.TRUE.equals(found.getIsActive()))
+        .isEmpty()) {
       throw new FiberDomainException(
-          "A fiber variant with this ISO code and material source already exists",
-          "FIBER_REQUEST_VARIANT_EXISTS",
-          409,
-          new Object[] {isoCode.getIsoCode(), materialSource});
+          "Fiber category not found: " + categoryCode,
+          "FIBER_CATEGORY_NOT_FOUND",
+          404,
+          new Object[] {categoryCode});
     }
   }
 
-  private FiberDomainException missingTenantReference(String table, String code) {
+  private static FiberDomainException publicationIncomplete(FiberIsoCode isoCode) {
     return new FiberDomainException(
-        "Tenant reference data is missing for " + table + ": " + code,
-        "FIBER_TENANT_REFERENCE_DATA_MISSING",
+        "The shared catalogue publication of this ISO code is incomplete",
+        "FIBER_CATALOG_PUBLICATION_INCOMPLETE",
         409,
-        new Object[] {table, code});
+        new Object[] {isoCode.getIsoCode()});
   }
 
   private FiberDomainException duplicateRequest(String isoCode, MaterialSource materialSource) {
@@ -459,14 +398,6 @@ public class FiberRequestService {
         409,
         new Object[] {isoCode, materialSource});
   }
-
-  private enum IsoResolutionState {
-    TENANT,
-    TEMPLATE_ONLY,
-    NEW
-  }
-
-  private record IsoResolution(IsoResolutionState state, FiberIsoCode isoCode) {}
 
   private void sendOnSubmitNotification(
       UUID fiberRequestId, UUID tenantId, String isoCode, String fiberName) {
