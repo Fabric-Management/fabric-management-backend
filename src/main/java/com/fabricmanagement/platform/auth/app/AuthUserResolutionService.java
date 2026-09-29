@@ -10,6 +10,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -97,19 +98,32 @@ public class AuthUserResolutionService {
     authUserRepository.save(authUser);
   }
 
-  /** Record a failed identity login attempt; lock account if max attempts reached. */
-  @Transactional
+  /**
+   * Record a failed identity login attempt; lock account if max attempts reached.
+   *
+   * <p>Runs in a transaction of its own: the caller rejects the login by throwing, which rolls back
+   * the caller's transaction, and the attempt must survive that or the lockout never applies. The
+   * row is re-read so concurrent attempts do not overwrite each other's count. The passed instance
+   * is updated to match, for the caller's logging.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void recordFailedAttempt(LoginIdentity identity) {
-    identity.recordFailedLogin(maxAttempts(), lockDurationSeconds());
+    LoginIdentity current =
+        identity.getId() == null
+            ? identity
+            : loginIdentityRepository.findById(identity.getId()).orElse(identity);
+    current.recordFailedLogin(maxAttempts(), lockDurationSeconds());
 
-    if (identity.isLocked()) {
+    if (current.isLocked()) {
       log.warn(
           "LoginIdentity locked: identityId={}, attempts={}, until={}",
-          identity.getId(),
-          identity.getFailedLoginAttempts(),
-          identity.getLockedUntil());
+          current.getId(),
+          current.getFailedLoginAttempts(),
+          current.getLockedUntil());
     }
-    loginIdentityRepository.save(identity);
+    loginIdentityRepository.save(current);
+    identity.setFailedLoginAttempts(current.getFailedLoginAttempts());
+    identity.setLockedUntil(current.getLockedUntil());
   }
 
   /** Reset failed attempts and set last login. */

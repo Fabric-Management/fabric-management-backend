@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +38,7 @@ class VerificationCodeServiceTest {
 
   @Mock private VerificationCodeRepository verificationCodeRepository;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private VerificationCodeAttemptRecorder attemptRecorder;
 
   @InjectMocks private VerificationCodeService service;
 
@@ -71,8 +73,25 @@ class VerificationCodeServiceTest {
       assertThat(saved.getContactValue()).isEqualTo(CONTACT);
       assertThat(saved.getType()).isEqualTo(TYPE);
       assertThat(saved.getCodeHash()).isEqualTo("hashed");
+      assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
       assertThat(result.code()).hasSize(6);
       assertThat(result.expiresAt()).isAfter(Instant.now());
+    }
+
+    @Test
+    void anonymousCallerGetsACodeOwnedByTheSystemTenant() {
+      TenantContext.clear();
+      when(passwordEncoder.encode(any(String.class))).thenReturn("hashed");
+
+      service.generate(CONTACT, TYPE);
+
+      ArgumentCaptor<VerificationCode> captor = ArgumentCaptor.forClass(VerificationCode.class);
+      verify(verificationCodeRepository).save(captor.capture());
+      // BaseEntity.onCreate() requires a tenant; without this the anonymous flows (registration,
+      // password reset) fail to persist the code and nothing is sent.
+      assertThat(captor.getValue().getTenantId()).isEqualTo(TenantContext.SYSTEM_TENANT_ID);
+      verify(verificationCodeRepository)
+          .deleteByTenantIdAndContactValueAndType(TenantContext.SYSTEM_TENANT_ID, CONTACT, TYPE);
     }
   }
 
@@ -172,13 +191,15 @@ class VerificationCodeServiceTest {
               TENANT_ID, CONTACT, TYPE))
           .thenReturn(Optional.of(code));
       when(passwordEncoder.matches(eq("123456"), eq("hash"))).thenReturn(false);
+      when(attemptRecorder.recordFailedAttempt(code.getId())).thenReturn(1);
 
       assertThatThrownBy(() -> service.validateAndConsume(CONTACT, TYPE, "123456"))
           .isInstanceOf(
               com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("invalid or expired");
-      verify(verificationCodeRepository).save(code);
-      assertThat(code.getAttemptCount()).isEqualTo(1);
+      // The attempt is recorded in its own transaction so the throw above cannot undo it.
+      verify(attemptRecorder).recordFailedAttempt(code.getId());
+      verify(verificationCodeRepository, never()).save(code);
     }
   }
 }

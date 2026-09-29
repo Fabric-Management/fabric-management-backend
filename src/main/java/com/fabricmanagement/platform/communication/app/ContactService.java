@@ -161,26 +161,6 @@ public class ContactService {
         tenantId, query.trim(), PageRequest.of(0, 20));
   }
 
-  /**
-   * Check if any contact exists with the given email domain. Used for providing context-aware error
-   * messages during login.
-   *
-   * <p><b>Note:</b> This is a cross-tenant check (not tenant-scoped) because we want to know if the
-   * domain exists anywhere in the system for better error message context.
-   *
-   * @param domain Email domain (e.g., "gmail.com", "company.com")
-   * @return true if any contact with this domain exists
-   */
-  @Transactional(readOnly = true)
-  public boolean existsByEmailDomain(String domain) {
-    if (domain == null || domain.isBlank()) {
-      return false;
-    }
-    String normalizedDomain = domain.trim().toLowerCase();
-    log.trace("Checking if contacts exist with domain: {}", normalizedDomain);
-    return contactRepository.existsByEmailDomain(normalizedDomain);
-  }
-
   @Transactional(readOnly = true)
   public List<Contact> findExtensionsByParent(UUID parentContactId) {
     UUID tenantId = TenantContext.requireTenantId();
