@@ -12,6 +12,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.orderintake.app.CustomerRequestService;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
@@ -76,6 +77,8 @@ public class SalesOrderService {
           .OrderCoverActivationRepository
       orderCoverActivationRepository;
   private final OrderCoverEnrolmentService orderCoverEnrolmentService;
+  private final OrderIntakeHooks orderIntakeHooks;
+  private final CustomerRequestService customerRequestService;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -93,6 +96,7 @@ public class SalesOrderService {
 
     // Resolve partner ID (handles both new and legacy IDs)
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
+    orderIntakeHooks.validateLines(tenantId, tradingPartnerId, request.getLines());
 
     // Generate order number
     LocalDate effectiveDate =
@@ -165,6 +169,14 @@ public class SalesOrderService {
       }
     }
 
+    // Joining the create transaction prevents an order being left behind if a request is invalid.
+    if (request.getCustomRequests() != null) {
+      for (var customRequest : request.getCustomRequests()) {
+        customerRequestService.create(
+            saved.getId(), customRequest, TenantContext.getCurrentUserId());
+      }
+    }
+
     // Get partner details for response
     TradingPartnerDto partner = partnerService.findById(tenantId, tradingPartnerId).orElse(null);
 
@@ -210,10 +222,12 @@ public class SalesOrderService {
 
     // 3. Build OrderTotals — totalAmount hesaplanacak, tax/discount request'ten
     String currency = request.getCurrency();
+    orderIntakeHooks.validateLines(tenantId, order.getTradingPartnerId(), request.getLines());
 
     // 4. Line sync (full-replace)
     List<SalesOrderLine> existingLines =
         lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
+    orderIntakeHooks.assertProductsUnchanged(existingLines, request.getLines());
 
     Set<UUID> incomingLineIds =
         request.getLines().stream()
@@ -353,6 +367,15 @@ public class SalesOrderService {
 
     line.setModuleType(req.getModuleType());
     line.setModuleSpecs(req.getModuleSpecs());
+    line.setColorId(req.getColorId());
+    line.setFinishedWidth(req.getFinishedWidth());
+    line.setFinishedWidthUnit(normaliseWidthUnit(req.getFinishedWidthUnit()));
+    line.setRequestedDeliveryDate(req.getRequestedDeliveryDate());
+    line.setSingleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()));
+  }
+
+  private static String normaliseWidthUnit(String unit) {
+    return unit == null || unit.isBlank() ? null : unit.trim().toUpperCase(java.util.Locale.ROOT);
   }
 
   private SalesOrderLine mapUpdateLineRequestToEntity(
@@ -375,6 +398,11 @@ public class SalesOrderService {
         .lineStatus(SalesOrderLineStatus.PENDING)
         .moduleType(request.getModuleType())
         .moduleSpecs(request.getModuleSpecs())
+        .colorId(request.getColorId())
+        .finishedWidth(request.getFinishedWidth())
+        .finishedWidthUnit(normaliseWidthUnit(request.getFinishedWidthUnit()))
+        .requestedDeliveryDate(request.getRequestedDeliveryDate())
+        .singleLotRequired(Boolean.TRUE.equals(request.getSingleLotRequired()))
         .build();
   }
 
@@ -552,6 +580,10 @@ public class SalesOrderService {
     }
 
     if (order.getStatus() == OrderStatus.DRAFT) {
+      // SOI D4/D7: intake conditions are checked before an approval is requested.
+      orderIntakeHooks.checkConfirmable(
+          order,
+          lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId()));
       boolean needsApproval =
           approvalPort.requiresApproval(
               tenantId,
@@ -627,6 +659,24 @@ public class SalesOrderService {
           TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
           UUID tenantId = TenantContext.requireTenantId();
           SalesOrder order = getOrderOrThrow(tenantId, orderId);
+          if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
+            // SOI D4: stock or acceptances may have changed while the approval was pending.
+            List<String> blockers =
+                orderIntakeHooks.confirmationBlockers(
+                    order,
+                    lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
+                        order.getId()));
+            if (!blockers.isEmpty()) {
+              order.returnToDraftAfterApproval(
+                  "ORDER_INTAKE_BLOCKED_AFTER_APPROVAL: " + String.join("; ", blockers));
+              SalesOrder saved = orderRepository.save(order);
+              log.warn(
+                  "Approved sales order {} returned to draft; intake conditions no longer hold: {}",
+                  saved.getOrderNumber(),
+                  blockers);
+              return SalesOrderDto.from(saved);
+            }
+          }
           order.confirmFromApproval();
           return finalizeConfirmation(order, tenantId);
         });
@@ -642,6 +692,9 @@ public class SalesOrderService {
 
     List<SalesOrderLine> orderLines =
         lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId());
+
+    // SOI D4 (A05): accepted pieces are re-checked and held in this transaction, or nothing is.
+    orderIntakeHooks.allocateAtConfirmation(saved, orderLines, TenantContext.getCurrentUserId());
 
     com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime coverRegime =
         orderCoverEnrolmentService.decide(saved, orderLines);
@@ -783,6 +836,7 @@ public class SalesOrderService {
 
     order.cancel();
     SalesOrder saved = orderRepository.save(order);
+    orderIntakeHooks.releaseOnCancellation(activeLineIds, currentUserId);
 
     domainEventPublisher.publish(
         new SalesOrderCancelledEvent(
@@ -992,6 +1046,11 @@ public class SalesOrderService {
                 : null)
         .moduleType(req.getModuleType())
         .moduleSpecs(req.getModuleSpecs())
+        .colorId(req.getColorId())
+        .finishedWidth(req.getFinishedWidth())
+        .finishedWidthUnit(normaliseWidthUnit(req.getFinishedWidthUnit()))
+        .requestedDeliveryDate(req.getRequestedDeliveryDate())
+        .singleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()))
         .lineStatus(SalesOrderLineStatus.PENDING)
         .build();
   }
@@ -1003,6 +1062,12 @@ public class SalesOrderService {
         .salesOrderId(line.getSalesOrderId())
         .productId(line.getProductId())
         .productDesc(line.getProductDesc())
+        .colorId(line.getColorId())
+        .finishedWidth(line.getFinishedWidth())
+        .finishedWidthUnit(line.getFinishedWidthUnit())
+        .requestedDeliveryDate(line.getRequestedDeliveryDate())
+        .initialRequestedQty(line.getInitialRequestedQty())
+        .singleLotRequired(line.isSingleLotRequired())
         .requestedQty(line.getRequestedQty())
         .shippedQty(line.getShippedQty())
         .unit(line.getUnit())
@@ -1013,6 +1078,7 @@ public class SalesOrderService {
         .requirementProfile(line.getRequirementProfileSnapshot())
         .lineStatus(line.getLineStatus())
         .recipeId(line.getRecipeId())
+        .version(line.getVersion())
         .build();
   }
 

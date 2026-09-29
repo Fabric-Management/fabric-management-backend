@@ -32,11 +32,13 @@ public class ProductionLotService {
 
   private final BatchRepository batchRepository;
   private final WorkOrderRepository workOrderRepository;
+  private final WorkOrderExecutionGuard executionGuard;
 
   @Transactional
   public ProductionLotResponse openLot(UUID workOrderId, OpenProductionLotRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
     WorkOrder wo = loadWorkOrder(workOrderId, tenantId);
+    executionGuard.requireExecutable(wo);
 
     if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
       throw new WorkOrderDomainException(

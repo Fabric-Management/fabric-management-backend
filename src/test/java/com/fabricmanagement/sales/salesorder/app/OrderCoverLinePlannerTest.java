@@ -73,13 +73,38 @@ class OrderCoverLinePlannerTest {
   }
 
   @Test
-  void fullOpenQuantityIsPlannedInsteadOfTheEvidenceShortfall() {
+  void openQuantityWithoutHeldStockIsPlannedInsteadOfTheEvidenceShortfall() {
+    // SOI D5 (R12): rewritten on purpose. Evidence stock that is not held is never subtracted;
+    // only the finished stock held for the line at confirmation is.
     SalesOrderLine line = line(completeProfile(), SalesOrderLineStatus.PENDING, "80");
     var assessment =
         OrderCoverLinePlanner.assess(scope(true), line, evidenceKnown("60"), false, false);
     assertThat(assessment.selectable()).isTrue();
     assertThat(assessment.productionQuantity()).isEqualByComparingTo("80");
     assertThat(assessment.rationaleRequiredIfSelected()).isFalse();
+  }
+
+  @Test
+  void heldStockIsSubtractedSoTheNeedIsNotPlannedTwice() {
+    // SOI S06: 500 m requested, 212 m held from stock -> 288 m to production, not 500 m.
+    SalesOrderLine line = line(completeProfile(), SalesOrderLineStatus.PENDING, "500");
+    var assessment =
+        OrderCoverLinePlanner.assess(
+            scope(true), line, evidenceKnown("288"), false, false, new BigDecimal("212"));
+    assertThat(assessment.selectable()).isTrue();
+    assertThat(assessment.productionQuantity()).isEqualByComparingTo("288");
+  }
+
+  @Test
+  void stockThatCoversTheLineOrCannotBeStatedBlocksProduction() {
+    SalesOrderLine line = line(completeProfile(), SalesOrderLineStatus.PENDING, "200");
+    assertBlock(
+        OrderCoverLinePlanner.assess(
+            scope(true), line, evidenceKnown("0"), false, false, new BigDecimal("200")),
+        OrderCoverLinePlanner.BlockCode.COVERED_BY_STOCK);
+    assertBlock(
+        OrderCoverLinePlanner.assess(scope(true), line, evidenceKnown("0"), false, false, null),
+        OrderCoverLinePlanner.BlockCode.COVER_PORTION_UNKNOWN);
   }
 
   @Test
@@ -177,7 +202,11 @@ class OrderCoverLinePlannerTest {
             line,
             evidenceKnown("1"),
             () -> calls.add("reservation") && false,
-            () -> calls.add("production") && false);
+            () -> calls.add("production") && false,
+            () -> {
+              calls.add("stock");
+              return java.util.Optional.of(BigDecimal.ZERO);
+            });
     assertBlock(structural, OrderCoverLinePlanner.BlockCode.LINE_NOT_OPEN);
     assertThat(calls).as("no port call after a structural block").isEmpty();
 
@@ -187,7 +216,11 @@ class OrderCoverLinePlannerTest {
             line,
             evidenceKnown("1"),
             () -> calls.add("reservation"),
-            () -> calls.add("production") && false);
+            () -> calls.add("production") && false,
+            () -> {
+              calls.add("stock");
+              return java.util.Optional.of(BigDecimal.ZERO);
+            });
     assertBlock(reserved, OrderCoverLinePlanner.BlockCode.ACTIVE_RESERVATION_EXISTS);
     assertThat(calls)
         .as("production is not consulted after a reservation block")
@@ -200,8 +233,27 @@ class OrderCoverLinePlannerTest {
             line,
             evidenceKnown("1"),
             () -> calls.add("reservation") && false,
-            () -> calls.add("production"));
+            () -> calls.add("production"),
+            () -> {
+              calls.add("stock");
+              return java.util.Optional.of(BigDecimal.ZERO);
+            });
     assertBlock(produced, OrderCoverLinePlanner.BlockCode.ACTIVE_PRODUCTION_EXISTS);
     assertThat(calls).containsExactly("reservation", "production");
+
+    calls.clear();
+    var planned =
+        OrderCoverLinePlanner.assess(
+            scope(true),
+            line,
+            evidenceKnown("1"),
+            () -> calls.add("reservation") && false,
+            () -> calls.add("production") && false,
+            () -> {
+              calls.add("stock");
+              return java.util.Optional.of(new BigDecimal("4"));
+            });
+    assertThat(planned.productionQuantity()).isEqualByComparingTo("6");
+    assertThat(calls).containsExactly("reservation", "production", "stock");
   }
 }

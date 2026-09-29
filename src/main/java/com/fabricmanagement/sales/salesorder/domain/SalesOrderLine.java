@@ -19,8 +19,9 @@ import org.hibernate.annotations.Type;
 /**
  * A single product line within a SalesOrder.
  *
- * <p>Each line may reference a {@code Product} entity (via productId) or use a free-text {@code
- * productDesc}. At least one must be non-null (validated in service layer).
+ * <p>Each line is one distribution of a catalogue product (SOI K04): the product, colour, finished
+ * width, unit, quantity, price and optional delivery date. {@code productId} is mandatory (SOI
+ * K02); {@code productDesc} is an optional line note and never a substitute for the product.
  *
  * <p>On {@code SalesOrderConfirmed}, the RuleEngine will:
  *
@@ -47,7 +48,7 @@ import org.hibernate.annotations.Type;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class SalesOrderLine extends BaseEntity {
+public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
 
   // ── References ───────────────────────────────────────────────────────────
 
@@ -55,24 +56,53 @@ public class SalesOrderLine extends BaseEntity {
   @Column(name = "sales_order_id", nullable = false)
   private UUID salesOrderId;
 
-  /**
-   * FK → Product. Optional — use productDesc when product is not yet catalogued. At least one of
-   * productId / productDesc must be non-null.
-   */
-  @Column(name = "product_id")
+  /** FK → Product. Mandatory: a catalogue line always names a product (SOI K02). */
+  @Column(name = "product_id", nullable = false)
   private UUID productId;
 
-  /**
-   * Free-text product description. Used when no Product entity exists yet (custom / prototype
-   * orders).
-   */
+  /** Optional line note. Never a substitute for {@link #productId}. */
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;
+
+  // ── Distribution (SOI K04/K05) ───────────────────────────────────────────
+
+  /** Colour card of this distribution; must be an active tenant colour card when present. */
+  @Column(name = "color_id")
+  private UUID colorId;
+
+  /** Finished (not greige) width; one of the product's defined widths (SOI K11, R05). */
+  @Column(name = "finished_width", precision = 8, scale = 2)
+  private BigDecimal finishedWidth;
+
+  @Column(name = "finished_width_unit", length = 10)
+  private String finishedWidthUnit;
+
+  /** Customer-requested delivery date of this distribution, when it differs per distribution. */
+  @Column(name = "requested_delivery_date")
+  private java.time.LocalDate requestedDeliveryDate;
+
+  /** The customer requires the whole distribution from a single dye lot (SOI R11). */
+  @Column(name = "single_lot_required", nullable = false)
+  @Builder.Default
+  private boolean singleLotRequired = false;
 
   // ── Quantities & Pricing ─────────────────────────────────────────────────
 
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
+
+  /**
+   * Quantity first requested by the customer. Immutable: proposals and accepted quantities are
+   * recorded separately and never overwrite it (SOI K08).
+   */
+  @Column(
+      name = "initial_requested_qty",
+      nullable = false,
+      updatable = false,
+      precision = 15,
+      scale = 3)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal initialRequestedQty;
 
   @Column(name = "shipped_qty", nullable = false, precision = 15, scale = 3)
   @Builder.Default
@@ -240,9 +270,37 @@ public class SalesOrderLine extends BaseEntity {
     return true;
   }
 
-  /** Validates that at least one of productId / productDesc is present. */
+  /**
+   * Replaces the product after a traced correction (SOI R19). The requirement profile was resolved
+   * for the old product, so it is dropped and must be resolved again from a new basis.
+   */
+  public void correctProduct(UUID newProductId) {
+    if (newProductId == null || newProductId.equals(productId)) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "A product correction names a different product");
+    }
+    this.productId = newProductId;
+    this.requirementProfileId = null;
+    this.requirementProfileVersion = null;
+    this.requirementProfileFingerprint = null;
+    this.requirementProfileSnapshot = null;
+  }
+
+  /** A line is valid only when it names a product (SOI K02). */
   public boolean isValid() {
-    return productId != null || (productDesc != null && !productDesc.isBlank());
+    return productId != null;
+  }
+
+  /** Records the first requested quantity once; later quantity changes never overwrite it. */
+  public void captureInitialRequestIfAbsent() {
+    if (initialRequestedQty == null) {
+      initialRequestedQty = requestedQty;
+    }
+  }
+
+  /** True when the line carries a finished-width requirement. */
+  public boolean hasFinishedWidth() {
+    return finishedWidth != null;
   }
 
   /**
@@ -278,9 +336,14 @@ public class SalesOrderLine extends BaseEntity {
   @PrePersist
   @PreUpdate
   private void validateEntity() {
+    captureInitialRequestIfAbsent();
     if (!isValid()) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
-          "Either productId or productDesc must be provided for SalesOrderLine");
+          "A sales-order line must name a product");
+    }
+    if ((finishedWidth == null) != (finishedWidthUnit == null)) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Finished width and its unit must be given together");
     }
     if (Boolean.TRUE.equals(getIsActive())
         && (requestedQty == null || requestedQty.compareTo(BigDecimal.ZERO) <= 0)) {

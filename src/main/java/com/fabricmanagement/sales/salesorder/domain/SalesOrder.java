@@ -192,6 +192,61 @@ public class SalesOrder extends BaseEntity {
   private UUID sampleRequestId;
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Customer-agreed quantity tolerance (SOI A03) — optional, never a default
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Column(name = "agreed_tolerance_up_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private java.math.BigDecimal agreedToleranceUpPct;
+
+  @Column(name = "agreed_tolerance_down_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private java.math.BigDecimal agreedToleranceDownPct;
+
+  @Column(name = "agreed_tolerance_source", columnDefinition = "TEXT")
+  @Setter(AccessLevel.NONE)
+  private String agreedToleranceSource;
+
+  @Column(name = "agreed_tolerance_recorded_by")
+  @Setter(AccessLevel.NONE)
+  private UUID agreedToleranceRecordedBy;
+
+  @Column(name = "agreed_tolerance_recorded_at")
+  @Setter(AccessLevel.NONE)
+  private java.time.Instant agreedToleranceRecordedAt;
+
+  /**
+   * Records the quantity tolerance agreed with the customer, or clears it when both limits are
+   * null. The source (contract, e-mail, conversation) is mandatory for a recorded limit.
+   */
+  public void recordAgreedTolerance(
+      java.math.BigDecimal upPct,
+      java.math.BigDecimal downPct,
+      String source,
+      UUID actor,
+      java.time.Instant at) {
+    if (upPct == null && downPct == null) {
+      this.agreedToleranceUpPct = null;
+      this.agreedToleranceDownPct = null;
+      this.agreedToleranceSource = null;
+      this.agreedToleranceRecordedBy = null;
+      this.agreedToleranceRecordedAt = null;
+      return;
+    }
+    if ((upPct != null && upPct.signum() < 0) || (downPct != null && downPct.signum() < 0)) {
+      throw new OrderDomainException("An agreed tolerance cannot be negative");
+    }
+    if (source == null || source.isBlank() || actor == null || at == null) {
+      throw new OrderDomainException("An agreed tolerance needs its source, recorder and time");
+    }
+    this.agreedToleranceUpPct = upPct;
+    this.agreedToleranceDownPct = downPct;
+    this.agreedToleranceSource = source.trim();
+    this.agreedToleranceRecordedBy = actor;
+    this.agreedToleranceRecordedAt = at;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Metadata
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -249,6 +304,20 @@ public class SalesOrder extends BaseEntity {
           "Only PENDING_APPROVAL orders can be rejected. Current: " + status);
     }
     this.status = OrderStatus.REJECTED;
+    this.rejectionReason = reason;
+  }
+
+  /**
+   * The approval arrived, but the order-intake conditions of confirmation no longer hold (stock
+   * taken, acceptance stale). The order goes back to draft with the reason so it is decided again
+   * (SOI D4).
+   */
+  public void returnToDraftAfterApproval(String reason) {
+    if (status != OrderStatus.PENDING_APPROVAL) {
+      throw new OrderDomainException(
+          "Only PENDING_APPROVAL orders return to draft after approval. Current: " + status, 409);
+    }
+    this.status = OrderStatus.DRAFT;
     this.rejectionReason = reason;
   }
 

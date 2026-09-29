@@ -64,6 +64,10 @@ class SalesOrderServiceCreateTest {
       orderCoverActivationRepository;
 
   @Mock private OrderCoverEnrolmentService orderCoverEnrolmentService;
+  @Mock private OrderIntakeHooks orderIntakeHooks;
+
+  @Mock
+  private com.fabricmanagement.sales.orderintake.app.CustomerRequestService customerRequestService;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
@@ -258,6 +262,123 @@ class SalesOrderServiceCreateTest {
     verify(lineRepository, never()).saveAll(ArgumentMatchers.<List<SalesOrderLine>>any());
   }
 
+  @Test
+  void createOrder_validatesEveryCatalogueLineAgainstTheOrderCustomerBeforePersisting() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of(lineRequest(new BigDecimal("500"), new BigDecimal("4.20"), "TRY")));
+    stubSuccessfulCreate();
+
+    salesOrderService.createOrder(request);
+
+    var ordered = org.mockito.Mockito.inOrder(orderIntakeHooks, orderRepository);
+    ordered.verify(orderIntakeHooks).validateLines(tenantId, tradingPartnerId, request.getLines());
+    ordered.verify(orderRepository).save(any(SalesOrder.class));
+  }
+
+  @Test
+  void createOrder_persistsNothingWhenACatalogueRuleFails() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of(lineRequest(new BigDecimal("500"), new BigDecimal("4.20"), "TRY")));
+    when(partnerResolver.resolvePartnerId(tenantId, requestPartnerId)).thenReturn(tradingPartnerId);
+    org.mockito.Mockito.doThrow(
+            com.fabricmanagement.sales.common.exception.OrderIntakeException.unitNotAllowed("KG"))
+        .when(orderIntakeHooks)
+        .validateLines(tenantId, tradingPartnerId, request.getLines());
+
+    assertThatThrownBy(() -> salesOrderService.createOrder(request))
+        .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderIntakeException.class);
+    verify(orderRepository, never()).save(any(SalesOrder.class));
+  }
+
+  @Test
+  void createOrder_copiesDistributionFieldsToTheLine() {
+    CreateSalesOrderRequest request = baseRequest();
+    UUID colorId = UUID.randomUUID();
+    SalesOrderLineRequest line = lineRequest(new BigDecimal("500"), new BigDecimal("4.20"), "TRY");
+    line.setColorId(colorId);
+    line.setFinishedWidth(new BigDecimal("160"));
+    line.setFinishedWidthUnit("cm");
+    line.setRequestedDeliveryDate(LocalDate.of(2026, 11, 12));
+    line.setSingleLotRequired(true);
+    request.setLines(List.of(line));
+    stubSuccessfulCreate();
+    when(lineRepository.saveAll(ArgumentMatchers.<List<SalesOrderLine>>any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    salesOrderService.createOrder(request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<SalesOrderLine>> lines = ArgumentCaptor.forClass(List.class);
+    verify(lineRepository).saveAll(lines.capture());
+    SalesOrderLine saved = lines.getValue().getFirst();
+    assertThat(saved.getColorId()).isEqualTo(colorId);
+    assertThat(saved.getFinishedWidth()).isEqualByComparingTo("160");
+    assertThat(saved.getFinishedWidthUnit()).isEqualTo("CM");
+    assertThat(saved.getRequestedDeliveryDate()).isEqualTo(LocalDate.of(2026, 11, 12));
+    assertThat(saved.isSingleLotRequired()).isTrue();
+  }
+
+  @Test
+  void createOrder_savesCustomRequestWithItsCatalogueLinesAndActor() {
+    UUID actor = UUID.randomUUID();
+    TenantContext.setCurrentUserId(actor);
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of(lineRequest(new BigDecimal("500"), BigDecimal.TEN, "TRY")));
+    var customRequest = customRequest("Match the customer's sample");
+    request.setCustomRequests(List.of(customRequest));
+    stubSuccessfulCreate();
+    when(lineRepository.saveAll(ArgumentMatchers.<List<SalesOrderLine>>any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    SalesOrderDto result = salesOrderService.createOrder(request);
+
+    var sequence =
+        org.mockito.Mockito.inOrder(orderRepository, lineRepository, customerRequestService);
+    sequence.verify(orderRepository).save(any(SalesOrder.class));
+    sequence.verify(lineRepository).saveAll(any());
+    sequence.verify(customerRequestService).create(result.getId(), customRequest, actor);
+    assertThat(result.getLines()).hasSize(1);
+  }
+
+  @Test
+  void createOrder_allowsCustomOnlyDraftWithoutAnUnboundCatalogueLine() {
+    UUID actor = UUID.randomUUID();
+    TenantContext.setCurrentUserId(actor);
+    CreateSalesOrderRequest request = baseRequest();
+    var customRequest = customRequest("Sample without quantity yet");
+    request.setCustomRequests(List.of(customRequest));
+    stubSuccessfulCreate();
+
+    SalesOrderDto result = salesOrderService.createOrder(request);
+
+    assertThat(result.getLines()).isEmpty();
+    verify(lineRepository, never()).saveAll(any());
+    verify(customerRequestService).create(result.getId(), customRequest, actor);
+  }
+
+  @Test
+  void createOrder_propagatesCustomRequestFailureToTheEnclosingTransaction() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setCustomRequests(List.of(customRequest("")));
+    stubCreateUntilTotalCalculation();
+    when(orderRepository.save(any(SalesOrder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    org.mockito.Mockito.doThrow(new IllegalArgumentException("Request evidence is required"))
+        .when(customerRequestService)
+        .create(any(), any(), any());
+
+    assertThatThrownBy(() -> salesOrderService.createOrder(request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Request evidence is required");
+    verify(partnerService, never()).findById(any(), any());
+  }
+
+  private com.fabricmanagement.sales.orderintake.dto.CustomerRequestDtos.RequestInput customRequest(
+      String description) {
+    return new com.fabricmanagement.sales.orderintake.dto.CustomerRequestDtos.RequestInput(
+        description, null, null, null, null, null, null, null, null, null, List.of());
+  }
+
   private CreateSalesOrderRequest baseRequest() {
     CreateSalesOrderRequest request = new CreateSalesOrderRequest();
     request.setPartnerId(requestPartnerId);
@@ -275,6 +396,7 @@ class SalesOrderServiceCreateTest {
   private SalesOrderLineRequest lineRequest(
       BigDecimal requestedQty, BigDecimal unitPrice, String currency, ModuleType moduleType) {
     return SalesOrderLineRequest.builder()
+        .productId(UUID.randomUUID())
         .productDesc("Cotton fabric")
         .requestedQty(requestedQty)
         .unit("KG")

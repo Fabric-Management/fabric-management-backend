@@ -42,7 +42,8 @@ class OrderCoverSecurityTest {
             mock(com.fabricmanagement.sales.salesorder.domain.port.OrderCoverCapabilityPort.class),
             mock(com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReservationPort.class),
             mock(com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort.class),
-            Clock.systemUTC());
+            Clock.systemUTC(),
+            line -> java.util.Optional.of(java.math.BigDecimal.ZERO));
     assertThatThrownBy(() -> service.assertReadable(orderId, actor))
         .isInstanceOf(NotFoundException.class)
         .hasMessage("Sales order not found");
@@ -84,7 +85,8 @@ class OrderCoverSecurityTest {
             capabilities,
             mock(com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReservationPort.class),
             mock(com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort.class),
-            Clock.systemUTC());
+            Clock.systemUTC(),
+            line -> java.util.Optional.of(java.math.BigDecimal.ZERO));
 
     var action = service.detail(orderId, actor).actions().getFirst();
 

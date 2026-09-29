@@ -73,6 +73,10 @@ public class OpenApiExportIT {
           new NullableReference("DecisionCapability", "routesTo", "DecisionRouteTarget"),
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
           new NullableReference("OrderCoverDetail", "evidence", "OrderCoverEvidence"),
+          new NullableReference("OrderDeliveryOutlook", "arrival", "ArrivalEstimateView"),
+          new NullableReference("QuantityAcceptance", "remainingNeed", "RemainingNeedDecision"),
+          new NullableReference(
+              "OrderIntakeReadinessLine", "stockChoice", "QuantityAcceptanceBasis"),
           new NullableReference(
               "OrderCoverLineDecision", "blockReason", "OrderCoverLineBlockReason"),
           new NullableReference(

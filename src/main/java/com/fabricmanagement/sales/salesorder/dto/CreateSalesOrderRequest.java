@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
+import com.fabricmanagement.sales.orderintake.dto.CustomerRequestDtos;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -7,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -100,4 +102,13 @@ public class CreateSalesOrderRequest {
    * the line API. Each line is validated via {@code @Valid}.
    */
   @Valid private List<SalesOrderLineRequest> lines = new ArrayList<>();
+
+  /** Customer-specific requests recorded atomically with the draft, before a product is known. */
+  @Valid
+  @Size(max = 100)
+  @Schema(
+      description =
+          "Optional customer requests saved in the same transaction as the draft. "
+              + "They remain requests until evaluated and approved; they are not unbound order lines.")
+  private List<CustomerRequestDtos.@NotNull RequestInput> customRequests = new ArrayList<>();
 }

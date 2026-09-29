@@ -44,6 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class WorkOrderServiceTest {
 
+  @Mock private WorkOrderExecutionGuard executionGuard;
   @Mock private WorkOrderRepository workOrderRepository;
   @Mock private WorkOrderConsumptionRepository workOrderConsumptionRepository;
   @Mock private ProductionRecordRepository productionRecordRepository;
@@ -105,6 +106,7 @@ class WorkOrderServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     WorkOrderResponse response = workOrderService.startProduction(workOrderId, request);
+    verify(executionGuard).requireExecutable(workOrder);
 
     assertThat(response.status()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
     assertThat(response.outputProductId()).isEqualTo(outputProductId);

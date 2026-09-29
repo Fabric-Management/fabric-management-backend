@@ -20,7 +20,9 @@ import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchSourceType;
@@ -117,6 +119,7 @@ class WalkingSkeletonIT {
 
   @Autowired private TradingPartnerService tradingPartnerService;
   @Autowired private SalesOrderService salesOrderService;
+  @Autowired private ProductRepository productRepository;
   @Autowired private WorkOrderRepository workOrderRepository;
   @Autowired private WorkOrderService workOrderService;
   @Autowired private ApprovalRequestRepository approvalRequestRepository;
@@ -197,9 +200,11 @@ class WalkingSkeletonIT {
     req.setOrderDate(LocalDate.now());
     req.setRequestedDeliveryDate(LocalDate.now().plusDays(10));
 
-    // Add exactly one line
+    // Add exactly one line; a catalogue line always names a product (SOI K02).
+    Product wsFabric = productRepository.saveAndFlush(Product.create(ProductType.FABRIC, "KG"));
     SalesOrderLineRequest lineReq =
         SalesOrderLineRequest.builder()
+            .productId(wsFabric.getId())
             .productDesc("Premium WS Fabric")
             .requestedQty(new BigDecimal("1000.00"))
             .unit("KG")

@@ -264,6 +264,9 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
                 lines.saveAndFlush(
                     SalesOrderLine.builder()
                         .salesOrderId(order.getId())
+                        // Mandatory product (SOI K02); an unregistered id keeps the evidence
+                        // unknown exactly like the former description-only fixture did.
+                        .productId(UUID.randomUUID())
                         .productDesc("Customer specified textile " + index)
                         .requestedQty(new BigDecimal("10.000"))
                         .unit("kg")

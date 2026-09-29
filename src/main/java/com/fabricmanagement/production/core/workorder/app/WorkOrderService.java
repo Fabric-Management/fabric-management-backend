@@ -64,6 +64,7 @@ public class WorkOrderService {
   private final DocumentNumberGenerator documentNumberGenerator;
   private final WorkOrderProductionCompletionService workOrderProductionCompletionService;
   private final SalesOrderLineFulfilmentLock fulfilmentLock;
+  private final WorkOrderExecutionGuard executionGuard;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -329,6 +330,12 @@ public class WorkOrderService {
   @Transactional
   public WorkOrderResponse changeStatus(UUID id, WorkOrderStatus newStatus) {
     WorkOrder workOrder = findEntityById(id);
+    if (newStatus == WorkOrderStatus.APPROVED
+        || newStatus == WorkOrderStatus.SENT
+        || newStatus == WorkOrderStatus.IN_PROGRESS
+        || newStatus == WorkOrderStatus.COMPLETED) {
+      executionGuard.requireExecutable(workOrder);
+    }
 
     if (!workOrder.getStatus().canTransitionTo(newStatus)) {
       throw new WorkOrderDomainException(
@@ -364,6 +371,8 @@ public class WorkOrderService {
   @Transactional
   public WorkOrderResponse startProduction(UUID id, StartProductionRequest request) {
     WorkOrder workOrder = findEntityById(id);
+    executionGuard.requireExecutable(workOrder);
+    executionGuard.requireCurrentProduct(workOrder, request.getOutputProductId());
 
     if (!workOrder.getStatus().canTransitionTo(WorkOrderStatus.IN_PROGRESS)) {
       throw new WorkOrderDomainException(
@@ -403,6 +412,7 @@ public class WorkOrderService {
     UUID actorId = TenantContext.getCurrentUserId();
 
     WorkOrder workOrder = findEntityById(workOrderId);
+    executionGuard.requireExecutable(workOrder);
 
     // Rule 1: Must be IN_PROGRESS
     if (workOrder.getStatus() != WorkOrderStatus.IN_PROGRESS) {

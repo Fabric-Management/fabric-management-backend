@@ -203,6 +203,7 @@ class OrderCoverUnknownSuitabilityTest {
             reservations,
             mock(DomainEventPublisher.class),
             Clock.fixed(Instant.parse("2026-09-19T12:00:00Z"), ZoneOffset.UTC),
+            orderLine -> java.util.Optional.of(java.math.BigDecimal.ZERO),
             mock(SalesOrderLineFulfilmentLock.class));
     return new Fixture(service, results, lineResults, production, lineId, evidenceId);
   }

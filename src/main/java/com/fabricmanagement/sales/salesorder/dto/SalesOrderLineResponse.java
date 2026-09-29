@@ -19,6 +19,15 @@ public class SalesOrderLineResponse {
   UUID salesOrderId;
   UUID productId;
   String productDesc;
+  UUID colorId;
+  BigDecimal finishedWidth;
+  String finishedWidthUnit;
+  java.time.LocalDate requestedDeliveryDate;
+
+  @Schema(description = "Quantity first requested by the customer (immutable)")
+  BigDecimal initialRequestedQty;
+
+  boolean singleLotRequired;
   BigDecimal requestedQty;
   BigDecimal shippedQty;
   String unit;
@@ -33,4 +42,7 @@ public class SalesOrderLineResponse {
 
   SalesOrderLineStatus lineStatus;
   UUID recipeId;
+
+  @Schema(description = "Line version; commands that change the line send it back (SOI R19)")
+  Long version;
 }

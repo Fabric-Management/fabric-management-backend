@@ -1,0 +1,19 @@
+package com.fabricmanagement.product.core.infra.repository;
+
+import com.fabricmanagement.product.core.domain.ProductFinishedWidth;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ProductFinishedWidthRepository extends JpaRepository<ProductFinishedWidth, UUID> {
+
+  List<ProductFinishedWidth>
+      findByTenantIdAndProductIdAndIsActiveTrueOrderByWidthUnitAscWidthValueAsc(
+          UUID tenantId, UUID productId);
+
+  List<ProductFinishedWidth> findByTenantIdAndProductIdInAndIsActiveTrue(
+      UUID tenantId, Collection<UUID> productIds);
+}

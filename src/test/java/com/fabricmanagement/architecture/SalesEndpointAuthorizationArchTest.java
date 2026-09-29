@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(59)
+        .hasSize(103)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(59);
+    assertThat(expected).hasSize(103);
   }
 
   @Test
@@ -256,6 +256,90 @@ class SalesEndpointAuthorizationArchTest {
         "holdOrder",
         "resumeOrder",
         "reviseOrder");
+    // SOI order intake (D1-D8).
+    add(result, "OrderIntakeProductController", Category.REFERENCE_READ, "search");
+    add(
+        result,
+        "OrderIntakeController",
+        Category.TRANSACTIONAL_READ,
+        "getLatestQuantityProposal",
+        "listToneAcceptances",
+        "listQuantityAcceptances",
+        "getAgreedQuantityTolerance",
+        "getOrderIntakeReadiness");
+    add(
+        result,
+        "OrderIntakeController",
+        Category.MUTATION,
+        "evaluateLineQuantity",
+        "recordToneAcceptance",
+        "recordAgreedTolerance",
+        "recordQuantityAcceptance",
+        "withdrawQuantityAcceptance");
+    add(
+        result,
+        "CustomerRequestController",
+        Category.TRANSACTIONAL_READ,
+        "listIntakeAttachments",
+        "downloadIntakeAttachment",
+        "listCustomerProductRequests",
+        "listUnattachedCustomerProductRequests",
+        "getPartialDeliveryPreference");
+    add(
+        result,
+        "CustomerRequestController",
+        Category.CREATE,
+        "uploadIntakeAttachment",
+        "createCustomerProductRequest");
+    add(
+        result,
+        "CustomerRequestController",
+        Category.MUTATION,
+        "updateCustomerProductRequest",
+        "attachCustomerProductRequest",
+        "detachCustomerProductRequest",
+        "closeCustomerProductRequest",
+        "markCustomerRequestRevisionSent",
+        "recordCustomerRequestDecision",
+        "resolveCustomerProductRequest",
+        "recordPartialDeliveryPreference");
+    add(
+        result,
+        "CustomerRequestEvaluationController",
+        Category.TRANSACTIONAL_READ,
+        "evaluationQueue",
+        "getForEvaluation",
+        "downloadAttachment");
+    add(result, "CustomerRequestEvaluationController", Category.MUTATION, "evaluate", "propose");
+    add(
+        result,
+        "OrderFulfilmentController",
+        Category.TRANSACTIONAL_READ,
+        "getOrderDeliveryOutlook",
+        "listLineProductCorrections",
+        "listLineHolds");
+    add(
+        result,
+        "OrderFulfilmentController",
+        Category.MUTATION,
+        "requestPortionReadiness",
+        "correctLineProduct",
+        "requestLineHold");
+    add(
+        result,
+        "FulfilmentPlanningController",
+        Category.TRANSACTIONAL_READ,
+        "listProductionReadinessRequests",
+        "listWarehouseReadinessRequests");
+    add(
+        result,
+        "FulfilmentPlanningController",
+        Category.MUTATION,
+        "confirmGreigeCover",
+        "withdrawGreigeCover",
+        "confirmProductionReadiness",
+        "confirmShipReadiness",
+        "recordArrivalEstimate");
     return Map.copyOf(result);
   }
 

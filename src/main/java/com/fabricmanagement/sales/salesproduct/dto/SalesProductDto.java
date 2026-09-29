@@ -19,4 +19,5 @@ public class SalesProductDto {
   String photos;
   boolean isActive;
   UUID tenantId;
+  UUID customerId;
 }

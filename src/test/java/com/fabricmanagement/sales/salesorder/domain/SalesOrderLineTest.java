@@ -178,8 +178,45 @@ class SalesOrderLineTest {
     assertThat(line.isOverShipped()).isFalse();
   }
 
+  @Test
+  void validateEntity_rejectsALineWithoutProductEvenWithADescription() {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .productDesc("Navy satin like the customer's swatch")
+            .requestedQty(new BigDecimal("500"))
+            .unit("M")
+            .build();
+
+    assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(line, "validateEntity"))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("must name a product");
+  }
+
+  @Test
+  void initialRequestIsCapturedOnceAndSurvivesLaterQuantityChanges() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("500"));
+    ReflectionTestUtils.invokeMethod(line, "validateEntity");
+
+    line.setRequestedQty(new BigDecimal("514"));
+    ReflectionTestUtils.invokeMethod(line, "validateEntity");
+
+    assertThat(line.getInitialRequestedQty()).isEqualByComparingTo("500");
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("514");
+  }
+
+  @Test
+  void validateEntity_requiresFinishedWidthAndUnitTogether() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("500"));
+    line.setFinishedWidth(new BigDecimal("160"));
+
+    assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(line, "validateEntity"))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Finished width and its unit");
+  }
+
   private SalesOrderLine lineWithRequestedQty(BigDecimal requestedQty) {
     return SalesOrderLine.builder()
+        .productId(UUID.randomUUID())
         .productDesc("Cotton fabric")
         .requestedQty(requestedQty)
         .unit("KG")

@@ -117,7 +117,9 @@ class SalesDemoSeederTest {
                 mock(
                     com.fabricmanagement.sales.salesorder.infra.repository
                         .OrderCoverActivationRepository.class),
-                enrolment));
+                enrolment,
+                mock(com.fabricmanagement.sales.salesorder.app.OrderIntakeHooks.class),
+                mock(com.fabricmanagement.sales.orderintake.app.CustomerRequestService.class)));
     // Isolate creation only; seedFor invokes the real demo entry and shared approval flow.
     doAnswer(
             invocation -> {

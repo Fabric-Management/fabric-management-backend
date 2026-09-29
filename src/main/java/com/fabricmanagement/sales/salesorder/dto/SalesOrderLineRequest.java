@@ -1,9 +1,9 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
+import com.fabricmanagement.sales.salesorder.domain.CatalogLineInput;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -19,11 +19,34 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SalesOrderLineRequest {
+public class SalesOrderLineRequest implements CatalogLineInput {
 
+  @NotNull(message = "Product is required; the description never replaces it")
   private UUID productId;
 
+  @Schema(description = "Optional line note; never a substitute for the product")
   private String productDesc;
+
+  @Schema(description = "Colour card of this distribution (active tenant colour card)")
+  private UUID colorId;
+
+  @Schema(description = "Finished width; must be one of the product's defined widths")
+  @DecimalMin(value = "0.01", message = "Finished width must be positive")
+  private BigDecimal finishedWidth;
+
+  @Schema(
+      description = "Unit of the finished width",
+      allowableValues = {"CM", "IN"})
+  @jakarta.validation.constraints.Pattern(
+      regexp = "CM|IN|cm|in",
+      message = "Width unit must be CM or IN")
+  private String finishedWidthUnit;
+
+  @Schema(description = "Customer-requested delivery date of this distribution")
+  private java.time.LocalDate requestedDeliveryDate;
+
+  @Schema(description = "The customer requires this distribution from a single dye lot")
+  private Boolean singleLotRequired;
 
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be greater than zero")
@@ -41,13 +64,4 @@ public class SalesOrderLineRequest {
 
   @Schema(description = "Typed, traceable order-line requirement profile input")
   private RequirementProfileInput requirementProfile;
-
-  /**
-   * Validates that at least one of productId or productDesc is provided. Triggered automatically by
-   * Bean Validation via @Valid on parent request.
-   */
-  @AssertTrue(message = "Either productId or productDesc must be provided")
-  public boolean isProductOrDescPresent() {
-    return productId != null || (productDesc != null && !productDesc.isBlank());
-  }
 }

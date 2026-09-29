@@ -432,6 +432,7 @@ class SalesOrderMutationScopeIT {
       lineRepository.saveAndFlush(
           SalesOrderLine.builder()
               .salesOrderId(order.getId())
+              .productId(UUID.randomUUID())
               .productDesc("Scope fixture " + index)
               .requestedQty(BigDecimal.TEN)
               .unit("KG")

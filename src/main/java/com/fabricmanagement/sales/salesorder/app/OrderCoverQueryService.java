@@ -35,6 +35,7 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
   private final SalesOrderReservationPort reservations;
   private final ProductionOrderPort production;
   private final Clock clock;
+  private final com.fabricmanagement.sales.salesorder.domain.port.LineStockPortionPort stockPortion;
 
   @Transactional(readOnly = true)
   public void assertReadable(UUID orderId, UUID actorId) {
@@ -211,7 +212,8 @@ public class OrderCoverQueryService implements OrderCoverFollowQueryPort {
               line,
               evidenceLine,
               () -> reservations.hasActiveReservation(lineId),
-              () -> production.hasActiveProduction(tenant, lineId));
+              () -> production.hasActiveProduction(tenant, lineId),
+              () -> stockPortion.ownFinishedStock(line));
       OrderCoverLineBlockReason reason = null;
       boolean selectable = assessment.selectable() && caseBlockedReason == null;
       if (!assessment.selectable()) {

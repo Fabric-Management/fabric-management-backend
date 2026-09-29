@@ -40,6 +40,7 @@ public class WorkOrderConsumptionService {
 
   private final WorkOrderConsumptionRepository workOrderConsumptionRepository;
   private final WorkOrderRepository workOrderRepository;
+  private final WorkOrderExecutionGuard executionGuard;
   private final StockUnitService stockUnitService;
   private final StockUnitRepository stockUnitRepository;
   private final BatchRepository batchRepository;
@@ -61,6 +62,7 @@ public class WorkOrderConsumptionService {
 
     // 1. Verify WorkOrder
     WorkOrder workOrder = loadWorkOrder(workOrderId, tenantId);
+    executionGuard.requireExecutable(workOrder);
     if (workOrder.getStatus() != WorkOrderStatus.IN_PROGRESS) {
       throw new WorkOrderDomainException(
           String.format(

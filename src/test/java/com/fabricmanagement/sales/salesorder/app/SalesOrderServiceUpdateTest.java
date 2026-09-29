@@ -60,6 +60,7 @@ class SalesOrderServiceUpdateTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private SalesOrderAccessPolicy accessPolicy;
   @Mock private RequirementProfileService requirementProfileService;
+  @Mock private OrderIntakeHooks orderIntakeHooks;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
@@ -534,6 +535,7 @@ class SalesOrderServiceUpdateTest {
       UUID id, ModuleType moduleType, BigDecimal requestedQty, Money unitPrice) {
     SalesOrderLine line =
         SalesOrderLine.builder()
+            .productId(UUID.randomUUID())
             .productDesc("Cotton fabric")
             .requestedQty(requestedQty)
             .unit("KG")
