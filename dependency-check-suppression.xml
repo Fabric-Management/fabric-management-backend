@@ -153,6 +153,20 @@
     </suppress>
 
     <suppress until="2026-12-01Z">
+        <notes>Spring Security 6.5.0-6.5.11 is affected by CVE-2026-41707 only through
+        DPoPProofJwtDecoderFactory, whose bounded jti cache lets a flood of requests evict a
+        processed DPoP proof so it can be replayed. The factory ships in the OAuth2 JOSE module
+        (org.springframework.security.oauth2.jwt); this service has no OAuth2 JOSE or resource
+        server dependency and no DPoP usage. Dependency-Check matches the CVE per jar through the
+        shared Spring Security CPE, so the selector covers the same four exact 6.5.11 coordinates
+        as the rules above. DependencySecurityAssumptionsTest guards the applicability condition.
+        The 6.5.x fix (6.5.12) is Enterprise-only; remove this version-pinned suppression after the
+        Spring Boot 4 / Spring Security 7.0.7 or 7.1.1 migration.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(config|core|crypto|web)@6\.5\.11$</packageUrl>
+        <cve>CVE-2026-41707</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
         <notes>Spring Cloud Commons 4.3.0-4.3.3 is affected by CVE-2026-59284 when writable
         /actuator/env is enabled without a property-key allow-list. The committed base allow-list
         excludes env and wildcard, and no application profile widens that exposure;

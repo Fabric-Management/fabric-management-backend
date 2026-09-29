@@ -210,6 +210,25 @@ class DependencySecurityAssumptionsTest {
   }
 
   @Test
+  void dPoPProofDecodingMustRemainOffTheClasspath() {
+    assertThat(
+            ClassUtils.isPresent(
+                "org.springframework.security.oauth2.jwt.DPoPProofJwtDecoderFactory",
+                getClass().getClassLoader()))
+        .as(
+            "CVE-2026-41707: the DPoP proof decoder must remain absent while the Spring Security"
+                + " 6.5.11 suppression is active")
+        .isFalse();
+    assertThat(
+            ClassUtils.isPresent(
+                "org.springframework.security.oauth2.jwt.JwtDecoder", getClass().getClassLoader()))
+        .as(
+            "CVE-2026-41707: adding the OAuth2 JOSE module requires a new DPoP replay"
+                + " vulnerability assessment")
+        .isFalse();
+  }
+
+  @Test
   void actuatorEnvironmentEndpointMustRemainUnexposed() throws IOException {
     List<YamlProperty> exposureProperties =
         loadApplicationYamlProperties().stream()
