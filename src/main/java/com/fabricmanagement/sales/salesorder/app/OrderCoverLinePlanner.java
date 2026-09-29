@@ -35,8 +35,8 @@ public final class OrderCoverLinePlanner {
     if (activeProduction.getAsBoolean()) {
       return blocked(BlockCode.ACTIVE_PRODUCTION_EXISTS, List.of());
     }
-    return assess(
-        scopeLine, orderLine, evidenceLine, false, false, ownFinishedStock.get().orElse(null));
+    // The structural result already carries the open quantity; the scope line is read only once.
+    return withOwnFinishedStock(structural, ownFinishedStock.get().orElse(null));
   }
 
   /** Pure form for a line without a finished-stock portion (unit tests of the structural rules). */
@@ -95,18 +95,29 @@ public final class OrderCoverLinePlanner {
     if (activeProduction) {
       return blocked(BlockCode.ACTIVE_PRODUCTION_EXISTS, List.of());
     }
-    if (ownFinishedStock == null) {
-      return blocked(BlockCode.COVER_PORTION_UNKNOWN, List.of());
-    }
-    BigDecimal productionQuantity = unresolved.subtract(ownFinishedStock);
-    if (productionQuantity.signum() <= 0) {
-      return blocked(BlockCode.COVERED_BY_STOCK, List.of());
-    }
     var shortfall = evidenceLine.shortfall();
     boolean rationaleRequired =
         shortfall.state() != OrderCoverEvidenceDto.Knowledge.KNOWN
             || new BigDecimal(shortfall.value()).signum() <= 0;
-    return new LineAssessment(true, null, List.of(), productionQuantity, rationaleRequired);
+    return withOwnFinishedStock(
+        new LineAssessment(true, null, List.of(), unresolved, rationaleRequired), ownFinishedStock);
+  }
+
+  /**
+   * Subtracts the finished stock already held for the line from an open, selectable line's quantity
+   * (SOI D5). Applied once, after the structural and live checks.
+   */
+  private static LineAssessment withOwnFinishedStock(
+      LineAssessment open, BigDecimal ownFinishedStock) {
+    if (ownFinishedStock == null) {
+      return blocked(BlockCode.COVER_PORTION_UNKNOWN, List.of());
+    }
+    BigDecimal productionQuantity = open.productionQuantity().subtract(ownFinishedStock);
+    if (productionQuantity.signum() <= 0) {
+      return blocked(BlockCode.COVERED_BY_STOCK, List.of());
+    }
+    return new LineAssessment(
+        true, null, List.of(), productionQuantity, open.rationaleRequiredIfSelected());
   }
 
   public static SelectionAssessment assessSelection(List<LineAssessment> assessments) {

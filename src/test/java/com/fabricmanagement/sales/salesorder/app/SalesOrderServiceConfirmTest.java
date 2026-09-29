@@ -60,6 +60,9 @@ class SalesOrderServiceConfirmTest {
 
   @Mock private OrderCoverEnrolmentService orderCoverEnrolmentService;
 
+  // SOI intake checks; a mock is a no-op that reports no blockers.
+  @Mock private OrderIntakeHooks orderIntakeHooks;
+
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrderConfirmedEvent> eventCaptor;

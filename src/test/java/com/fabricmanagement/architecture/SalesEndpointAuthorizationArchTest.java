@@ -265,7 +265,7 @@ class SalesEndpointAuthorizationArchTest {
         "getLatestQuantityProposal",
         "listToneAcceptances",
         "listQuantityAcceptances",
-        "getAgreedQuantityTolerance",
+        "getAgreedTolerance",
         "getOrderIntakeReadiness");
     add(
         result,

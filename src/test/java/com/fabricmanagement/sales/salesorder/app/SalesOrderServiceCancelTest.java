@@ -36,6 +36,9 @@ class SalesOrderServiceCancelTest {
   @Mock private DomainEventPublisher domainEventPublisher;
   @Mock private SalesOrderAccessPolicy accessPolicy;
 
+  // SOI intake checks; a mock is a no-op that reports no blockers.
+  @Mock private OrderIntakeHooks orderIntakeHooks;
+
   @InjectMocks private SalesOrderService salesOrderService;
 
   private final UUID userId = UUID.randomUUID();
