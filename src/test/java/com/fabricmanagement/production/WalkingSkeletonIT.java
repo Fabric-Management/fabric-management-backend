@@ -326,10 +326,10 @@ class WalkingSkeletonIT {
         .hasSizeGreaterThanOrEqualTo(2);
     UUID fiberProductId1 = seededFiberProductIds.get(0);
     UUID fiberProductId2 = seededFiberProductIds.get(1);
-    // The output batch is typed YARN in the domain while its product_id remains one of the seeded
-    // fibre products; the FK constrains the table, not the product type.
-    UUID outputProductId =
-        seededFiberProductIds.size() > 2 ? seededFiberProductIds.get(2) : fiberProductId1;
+    // The work order serves the sales line, so it must produce the line's current product (SOI
+    // D8 hold guard). The output batch stays typed YARN in the domain; the FK constrains the
+    // table, not the product type.
+    UUID outputProductId = wsFabric.getId();
 
     Batch rawBatch1 =
         Batch.create(

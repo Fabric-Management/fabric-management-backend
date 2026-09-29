@@ -140,15 +140,23 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
   }
 
   @Test
-  void freeTextGovernedLineIsUnresolvedWithoutAnEarlyProductionTask() throws Exception {
+  void unregisteredProductGovernedLineIsUnresolvedWithoutAnEarlyProductionTask() throws Exception {
     var cover = governed(1);
     awaitDelivery(storedEvent(SalesOrderConfirmedEvent.class, cover.orderId()));
+    // A line always names a product (SOI K02); the fixture's product is not registered, so the
+    // cover evidence stays unknown exactly like the former description-only line.
+    UUID productId =
+        jdbc.queryForObject(
+            "select product_id from sales_ord.sales_order_line where id=?",
+            UUID.class,
+            cover.lineIds().getFirst());
+    assertThat(productId).isNotNull();
     assertThat(
             jdbc.queryForObject(
-                "select product_id from sales_ord.sales_order_line where id=?",
-                UUID.class,
-                cover.lineIds().getFirst()))
-        .isNull();
+                "select count(*) from production.prod_product where id=?",
+                Integer.class,
+                productId))
+        .isZero();
     assertThat(
             jdbc.queryForList(
                 "select sales_order_line_id from sales_ord.order_cover_case_line where case_id=?"

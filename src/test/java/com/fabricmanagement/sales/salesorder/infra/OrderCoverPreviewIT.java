@@ -156,10 +156,12 @@ class OrderCoverPreviewIT extends OrderCoverIntegrationSupport {
                     .getId());
     tx(
         () -> {
-          for (UUID lineId : cover.lineIds()) {
-            var line = lines.findById(lineId).orElseThrow();
+          for (int index = 0; index < cover.lineIds().size(); index++) {
+            var line = lines.findById(cover.lineIds().get(index)).orElseThrow();
             line.setProductId(productId);
             line.setRequestedQty(new BigDecimal("80"));
+            // One active distribution per product and delivery date (SOI TK-2).
+            line.setRequestedDeliveryDate(java.time.LocalDate.now().plusDays(index + 1L));
             lines.save(line);
           }
           lines.flush();
