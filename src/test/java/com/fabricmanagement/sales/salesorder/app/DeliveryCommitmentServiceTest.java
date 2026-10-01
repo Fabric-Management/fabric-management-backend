@@ -72,7 +72,7 @@ class DeliveryCommitmentServiceTest {
             .requestedDeliveryDate(LocalDate.of(2026, 10, 20))
             .build();
     ReflectionTestUtils.setField(order, "id", orderId);
-    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Uşak", null));
+    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Bradford", null));
     when(orders.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
     when(orders.lockByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
     when(accessPolicy.canRead(tenantId, actor, order)).thenReturn(true);
@@ -108,7 +108,7 @@ class DeliveryCommitmentServiceTest {
         on,
         origin,
         reason,
-        "Ayşe Demir",
+        "Jane Smith",
         CommitmentChannel.EMAIL,
         AGREED,
         null,
@@ -125,7 +125,7 @@ class DeliveryCommitmentServiceTest {
     assertThat(history.current()).isEqualTo(history.initial());
     assertThat(history.current().origin()).isEqualTo(CommitmentChangeOrigin.INITIAL);
     assertThat(history.current().deliveryEvent()).isEqualTo(DeliveryEvent.HANDED_TO_CARRIER);
-    assertThat(history.current().deliveryPlace()).isEqualTo("Mill gate, Uşak");
+    assertThat(history.current().deliveryPlace()).isEqualTo("Mill gate, Bradford");
     assertThat(history.shiftFromInitialDays()).isZero();
   }
 
@@ -219,7 +219,7 @@ class DeliveryCommitmentServiceTest {
                 LocalDate.of(2026, 10, 23),
                 CommitmentChangeOrigin.BUYER_REQUEST,
                 "Buyer asked us to deliver",
-                "Ayşe Demir",
+                "Jane Smith",
                 CommitmentChannel.PHONE,
                 AGREED,
                 DeliveryTerm.DAP,
@@ -262,11 +262,12 @@ class DeliveryCommitmentServiceTest {
 
     service.record(orderId, input(null, LocalDate.of(2026, 10, 21), null, null), actor);
 
-    service.assertTermsEditable(order, DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Uşak", null));
+    service.assertTermsEditable(
+        order, DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Bradford", null));
     assertThatThrownBy(
             () ->
                 service.assertTermsEditable(
-                    order, DeliveryTerms.of(DeliveryTerm.EXW, "Mill gate, Uşak", null)))
+                    order, DeliveryTerms.of(DeliveryTerm.EXW, "Mill gate, Bradford", null)))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("new commitment");
   }

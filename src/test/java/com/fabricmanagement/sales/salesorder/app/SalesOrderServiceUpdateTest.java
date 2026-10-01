@@ -143,14 +143,16 @@ class SalesOrderServiceUpdateTest {
     when(orderRepository.save(any())).thenReturn(draftOrder);
     UpdateSalesOrderRequest request = updateRequest(new ArrayList<>());
     request.setDeliveryTerm(com.fabricmanagement.sales.salesorder.domain.DeliveryTerm.FCA);
-    request.setDeliveryPlace(" Mill gate, Uşak ");
+    request.setDeliveryPlace(" Mill gate, Bradford ");
     request.setRequestedDeliveryDate(java.time.LocalDate.of(2026, 10, 20));
 
     salesOrderService.updateOrder(orderId, currentUserId, request);
 
     var expected =
         com.fabricmanagement.sales.salesorder.domain.DeliveryTerms.of(
-            com.fabricmanagement.sales.salesorder.domain.DeliveryTerm.FCA, "Mill gate, Uşak", null);
+            com.fabricmanagement.sales.salesorder.domain.DeliveryTerm.FCA,
+            "Mill gate, Bradford",
+            null);
     verify(deliveryCommitments).assertTermsEditable(draftOrder, expected);
     assertThat(draftOrder.getDeliveryTerms()).isEqualTo(expected);
     assertThat(draftOrder.getDeliveryEvent())

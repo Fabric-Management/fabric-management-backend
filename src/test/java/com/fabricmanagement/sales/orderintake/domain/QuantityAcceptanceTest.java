@@ -20,11 +20,11 @@ class QuantityAcceptanceTest {
   void customerAcceptanceNeedsContactChannelTime() {
     QuantityAcceptance.CustomerEvidence phone =
         new QuantityAcceptance.CustomerEvidence(
-            "Ayşe (buyer)", AcceptanceChannel.PHONE, NOW, null, null, true);
+            "Jane (buyer)", AcceptanceChannel.PHONE, NOW, null, null, true);
     QuantityAcceptance accepted =
         record(option(QuantityOption.OptionKind.ABOVE, false), phone, null);
     assertThat(accepted.getChannel()).isEqualTo(AcceptanceChannel.PHONE);
-    assertThat(accepted.getCustomerContact()).isEqualTo("Ayşe (buyer)");
+    assertThat(accepted.getCustomerContact()).isEqualTo("Jane (buyer)");
     assertThat(accepted.getEvidenceAttachmentId()).isNull();
 
     QuantityAcceptance.CustomerEvidence noContact =
@@ -35,7 +35,7 @@ class QuantityAcceptanceTest {
         .isInstanceOf(IllegalArgumentException.class);
     QuantityAcceptance.CustomerEvidence noStatement =
         new QuantityAcceptance.CustomerEvidence(
-            "Ayşe", AcceptanceChannel.PHONE, NOW, null, null, false);
+            "Jane", AcceptanceChannel.PHONE, NOW, null, null, false);
     assertThatThrownBy(
             () -> record(option(QuantityOption.OptionKind.ABOVE, false), noStatement, null))
         .isInstanceOf(IllegalArgumentException.class);

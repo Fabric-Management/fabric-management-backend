@@ -26,13 +26,13 @@ class SalesOrderTest {
             "REF-123",
             LocalDate.of(2023, 10, 1),
             LocalDate.of(2023, 10, 15),
-            DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Uşak", null),
+            DeliveryTerms.of(DeliveryTerm.FCA, "Mill gate, Bradford", null),
             DeliveryTermStatus.AGREED_BY_CONTRACT,
             "Frame contract 2026/14",
             "60 days from invoice",
             AgreementContext.OTHER,
-            "Agent's office in Istanbul",
-            "Ayşe Demir",
+            "Agent's office in Manchester",
+            "Jane Smith",
             "ayse@buyer.example",
             "+905551112233",
             true,
@@ -52,14 +52,14 @@ class SalesOrderTest {
     assertThat(order.getDeliveryTermStatus()).isEqualTo(DeliveryTermStatus.AGREED_BY_CONTRACT);
     assertThat(order.getDeliveryContractReference()).isEqualTo("Frame contract 2026/14");
     assertThat(order.getDeliveryTerm()).isEqualTo(DeliveryTerm.FCA);
-    assertThat(order.getDeliveryPlace()).isEqualTo("Mill gate, Uşak");
+    assertThat(order.getDeliveryPlace()).isEqualTo("Mill gate, Bradford");
     assertThat(order.getIncotermsVersion()).isEqualTo(IncotermsVersion.INCOTERMS_2020);
     assertThat(order.getDeliveryEvent()).isEqualTo(DeliveryEvent.HANDED_TO_CARRIER);
     assertThat(order.getCommittedOn()).isNull();
     assertThat(order.getPaymentTerms()).isEqualTo("60 days from invoice");
     assertThat(order.getAgreementContext()).isEqualTo(AgreementContext.OTHER);
-    assertThat(order.getAgreementContextNote()).isEqualTo("Agent's office in Istanbul");
-    assertThat(order.getContactName()).isEqualTo("Ayşe Demir");
+    assertThat(order.getAgreementContextNote()).isEqualTo("Agent's office in Manchester");
+    assertThat(order.getContactName()).isEqualTo("Jane Smith");
     assertThat(order.getContactEmail()).isEqualTo("ayse@buyer.example");
     assertThat(order.getContactPhone()).isEqualTo("+905551112233");
     assertThat(order.isContactWhatsapp()).isTrue();
@@ -347,7 +347,7 @@ class SalesOrderTest {
   @Test
   void aDeliveryTermIsAProposalUntilTheCustomerApprovesOrAContractFixedIt() {
     SalesOrder order = SalesOrder.builder().orderNumber("SO-1").build();
-    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Bursa mill", null));
+    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Bradford mill", null));
 
     order.applyDeliveryTermStatus(null, null);
     assertThat(order.getDeliveryTermStatus()).isEqualTo(DeliveryTermStatus.PROPOSED);

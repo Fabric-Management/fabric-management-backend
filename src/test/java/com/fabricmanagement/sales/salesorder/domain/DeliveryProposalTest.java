@@ -15,7 +15,8 @@ class DeliveryProposalTest {
   private static final UUID PLANNER = UUID.randomUUID();
   private static final Instant NOW = Instant.parse("2026-10-01T12:00:00Z");
   private static final LocalDate TODAY = LocalDate.of(2026, 10, 1);
-  private static final DeliveryTerms FCA = DeliveryTerms.of(DeliveryTerm.FCA, "Bursa mill", null);
+  private static final DeliveryTerms FCA =
+      DeliveryTerms.of(DeliveryTerm.FCA, "Bradford mill", null);
 
   private static DeliveryProposal propose(DeliveryTerms terms, LocalDate on, Instant until) {
     return DeliveryProposal.propose(ORDER, null, 1, 0, on, until, terms, null, PLANNER, NOW, TODAY);
@@ -30,7 +31,7 @@ class DeliveryProposalTest {
     assertThat(proposal.getDeliveryEvent()).isEqualTo(DeliveryEvent.HANDED_TO_CARRIER);
     assertThat(proposal.appliesTo(FCA)).isTrue();
     // A changed place changes what the date means: the proposal no longer applies.
-    assertThat(proposal.appliesTo(DeliveryTerms.of(DeliveryTerm.FCA, "Istanbul port", null)))
+    assertThat(proposal.appliesTo(DeliveryTerms.of(DeliveryTerm.FCA, "Felixstowe port", null)))
         .isFalse();
     assertThat(proposal.isExpiredAt(NOW)).isFalse();
     assertThat(proposal.isExpiredAt(NOW.plusSeconds(48 * 3600))).isTrue();

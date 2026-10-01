@@ -20,7 +20,7 @@ class DeliveryCommitmentTest {
   private static DeliveryCommitment.Agreement agreement(
       LocalDate on, DeliveryTerms terms, CommitmentChangeOrigin origin, String reason) {
     return new DeliveryCommitment.Agreement(
-        on, terms, origin, reason, "Ayşe Demir", CommitmentChannel.EMAIL, NOW.minusSeconds(60));
+        on, terms, origin, reason, "Jane Smith", CommitmentChannel.EMAIL, NOW.minusSeconds(60));
   }
 
   private static DeliveryCommitment initial() {
@@ -165,7 +165,7 @@ class DeliveryCommitmentTest {
                         FCA,
                         null,
                         null,
-                        "Ayşe Demir",
+                        "Jane Smith",
                         CommitmentChannel.PHONE,
                         NOW.plusSeconds(3600)),
                     ACTOR,

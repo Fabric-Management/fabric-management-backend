@@ -433,7 +433,7 @@ class QuantityAcceptanceServiceTest {
         option.optionKey(),
         false,
         remaining,
-        "Ayşe (buyer)",
+        "Jane (buyer)",
         AcceptanceChannel.PHONE,
         NOW,
         null,

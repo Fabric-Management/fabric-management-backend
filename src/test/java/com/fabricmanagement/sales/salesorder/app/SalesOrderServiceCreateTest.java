@@ -166,7 +166,7 @@ class SalesOrderServiceCreateTest {
     CreateSalesOrderRequest request = baseRequest();
     request.setAgreementContext(
         com.fabricmanagement.sales.salesorder.domain.AgreementContext.WE_VISITED_CUSTOMER);
-    request.setContactName(" Ayşe Demir ");
+    request.setContactName(" Jane Smith ");
     request.setContactPhone("+905551112233");
     request.setContactWhatsapp(true);
     SalesOrderLineRequest standard = lineRequest(new BigDecimal("500"), BigDecimal.TEN, "USD");
@@ -190,7 +190,7 @@ class SalesOrderServiceCreateTest {
     assertThat(created.getAgreementContext())
         .isEqualTo(
             com.fabricmanagement.sales.salesorder.domain.AgreementContext.WE_VISITED_CUSTOMER);
-    assertThat(created.getContactName()).isEqualTo("Ayşe Demir");
+    assertThat(created.getContactName()).isEqualTo("Jane Smith");
     assertThat(created.getContactPhone()).isEqualTo("+905551112233");
     assertThat(created.isContactWhatsapp()).isTrue();
   }
@@ -198,13 +198,13 @@ class SalesOrderServiceCreateTest {
   @Test
   void createOrder_whatsappNeedsAPhoneNumber() {
     CreateSalesOrderRequest request = baseRequest();
-    request.setContactName("Ayşe Demir");
+    request.setContactName("Jane Smith");
     request.setContactWhatsapp(true);
     stubSuccessfulCreate();
 
     SalesOrderDto created = salesOrderService.createOrder(request);
 
-    assertThat(created.getContactName()).isEqualTo("Ayşe Demir");
+    assertThat(created.getContactName()).isEqualTo("Jane Smith");
     assertThat(created.isContactWhatsapp()).isFalse();
   }
 

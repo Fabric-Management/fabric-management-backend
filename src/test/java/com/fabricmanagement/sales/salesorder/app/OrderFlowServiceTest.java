@@ -84,7 +84,7 @@ class OrderFlowServiceTest {
             .build();
     ReflectionTestUtils.setField(order, "id", orderId);
     work.order(order);
-    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Bursa mill", null));
+    order.applyDeliveryTerms(DeliveryTerms.of(DeliveryTerm.FCA, "Bradford mill", null));
     order.applyDeliveryTermStatus(null, null);
     when(orders.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
     when(orders.lockByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));

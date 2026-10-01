@@ -36,12 +36,12 @@ class DeliveryTermsTest {
 
   @Test
   void aTermNeedsItsPlaceAndDefaultsToTheCurrentEdition() {
-    DeliveryTerms terms = DeliveryTerms.of(DeliveryTerm.FCA, "  Mill gate, Uşak ", null);
+    DeliveryTerms terms = DeliveryTerms.of(DeliveryTerm.FCA, "  Mill gate, Bradford ", null);
 
     assertThat(terms)
         .isEqualTo(
             new DeliveryTerms(
-                DeliveryTerm.FCA, "Mill gate, Uşak", IncotermsVersion.INCOTERMS_2020));
+                DeliveryTerm.FCA, "Mill gate, Bradford", IncotermsVersion.INCOTERMS_2020));
     assertThat(terms.event()).isEqualTo(DeliveryEvent.HANDED_TO_CARRIER);
     assertThatThrownBy(() -> DeliveryTerms.of(DeliveryTerm.EXW, " ", null))
         .isInstanceOf(OrderDomainException.class)
