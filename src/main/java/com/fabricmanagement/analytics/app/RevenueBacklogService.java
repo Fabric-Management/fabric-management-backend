@@ -7,6 +7,7 @@ import com.fabricmanagement.analytics.dto.RevenueTrendBucketDto;
 import com.fabricmanagement.analytics.dto.RevenueTrendCustomerDto;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.finance.common.app.port.AnalyticsFinancePort;
@@ -95,35 +96,36 @@ public class RevenueBacklogService {
       if (!EXCLUDED_BACKLOG_STATUSES.contains(order.status())) {
         allPartnerIds.add(order.tradingPartnerId());
 
-        BigDecimal convertedValue;
-        try {
-          convertedValue =
-              exchangeRateService
-                  .convert(
-                      tenantId,
-                      order.netRevenue().getAmount(),
-                      order.netRevenue().getCurrency().getCurrencyCode(),
-                      reportingCurrency,
-                      today)
-                  .getConvertedAmount();
-        } catch (ExchangeRateRequiredException ex) {
-          convertedValue = order.netRevenue().getAmount(); // Degrade
-          warnings.add(
-              new RevenueBacklogWarningDto(
-                  "MISSING_EXCHANGE_RATE",
-                  order.orderId().toString(),
-                  "Missing exchange rate for order backlog conversion: "
-                      + order.netRevenue().getCurrency().getCurrencyCode()
-                      + " to "
-                      + reportingCurrency
-                      + " \u2014 using raw "
-                      + order.netRevenue().getCurrency().getCurrencyCode()
-                      + " amount as fallback"));
+        // Each agreed currency is converted on its own; a missing rate degrades that part only.
+        // The converted parts are summed first so a mixed-currency order still counts once.
+        BigDecimal orderValue = BigDecimal.ZERO;
+        for (Money net : order.netRevenues()) {
+          String currency = net.getCurrency().getCurrencyCode();
+          BigDecimal convertedValue;
+          try {
+            convertedValue =
+                exchangeRateService
+                    .convert(tenantId, net.getAmount(), currency, reportingCurrency, today)
+                    .getConvertedAmount();
+          } catch (ExchangeRateRequiredException ex) {
+            convertedValue = net.getAmount(); // Degrade
+            warnings.add(
+                new RevenueBacklogWarningDto(
+                    "MISSING_EXCHANGE_RATE",
+                    order.orderId().toString(),
+                    "Missing exchange rate for order backlog conversion: "
+                        + currency
+                        + " to "
+                        + reportingCurrency
+                        + " \u2014 using raw "
+                        + currency
+                        + " amount as fallback"));
+          }
+          orderValue = orderValue.add(convertedValue);
         }
-
         backlogAggregators
             .computeIfAbsent(order.tradingPartnerId(), k -> new BacklogAggregator())
-            .add(convertedValue);
+            .add(orderValue);
       }
     }
 

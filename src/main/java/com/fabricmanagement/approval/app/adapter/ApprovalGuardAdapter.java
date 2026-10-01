@@ -30,4 +30,15 @@ public class ApprovalGuardAdapter implements ApprovalPort {
     return approvalGuardService.checkAndEnforceApproval(
         tenantId, userId, type, entityId, amount, currency);
   }
+
+  @Override
+  public boolean requiresApproval(
+      UUID tenantId,
+      UUID userId,
+      String entityType,
+      UUID entityId,
+      java.util.List<com.fabricmanagement.common.util.Money> amounts) {
+    ApprovalEntityType type = ApprovalEntityType.valueOf(entityType);
+    return approvalGuardService.checkAndEnforceApproval(tenantId, userId, type, entityId, amounts);
+  }
 }

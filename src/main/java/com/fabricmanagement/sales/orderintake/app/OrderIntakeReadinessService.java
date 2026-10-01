@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OrderIntakeReadinessService {
 
+  static final String ORDER_WITH_PLANNING = "ORDER_WITH_PLANNING";
+
   private final OrderIntakeAccess access;
   private final SalesOrderLineRepository lines;
   private final QuantityAcceptanceRepository acceptances;
@@ -92,7 +94,11 @@ public class OrderIntakeReadinessService {
             .toList();
     boolean canWrite = access.canWrite(order, actor);
     List<OrderIntakeReadinessDto.Capability> capabilities =
-        capabilities(draft, canWrite, blocks.isEmpty() && !orderLines.isEmpty());
+        capabilities(
+            draft,
+            order.getFlowStage().locksCommercialContent(),
+            canWrite,
+            blocks.isEmpty() && !orderLines.isEmpty());
     boolean confirmable =
         capabilities.stream()
             .anyMatch(
@@ -109,30 +115,37 @@ public class OrderIntakeReadinessService {
         clock.instant());
   }
 
+  /**
+   * Content actions change what planning evaluated, so they close while the order is with planning
+   * (ORDER_WITH_PLANNING); sales must withdraw it to draft first. Evaluation inputs, attachments,
+   * readiness and hold requests stay open: they inform planning rather than change the order.
+   */
   private List<OrderIntakeReadinessDto.Capability> capabilities(
-      boolean draft, boolean canWrite, boolean nothingBlocks) {
+      boolean draft, boolean contentLocked, boolean canWrite, boolean nothingBlocks) {
     List<OrderIntakeReadinessDto.Capability> result = new ArrayList<>();
-    result.add(draftWrite(OrderIntakeAction.EVALUATE_QUANTITY, draft, canWrite));
-    result.add(draftWrite(OrderIntakeAction.RECORD_STOCK_CHOICE, draft, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_TONE_ACCEPTANCE, canWrite));
-    result.add(draftWrite(OrderIntakeAction.RECORD_AGREED_TOLERANCE, draft, canWrite));
-    result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, canWrite));
-    result.add(draftWrite(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, draft, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, canWrite));
-    result.add(anyWrite(OrderIntakeAction.UPLOAD_ATTACHMENT, canWrite));
-    result.add(anyWrite(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, canWrite));
-    result.add(anyWrite(OrderIntakeAction.CORRECT_PRODUCT, canWrite));
-    result.add(anyWrite(OrderIntakeAction.REQUEST_HOLD, canWrite));
+    result.add(draftWrite(OrderIntakeAction.EVALUATE_QUANTITY, draft, false, canWrite));
+    result.add(draftWrite(OrderIntakeAction.RECORD_STOCK_CHOICE, draft, contentLocked, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_TONE_ACCEPTANCE, contentLocked, canWrite));
+    result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, contentLocked, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, contentLocked, canWrite));
+    result.add(
+        draftWrite(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, draft, contentLocked, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, contentLocked, canWrite));
+    result.add(anyWrite(OrderIntakeAction.UPLOAD_ATTACHMENT, false, canWrite));
+    result.add(anyWrite(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, false, canWrite));
+    result.add(anyWrite(OrderIntakeAction.CORRECT_PRODUCT, contentLocked, canWrite));
+    result.add(anyWrite(OrderIntakeAction.REQUEST_HOLD, false, canWrite));
     List<PermissionKey> confirmKeys = List.of(PermissionKey.SALES_CONFIRM);
     String confirmReason =
         !draft
             ? "ORDER_NOT_DRAFT"
-            : !canWrite
-                ? "NO_OBJECT_ACCESS"
-                : !permissions.has(PermissionKey.SALES_CONFIRM)
-                    ? "PERMISSION_DENIED"
-                    : !nothingBlocks ? "BLOCKED" : null;
+            : contentLocked
+                ? ORDER_WITH_PLANNING
+                : !canWrite
+                    ? "NO_OBJECT_ACCESS"
+                    : !permissions.has(PermissionKey.SALES_CONFIRM)
+                        ? "PERMISSION_DENIED"
+                        : !nothingBlocks ? "BLOCKED" : null;
     result.add(
         new OrderIntakeReadinessDto.Capability(
             OrderIntakeAction.CONFIRM_ORDER, confirmReason == null, confirmReason, confirmKeys));
@@ -140,24 +153,27 @@ public class OrderIntakeReadinessService {
   }
 
   private OrderIntakeReadinessDto.Capability draftWrite(
-      OrderIntakeAction action, boolean draft, boolean canWrite) {
-    String reason =
-        !draft
-            ? "ORDER_NOT_DRAFT"
-            : !canWrite
-                ? "NO_OBJECT_ACCESS"
-                : !permissions.has(PermissionKey.SALES_WRITE) ? "PERMISSION_DENIED" : null;
+      OrderIntakeAction action, boolean draft, boolean contentLocked, boolean canWrite) {
+    String reason = !draft ? "ORDER_NOT_DRAFT" : writeReason(contentLocked, canWrite);
     return new OrderIntakeReadinessDto.Capability(
         action, reason == null, reason, List.of(PermissionKey.SALES_WRITE));
   }
 
-  private OrderIntakeReadinessDto.Capability anyWrite(OrderIntakeAction action, boolean canWrite) {
-    String reason =
-        !canWrite
-            ? "NO_OBJECT_ACCESS"
-            : !permissions.has(PermissionKey.SALES_WRITE) ? "PERMISSION_DENIED" : null;
+  private OrderIntakeReadinessDto.Capability anyWrite(
+      OrderIntakeAction action, boolean contentLocked, boolean canWrite) {
+    String reason = writeReason(contentLocked, canWrite);
     return new OrderIntakeReadinessDto.Capability(
         action, reason == null, reason, List.of(PermissionKey.SALES_WRITE));
+  }
+
+  private String writeReason(boolean contentLocked, boolean canWrite) {
+    if (contentLocked) {
+      return ORDER_WITH_PLANNING;
+    }
+    if (!canWrite) {
+      return "NO_OBJECT_ACCESS";
+    }
+    return permissions.has(PermissionKey.SALES_WRITE) ? null : "PERMISSION_DENIED";
   }
 
   private static OrderIntakeReadinessDto.Block toDto(ConfirmationGate.Block block) {

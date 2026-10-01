@@ -13,6 +13,7 @@ import com.fabricmanagement.production.core.batch.infra.repository.BatchFinished
 import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.core.batch.infra.repository.LotCompatibilityConfirmationRepository;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
 import com.fabricmanagement.production.core.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnitAllocation;
@@ -26,6 +27,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -119,6 +122,128 @@ public class ProposalStockQueryService {
             .flatMap(Optional::stream)
             .toList();
     return new ProposalStock(lots, compatibleGroups(query, lots));
+  }
+
+  /**
+   * All-colour overview for a bounded catalogue search. Uses the same piece eligibility rules as
+   * order proposals, but loads lots and their evidence in batches. This is advisory: neither a
+   * colour nor a finished width has been chosen yet and nothing is reserved.
+   */
+  public Map<UUID, OfferableStockSummary> offerableSummaries(
+      UUID tenantId, Collection<UUID> productIds) {
+    if (productIds.isEmpty()) {
+      return Map.of();
+    }
+    List<Batch> batches =
+        batchRepository
+            .findByTenantIdAndProductIdInAndIsActiveTrueOrderById(tenantId, productIds)
+            .stream()
+            .filter(batch -> SALEABLE_LOT_STATUSES.contains(batch.getStatus()))
+            .toList();
+    if (batches.isEmpty()) {
+      return Map.of();
+    }
+
+    List<UUID> batchIds = batches.stream().map(Batch::getId).toList();
+    Map<UUID, List<StockUnit>> unitsByBatch =
+        stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(tenantId, batchIds).stream()
+            .collect(Collectors.groupingBy(StockUnit::getBatchId));
+    List<UUID> unitIds =
+        unitsByBatch.values().stream().flatMap(Collection::stream).map(StockUnit::getId).toList();
+    Map<UUID, StockUnitCut> latestCut = latestCuts(tenantId, unitIds);
+    Set<UUID> reservedLots = lotsWithAnonymousReservation(tenantId, batchIds);
+    Set<UUID> gradeIds =
+        unitsByBatch.values().stream()
+            .flatMap(Collection::stream)
+            .map(StockUnit::getQualityGradeId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<UUID, QualityGradeQueryService.QualityGradeReference> grades =
+        gradeIds.isEmpty()
+            ? Map.of()
+            : gradeQueryService.findReferencesByIds(gradeIds).stream()
+                .collect(
+                    Collectors.toMap(
+                        QualityGradeQueryService.QualityGradeReference::id, Function.identity()));
+
+    Map<UUID, MutableOfferableStock> totals = new HashMap<>();
+    for (Batch batch : batches) {
+      Optional<BatchPrimaryMeasureService.Resolution> resolution =
+          measureService.findResolution(batch.getProductType());
+      if (resolution.isEmpty()) {
+        continue;
+      }
+      MutableOfferableStock total =
+          totals.computeIfAbsent(batch.getProductId(), ignored -> new MutableOfferableStock());
+      for (StockUnit unit : unitsByBatch.getOrDefault(batch.getId(), List.of())) {
+        if (unit.getStatus() == StockUnitStatus.DEPLETED
+            || unit.getStatus() == StockUnitStatus.DISPOSED) {
+          continue;
+        }
+        StockUnitCut cut = latestCut.get(unit.getId());
+        ProposalPiece piece =
+            toPiece(
+                unit,
+                resolution.get().primaryMeasure(),
+                WidthEvidence.NOT_REQUIRED,
+                cut,
+                grades,
+                reservedLots.contains(batch.getId()));
+        if (piece.state() == PieceState.UNKNOWN) {
+          total.unknownPieces++;
+        } else if (piece.state() == PieceState.ELIGIBLE) {
+          total.packages.merge(unit.getPackageType(), 1L, Long::sum);
+          total.availablePieces++;
+          Optional<BigDecimal> kg =
+              measureService.toCanonical(
+                  unit.getCurrentWeight(), unit.getUnit(), PrimaryMeasure.WEIGHT);
+          Optional<BigDecimal> metres =
+              measureService.toCanonical(
+                  unit.getLength(), unit.getLengthUnit(), PrimaryMeasure.LENGTH);
+          // A length cut updates the remaining length but does not reweigh the piece.
+          if (kg.isPresent() && cut == null) {
+            total.kilograms = total.kilograms.add(kg.get());
+          } else {
+            total.kilogramsIncomplete = true;
+          }
+          if (metres.isPresent()) {
+            total.metres = total.metres.add(metres.get());
+          } else {
+            total.metresIncomplete = true;
+          }
+        }
+      }
+    }
+    return totals.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().toSummary()));
+  }
+
+  public record OfferableStockSummary(
+      Map<PackageType, Long> packages,
+      BigDecimal kilograms,
+      BigDecimal metres,
+      long unknownPieces) {
+    public static OfferableStockSummary empty() {
+      return new OfferableStockSummary(Map.of(), null, null, 0);
+    }
+  }
+
+  private static final class MutableOfferableStock {
+    private final Map<PackageType, Long> packages = new EnumMap<>(PackageType.class);
+    private BigDecimal kilograms = BigDecimal.ZERO;
+    private BigDecimal metres = BigDecimal.ZERO;
+    private boolean kilogramsIncomplete;
+    private boolean metresIncomplete;
+    private long availablePieces;
+    private long unknownPieces;
+
+    private OfferableStockSummary toSummary() {
+      return new OfferableStockSummary(
+          Map.copyOf(packages),
+          availablePieces == 0 || kilogramsIncomplete ? null : kilograms,
+          availablePieces == 0 || metresIncomplete ? null : metres,
+          unknownPieces);
+    }
   }
 
   /** The canonical dimension a product type is measured in (fabric: length, fibre/yarn: weight). */

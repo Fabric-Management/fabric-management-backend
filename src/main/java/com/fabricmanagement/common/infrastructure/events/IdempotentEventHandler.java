@@ -29,7 +29,13 @@ public class IdempotentEventHandler {
    * @param methodName handler metot adı
    * @param handler yan-etki üreten iş mantığı
    */
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  // REQUIRED, not REQUIRES_NEW: every @ApplicationModuleListener already runs in its own
+  // REQUIRES_NEW transaction, so a second one here made each async listener hold TWO pooled
+  // connections — under an event burst (hundreds of stock-unit events from one seed) the pool
+  // deadlocked: every thread held its first connection while waiting 30 s for a second. Joining
+  // the listener's transaction keeps the processed-marker and the side effects atomic (a failing
+  // handler rolls both back, so the retry/republish path still sees the event as unprocessed).
+  @Transactional(propagation = Propagation.REQUIRED)
   public void executeOnce(
       UUID eventId, Class<?> listenerClass, String methodName, Runnable handler) {
     String listenerId = ClassUtils.getUserClass(listenerClass).getSimpleName() + "#" + methodName;

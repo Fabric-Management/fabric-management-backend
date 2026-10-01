@@ -7,7 +7,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.orderintake.domain.AcceptanceTerms;
 import com.fabricmanagement.sales.orderintake.domain.CustomerProductRequest;
 import com.fabricmanagement.sales.orderintake.domain.CustomerRequestDecisionOutcome;
@@ -36,12 +35,7 @@ class CustomRequestGateTest {
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT);
-    order =
-        SalesOrder.builder()
-            .totals(OrderTotals.zero("EUR"))
-            .tradingPartnerId(UUID.randomUUID())
-            .orderNumber("SO-9")
-            .build();
+    order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-9").build();
     order.setId(UUID.randomUUID());
     line =
         SalesOrderLine.builder()

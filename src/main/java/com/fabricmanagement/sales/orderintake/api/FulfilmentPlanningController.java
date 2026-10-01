@@ -88,7 +88,8 @@ public class FulfilmentPlanningController {
       summary = "Open readiness questions for production portions")
   public ResponseEntity<ApiResponse<List<FulfilmentDtos.ReadinessRequestView>>>
       listProductionReadinessRequests() {
-    return ResponseEntity.ok(ApiResponse.success(coverPlanning.openRequests(false)));
+    return ResponseEntity.ok(
+        ApiResponse.success(coverPlanning.openRequests(false, OrderIntakeActor.current())));
   }
 
   @GetMapping("/readiness-requests/warehouse")
@@ -98,7 +99,18 @@ public class FulfilmentPlanningController {
       summary = "Open ship-readiness questions for held stock")
   public ResponseEntity<ApiResponse<List<FulfilmentDtos.ReadinessRequestView>>>
       listWarehouseReadinessRequests() {
-    return ResponseEntity.ok(ApiResponse.success(coverPlanning.openRequests(true)));
+    return ResponseEntity.ok(
+        ApiResponse.success(coverPlanning.openRequests(true, OrderIntakeActor.current())));
+  }
+
+  @GetMapping("/arrival-work")
+  @PreAuthorize("@auth.can(authentication, 'logistics', 'read')")
+  @Operation(
+      operationId = "listArrivalWork",
+      summary = "Orders in fulfilment whose arrival estimate is in your team's or your scope")
+  public ResponseEntity<ApiResponse<List<FulfilmentDtos.ArrivalWorkItem>>> listArrivalWork() {
+    return ResponseEntity.ok(
+        ApiResponse.success(coverPlanning.arrivalWork(OrderIntakeActor.current())));
   }
 
   @PutMapping("/orders/{orderId}/arrival-estimate")

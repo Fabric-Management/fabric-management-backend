@@ -21,7 +21,6 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
@@ -277,7 +276,14 @@ class SalesOrderMutationScopeIT {
     SalesOrder order = createOrder(Mutation.CONFIRM, colleague);
     clearInvocations(approvalPort, ruleEngine, eventPublisher);
     assertDeniedAndUnchanged(Mutation.CONFIRM, order);
-    verify(approvalPort, never()).requiresApproval(any(), any(), any(), any(), any(), any());
+    verify(approvalPort, never())
+        .requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any());
     verify(ruleEngine, never()).processConfirmedOrder(any());
     verify(eventPublisher, never()).publish(any());
   }
@@ -319,7 +325,13 @@ class SalesOrderMutationScopeIT {
   @ValueSource(booleans = {false, true})
   void demoEntryPreservesBothApprovalBranchesWithoutUserPermissions(boolean approvalRequired) {
     SalesOrder order = createOrder(Mutation.CONFIRM, actor);
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any()))
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
         .thenAnswer(
             invocation -> {
               assertThat((UUID) invocation.getArgument(1)).isEqualTo(actor.id());
@@ -425,7 +437,6 @@ class SalesOrderMutationScopeIT {
             .statusBeforeHold(mutation == Mutation.RESUME ? OrderStatus.CONFIRMED : null)
             .rejectionReason(mutation == Mutation.REVISE ? "Rejected fixture" : null)
             .orderDate(LocalDate.now())
-            .totals(OrderTotals.zero("GBP"))
             .build();
     order = salesOrderRepository.saveAndFlush(order);
     for (int index = 0; index < 2; index++) {

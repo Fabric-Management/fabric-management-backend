@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
@@ -90,7 +89,13 @@ class SalesDemoSeederTest {
     when(orders.findByTenantIdAndId(eq(TENANT_ID), any()))
         .thenAnswer(invocation -> Optional.ofNullable(stored.get(invocation.getArgument(1))));
     when(orders.save(any(SalesOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
-    when(approval.requiresApproval(any(), any(), any(), any(), any(), any()))
+    when(approval.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
         .thenAnswer(
             invocation -> {
               assertThat((UUID) invocation.getArgument(1)).isEqualTo(SystemUser.ID);
@@ -113,7 +118,9 @@ class SalesDemoSeederTest {
                 null,
                 approval,
                 null,
+                mock(com.fabricmanagement.sales.salesorder.app.SalesOrderRevision.class),
                 mock(SalesOrderAccessPolicy.class),
+                mock(com.fabricmanagement.sales.salesorder.app.DeliveryCommitmentService.class),
                 mock(
                     com.fabricmanagement.sales.salesorder.infra.repository
                         .OrderCoverActivationRepository.class),
@@ -128,12 +135,12 @@ class SalesDemoSeederTest {
                   SalesOrder.builder()
                       .tradingPartnerId(request.getPartnerId())
                       .orderNumber("SO-SEED-" + stored.size())
-                      .totals(OrderTotals.zero(request.getCurrency()))
                       .build();
               order.setId(UUID.randomUUID());
               order.setTenantId(TENANT_ID);
               stored.put(order.getId(), order);
-              return SalesOrderDto.from(order);
+              return SalesOrderDto.from(
+                  order, com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotals.EMPTY);
             })
         .when(realConfirmation)
         .createOrder(any());

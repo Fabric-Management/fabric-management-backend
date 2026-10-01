@@ -75,6 +75,7 @@ public class ProductCorrectionService {
           "ORDER_NOT_CORRECTABLE",
           "The product cannot be corrected while the order is " + order.getStatus());
     }
+    order.assertCommercialContentEditable();
     if (Objects.equals(input.fromProductId(), input.toProductId())) {
       throw OrderIntakeException.rule("SAME_PRODUCT", "Choose a different product");
     }

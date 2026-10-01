@@ -38,8 +38,8 @@ public class CustomerRequestEvaluationController {
   @Operation(
       operationId = "listCustomerRequestEvaluationQueue",
       summary = "Custom requests waiting for an evaluation or a new revision")
-  public ResponseEntity<ApiResponse<List<CustomerRequestDtos.RequestDto>>> evaluationQueue() {
-    return ResponseEntity.ok(ApiResponse.success(evaluation.queue()));
+  public ResponseEntity<ApiResponse<List<CustomerRequestDtos.EvaluationItem>>> evaluationQueue() {
+    return ResponseEntity.ok(ApiResponse.success(evaluation.queue(OrderIntakeActor.current())));
   }
 
   @GetMapping("/{requestId}")
@@ -49,7 +49,8 @@ public class CustomerRequestEvaluationController {
       summary = "A custom request with its files, evaluations, revisions and decisions")
   public ResponseEntity<ApiResponse<CustomerRequestDtos.RequestDto>> getForEvaluation(
       @PathVariable UUID requestId) {
-    return ResponseEntity.ok(ApiResponse.success(evaluation.get(requestId)));
+    return ResponseEntity.ok(
+        ApiResponse.success(evaluation.get(requestId, OrderIntakeActor.current())));
   }
 
   @GetMapping("/{requestId}/attachments/{attachmentId}/content")
@@ -59,6 +60,7 @@ public class CustomerRequestEvaluationController {
       summary = "Download a file of a custom request")
   public ResponseEntity<byte[]> downloadAttachment(
       @PathVariable UUID requestId, @PathVariable UUID attachmentId) {
+    evaluation.readable(requestId, OrderIntakeActor.current());
     return AttachmentResponses.of(attachments.downloadForRequest(requestId, attachmentId));
   }
 

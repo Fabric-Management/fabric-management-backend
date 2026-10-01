@@ -25,6 +25,8 @@ public class DeliveryPreferenceService {
   public CustomerRequestDtos.DeliveryPreferenceDto record(
       UUID orderId, CustomerRequestDtos.RecordDeliveryPreference input, UUID actor) {
     SalesOrder order = access.writableOrder(orderId, actor);
+    // Whether partial delivery is allowed is part of what planning evaluates.
+    order.assertCommercialContentEditable();
     OrderDeliveryPreference preference =
         repository
             .findByTenantIdAndSalesOrderId(TenantContext.requireTenantId(), order.getId())

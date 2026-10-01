@@ -27,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Component to seed a deterministic, demo-ready transactional dataset for a tenant. Uses the shared
@@ -48,6 +50,7 @@ public class DemoTransactionSeeder {
   private final SalesDemoSeeder salesDemoSeeder;
   private final ProcurementDemoSeeder procurementDemoSeeder;
   private final SalesQuoteDemoSeeder salesQuoteDemoSeeder;
+  private final PlaygroundSeedScopePort playgroundSeedScope;
 
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
@@ -147,7 +150,6 @@ public class DemoTransactionSeeder {
           orderReq.setPartnerId(customer.getId());
           orderReq.setCustomerReference(DEMO_SO_REFERENCE);
           orderReq.setOrderDate(LocalDate.now());
-          orderReq.setCurrency("USD");
           orderReq.setNotes("Demo Sales Order for initial evaluation");
 
           SalesOrderLineRequest line1 =
@@ -238,17 +240,57 @@ public class DemoTransactionSeeder {
     }
   }
 
+  /**
+   * The colour/stock demo (DEMO-SALES-1) is playground-only: it runs for a tenant that initial
+   * provisioning installed playground fixtures for, and for nothing else (FIBER-CATALOG-1 §9).
+   *
+   * <p>It runs in its own transaction (REQUIRES_NEW) so a failure inside it can never abort the
+   * caller's transaction — but a REQUIRES_NEW transaction cannot see rows the caller has not yet
+   * committed, and the register-first signup calls this from inside its onboarding transaction with
+   * the root organisation, roles and departments still uncommitted. Seeding then failed with "Root
+   * organisation missing" and rolled every colour card back. So when a transaction is active the
+   * run is deferred to just after that transaction commits (same thread, before the caller
+   * returns); without one it runs at once.
+   */
   private void seedSalesQuoteDemo(UUID tenantId) {
-    // Runs in its own transaction (REQUIRES_NEW, same pattern as SalesDemoSeeder): a DB-level
-    // failure inside the seeder aborts only ITS transaction, so catching here keeps signup /
-    // onboarding / reset flows (which call this from within their own transaction) healthy.
-    try {
-      salesQuoteDemoSeeder.seedFor(tenantId);
-    } catch (Exception salesQuoteEx) {
-      log.warn(
-          "Sales quote demo seeding failed for tenant {} - continuing; other demos unaffected.",
-          tenantId,
-          salesQuoteEx);
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              runSalesQuoteDemo(tenantId);
+            }
+          });
+      return;
     }
+    runSalesQuoteDemo(tenantId);
+  }
+
+  /**
+   * Runs with the tenant bound BEFORE any transaction opens: row-level security binds {@code
+   * app.current_tenant} when a transaction acquires its connection, and in the afterCommit path the
+   * caller's tenant context has already been restored. Both the scope check and the seeder's own
+   * REQUIRES_NEW transaction therefore start inside this context, never before it.
+   */
+  private void runSalesQuoteDemo(UUID tenantId) {
+    TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          try {
+            if (!playgroundSeedScope.isInitialPlaygroundProvisioning(tenantId)) {
+              log.info(
+                  "Sales quote demo skipped for tenant {}: not an initial playground provisioning.",
+                  tenantId);
+              return;
+            }
+            salesQuoteDemoSeeder.seedFor(tenantId);
+          } catch (Exception salesQuoteEx) {
+            log.warn(
+                "Sales quote demo seeding failed for tenant {} - continuing; other demos"
+                    + " unaffected.",
+                tenantId,
+                salesQuoteEx);
+          }
+        });
   }
 }

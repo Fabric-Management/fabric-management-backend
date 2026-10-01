@@ -1,8 +1,6 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
@@ -99,6 +97,39 @@ public class SalesOrder extends BaseEntity {
   @Builder.Default
   private OrderStatus status = OrderStatus.DRAFT;
 
+  /**
+   * Where the order stands in sales → planning → customer approval; a separate axis from {@link
+   * #status}. Moved only through {@link #moveFlowTo}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "flow_stage", nullable = false, length = 30)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private OrderFlowStage flowStage = OrderFlowStage.DRAFT;
+
+  /**
+   * Counts the hand-overs to planning. A proposal belongs to the round it was made in; after the
+   * order is taken back and handed over again, an earlier proposal is not reused.
+   */
+  @Column(name = "planning_round", nullable = false)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private int planningRound = 0;
+
+  /**
+   * Counts the evaluations within the order's planning history. Reopening a finished evaluation
+   * starts a new one: a proposal made before the reopening no longer completes planning.
+   */
+  @Column(name = "planning_evaluation", nullable = false)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private int planningEvaluation = 0;
+
+  /** When the order was last handed to planning. */
+  @Column(name = "planning_submitted_at")
+  @Setter(AccessLevel.NONE)
+  private java.time.Instant planningSubmittedAt;
+
   /** Status before ON_HOLD, used to restore on resume. */
   @Enumerated(EnumType.STRING)
   @Column(name = "status_before_hold", length = 30)
@@ -116,40 +147,96 @@ public class SalesOrder extends BaseEntity {
   @Column(name = "order_date", nullable = false)
   private LocalDate orderDate;
 
-  /** Customer's requested delivery date. */
+  /**
+   * The delivery date the customer asked for: their request, kept as told. It never takes the
+   * meaning of the delivery term's event; choosing FCA later does not turn "in my warehouse on the
+   * 20th" into "handed to the carrier on the 20th".
+   */
   @Column(name = "requested_delivery_date")
   private LocalDate requestedDeliveryDate;
 
-  /** Our promised delivery date. */
-  @Column(name = "promised_delivery_date")
-  private LocalDate promisedDeliveryDate;
+  /**
+   * The current agreed committed date for the delivery event. Written only by recording a delivery
+   * commitment, whose append-only history keeps the first promise and every change.
+   */
+  @Column(name = "committed_on")
+  @Setter(AccessLevel.NONE)
+  private LocalDate committedOn;
+
+  // ── Delivery term (Incoterms) ────────────────────────────────────────────
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "delivery_term", length = 3)
+  @Setter(AccessLevel.NONE)
+  private DeliveryTerm deliveryTerm;
+
+  /** The place named with the term; under C-terms this is the destination. */
+  @Column(name = "delivery_place", length = DeliveryTerms.MAX_PLACE_LENGTH)
+  @Setter(AccessLevel.NONE)
+  private String deliveryPlace;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "incoterms_version", length = 20)
+  @Setter(AccessLevel.NONE)
+  private IncotermsVersion incotermsVersion;
+
+  /** Proposed or agreed; null while no term is entered. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "delivery_term_status", length = 30)
+  @Setter(AccessLevel.NONE)
+  private DeliveryTermStatus deliveryTermStatus;
+
+  /** The contract that fixed the term, when {@link DeliveryTermStatus#AGREED_BY_CONTRACT}. */
+  @Column(name = "delivery_contract_reference", length = 200)
+  @Setter(AccessLevel.NONE)
+  private String deliveryContractReference;
 
   /** Actual delivery date. */
   @Column(name = "actual_delivery_date")
   private LocalDate actualDeliveryDate;
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Financial
+  // Commercial terms
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /**
+   * Agreed payment terms. The order carries no currency or amounts of its own: each line keeps its
+   * agreed price and currency, and the order totals are derived per currency from the lines (see
+   * {@link OrderCurrencyTotals}). The currency a payment is actually made in is recorded at
+   * collection, not here.
+   */
+  @Column(name = "payment_terms", length = 200)
+  private String paymentTerms;
+
+  /** Where the conversation that led to the order took place; context, not acceptance. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "agreement_context", length = 30)
   @Setter(AccessLevel.NONE)
-  @Embedded
-  private OrderTotals totals;
+  private AgreementContext agreementContext;
 
-  public void updateTotals(OrderTotals newTotals) {
-    if (newTotals == null) {
-      throw new IllegalArgumentException("OrderTotals cannot be null");
-    }
-    this.totals = newTotals;
-  }
+  /** Description of an {@link AgreementContext#OTHER} context. */
+  @Column(name = "agreement_context_note", length = 500)
+  @Setter(AccessLevel.NONE)
+  private String agreementContextNote;
 
-  /** Helper to get currency code */
-  public String getCurrency() {
-    if (totals == null) {
-      throw new IllegalStateException("SalesOrder totals cannot be null");
-    }
-    return totals.getCurrency();
-  }
+  /**
+   * The customer's contact person for this order, kept as typed or chosen at order entry. It is a
+   * snapshot: a person who is not (yet) in the partner's contact list stays on the order, and the
+   * partner's contacts are never changed by an order.
+   */
+  @Column(name = "contact_name", length = 120)
+  private String contactName;
+
+  @Column(name = "contact_email", length = 254)
+  private String contactEmail;
+
+  @Column(name = "contact_phone", length = 30)
+  private String contactPhone;
+
+  /** Whether the contact's phone may be notified on WhatsApp. */
+  @Column(name = "contact_whatsapp", nullable = false)
+  @Builder.Default
+  private boolean contactWhatsapp = false;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Shipping
@@ -190,61 +277,6 @@ public class SalesOrder extends BaseEntity {
   /** FK → SampleRequest — populated when order originated from a sample request. */
   @Column(name = "sample_request_id")
   private UUID sampleRequestId;
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Customer-agreed quantity tolerance (SOI A03) — optional, never a default
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  @Column(name = "agreed_tolerance_up_pct", precision = 5, scale = 2)
-  @Setter(AccessLevel.NONE)
-  private java.math.BigDecimal agreedToleranceUpPct;
-
-  @Column(name = "agreed_tolerance_down_pct", precision = 5, scale = 2)
-  @Setter(AccessLevel.NONE)
-  private java.math.BigDecimal agreedToleranceDownPct;
-
-  @Column(name = "agreed_tolerance_source", columnDefinition = "TEXT")
-  @Setter(AccessLevel.NONE)
-  private String agreedToleranceSource;
-
-  @Column(name = "agreed_tolerance_recorded_by")
-  @Setter(AccessLevel.NONE)
-  private UUID agreedToleranceRecordedBy;
-
-  @Column(name = "agreed_tolerance_recorded_at")
-  @Setter(AccessLevel.NONE)
-  private java.time.Instant agreedToleranceRecordedAt;
-
-  /**
-   * Records the quantity tolerance agreed with the customer, or clears it when both limits are
-   * null. The source (contract, e-mail, conversation) is mandatory for a recorded limit.
-   */
-  public void recordAgreedTolerance(
-      java.math.BigDecimal upPct,
-      java.math.BigDecimal downPct,
-      String source,
-      UUID actor,
-      java.time.Instant at) {
-    if (upPct == null && downPct == null) {
-      this.agreedToleranceUpPct = null;
-      this.agreedToleranceDownPct = null;
-      this.agreedToleranceSource = null;
-      this.agreedToleranceRecordedBy = null;
-      this.agreedToleranceRecordedAt = null;
-      return;
-    }
-    if ((upPct != null && upPct.signum() < 0) || (downPct != null && downPct.signum() < 0)) {
-      throw new OrderDomainException("An agreed tolerance cannot be negative");
-    }
-    if (source == null || source.isBlank() || actor == null || at == null) {
-      throw new OrderDomainException("An agreed tolerance needs its source, recorder and time");
-    }
-    this.agreedToleranceUpPct = upPct;
-    this.agreedToleranceDownPct = downPct;
-    this.agreedToleranceSource = source.trim();
-    this.agreedToleranceRecordedBy = actor;
-    this.agreedToleranceRecordedAt = at;
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Metadata
@@ -340,6 +372,179 @@ public class SalesOrder extends BaseEntity {
    *
    * @throws OrderDomainException with HTTP 409 if order is not in DRAFT status
    */
+  /** The agreed delivery term, or {@link DeliveryTerms#NONE}. */
+  public DeliveryTerms getDeliveryTerms() {
+    return deliveryTerm == null
+        ? DeliveryTerms.NONE
+        : new DeliveryTerms(deliveryTerm, deliveryPlace, incotermsVersion);
+  }
+
+  /** The event the order's dates refer to, or null while no term is agreed. */
+  public DeliveryEvent getDeliveryEvent() {
+    return deliveryTerm == null ? null : deliveryTerm.event();
+  }
+
+  /** Sets an already validated term ({@link DeliveryTerms#of}). */
+  public void applyDeliveryTerms(DeliveryTerms terms) {
+    DeliveryTerms value = terms == null ? DeliveryTerms.NONE : terms;
+    this.deliveryTerm = value.term();
+    this.deliveryPlace = value.place();
+    this.incotermsVersion = value.version();
+  }
+
+  /**
+   * Sets whether the term is proposed or agreed by contract, as entered. A term without a status is
+   * a proposal; agreement by the customer comes only from the customer's approval ({@link
+   * #markDeliveryTermAgreedByCustomer()}). Without a term there is no status.
+   */
+  public void applyDeliveryTermStatus(DeliveryTermStatus status, String contractReference) {
+    String reference =
+        contractReference == null || contractReference.isBlank() ? null : contractReference.trim();
+    if (deliveryTerm == null) {
+      if (status != null || reference != null) {
+        throw new OrderDomainException("Choose the delivery term before its status");
+      }
+      this.deliveryTermStatus = null;
+      this.deliveryContractReference = null;
+      return;
+    }
+    DeliveryTermStatus value = status == null ? DeliveryTermStatus.PROPOSED : status;
+    if (value == DeliveryTermStatus.AGREED_BY_CUSTOMER) {
+      throw new OrderDomainException(
+          "A term is agreed by the customer only through the customer's approval");
+    }
+    if (value == DeliveryTermStatus.AGREED_BY_CONTRACT && reference == null) {
+      throw new OrderDomainException("Name the contract that fixed the delivery term");
+    }
+    if (value != DeliveryTermStatus.AGREED_BY_CONTRACT && reference != null) {
+      throw new OrderDomainException("A contract reference belongs to a term agreed by contract");
+    }
+    if (reference != null && reference.length() > 200) {
+      throw new OrderDomainException("The contract reference is too long");
+    }
+    this.deliveryTermStatus = value;
+    this.deliveryContractReference = reference;
+  }
+
+  /** The customer approved the sent order version, and with it the delivery term. */
+  public void markDeliveryTermAgreedByCustomer() {
+    if (deliveryTerm == null) {
+      throw new OrderDomainException("There is no delivery term to agree");
+    }
+    if (deliveryTermStatus != DeliveryTermStatus.AGREED_BY_CONTRACT) {
+      this.deliveryTermStatus = DeliveryTermStatus.AGREED_BY_CUSTOMER;
+    }
+  }
+
+  /** Context of the conversation; "other" needs its description, which only "other" carries. */
+  public void applyAgreementContext(AgreementContext context, String note) {
+    String text = note == null || note.isBlank() ? null : note.trim();
+    if (context == AgreementContext.OTHER && text == null) {
+      throw new OrderDomainException("Describe where the order was agreed");
+    }
+    if (context != AgreementContext.OTHER && text != null) {
+      throw new OrderDomainException("A description belongs to the \"other\" choice");
+    }
+    if (text != null && text.length() > 500) {
+      throw new OrderDomainException("The description is too long");
+    }
+    this.agreementContext = context;
+    this.agreementContextNote = text;
+  }
+
+  /** A new hand-over to planning: earlier proposals no longer count. */
+  public void startPlanningRound(java.time.Instant at) {
+    this.planningRound = planningRound + 1;
+    this.planningSubmittedAt = at;
+  }
+
+  /** A reopened evaluation: what planning proposed before has to be proposed or confirmed again. */
+  public void startNewEvaluation() {
+    this.planningEvaluation = planningEvaluation + 1;
+  }
+
+  /**
+   * Closed for any further work: delivered, cancelled, rejected or fully shipped. A closed order
+   * keeps its flow stage for the record, but no work on it is taken, assigned or done.
+   */
+  public boolean isClosedForWork() {
+    return status.isTerminal() || status == OrderStatus.SHIPPED;
+  }
+
+  /**
+   * Rejects a change to what planning evaluated while the order is with planning or the customer
+   * (see {@link OrderFlowStage#locksCommercialContent()}).
+   */
+  public void assertCommercialContentEditable() {
+    OrderFlowStage stage = flowStage == null ? OrderFlowStage.DRAFT : flowStage;
+    if (stage.locksCommercialContent()) {
+      throw OrderDomainException.withPlanning(
+          "Order "
+              + orderNumber
+              + " is "
+              + stage
+              + ": take it back to the draft with a reason to change what was evaluated");
+    }
+  }
+
+  /** Statuses in which an approved or confirmed order is being fulfilled. */
+  private static final java.util.Set<OrderStatus> PROCESSING =
+      java.util.EnumSet.of(
+          OrderStatus.CONFIRMED,
+          OrderStatus.IN_PROGRESS,
+          OrderStatus.PARTIALLY_SHIPPED,
+          OrderStatus.ON_HOLD);
+
+  /**
+   * Planning inputs (greige cover, production and ship readiness) are taken while planning
+   * evaluates the order and while the approved order is being fulfilled. Once planning has finished
+   * or the order went to the customer, the evaluation is reopened first, so that what the proposal
+   * and the sent version rest on never changes silently.
+   */
+  public void assertAcceptsPlanningInput() {
+    OrderFlowStage stage = flowStage == null ? OrderFlowStage.DRAFT : flowStage;
+    if (isClosedForWork()) {
+      throw com.fabricmanagement.sales.common.exception.OrderDomainException.stage(
+          "ORDER_CLOSED", "Order " + orderNumber + " is " + status);
+    }
+    if (stage == OrderFlowStage.IN_PLANNING || PROCESSING.contains(status)) {
+      return;
+    }
+    if (stage == OrderFlowStage.PLANNED || stage == OrderFlowStage.AWAITING_CUSTOMER_APPROVAL) {
+      throw com.fabricmanagement.sales.common.exception.OrderDomainException.stage(
+          "EVALUATION_CLOSED",
+          "Planning finished this evaluation; reopen it with a reason before changing its basis");
+    }
+    throw com.fabricmanagement.sales.common.exception.OrderDomainException.stage(
+        "EVALUATION_NOT_STARTED",
+        "Order " + orderNumber + " is " + stage + ": planning has not started evaluating it");
+  }
+
+  /** The arrival estimate belongs to an order in fulfilment, up to its delivery. */
+  public void assertAcceptsArrivalEstimate() {
+    if (!PROCESSING.contains(status) && status != OrderStatus.SHIPPED) {
+      throw com.fabricmanagement.sales.common.exception.OrderDomainException.stage(
+          "ORDER_NOT_IN_PROCESSING",
+          "Order " + orderNumber + " is " + status + ": not in fulfilment");
+    }
+  }
+
+  /** Moves the order to the next flow stage; a move the flow does not allow is a conflict. */
+  public OrderFlowStage moveFlowTo(OrderFlowStage next) {
+    OrderFlowStage current = flowStage == null ? OrderFlowStage.DRAFT : flowStage;
+    if (next == null || !current.canMoveTo(next)) {
+      throw new OrderDomainException(
+          "Order " + orderNumber + " cannot move from " + current + " to " + next, 409);
+    }
+    this.flowStage = next;
+    return current;
+  }
+
+  /** Called only when a delivery commitment is recorded; it is the current agreed date. */
+  public void applyCommittedDate(LocalDate committedOn) {
+    this.committedOn = committedOn;
+  }
+
   public void updateDraft(SalesOrderUpdateCommand cmd) {
     if (!status.canEdit()) {
       throw new OrderDomainException(
@@ -353,8 +558,14 @@ public class SalesOrder extends BaseEntity {
     this.customerReference = cmd.customerReference();
     this.orderDate = cmd.orderDate();
     this.requestedDeliveryDate = cmd.requestedDeliveryDate();
-    this.promisedDeliveryDate = cmd.promisedDeliveryDate();
-    this.updateTotals(cmd.totals());
+    applyDeliveryTerms(cmd.deliveryTerms());
+    applyDeliveryTermStatus(cmd.deliveryTermStatus(), cmd.deliveryContractReference());
+    this.paymentTerms = cmd.paymentTerms();
+    applyAgreementContext(cmd.agreementContext(), cmd.agreementContextNote());
+    this.contactName = cmd.contactName();
+    this.contactEmail = cmd.contactEmail();
+    this.contactPhone = cmd.contactPhone();
+    this.contactWhatsapp = cmd.contactWhatsapp();
     this.shippingAddress = cmd.shippingAddress();
     this.billingAddress = cmd.billingAddress();
     this.shippingMethod = cmd.shippingMethod();
@@ -501,19 +712,5 @@ public class SalesOrder extends BaseEntity {
     } else if (anyLineShipped && status.canShip()) {
       this.status = OrderStatus.PARTIALLY_SHIPPED;
     }
-  }
-
-  public Money getGrandTotal() {
-    if (totals == null) {
-      throw new IllegalStateException("SalesOrder totals cannot be null");
-    }
-    return totals.calculateGrandTotal();
-  }
-
-  public Money getNetTotal() {
-    if (totals == null) {
-      throw new IllegalStateException("SalesOrder totals cannot be null");
-    }
-    return totals.calculateNetTotal();
   }
 }

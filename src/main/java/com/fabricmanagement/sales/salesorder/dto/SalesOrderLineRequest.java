@@ -55,8 +55,38 @@ public class SalesOrderLineRequest implements CatalogLineInput {
   @NotNull(message = "Unit is required")
   private String unit;
 
+  @Schema(description = "Agreed unit price in the line currency; omitted while not agreed")
+  @DecimalMin(value = "0", message = "Unit price cannot be negative")
   private BigDecimal unitPrice;
+
+  @Schema(description = "Agreed sales currency of this line (ISO 4217)", example = "USD")
+  @jakarta.validation.constraints.Pattern(
+      regexp = "[A-Z]{3}",
+      message = "Currency must be a 3-letter ISO code")
   private String currency;
+
+  @Schema(description = "Discount on this line in the line currency; needs a unit price")
+  @DecimalMin(value = "0", message = "Discount cannot be negative")
+  private BigDecimal discountAmount;
+
+  @Schema(description = "Tax on this line in the line currency; needs a unit price")
+  @DecimalMin(value = "0", message = "Tax cannot be negative")
+  private BigDecimal taxAmount;
+
+  @Schema(description = "Quantity tolerance above the requested quantity agreed for this line (%)")
+  @DecimalMin(value = "0", message = "A tolerance cannot be negative")
+  @jakarta.validation.constraints.DecimalMax(
+      value = "100",
+      message = "A tolerance cannot exceed 100 percent")
+  private BigDecimal toleranceUpPct;
+
+  @Schema(description = "Quantity tolerance below the requested quantity agreed for this line (%)")
+  @DecimalMin(value = "0", message = "A tolerance cannot be negative")
+  @jakarta.validation.constraints.DecimalMax(
+      value = "100",
+      message = "A tolerance cannot exceed 100 percent")
+  private BigDecimal toleranceDownPct;
+
   private ModuleType moduleType;
 
   @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)

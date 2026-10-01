@@ -34,7 +34,7 @@ public enum SystemDepartment {
       "Production Planning",
       "Production scheduling, capacity planning and work orders",
       false,
-      false,
+      true,
       11),
   FIBER(
       "FIBER",
@@ -90,7 +90,7 @@ public enum SystemDepartment {
       "Shipping & Transport",
       "Shipping and transportation management",
       false,
-      false,
+      true,
       32),
 
   MAINTENANCE("MAINTENANCE", "Maintenance", "Equipment maintenance and repair", false, false, 40),

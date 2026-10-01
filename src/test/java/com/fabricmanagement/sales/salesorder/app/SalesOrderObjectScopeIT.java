@@ -14,7 +14,6 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
@@ -409,7 +408,7 @@ class SalesOrderObjectScopeIT {
       UUID partnerId,
       String orderNumber,
       OrderStatus status,
-      LocalDate promisedDeliveryDate) {
+      LocalDate committedOn) {
     TenantContext.setCurrentTenantId(tenantId);
     TenantContext.setCurrentUserId(creatorId);
     SalesOrder order =
@@ -418,8 +417,7 @@ class SalesOrderObjectScopeIT {
             .orderNumber(orderNumber)
             .status(status)
             .orderDate(LocalDate.now())
-            .promisedDeliveryDate(promisedDeliveryDate)
-            .totals(OrderTotals.zero("GBP"))
+            .committedOn(committedOn)
             .build();
     return salesOrderRepository.saveAndFlush(order);
   }

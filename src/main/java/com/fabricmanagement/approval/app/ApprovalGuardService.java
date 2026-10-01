@@ -64,8 +64,36 @@ public class ApprovalGuardService {
       String currency) {
 
     // 1. Policy var mı? (Yoksa direkt geçer)
-    ApprovalPolicy policy =
-        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null);
+    return enforce(
+        tenantId,
+        userId,
+        entityType,
+        entityId,
+        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null));
+  }
+
+  /** Multi-currency variant: thresholds are evaluated in each policy's own currency. */
+  @Transactional
+  public boolean checkAndEnforceApproval(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      java.util.List<com.fabricmanagement.common.util.Money> amounts) {
+    return enforce(
+        tenantId,
+        userId,
+        entityType,
+        entityId,
+        policyService.getActivePolicyFor(tenantId, entityType, amounts).orElse(null));
+  }
+
+  private boolean enforce(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      ApprovalPolicy policy) {
     if (policy == null) {
       log.debug("No active policy found for {} in tenant {}, continuing", entityType, tenantId);
       return false;

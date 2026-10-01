@@ -13,6 +13,9 @@ import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQuerySe
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
+import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService;
+import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.OfferableStockSummary;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeProductOption;
 import com.fabricmanagement.sales.salesproduct.domain.SalesProduct;
 import com.fabricmanagement.sales.salesproduct.infra.repository.SalesProductRepository;
@@ -34,6 +37,7 @@ class OrderIntakeProductSearchServiceTest {
 
   @Mock private ProductSalesDefinitionQueryService productDefinitions;
   @Mock private SalesProductRepository catalogue;
+  @Mock private ProposalStockQueryService stockQuery;
   @InjectMocks private OrderIntakeProductSearchService service;
 
   private final UUID tenantId = UUID.randomUUID();
@@ -70,12 +74,26 @@ class OrderIntakeProductSearchServiceTest {
                       java.util.stream.Collectors.toMap(
                           ProductDto::getId, OrderIntakeProductSearchServiceTest::definition));
             });
+    when(stockQuery.offerableSummaries(eq(tenantId), anyCollection()))
+        .thenReturn(
+            Map.of(
+                satin.getId(),
+                new OfferableStockSummary(
+                    Map.of(PackageType.ROLL, 2L),
+                    new BigDecimal("25.5"),
+                    new BigDecimal("100"),
+                    1)));
 
     List<OrderIntakeProductOption> result = service.search(customerA, ProductType.FABRIC, "satin");
 
     assertThat(result).extracting(OrderIntakeProductOption::uid).containsExactly("FAB-0142");
     assertThat(result.getFirst().listPrice()).isEqualByComparingTo("4.20");
     assertThat(result.getFirst().customerSpecific()).isFalse();
+    assertThat(result.getFirst().stock().packages()).containsEntry("ROLL", 2L);
+    assertThat(result.getFirst().stock().kg()).isEqualByComparingTo("25.5");
+    assertThat(result.getFirst().stock().metres()).isEqualByComparingTo("100");
+    assertThat(result.getFirst().stock().unknownPieces()).isEqualTo(1);
+    verify(stockQuery).offerableSummaries(tenantId, List.of(satin.getId()));
   }
 
   @Test
@@ -86,6 +104,7 @@ class OrderIntakeProductSearchServiceTest {
         .thenReturn(List.of(entry(privateToA.getId(), customerA, "6.10")));
     when(productDefinitions.findAll(eq(tenantId), anyList()))
         .thenReturn(Map.of(privateToA.getId(), definition(privateToA)));
+    when(stockQuery.offerableSummaries(eq(tenantId), anyCollection())).thenReturn(Map.of());
 
     List<OrderIntakeProductOption> result = service.search(customerA, null, "fab-0500");
 
@@ -95,6 +114,8 @@ class OrderIntakeProductSearchServiceTest {
             option -> {
               assertThat(option.customerSpecific()).isTrue();
               assertThat(option.listPrice()).isEqualByComparingTo("6.10");
+              assertThat(option.stock().packages()).isEmpty();
+              assertThat(option.stock().kg()).isNull();
             });
   }
 
@@ -125,6 +146,7 @@ class OrderIntakeProductSearchServiceTest {
                       java.util.stream.Collectors.toMap(
                           ProductDto::getId, OrderIntakeProductSearchServiceTest::definition));
             });
+    when(stockQuery.offerableSummaries(eq(tenantId), anyCollection())).thenReturn(Map.of());
 
     List<OrderIntakeProductOption> result = service.search(customerA, ProductType.FIBER, null);
 
@@ -138,6 +160,7 @@ class OrderIntakeProductSearchServiceTest {
   void nonSellableTypesReturnNothing() {
     assertThat(service.search(customerA, ProductType.CHEMICAL, null)).isEmpty();
     verify(productDefinitions, never()).sellableProducts(eq(tenantId), eq(ProductType.CHEMICAL));
+    verify(stockQuery, never()).offerableSummaries(eq(tenantId), anyCollection());
   }
 
   private static ProductDto product(String uid, String name) {

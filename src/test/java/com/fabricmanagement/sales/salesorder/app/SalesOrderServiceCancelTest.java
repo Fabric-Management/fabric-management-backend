@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -39,6 +38,7 @@ class SalesOrderServiceCancelTest {
   // SOI intake checks; a mock is a no-op that reports no blockers.
   @Mock private OrderIntakeHooks orderIntakeHooks;
 
+  @Mock private DeliveryCommitmentService deliveryCommitments;
   @InjectMocks private SalesOrderService salesOrderService;
 
   private final UUID userId = UUID.randomUUID();
@@ -54,7 +54,6 @@ class SalesOrderServiceCancelTest {
 
     order =
         SalesOrder.builder()
-            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .status(OrderStatus.IN_PROGRESS)

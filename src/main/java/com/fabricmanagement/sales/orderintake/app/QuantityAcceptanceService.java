@@ -18,7 +18,6 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
-import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -47,8 +46,8 @@ public class QuantityAcceptanceService {
   private final QuantityAcceptanceRepository acceptances;
   private final QuantityEvaluationService evaluation;
   private final SalesOrderLineRepository lines;
-  private final SalesOrderRepository orders;
-  private final OrderTotalsRecalculator totals;
+  private final LineAdjustmentGuard adjustments;
+  private final com.fabricmanagement.sales.salesorder.app.SalesOrderRevision revision;
   private final LotCompatibilityRequestPort compatibilityRequests;
   private final Clock clock;
 
@@ -71,6 +70,7 @@ public class QuantityAcceptanceService {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_DRAFT", "Stock choices are recorded while the order is a draft");
     }
+    order.assertCommercialContentEditable();
     SalesOrderLine line = access.line(order, lineId);
     QuantityProposal proposal =
         proposals
@@ -165,9 +165,9 @@ public class QuantityAcceptanceService {
             request.idempotencyKey());
 
     line.setRequestedQty(lineQty);
+    adjustments.assertFits(line);
     lines.save(line);
-    totals.recalculate(order);
-    orders.save(order);
+    revision.linesChanged(order);
     acceptance.coverTerms(AcceptanceTerms.fingerprint(line));
     QuantityAcceptance saved = acceptances.save(acceptance);
 
@@ -193,6 +193,7 @@ public class QuantityAcceptanceService {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_DRAFT", "Stock choices change only while the order is a draft");
     }
+    order.assertCommercialContentEditable();
     access.line(order, lineId);
     QuantityAcceptance active =
         acceptances
@@ -208,9 +209,9 @@ public class QuantityAcceptanceService {
       // The acceptance had moved the line to the accepted quantity; the customer's request stands
       // again.
       line.setRequestedQty(line.getInitialRequestedQty());
+      adjustments.assertFits(line);
       lines.save(line);
-      totals.recalculate(order);
-      orders.save(order);
+      revision.linesChanged(order);
     }
   }
 

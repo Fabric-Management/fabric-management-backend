@@ -1,6 +1,5 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
-import com.fabricmanagement.common.util.OrderTotals;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -9,8 +8,16 @@ public record SalesOrderUpdateCommand(
     String customerReference,
     LocalDate orderDate,
     LocalDate requestedDeliveryDate,
-    LocalDate promisedDeliveryDate,
-    OrderTotals totals,
+    DeliveryTerms deliveryTerms,
+    DeliveryTermStatus deliveryTermStatus,
+    String deliveryContractReference,
+    String paymentTerms,
+    AgreementContext agreementContext,
+    String agreementContextNote,
+    String contactName,
+    String contactEmail,
+    String contactPhone,
+    boolean contactWhatsapp,
     String shippingAddress,
     String billingAddress,
     String shippingMethod,

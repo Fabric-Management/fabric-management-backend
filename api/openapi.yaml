@@ -36,6 +36,8 @@ tags:
   name: Inventory Balance
 - description: Cash flow forecasting operations
   name: Finance - Cash Flow
+- description: Who is responsible for warehouse and shipping work
+  name: Order Work
 - description: Governed task transitions for order-cover decisions
   name: FlowBoard — Decision Tasks
 - description: IWM Warehouse Location Management API
@@ -124,6 +126,8 @@ tags:
   name: Organization Certifications
 - description: Sales-readable color-card projection
   name: Sales Color
+- description: Incoterms and agreed delivery promises
+  name: Delivery Commitments
 - description: Department operations
   name: Department
 - description: Role operations
@@ -195,6 +199,8 @@ tags:
   name: Approval Policy
 - description: Supplier R F Q operations
   name: Supplier R F Q
+- description: Sales hands the draft to planning; planning evaluates
+  name: Order Flow
 - description: Health operations
   name: Health
 - description: Subscription operations
@@ -43411,154 +43417,6 @@ paths:
           description: Internal Server Error
       tags:
       - Sales Orders — Cover
-  /api/v1/sales-orders/{orderId}/intake/agreed-tolerance:
-    get:
-      operationId: getAgreedQuantityTolerance
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseAgreedQuantityTolerance"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: The quantity tolerance agreed with the customer; null fields when none
-        was agreed
-      tags:
-      - Order Intake
-    put:
-      operationId: recordAgreedQuantityTolerance
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RecordAgreedQuantityToleranceRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseAgreedQuantityTolerance"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Record or clear the quantity tolerance agreed with the customer
-      tags:
-      - Order Intake
   /api/v1/sales-orders/{orderId}/intake/attachments:
     get:
       operationId: listIntakeAttachments
@@ -46386,6 +46244,70 @@ paths:
       summary: Get effective-dated commercial assignment history
       tags:
       - Customer Commercial Assignments
+  /api/v1/sales/delivery-terms:
+    get:
+      operationId: listDeliveryTerms
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListDeliveryTermOption"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Incoterms rules with the event their dates refer to
+      tags:
+      - Delivery Commitments
   /api/v1/sales/lots:
     get:
       operationId: listSalesLots
@@ -46457,6 +46379,1186 @@ paths:
       summary: "List sales-readable lots, pieces, and advisory ATP quantities"
       tags:
       - Sales Lot
+  /api/v1/sales/order-flow/planning-queue:
+    get:
+      operationId: listOrdersWithPlanning
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListPlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Orders waiting for or in planning
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}:
+    get:
+      operationId: getOrderFlow
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderFlowView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The order's flow stage, proposal and history"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/claim:
+    post:
+      operationId: claimOrderEvaluation
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Take an unassigned order routed to your planning team and start evaluating
+        it
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/complete:
+    post:
+      operationId: completeOrderPlanning
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Finish planning with a current, valid proposal"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/planning-assignment:
+    post:
+      operationId: assignOrderPlanner
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignOrderWork"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Assign or reassign the order's planning to a team member, with a reason"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/planning-candidates:
+    get:
+      operationId: listOrderPlannerCandidates
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListOrderWorkCandidate"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Team members the order's planning may be assigned to
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/planning-history:
+    get:
+      operationId: getOrderPlanningHistory
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListOrderWorkEventView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Routing, claims, assignments and releases of the order's planning"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/planning-release:
+    post:
+      operationId: releaseOrderPlanner
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseOrderWork"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Give the order's planning back to the team's queue, with a reason"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/proposals:
+    post:
+      operationId: proposeOrderDelivery
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposeDelivery"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Propose the date for the delivery term's event, valid until a set\
+        \ time"
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/reopen:
+    post:
+      operationId: reopenOrderEvaluation
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenOrderEvaluation"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reopen a finished evaluation with a reason before changing its basis
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/return:
+    post:
+      operationId: returnOrderToSales
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderFlowReason"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Return the order to sales with a reason
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/start-evaluation:
+    post:
+      operationId: startOrderEvaluation
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePlanningQueueItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: The planner the order was assigned to starts evaluating it
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/submit:
+    post:
+      operationId: submitOrderToPlanning
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderFlowView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Hand the draft to planning
+      tags:
+      - Order Flow
+  /api/v1/sales/order-flow/{orderId}/withdraw:
+    post:
+      operationId: withdrawOrderToDraft
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderFlowReason"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderFlowView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Take the order back to the draft; the reason is required once planning
+        started
+      tags:
+      - Order Flow
+  /api/v1/sales/order-intake/arrival-work:
+    get:
+      operationId: listArrivalWork
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListArrivalWorkItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Orders in fulfilment whose arrival estimate is in your team's or your
+        scope
+      tags:
+      - Fulfilment Planning
+  /api/v1/sales/order-intake/availability:
+    get:
+      description: Sales-readable projection of the piece-level stock the quantity
+        evaluation uses. A missing colour matches colourless lots only. Nothing is
+        reserved.
+      operationId: getOrderIntakeAvailability
+      parameters:
+      - description: Product identifier
+        in: query
+        name: productId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Colour card identifier; omit for colourless stock
+        in: query
+        name: colorId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: "Customer, so confirmed lot compatibility is honoured"
+        in: query
+        name: customerId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderIntakeAvailability"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Stock a product has in one colour, as advisory whole-piece quantities"
+      tags:
+      - Order Intake
   /api/v1/sales/order-intake/custom-requests/evaluation-queue:
     get:
       operationId: listCustomerRequestEvaluationQueue
@@ -46465,7 +47567,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ApiResponseListCustomerProductRequest"
+                $ref: "#/components/schemas/ApiResponseListCustomerRequestEvaluationItem"
           description: OK
         "400":
           content:
@@ -47210,6 +48312,398 @@ paths:
       summary: "Record when the goods are expected at the customer, with its source"
       tags:
       - Fulfilment Planning
+  /api/v1/sales/order-intake/orders/{orderId}/work/{kind}:
+    get:
+      operationId: getOrderLogisticsWork
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/OrderWorkKind"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderWorkView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Who is responsible for the work, its history and your actions"
+      tags:
+      - Order Work
+  /api/v1/sales/order-intake/orders/{orderId}/work/{kind}/assignment:
+    post:
+      operationId: assignOrderLogisticsWork
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/OrderWorkKind"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignOrderWork"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderWorkView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Assign or reassign the work to a team member, with a reason"
+      tags:
+      - Order Work
+  /api/v1/sales/order-intake/orders/{orderId}/work/{kind}/candidates:
+    get:
+      operationId: listOrderLogisticsWorkCandidates
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/OrderWorkKind"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListOrderWorkCandidate"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Team members the work may be assigned to
+      tags:
+      - Order Work
+  /api/v1/sales/order-intake/orders/{orderId}/work/{kind}/claim:
+    post:
+      operationId: claimOrderLogisticsWork
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/OrderWorkKind"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderWorkView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Take unassigned work routed to your team
+      tags:
+      - Order Work
+  /api/v1/sales/order-intake/orders/{orderId}/work/{kind}/release:
+    post:
+      operationId: releaseOrderLogisticsWork
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/OrderWorkKind"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseOrderWork"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderWorkView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Give the work back to the team's queue, with a reason"
+      tags:
+      - Order Work
   /api/v1/sales/order-intake/products:
     get:
       operationId: searchOrderIntakeProducts
@@ -48711,6 +50205,78 @@ paths:
       summary: Ship an order
       tags:
       - Sales Orders
+  /api/v1/sales/orders/{orderId}/delivery-commitments:
+    get:
+      operationId: getDeliveryCommitments
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDeliveryCommitmentHistory"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The order's delivery commitments, first promise first, with their\
+        \ shifts"
+      tags:
+      - Delivery Commitments
   /api/v1/sales/ownership/triage:
     get:
       operationId: list_4
@@ -53982,41 +55548,14 @@ components:
           type: string
           description: Bucket code
           example: DAYS_31_60
-    AgreedQuantityTolerance:
-      type: object
-      properties:
-        downPct:
-          type:
-          - number
-          - "null"
-        recordedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        recordedBy:
-          type:
-          - string
-          - "null"
-          format: uuid
-        salesOrderId:
-          type: string
-          format: uuid
-        source:
-          type:
-          - string
-          - "null"
-        upPct:
-          type:
-          - number
-          - "null"
-      required:
-      - downPct
-      - recordedAt
-      - recordedBy
-      - salesOrderId
-      - source
-      - upPct
+    AgreementContext:
+      type: string
+      enum:
+      - CUSTOMER_VISITED_US
+      - WE_VISITED_CUSTOMER
+      - TRADE_FAIR_OR_EVENT
+      - REMOTE_MEETING
+      - OTHER
     ApiProblemDetail:
       properties:
         args:
@@ -54094,24 +55633,6 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AddressValidationResponse"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    ApiResponseAgreedQuantityTolerance:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/AgreedQuantityTolerance"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -54773,6 +56294,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseDeliveryCommitmentHistory:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DeliveryCommitmentHistory"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDepartmentDto:
       type: object
       properties:
@@ -55214,6 +56753,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListArrivalWorkItem:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArrivalWorkItem"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListAutomationRuleResponse:
       type: object
       properties:
@@ -55474,6 +57033,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListCustomerRequestEvaluationItem:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerRequestEvaluationItem"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListCustomerToneAcceptance:
       type: object
       properties:
@@ -55501,6 +57080,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DashboardWidgetDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListDeliveryTermOption:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryTermOption"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -55933,6 +57532,46 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListOrderWorkCandidate:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkCandidate"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListOrderWorkEventView:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkEventView"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListOrganizationAddressDto:
       type: object
       properties:
@@ -56120,6 +57759,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PermissionTemplateDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListPlanningQueueItem:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanningQueueItem"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -57248,11 +58907,65 @@ components:
           type: array
           items:
             type: string
+    ApiResponseOrderFlowView:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderFlowView"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderIntakeAvailability:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderIntakeAvailability"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseOrderIntakeReadiness:
       type: object
       properties:
         data:
           $ref: "#/components/schemas/OrderIntakeReadiness"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderWorkView:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderWorkView"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -58189,6 +59902,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PermissionTemplateDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePlanningQueueItem:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PlanningQueueItem"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -59691,6 +61422,33 @@ components:
       - recordedBy
       - source
       - sourceReference
+    ArrivalWorkItem:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkCapability"
+        arrival:
+          anyOf:
+          - $ref: "#/components/schemas/ArrivalEstimateView"
+          - type: "null"
+        assignment:
+          $ref: "#/components/schemas/OrderWorkAssignmentView"
+        orderNumber:
+          type: string
+        orderStatus:
+          type: string
+        salesOrderId:
+          type: string
+          format: uuid
+      required:
+      - actions
+      - arrival
+      - assignment
+      - orderNumber
+      - orderStatus
+      - salesOrderId
     AssignAddressRequest:
       type: object
       properties:
@@ -59741,6 +61499,19 @@ components:
           type: boolean
       required:
       - departmentId
+    AssignOrderWork:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - assigneeId
+      - reason
     AssignPrimaryRepresentativeRequest:
       type: object
       properties:
@@ -60993,6 +62764,20 @@ components:
           colorId:
             type: string
             format: uuid
+    CommitmentChangeOrigin:
+      type: string
+      enum:
+      - INITIAL
+      - BUYER_REQUEST
+      - SELLER_REVISION
+    CommitmentChannel:
+      type: string
+      enum:
+      - PHONE
+      - EMAIL
+      - MESSAGE
+      - IN_PERSON
+      - DOCUMENT
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -63105,12 +64890,35 @@ components:
     CreateSalesOrderRequest:
       type: object
       properties:
+        agreementContext:
+          $ref: "#/components/schemas/AgreementContext"
+          description: Where the conversation that led to the order took place
+        agreementContextNote:
+          type: string
+          description: Description of an OTHER context
+          maxLength: 500
+          minLength: 0
         billingAddress:
           type: string
-        currency:
+        contactEmail:
           type: string
-          minLength: 1
-          pattern: "[A-Z]{3}"
+          format: email
+          description: Contact e-mail
+          maxLength: 254
+          minLength: 0
+        contactName:
+          type: string
+          description: Customer contact person for this order
+          maxLength: 120
+          minLength: 0
+        contactPhone:
+          type: string
+          description: Contact mobile phone
+          maxLength: 30
+          minLength: 0
+        contactWhatsapp:
+          type: boolean
+          description: Whether the contact may be notified on WhatsApp at this phone
         customRequests:
           type: array
           description: Optional customer requests saved in the same transaction as
@@ -63125,8 +64933,26 @@ components:
         deadline:
           type: string
           format: date
-        discountAmount:
-          type: number
+        deliveryContractReference:
+          type: string
+          description: The contract that fixed the term
+          maxLength: 200
+          minLength: 0
+        deliveryPlace:
+          type: string
+          description: Place named with the term (under C-terms the destination)
+          maxLength: 200
+          minLength: 0
+        deliveryTerm:
+          $ref: "#/components/schemas/DeliveryTerm"
+          description: Incoterms rule agreed for the order; omit until one is agreed
+        deliveryTermStatus:
+          $ref: "#/components/schemas/DeliveryTermStatus"
+          description: Proposed (default) or agreed by a prior contract; agreement
+            by the customer is set only by the customer's approval
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
+          description: Incoterms edition; defaults to 2020 when a term is given
         lines:
           type: array
           items:
@@ -63160,9 +64986,11 @@ components:
         partnerId:
           type: string
           format: uuid
-        promisedDeliveryDate:
+        paymentTerms:
           type: string
-          format: date
+          description: Agreed payment terms
+          maxLength: 200
+          minLength: 0
         quoteId:
           type: string
           format: uuid
@@ -63176,15 +65004,7 @@ components:
           type: string
         shippingMethod:
           type: string
-        taxAmount:
-          type: number
-        totalAmount:
-          type: number
-          deprecated: true
-          description: "Deprecated: ignored on create; total is calculated from order\
-            \ lines."
       required:
-      - currency
       - orderDate
       - partnerId
     CreateSalesProductRequest:
@@ -64407,6 +66227,28 @@ components:
       - id
       - note
       - outcome
+    CustomerRequestEvaluationItem:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkCapability"
+        assignment:
+          anyOf:
+          - $ref: "#/components/schemas/OrderWorkAssignmentView"
+          - type: "null"
+        orderNumber:
+          type:
+          - string
+          - "null"
+        request:
+          $ref: "#/components/schemas/CustomerProductRequest"
+      required:
+      - actions
+      - assignment
+      - orderNumber
+      - request
     CustomerRequestEvaluationOutcome:
       type: string
       enum:
@@ -64981,6 +66823,225 @@ components:
           minLength: 0
       required:
       - reason
+    DeliveryCommitmentHistory:
+      type: object
+      properties:
+        buyerRequestedShiftDays:
+          type: integer
+          format: int64
+        current:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryCommitmentView"
+          - type: "null"
+        initial:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryCommitmentView"
+          - type: "null"
+        orderId:
+          type: string
+          format: uuid
+        revisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryCommitmentView"
+        sameEventThroughout:
+          type: boolean
+        sellerRevisionShiftDays:
+          type: integer
+          format: int64
+        shiftFromInitialDays:
+          type:
+          - integer
+          - "null"
+          format: int64
+      required:
+      - buyerRequestedShiftDays
+      - current
+      - initial
+      - orderId
+      - revisions
+      - sameEventThroughout
+      - sellerRevisionShiftDays
+      - shiftFromInitialDays
+    DeliveryCommitmentView:
+      type: object
+      properties:
+        agreedAt:
+          type: string
+          format: date-time
+        channel:
+          $ref: "#/components/schemas/CommitmentChannel"
+        committedOn:
+          type: string
+          format: date
+        customerContact:
+          type: string
+        deliveryEvent:
+          $ref: "#/components/schemas/DeliveryEvent"
+        deliveryPlace:
+          type: string
+        deliveryTerm:
+          $ref: "#/components/schemas/DeliveryTerm"
+        id:
+          type: string
+          format: uuid
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
+        origin:
+          $ref: "#/components/schemas/CommitmentChangeOrigin"
+        reason:
+          type:
+          - string
+          - "null"
+        recordedAt:
+          type: string
+          format: date-time
+        recordedBy:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          format: int32
+        shiftFromPreviousDays:
+          type:
+          - integer
+          - "null"
+          format: int64
+      required:
+      - agreedAt
+      - channel
+      - committedOn
+      - customerContact
+      - deliveryEvent
+      - deliveryPlace
+      - deliveryTerm
+      - id
+      - incotermsVersion
+      - origin
+      - reason
+      - recordedAt
+      - recordedBy
+      - sequence
+      - shiftFromPreviousDays
+    DeliveryEvent:
+      type: string
+      enum:
+      - AVAILABLE_FOR_COLLECTION
+      - HANDED_TO_CARRIER
+      - ALONGSIDE_VESSEL
+      - ON_BOARD_VESSEL
+      - READY_FOR_UNLOADING_AT_DESTINATION
+      - UNLOADED_AT_DESTINATION
+    DeliveryNamedPlaceRole:
+      type: string
+      enum:
+      - PLACE_OF_DELIVERY
+      - PLACE_OF_DESTINATION
+      - PORT_OF_SHIPMENT
+      - PORT_OF_DESTINATION
+    DeliveryProposalView:
+      type: object
+      properties:
+        appliesToCurrentTerms:
+          type: boolean
+          description: Made under the order's current delivery term and place
+        deliveryEvent:
+          $ref: "#/components/schemas/DeliveryEvent"
+        deliveryPlace:
+          type: string
+        deliveryTerm:
+          $ref: "#/components/schemas/DeliveryTerm"
+        expired:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
+        madeBeforeReopen:
+          type: boolean
+          description: Made before the evaluation was reopened; propose or confirm
+            again
+        note:
+          type:
+          - string
+          - "null"
+        proposedAt:
+          type: string
+          format: date-time
+        proposedBy:
+          type: string
+          format: uuid
+        proposedOn:
+          type: string
+          format: date
+        sequence:
+          type: integer
+          format: int32
+        validUntil:
+          type: string
+          format: date-time
+      required:
+      - appliesToCurrentTerms
+      - deliveryEvent
+      - deliveryPlace
+      - deliveryTerm
+      - expired
+      - id
+      - incotermsVersion
+      - madeBeforeReopen
+      - note
+      - proposedAt
+      - proposedBy
+      - proposedOn
+      - sequence
+      - validUntil
+    DeliveryTerm:
+      type: string
+      enum:
+      - EXW
+      - FCA
+      - CPT
+      - CIP
+      - DAT
+      - DAP
+      - DPU
+      - DDP
+      - FAS
+      - FOB
+      - CFR
+      - CIF
+    DeliveryTermOption:
+      type: object
+      properties:
+        event:
+          $ref: "#/components/schemas/DeliveryEvent"
+        eventAtDestination:
+          type: boolean
+        namedPlaceRole:
+          $ref: "#/components/schemas/DeliveryNamedPlaceRole"
+        seaAndInlandWaterwayOnly:
+          type: boolean
+        term:
+          $ref: "#/components/schemas/DeliveryTerm"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncotermsVersion"
+          uniqueItems: true
+      required:
+      - event
+      - eventAtDestination
+      - namedPlaceRole
+      - seaAndInlandWaterwayOnly
+      - term
+      - versions
+    DeliveryTermStatus:
+      type: string
+      enum:
+      - PROPOSED
+      - AGREED_BY_CONTRACT
+      - AGREED_BY_CUSTOMER
     DepartmentDto:
       type: object
       properties:
@@ -66767,6 +68828,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+    IncotermsVersion:
+      type: string
+      enum:
+      - INCOTERMS_2010
+      - INCOTERMS_2020
     IntakeAcceptanceChannel:
       type: string
       enum:
@@ -68520,13 +70586,78 @@ components:
       - pendingCustomRequestIds
       - readyPartsMayShipFirst
       - salesOrderId
+    OrderFlowEventView:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        fromStage:
+          $ref: "#/components/schemas/OrderFlowStage"
+        occurredAt:
+          type: string
+          format: date-time
+        reason:
+          type:
+          - string
+          - "null"
+        toStage:
+          $ref: "#/components/schemas/OrderFlowStage"
+      required:
+      - actorId
+      - fromStage
+      - occurredAt
+      - reason
+      - toStage
+    OrderFlowReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+    OrderFlowStage:
+      type: string
+      enum:
+      - DRAFT
+      - AWAITING_PLANNING
+      - IN_PLANNING
+      - PLANNED
+      - AWAITING_CUSTOMER_APPROVAL
+      - CUSTOMER_APPROVED
+    OrderFlowView:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderFlowEventView"
+        orderId:
+          type: string
+          format: uuid
+        planning:
+          anyOf:
+          - $ref: "#/components/schemas/OrderWorkAssignmentView"
+          - type: "null"
+          description: "Planning team and the planner responsible, once handed over"
+        proposal:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryProposalView"
+          - type: "null"
+        stage:
+          $ref: "#/components/schemas/OrderFlowStage"
+      required:
+      - events
+      - orderId
+      - planning
+      - proposal
+      - stage
     OrderIntakeAction:
       type: string
       enum:
       - EVALUATE_QUANTITY
       - RECORD_STOCK_CHOICE
       - RECORD_TONE_ACCEPTANCE
-      - RECORD_AGREED_TOLERANCE
       - ADD_CUSTOM_REQUEST
       - RECORD_CUSTOMER_DECISION
       - RESOLVE_CUSTOM_REQUEST
@@ -68536,6 +70667,57 @@ components:
       - CORRECT_PRODUCT
       - REQUEST_HOLD
       - CONFIRM_ORDER
+    OrderIntakeAvailability:
+      type: object
+      properties:
+        availablePieceCount:
+          type: integer
+          format: int64
+        availableQuantity:
+          type: number
+          description: "Sum of whole pieces that may be offered now, in the canonical\
+            \ unit"
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Colour card the stock was matched on; null means colourless
+            stock only
+        lotCount:
+          type: integer
+          format: int64
+        productId:
+          type: string
+          format: uuid
+        unit:
+          type: string
+          description: "Canonical unit of the quantities (M for fabric, KG for yarn\
+            \ and fibre)"
+        unknownPieceCount:
+          type: integer
+          format: int64
+          description: "Pieces whose availability is not yet known, measured or not"
+        unknownQuantity:
+          type: number
+          description: "Sum of pieces whose availability is not yet known (missing\
+            \ evidence, anonymous reservation), in the canonical unit; never counted\
+            \ as available"
+        unmeasuredPieceCount:
+          type: integer
+          format: int64
+          description: "Pieces with no exact canonical measure; counted here, never\
+            \ in a quantity"
+      required:
+      - availablePieceCount
+      - availableQuantity
+      - colorId
+      - lotCount
+      - productId
+      - unit
+      - unknownPieceCount
+      - unknownQuantity
+      - unmeasuredPieceCount
     OrderIntakeCapability:
       type: object
       properties:
@@ -68593,6 +70775,10 @@ components:
           - FABRIC
           - CHEMICAL
           - CONSUMABLE
+        stock:
+          $ref: "#/components/schemas/OrderIntakeProductStock"
+          description: "Advisory stock across colours, before colour and width are\
+            \ chosen"
         uid:
           type: string
       required:
@@ -68605,7 +70791,38 @@ components:
       - listPrice
       - productId
       - productType
+      - stock
       - uid
+    OrderIntakeProductStock:
+      type: object
+      properties:
+        kg:
+          type:
+          - number
+          - "null"
+          description: Exact kilograms of all offerable pieces; null if any lacks
+            weight
+        metres:
+          type:
+          - number
+          - "null"
+          description: Exact metres of all offerable pieces; null if any lacks length
+        packages:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: Offerable whole pieces by their recorded package type
+        unknownPieces:
+          type: integer
+          format: int64
+          description: Pieces whose availability still needs evidence; excluded from
+            all totals
+      required:
+      - kg
+      - metres
+      - packages
+      - unknownPieces
     OrderIntakeReadiness:
       type: object
       properties:
@@ -68730,6 +70947,161 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MarginWarningDto"
+    OrderWorkAction:
+      type: string
+      enum:
+      - CLAIM
+      - ASSIGN
+      - RELEASE
+      - START_EVALUATION
+      - PROPOSE
+      - COMPLETE
+      - RETURN
+      - REOPEN
+      - CONFIRM_READINESS
+      - CONFIRM_GREIGE_COVER
+      - WITHDRAW_GREIGE_COVER
+      - RECORD_ARRIVAL
+      - EVALUATE_REQUEST
+      - PROPOSE_REVISION
+    OrderWorkAssignmentView:
+      type: object
+      properties:
+        assignedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        assigneeId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        assigneeName:
+          type:
+          - string
+          - "null"
+        departmentCode:
+          type: string
+        kind:
+          $ref: "#/components/schemas/OrderWorkKind"
+        mine:
+          type: boolean
+          description: The current user is the responsible person
+        routedAt:
+          type: string
+          format: date-time
+        teamCanTake:
+          type: boolean
+          description: "Someone is responsible, or an active member of the routed\
+            \ team could take it; false means the work is waiting with nobody able\
+            \ to take it"
+      required:
+      - assignedAt
+      - assigneeId
+      - assigneeName
+      - departmentCode
+      - kind
+      - mine
+      - routedAt
+      - teamCanTake
+    OrderWorkCandidate:
+      type: object
+      properties:
+        displayName:
+          type: string
+        userId:
+          type: string
+          format: uuid
+      required:
+      - displayName
+      - userId
+    OrderWorkCapability:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/OrderWorkAction"
+        allowed:
+          type: boolean
+        reason:
+          type:
+          - string
+          - "null"
+      required:
+      - action
+      - allowed
+      - reason
+    OrderWorkEventType:
+      type: string
+      enum:
+      - ROUTED
+      - CLAIMED
+      - ASSIGNED
+      - RELEASED
+    OrderWorkEventView:
+      type: object
+      properties:
+        actorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        departmentCode:
+          type: string
+        fromAssigneeId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        reason:
+          type:
+          - string
+          - "null"
+        toAssigneeId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        type:
+          $ref: "#/components/schemas/OrderWorkEventType"
+      required:
+      - actorId
+      - departmentCode
+      - fromAssigneeId
+      - occurredAt
+      - reason
+      - toAssigneeId
+      - type
+    OrderWorkKind:
+      type: string
+      enum:
+      - PLANNING
+      - SHIP_READINESS
+      - ARRIVAL_ESTIMATE
+    OrderWorkView:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkCapability"
+        assignment:
+          $ref: "#/components/schemas/OrderWorkAssignmentView"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWorkEventView"
+        orderId:
+          type: string
+          format: uuid
+      required:
+      - actions
+      - assignment
+      - history
+      - orderId
     OrganizationAddressData:
       type: object
       properties:
@@ -70433,6 +72805,8 @@ components:
       - logistics:cancel
       - logistics:delete
       - logistics:deliver
+      - logistics:assign
+      - logistics:claim
       - logistics:prepare
       - logistics:read
       - logistics:ship
@@ -70442,6 +72816,8 @@ components:
       - members:write
       - procurement:read
       - procurement:write
+      - production:assign
+      - production:claim
       - production:read
       - production:write
       - products:read
@@ -70522,6 +72898,111 @@ components:
           type: string
         value:
           type: string
+    PlanningQueueItem:
+      type: object
+      properties:
+        actions:
+          type: array
+          description: What the current user may do; a null reason means allowed
+          items:
+            $ref: "#/components/schemas/OrderWorkCapability"
+        assignment:
+          anyOf:
+          - $ref: "#/components/schemas/OrderWorkAssignmentView"
+          - type: "null"
+        customerName:
+          type:
+          - string
+          - "null"
+        deliveryEvent:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryEvent"
+          - type: "null"
+        deliveryPlace:
+          type:
+          - string
+          - "null"
+        deliveryTerm:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryTerm"
+          - type: "null"
+        deliveryTermStatus:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryTermStatus"
+          - type: "null"
+        documentsAddedDuringPlanning:
+          type: integer
+          format: int64
+          description: Documents added since the order was handed to planning
+        incotermsVersion:
+          anyOf:
+          - $ref: "#/components/schemas/IncotermsVersion"
+          - type: "null"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanningQueueLine"
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        proposal:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryProposalView"
+          - type: "null"
+        requestedDeliveryDate:
+          type:
+          - string
+          - "null"
+          format: date
+        stage:
+          $ref: "#/components/schemas/OrderFlowStage"
+      required:
+      - actions
+      - assignment
+      - customerName
+      - deliveryEvent
+      - deliveryPlace
+      - deliveryTerm
+      - deliveryTermStatus
+      - documentsAddedDuringPlanning
+      - incotermsVersion
+      - lines
+      - orderId
+      - orderNumber
+      - proposal
+      - requestedDeliveryDate
+      - stage
+    PlanningQueueLine:
+      type: object
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        productDesc:
+          type:
+          - string
+          - "null"
+        requestedDeliveryDate:
+          type:
+          - string
+          - "null"
+          format: date
+        requestedQty:
+          type:
+          - number
+          - "null"
+        unit:
+          type:
+          - string
+          - "null"
+      required:
+      - lineId
+      - productDesc
+      - requestedDeliveryDate
+      - requestedQty
+      - unit
     PlaygroundImpersonateResponse:
       type: object
       description: Response returned after switching persona in a playground session
@@ -70699,9 +73180,21 @@ components:
     PortionReadinessRequest:
       type: object
       properties:
+        actions:
+          type: array
+          description: What the current user may do; a null reason means allowed
+          items:
+            $ref: "#/components/schemas/OrderWorkCapability"
+        assignment:
+          anyOf:
+          - $ref: "#/components/schemas/OrderWorkAssignmentView"
+          - type: "null"
+          description: "Planning for production portions, the warehouse for held stock"
         id:
           type: string
           format: uuid
+        orderNumber:
+          type: string
         portion:
           $ref: "#/components/schemas/CoverPortionKind"
         requestedAt:
@@ -70721,7 +73214,10 @@ components:
           type: string
           format: uuid
       required:
+      - actions
+      - assignment
       - id
+      - orderNumber
       - portion
       - requestedAt
       - requestedBy
@@ -71503,6 +73999,22 @@ components:
       - productId
       - solution
       - summary
+    ProposeDelivery:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        proposedOn:
+          type: string
+          format: date
+        validUntil:
+          type: string
+          format: date-time
+      required:
+      - proposedOn
+      - validUntil
     PublicQuoteLineResponse:
       type: object
       description: Customer-facing quote line without internal pricing fields
@@ -73217,21 +75729,6 @@ components:
         tradingPartnerId:
           type: string
           format: uuid
-    RecordAgreedQuantityToleranceRequest:
-      type: object
-      properties:
-        downPct:
-          type: number
-          maximum: 100
-          minimum: 0
-        source:
-          type: string
-          maxLength: 1000
-          minLength: 0
-        upPct:
-          type: number
-          maximum: 100
-          minimum: 0
     RecordArrivalEstimateRequest:
       type: object
       properties:
@@ -73607,6 +76104,15 @@ components:
           minLength: 1
       required:
       - reason
+    ReleaseOrderWork:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - reason
     RemainingNeedDecision:
       type: string
       enum:
@@ -73626,6 +76132,15 @@ components:
           format: int32
         reversalMovement:
           type: number
+    ReopenOrderEvaluation:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - reason
     RequestLineHoldRequest:
       type: object
       properties:
@@ -74382,31 +76897,81 @@ components:
           format: uuid
         name:
           type: string
+    SalesOrderCurrencyTotalDto:
+      type: object
+      description: "Order totals in one agreed currency, derived from the lines"
+      properties:
+        currency:
+          type: string
+          example: USD
+        discountAmount:
+          type: number
+        grandTotal:
+          type: number
+          description: Net plus tax
+        netAmount:
+          type: number
+          description: Subtotal less discount
+        subtotal:
+          type: number
+          description: Σ quantity × unit price
+        taxAmount:
+          type: number
+      required:
+      - currency
+      - discountAmount
+      - grandTotal
+      - netAmount
+      - subtotal
+      - taxAmount
     SalesOrderDto:
       type: object
       properties:
         actualDeliveryDate:
           type: string
           format: date
+        agreementContext:
+          $ref: "#/components/schemas/AgreementContext"
+        agreementContextNote:
+          type: string
         billingAddress:
           type: string
+        committedOn:
+          type: string
+          format: date
+        contactEmail:
+          type: string
+        contactName:
+          type: string
+        contactPhone:
+          type: string
+        contactWhatsapp:
+          type: boolean
         createdAt:
           type: string
           format: date-time
-        currency:
-          type: string
         customerReference:
           type: string
         deadline:
           type: string
           format: date
-        discountAmount:
-          type: number
-        grandTotal:
-          type: number
+        deliveryContractReference:
+          type: string
+        deliveryEvent:
+          $ref: "#/components/schemas/DeliveryEvent"
+        deliveryPlace:
+          type: string
+        deliveryTerm:
+          $ref: "#/components/schemas/DeliveryTerm"
+        deliveryTermStatus:
+          $ref: "#/components/schemas/DeliveryTermStatus"
+        flowStage:
+          $ref: "#/components/schemas/OrderFlowStage"
         id:
           type: string
           format: uuid
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
         isActive:
           type: boolean
         lines:
@@ -74439,9 +77004,8 @@ components:
           - SAMPLE
           - CONSIGNMENT
           - WORK_ORDER
-        promisedDeliveryDate:
+        paymentTerms:
           type: string
-          format: date
         quoteId:
           type: string
           format: uuid
@@ -74483,10 +77047,10 @@ components:
           - CANCELLED
           - REJECTED
           - ON_HOLD
-        taxAmount:
-          type: number
-        totalAmount:
-          type: number
+        totals:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrderCurrencyTotalDto"
         tradingPartner:
           $ref: "#/components/schemas/TradingPartnerDto"
         tradingPartnerId:
@@ -74494,12 +77058,18 @@ components:
           format: uuid
         uid:
           type: string
+        unpricedLineCount:
+          type: integer
+          format: int32
         updatedAt:
           type: string
           format: date-time
         version:
           type: integer
           format: int64
+      required:
+      - totals
+      - unpricedLineCount
     SalesOrderLineRequest:
       type: object
       properties:
@@ -74509,6 +77079,13 @@ components:
           description: Colour card of this distribution (active tenant colour card)
         currency:
           type: string
+          description: Agreed sales currency of this line (ISO 4217)
+          example: USD
+          pattern: "[A-Z]{3}"
+        discountAmount:
+          type: number
+          description: Discount on this line in the line currency; needs a unit price
+          minimum: 0
         finishedWidth:
           type: number
           description: Finished width; must be one of the product's defined widths
@@ -74549,10 +77126,28 @@ components:
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot
+        taxAmount:
+          type: number
+          description: Tax on this line in the line currency; needs a unit price
+          minimum: 0
+        toleranceDownPct:
+          type: number
+          description: Quantity tolerance below the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
+        toleranceUpPct:
+          type: number
+          description: Quantity tolerance above the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
         unit:
           type: string
         unitPrice:
           type: number
+          description: Agreed unit price in the line currency; omitted while not agreed
+          minimum: 0
       required:
       - productId
       - requestedQty
@@ -74565,6 +77160,9 @@ components:
           format: uuid
         currency:
           type: string
+        discountAmount:
+          type: number
+          description: Discount on this line in the line currency
         finishedWidth:
           type: number
         finishedWidthUnit:
@@ -74617,6 +77215,21 @@ components:
           type: number
         singleLotRequired:
           type: boolean
+        taxAmount:
+          type: number
+          description: Tax on this line in the line currency
+        toleranceDownPct:
+          type: number
+          description: Agreed quantity tolerance below the requested quantity (%)
+        toleranceRecordedAt:
+          type: string
+          format: date-time
+        toleranceRecordedBy:
+          type: string
+          format: uuid
+        toleranceUpPct:
+          type: number
+          description: Agreed quantity tolerance above the requested quantity (%)
         uid:
           type: string
         unit:
@@ -77329,6 +79942,13 @@ components:
           description: Colour card of this distribution (active tenant colour card)
         currency:
           type: string
+          description: Agreed sales currency of this line (ISO 4217)
+          example: USD
+          pattern: "[A-Z]{3}"
+        discountAmount:
+          type: number
+          description: Discount on this line in the line currency; needs a unit price
+          minimum: 0
         finishedWidth:
           type: number
           description: Finished width; must be one of the product's defined widths
@@ -77373,10 +79993,28 @@ components:
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot
+        taxAmount:
+          type: number
+          description: Tax on this line in the line currency; needs a unit price
+          minimum: 0
+        toleranceDownPct:
+          type: number
+          description: Quantity tolerance below the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
+        toleranceUpPct:
+          type: number
+          description: Quantity tolerance above the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
         unit:
           type: string
         unitPrice:
           type: number
+          description: Agreed unit price in the line currency; omitted while not agreed
+          minimum: 0
       required:
       - productId
       - requestedQty
@@ -77384,19 +80022,60 @@ components:
     UpdateSalesOrderRequest:
       type: object
       properties:
+        agreementContext:
+          $ref: "#/components/schemas/AgreementContext"
+          description: Where the conversation that led to the order took place
+        agreementContextNote:
+          type: string
+          description: Description of an OTHER context
+          maxLength: 500
+          minLength: 0
         billingAddress:
           type: string
-        currency:
+        contactEmail:
           type: string
-          minLength: 1
-          pattern: "[A-Z]{3}"
+          format: email
+          description: Contact e-mail
+          maxLength: 254
+          minLength: 0
+        contactName:
+          type: string
+          description: Customer contact person for this order
+          maxLength: 120
+          minLength: 0
+        contactPhone:
+          type: string
+          description: Contact mobile phone
+          maxLength: 30
+          minLength: 0
+        contactWhatsapp:
+          type: boolean
+          description: Whether the contact may be notified on WhatsApp at this phone
         customerReference:
           type: string
         deadline:
           type: string
           format: date
-        discountAmount:
-          type: number
+        deliveryContractReference:
+          type: string
+          description: The contract that fixed the term
+          maxLength: 200
+          minLength: 0
+        deliveryPlace:
+          type: string
+          description: Place named with the term (under C-terms the destination)
+          maxLength: 200
+          minLength: 0
+        deliveryTerm:
+          $ref: "#/components/schemas/DeliveryTerm"
+          description: Incoterms rule agreed for the order; omit until one is agreed
+        deliveryTermStatus:
+          $ref: "#/components/schemas/DeliveryTermStatus"
+          description: Proposed (default) or agreed by a prior contract; agreement
+            by the customer is set only by the customer's approval
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
+          description: Incoterms edition; defaults to 2020 when a term is given
         lines:
           type: array
           items:
@@ -77418,9 +80097,11 @@ components:
         orderDate:
           type: string
           format: date
-        promisedDeliveryDate:
+        paymentTerms:
           type: string
-          format: date
+          description: Agreed payment terms
+          maxLength: 200
+          minLength: 0
         requestedDeliveryDate:
           type: string
           format: date
@@ -77428,13 +80109,10 @@ components:
           type: string
         shippingMethod:
           type: string
-        taxAmount:
-          type: number
         version:
           type: integer
           format: int64
       required:
-      - currency
       - orderDate
       - version
     UpdateSubcontractOrderRequest:

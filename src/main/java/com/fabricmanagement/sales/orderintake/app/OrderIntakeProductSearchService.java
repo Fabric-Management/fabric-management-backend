@@ -5,7 +5,10 @@ import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQuerySe
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
+import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService;
+import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.OfferableStockSummary;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeProductOption;
+import com.fabricmanagement.sales.orderintake.dto.OrderIntakeProductStock;
 import com.fabricmanagement.sales.salesproduct.domain.SalesProduct;
 import com.fabricmanagement.sales.salesproduct.infra.repository.SalesProductRepository;
 import java.util.Comparator;
@@ -36,6 +39,7 @@ public class OrderIntakeProductSearchService {
 
   private final ProductSalesDefinitionQueryService productDefinitions;
   private final SalesProductRepository catalogue;
+  private final ProposalStockQueryService stockQuery;
 
   public List<OrderIntakeProductOption> search(
       UUID customerId, ProductType productType, String query) {
@@ -69,14 +73,24 @@ public class OrderIntakeProductSearchService {
             .toList();
     Map<UUID, ProductSalesDefinitionDto> definitions =
         productDefinitions.findAll(tenantId, visible);
-    return visible.stream()
+    List<ProductDto> offered =
+        visible.stream()
+            .filter(
+                product -> {
+                  ProductSalesDefinitionDto definition = definitions.get(product.getId());
+                  return definition != null && definition.active();
+                })
+            .toList();
+    Map<UUID, OfferableStockSummary> stock =
+        stockQuery.offerableSummaries(tenantId, offered.stream().map(ProductDto::getId).toList());
+    return offered.stream()
         .map(
             product ->
                 toOption(
                     definitions.get(product.getId()),
                     entries.getOrDefault(product.getId(), List.of()),
-                    customerId))
-        .filter(Objects::nonNull)
+                    customerId,
+                    stock.getOrDefault(product.getId(), OfferableStockSummary.empty())))
         .toList();
   }
 
@@ -102,10 +116,10 @@ public class OrderIntakeProductSearchService {
   }
 
   private static OrderIntakeProductOption toOption(
-      ProductSalesDefinitionDto definition, List<SalesProduct> entries, UUID customerId) {
-    if (definition == null || !definition.active()) {
-      return null;
-    }
+      ProductSalesDefinitionDto definition,
+      List<SalesProduct> entries,
+      UUID customerId,
+      OfferableStockSummary stock) {
     Optional<SalesProduct> customerEntry =
         entries.stream()
             .filter(entry -> customerId != null && customerId.equals(entry.getCustomerId()))
@@ -122,6 +136,7 @@ public class OrderIntakeProductSearchService {
         definition.finishedWidths(),
         customerEntry.isPresent(),
         priceEntry.map(SalesProduct::getListPrice).orElse(null),
-        priceEntry.map(SalesProduct::getCurrency).orElse(null));
+        priceEntry.map(SalesProduct::getCurrency).orElse(null),
+        OrderIntakeProductStock.from(stock));
   }
 }

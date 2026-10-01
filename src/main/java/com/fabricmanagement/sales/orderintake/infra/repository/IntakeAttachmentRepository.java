@@ -14,6 +14,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface IntakeAttachmentRepository extends JpaRepository<IntakeAttachment, UUID> {
 
+  /** Documents added to the order after a time, e.g. since it was handed to planning. */
+  long countByTenantIdAndSalesOrderIdAndUploadedAtAfter(
+      UUID tenantId, UUID salesOrderId, java.time.Instant after);
+
   /** Metadata only; the file content is read on download. */
   interface Summary {
     UUID getId();

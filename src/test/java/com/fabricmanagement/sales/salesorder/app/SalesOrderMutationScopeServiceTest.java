@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
 import com.fabricmanagement.platform.user.domain.DataScope;
@@ -58,8 +57,10 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
+            null,
             new SalesOrderAccessPolicy(
                 new SalesAccessScopeResolver(permissionEvaluator, userQueryService)),
+            null,
             null,
             null,
             null,
@@ -108,7 +109,6 @@ class SalesOrderMutationScopeServiceTest {
         SalesOrder.builder()
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-SCOPE")
-            .totals(OrderTotals.zero("GBP"))
             .status(initialStatus)
             .build();
     order.setId(UUID.randomUUID());

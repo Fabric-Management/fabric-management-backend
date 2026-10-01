@@ -284,7 +284,55 @@ public class PermissionTemplateSeeder {
             new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
-            new GrantRule("MANAGER", PermissionKey.LOGISTICS_CANCEL, DataScope.ORGANIZATION)));
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_CANCEL, DataScope.ORGANIZATION),
+            // Order work: a warehouse member takes ship-readiness work routed to the team;
+            // supervisors and managers (re)assign it with a reason.
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT)));
+
+    // 5b. PLANNING — production planning evaluates orders handed over by sales. Write is OWN for
+    // workers: they act on the orders they took; claiming covers the team's unassigned queue.
+    seedDepartment(
+        templates,
+        SystemDepartment.PLANNING.code(),
+        List.of(
+            new GrantRule("WORKER", PermissionKey.PRODUCTION_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PRODUCTION_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTION_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTION_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTION_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTION_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTION_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTION_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
+            new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION)));
+
+    // 5c. SHIPPING — records the sourced arrival estimate of orders in processing.
+    seedDepartment(
+        templates,
+        SystemDepartment.SHIPPING.code(),
+        List.of(
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_READ, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_WRITE, DataScope.OWN),
+            new GrantRule("WORKER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_READ, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_READ, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT)));
 
     // 6. FINANCE
     seedDepartment(

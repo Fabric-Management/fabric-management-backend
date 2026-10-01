@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -111,18 +112,169 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
-  @Embedded
-  @AttributeOverrides({
-    @AttributeOverride(
-        name = "amount",
-        column = @Column(name = "unit_price", precision = 18, scale = 4)),
-    @AttributeOverride(name = "currency", column = @Column(name = "currency", length = 3))
-  })
+  /**
+   * The agreed sales currency of this line (ISO 4217). Lines of one order may use different
+   * currencies; it can be known before the price is agreed.
+   */
+  @Column(name = "currency", length = 3)
   @Setter(AccessLevel.NONE)
-  private Money unitPrice;
+  private String currency;
 
+  /** Agreed unit price exactly as stored (4 decimals). Amount arithmetic uses this, not Money. */
+  @Column(name = "unit_price", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal unitPriceAmount;
+
+  /** Discount on this line, in the line currency. Requires an agreed unit price. */
+  @Column(name = "discount_amount", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal discountAmountValue;
+
+  /** Tax on this line, in the line currency. Requires an agreed unit price. */
+  @Column(name = "tax_amount", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal taxAmountValue;
+
+  /**
+   * Agreed unit price as {@link Money}, or {@code null} while not agreed. {@link Money} rounds to
+   * the currency's minor unit, so it is for display and comparison only: totals and validation use
+   * {@link #getUnitPriceAmount()}.
+   */
+  public Money getUnitPrice() {
+    return unitPriceAmount == null ? null : Money.of(unitPriceAmount, currency);
+  }
+
+  public Money getDiscountAmount() {
+    return discountAmountValue == null ? null : Money.of(discountAmountValue, currency);
+  }
+
+  public Money getTaxAmount() {
+    return taxAmountValue == null ? null : Money.of(taxAmountValue, currency);
+  }
+
+  /** Keeps the agreed currency and adjustments; a cleared price also clears the adjustments. */
   public void updateUnitPrice(Money price) {
-    this.unitPrice = price;
+    updatePricing(
+        price != null ? price.getCurrency().getCurrencyCode() : currency,
+        price != null ? price.getAmount() : null,
+        price != null ? discountAmountValue : null,
+        price != null ? taxAmountValue : null);
+  }
+
+  /** Replaces the commercial terms of this line after checking them against its quantity. */
+  public void updatePricing(
+      String newCurrency, BigDecimal unitPrice, BigDecimal discount, BigDecimal tax) {
+    validatePricing(requestedQty, newCurrency, unitPrice, discount, tax);
+    this.currency = newCurrency;
+    this.unitPriceAmount = unitPrice;
+    this.discountAmountValue = discount;
+    this.taxAmountValue = tax;
+  }
+
+  /** A changed quantity must still carry the recorded discount (SOI R08). */
+  public void assertAdjustmentsFitQuantity() {
+    validatePricing(requestedQty, currency, unitPriceAmount, discountAmountValue, taxAmountValue);
+  }
+
+  /**
+   * Commercial rules of a line: a price needs a currency; discount and tax need a price, cannot be
+   * negative, and the discount cannot exceed the line amount.
+   */
+  public static void validatePricing(
+      BigDecimal quantity,
+      String currency,
+      BigDecimal unitPrice,
+      BigDecimal discount,
+      BigDecimal tax) {
+    if (unitPrice != null && (currency == null || currency.isBlank())) {
+      throw new OrderDomainException("A priced line must name its currency");
+    }
+    if (unitPrice != null && unitPrice.signum() < 0) {
+      throw new OrderDomainException("Unit price cannot be negative");
+    }
+    if ((discount != null || tax != null) && unitPrice == null) {
+      throw new OrderDomainException("Discount and tax need an agreed unit price");
+    }
+    if ((discount != null && discount.signum() < 0) || (tax != null && tax.signum() < 0)) {
+      throw new OrderDomainException("Discount and tax cannot be negative");
+    }
+    if (discount != null
+        && quantity != null
+        && discount.compareTo(unitPrice.multiply(quantity)) > 0) {
+      throw new OrderDomainException("Line discount cannot exceed the line amount");
+    }
+  }
+
+  // ── Agreed quantity tolerance (SOI A03), per distribution ────────────────
+
+  /** How far above the requested quantity the customer accepts, in percent. */
+  @Column(name = "tolerance_up_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal toleranceUpPct;
+
+  /** How far below the requested quantity the customer accepts, in percent. */
+  @Column(name = "tolerance_down_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal toleranceDownPct;
+
+  @Column(name = "tolerance_recorded_by")
+  @Setter(AccessLevel.NONE)
+  private UUID toleranceRecordedBy;
+
+  @Column(name = "tolerance_recorded_at")
+  @Setter(AccessLevel.NONE)
+  private java.time.Instant toleranceRecordedAt;
+
+  /**
+   * Records the quantity tolerance agreed for this distribution, or clears it when both limits are
+   * null. The recorder and time are kept with it; where it was agreed is the order's agreement
+   * source. Re-recording the same limits keeps the original recorder and time, so an unrelated edit
+   * does not rewrite provenance.
+   */
+  public void recordTolerance(
+      BigDecimal upPct, BigDecimal downPct, UUID actor, java.time.Instant at) {
+    if (upPct == null && downPct == null) {
+      toleranceUpPct = null;
+      toleranceDownPct = null;
+      toleranceRecordedBy = null;
+      toleranceRecordedAt = null;
+      return;
+    }
+    validateTolerance(upPct, downPct);
+    if (sameAmount(upPct, toleranceUpPct) && sameAmount(downPct, toleranceDownPct)) {
+      return;
+    }
+    if (actor == null || at == null) {
+      throw new OrderDomainException("An agreed tolerance needs its recorder and time");
+    }
+    toleranceUpPct = upPct;
+    toleranceDownPct = downPct;
+    toleranceRecordedBy = actor;
+    toleranceRecordedAt = at;
+  }
+
+  /** Limits are 0–100%. */
+  public static void validateTolerance(BigDecimal upPct, BigDecimal downPct) {
+    for (BigDecimal pct : new BigDecimal[] {upPct, downPct}) {
+      if (pct != null && (pct.signum() < 0 || pct.compareTo(BigDecimal.valueOf(100)) > 0)) {
+        throw new OrderDomainException("An agreed tolerance is between 0 and 100 percent");
+      }
+    }
+  }
+
+  private static boolean sameAmount(BigDecimal left, BigDecimal right) {
+    return left == null ? right == null : right != null && left.compareTo(right) == 0;
+  }
+
+  /** Lombok fills the rest of the builder; a {@link Money} price sets amount and currency. */
+  public static class SalesOrderLineBuilder {
+    public SalesOrderLineBuilder unitPrice(Money price) {
+      this.unitPriceAmount = price == null ? null : price.getAmount();
+      if (price != null) {
+        this.currency = price.getCurrency().getCurrencyCode();
+      }
+      return this;
+    }
   }
 
   public void attachRequirementProfile(RequirementProfileSnapshot snapshot) {
@@ -142,12 +294,6 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
     requirementProfileVersion = snapshot.profileVersion();
     requirementProfileFingerprint = snapshot.fingerprint();
     requirementProfileSnapshot = snapshot;
-  }
-
-  public String getCurrency() {
-    return unitPrice != null && unitPrice.getCurrency() != null
-        ? unitPrice.getCurrency().getCurrencyCode()
-        : null;
   }
 
   @ElementCollection

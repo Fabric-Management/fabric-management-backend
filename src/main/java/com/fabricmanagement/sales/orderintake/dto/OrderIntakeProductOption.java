@@ -23,4 +23,8 @@ public record OrderIntakeProductOption(
             description = "True when the catalogue entry is private to this customer")
         boolean customerSpecific,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) BigDecimal listPrice,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String currency) {}
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String currency,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            description = "Advisory stock across colours, before colour and width are chosen")
+        OrderIntakeProductStock stock) {}

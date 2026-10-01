@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(103)
+        .hasSize(124)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(103);
+    assertThat(expected).hasSize(124);
   }
 
   @Test
@@ -203,6 +203,34 @@ class SalesEndpointAuthorizationArchTest {
         "createEntry",
         "deactivateEntry");
     add(result, "SalesColorController", Category.REFERENCE_READ, "listSalesColors");
+    add(result, "DeliveryCommitmentController", Category.REFERENCE_READ, "listDeliveryTerms");
+    add(
+        result,
+        "OrderFlowController",
+        Category.TRANSACTIONAL_READ,
+        "getOrderFlow",
+        "listOrdersWithPlanning",
+        "listOrderPlannerCandidates",
+        "getOrderPlanningHistory");
+    add(
+        result,
+        "OrderFlowController",
+        Category.MUTATION,
+        "submitOrderToPlanning",
+        "withdrawOrderToDraft",
+        "startOrderEvaluation",
+        "proposeOrderDelivery",
+        "completeOrderPlanning",
+        "returnOrderToSales",
+        "claimOrderEvaluation",
+        "assignOrderPlanner",
+        "releaseOrderPlanner",
+        "reopenOrderEvaluation");
+    add(
+        result,
+        "DeliveryCommitmentController",
+        Category.TRANSACTIONAL_READ,
+        "getDeliveryCommitments");
     add(result, "SalesQualityGradeController", Category.REFERENCE_READ, "listSalesGrades");
     add(result, "SalesLotController", Category.REFERENCE_READ, "listSalesLots");
     add(
@@ -258,6 +286,7 @@ class SalesEndpointAuthorizationArchTest {
         "reviseOrder");
     // SOI order intake (D1-D8).
     add(result, "OrderIntakeProductController", Category.REFERENCE_READ, "search");
+    add(result, "OrderIntakeAvailabilityController", Category.REFERENCE_READ, "get");
     add(
         result,
         "OrderIntakeController",
@@ -265,7 +294,6 @@ class SalesEndpointAuthorizationArchTest {
         "getLatestQuantityProposal",
         "listToneAcceptances",
         "listQuantityAcceptances",
-        "getAgreedTolerance",
         "getOrderIntakeReadiness");
     add(
         result,
@@ -273,7 +301,6 @@ class SalesEndpointAuthorizationArchTest {
         Category.MUTATION,
         "evaluateLineQuantity",
         "recordToneAcceptance",
-        "recordAgreedTolerance",
         "recordQuantityAcceptance",
         "withdrawQuantityAcceptance");
     add(
@@ -330,7 +357,21 @@ class SalesEndpointAuthorizationArchTest {
         "FulfilmentPlanningController",
         Category.TRANSACTIONAL_READ,
         "listProductionReadinessRequests",
-        "listWarehouseReadinessRequests");
+        "listWarehouseReadinessRequests",
+        "listArrivalWork");
+    add(
+        result,
+        "OrderWorkController",
+        Category.TRANSACTIONAL_READ,
+        "getOrderLogisticsWork",
+        "listOrderLogisticsWorkCandidates");
+    add(
+        result,
+        "OrderWorkController",
+        Category.MUTATION,
+        "claimOrderLogisticsWork",
+        "assignOrderLogisticsWork",
+        "releaseOrderLogisticsWork");
     add(
         result,
         "FulfilmentPlanningController",

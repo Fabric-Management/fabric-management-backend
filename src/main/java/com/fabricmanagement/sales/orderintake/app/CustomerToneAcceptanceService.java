@@ -31,6 +31,8 @@ public class CustomerToneAcceptanceService {
   public CustomerToneAcceptanceDto record(
       UUID orderId, OrderIntakeRequests.RecordToneAcceptance request, UUID actor) {
     SalesOrder order = access.writableOrder(orderId, actor);
+    // Which lots or tones the customer accepts shapes the goods planning evaluated.
+    order.assertCommercialContentEditable();
     var line = access.line(order, request.salesOrderLineId());
     var stock =
         evaluation

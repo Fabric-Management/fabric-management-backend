@@ -37,10 +37,11 @@ public class OrderCoverEvidenceService {
   private final OrderCoverObjectAccess objectAccess;
   private final DomainEventPublisher events;
 
+  /** Stores a new evidence revision when the inputs changed: a write on the order. */
   @PreAuthorize(
-      "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','read')")
+      "@auth.can(authentication,'flowboard','read') and @auth.can(authentication,'sales','write')")
   public OrderCoverEvidenceDto refresh(UUID orderId, UUID caseId) {
-    objectAccess.readable(orderId, requireActor());
+    objectAccess.assertWritable(orderId, requireActor());
     return appendWithRetry(orderId, caseId, false);
   }
 

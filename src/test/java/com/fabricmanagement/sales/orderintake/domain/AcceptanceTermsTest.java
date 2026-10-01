@@ -45,6 +45,18 @@ class AcceptanceTermsTest {
   }
 
   @Test
+  @DisplayName("A change in the fourth decimal of the agreed price needs a new acceptance")
+  void fourDecimalPriceChangeChangesTheFingerprint() {
+    SalesOrderLine agreed = line();
+    agreed.updatePricing("EUR", new BigDecimal("1.2345"), null, null);
+    SalesOrderLine changed = line();
+    changed.updatePricing("EUR", new BigDecimal("1.2349"), null, null);
+
+    assertThat(AcceptanceTerms.fingerprint(changed))
+        .isNotEqualTo(AcceptanceTerms.fingerprint(agreed));
+  }
+
+  @Test
   @DisplayName("Numeric scale and unit case do not count as a change")
   void representationIsNormalised() {
     SalesOrderLine plain = line();

@@ -746,6 +746,23 @@ public class TenantClonerService {
     jdbc.update(sql, newTenantId, templateId);
   }
 
+  /**
+   * Gives a newly onboarded tenant the golden template's sales ownership policy. Every customer
+   * relationship a tenant establishes is resolved against this policy; without it the ownership
+   * listener fails on every event and the publications stay incomplete. Idempotent.
+   *
+   * @return 1 when a policy was created, 0 when the tenant already had one
+   */
+  public int cloneOwnershipPolicyToTenant(UUID targetTenantId) {
+    UUID goldenTemplateId = findTemplateTenantId();
+    if (goldenTemplateId == null || targetTenantId == null) {
+      log.warn("Golden Template not found — cannot provision ownership policy.");
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId));
+  }
+
   private int cloneOwnershipPolicyIfMissing(
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     Integer existing =

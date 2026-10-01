@@ -1,10 +1,8 @@
 package com.fabricmanagement.sales.orderintake.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.sales.orderintake.app.AgreedToleranceService;
 import com.fabricmanagement.sales.orderintake.app.CustomerToneAcceptanceService;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeReadinessService;
-import com.fabricmanagement.sales.orderintake.app.OrderIntakeViews;
 import com.fabricmanagement.sales.orderintake.app.QuantityAcceptanceService;
 import com.fabricmanagement.sales.orderintake.app.QuantityEvaluationService;
 import com.fabricmanagement.sales.orderintake.dto.CustomerToneAcceptanceDto;
@@ -25,7 +23,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,7 +39,6 @@ public class OrderIntakeController {
 
   private final QuantityEvaluationService quantityEvaluation;
   private final CustomerToneAcceptanceService toneAcceptance;
-  private final AgreedToleranceService agreedTolerance;
   private final QuantityAcceptanceService quantityAcceptance;
   private final OrderIntakeReadinessService readiness;
 
@@ -94,29 +90,6 @@ public class OrderIntakeController {
       @PathVariable UUID orderId) {
     return ResponseEntity.ok(
         ApiResponse.success(toneAcceptance.forOrder(orderId, OrderIntakeActor.current())));
-  }
-
-  @GetMapping("/agreed-tolerance")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
-  @Operation(
-      operationId = "getAgreedQuantityTolerance",
-      summary = "The quantity tolerance agreed with the customer; null fields when none was agreed")
-  public ResponseEntity<ApiResponse<OrderIntakeViews.AgreedTolerance>> getAgreedTolerance(
-      @PathVariable UUID orderId) {
-    return ResponseEntity.ok(
-        ApiResponse.success(agreedTolerance.current(orderId, OrderIntakeActor.current())));
-  }
-
-  @PutMapping("/agreed-tolerance")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
-  @Operation(
-      operationId = "recordAgreedQuantityTolerance",
-      summary = "Record or clear the quantity tolerance agreed with the customer")
-  public ResponseEntity<ApiResponse<OrderIntakeViews.AgreedTolerance>> recordAgreedTolerance(
-      @PathVariable UUID orderId,
-      @Valid @RequestBody OrderIntakeRequests.RecordAgreedTolerance request) {
-    return ResponseEntity.ok(
-        ApiResponse.success(agreedTolerance.record(orderId, request, OrderIntakeActor.current())));
   }
 
   @PostMapping("/lines/{lineId}/quantity-acceptances")

@@ -132,6 +132,19 @@ public final class CustomerRequestDtos {
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant proposedAt,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Instant sentAt) {}
 
+  /**
+   * A custom request waiting for planning, with the order it belongs to (if any), who holds that
+   * order's planning, and what the current user may do with it.
+   */
+  @Schema(name = "CustomerRequestEvaluationItem")
+  public record EvaluationItem(
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) RequestDto request,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String orderNumber,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+          com.fabricmanagement.sales.salesorder.dto.OrderWorkDtos.AssignmentView assignment,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          List<com.fabricmanagement.sales.salesorder.dto.OrderWorkDtos.Capability> actions) {}
+
   @Schema(name = "CustomerProductRequest")
   public record RequestDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,

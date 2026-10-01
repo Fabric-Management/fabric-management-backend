@@ -1,7 +1,6 @@
 package com.fabricmanagement.sales.orderintake.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.AcceptanceTerms;
 import com.fabricmanagement.sales.orderintake.domain.CustomerProductRequest;
@@ -18,7 +17,7 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
-import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -46,8 +45,7 @@ public class CustomerRequestService {
   private final CustomerRequestViews views;
   private final CatalogLineValidator catalogLineValidator;
   private final SalesOrderLineRepository lines;
-  private final SalesOrderRepository orders;
-  private final OrderTotalsRecalculator totals;
+  private final com.fabricmanagement.sales.salesorder.app.SalesOrderRevision orderRevision;
   private final Clock clock;
 
   @Transactional
@@ -162,6 +160,8 @@ public class CustomerRequestService {
       CustomerRequestDtos.RecordDecision input,
       UUID actor) {
     SalesOrder order = access.writableOrder(orderId, actor);
+    // The customer's answer defines what is ordered; it is not recorded while planning evaluates.
+    order.assertCommercialContentEditable();
     CustomerProductRequest request = attached(order, requestId);
     CustomerRequestRevision revision = latest(request, revisionNo);
     attachments.requireAttachmentOfCustomer(input.evidenceAttachmentId(), request.getCustomerId());
@@ -225,7 +225,7 @@ public class CustomerRequestService {
             .latestRevision(request)
             .orElseThrow(
                 () -> OrderIntakeException.rule("SAMPLE_APPROVAL_REQUIRED", "No revision"));
-    Money price = price(order, input);
+    BigDecimal price = price(input);
     SalesOrderLine line =
         SalesOrderLine.builder()
             .salesOrderId(order.getId())
@@ -233,7 +233,8 @@ public class CustomerRequestService {
             .productDesc(request.getDescription())
             .requestedQty(request.getRequestedQty())
             .unit(request.getUnit())
-            .unitPrice(price)
+            .currency(currency(input))
+            .unitPriceAmount(price)
             .lineStatus(SalesOrderLineStatus.PENDING)
             .colorId(input.colorId())
             .finishedWidth(input.finishedWidth())
@@ -252,8 +253,7 @@ public class CustomerRequestService {
     catalogLineValidator.validate(
         TenantContext.requireTenantId(), order.getTradingPartnerId(), all);
     SalesOrderLine saved = lines.save(line);
-    totals.recalculate(order);
-    orders.save(order);
+    orderRevision.linesChanged(order);
     request.resolve(saved.getId());
     return views.view(requests.save(request));
   }
@@ -279,16 +279,21 @@ public class CustomerRequestService {
         .orElseThrow(() -> OrderIntakeException.notFound("Revision", revisionNo));
   }
 
-  private static Money price(SalesOrder order, CustomerRequestDtos.ResolveRequest input) {
+  /** The agreed currency of the new line; lines of one order may differ in currency. */
+  private static String currency(CustomerRequestDtos.ResolveRequest input) {
+    return input.currency() == null ? null : input.currency().toUpperCase(java.util.Locale.ROOT);
+  }
+
+  /** The agreed unit price exactly as entered (four decimals); Money would round it. */
+  private static BigDecimal price(CustomerRequestDtos.ResolveRequest input) {
     if (input.unitPrice() == null) {
       return null;
     }
-    String currency = input.currency() != null ? input.currency() : order.getCurrency();
-    if (!currency.equalsIgnoreCase(order.getCurrency())) {
+    if (input.currency() == null) {
       throw OrderIntakeException.rule(
-          "CURRENCY_MISMATCH", "The line price must be in the order currency");
+          "CURRENCY_REQUIRED", "A priced line must name its agreed currency");
     }
-    return Money.of(input.unitPrice(), order.getCurrency());
+    return input.unitPrice();
   }
 
   private CustomerProductRequest attached(SalesOrder order, UUID requestId) {
@@ -310,6 +315,7 @@ public class CustomerRequestService {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_DRAFT", "Custom requests change only while the order is a draft");
     }
+    order.assertCommercialContentEditable();
     return order;
   }
 

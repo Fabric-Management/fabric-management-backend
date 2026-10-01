@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.production.core.batch.api.LotCompatibilityRequestPort;
 import com.fabricmanagement.production.core.workorder.api.WorkOrderHoldPort;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
@@ -92,12 +91,7 @@ class ProductCorrectionServiceTest {
             compatibilityRequests,
             Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC),
             fulfilmentLock);
-    order =
-        SalesOrder.builder()
-            .totals(OrderTotals.zero("EUR"))
-            .tradingPartnerId(UUID.randomUUID())
-            .orderNumber("SO-5")
-            .build();
+    order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-5").build();
     order.setId(UUID.randomUUID());
     navy160 = line(OLD, 2L);
     navy155 = line(OLD, 5L);

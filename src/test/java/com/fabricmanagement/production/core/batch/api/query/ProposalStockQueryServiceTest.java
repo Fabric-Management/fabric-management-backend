@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
+import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.OfferableStockSummary;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
@@ -24,6 +26,7 @@ import com.fabricmanagement.production.core.batch.infra.repository.BatchFinished
 import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.core.batch.infra.repository.LotCompatibilityConfirmationRepository;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
 import com.fabricmanagement.production.core.stockunit.domain.QualityDisposition;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnitCut;
@@ -262,6 +265,68 @@ class ProposalStockQueryServiceTest {
     assertThat(groups).containsExactly(Set.of(first.getId(), second.getId()));
   }
 
+  @Test
+  void offerableSummaryBatchesProductsAndKeepsMissingMeasurementsUnknown() {
+    Batch first = lot(COLOR, null);
+    Batch second = lot(UUID.randomUUID(), null);
+    UUID noStockProduct = UUID.randomUUID();
+    StockUnit measured = stockPiece(first, "40", "10", StockUnitStatus.AVAILABLE, false);
+    StockUnit missingWeight = stockPiece(second, "60", null, StockUnitStatus.AVAILABLE, false);
+    StockUnit flagged = stockPiece(second, "20", "5", StockUnitStatus.AVAILABLE, true);
+    StockUnit reserved = stockPiece(first, "30", "4", StockUnitStatus.RESERVED, false);
+    when(batchRepository.findByTenantIdAndProductIdInAndIsActiveTrueOrderById(
+            TENANT, List.of(PRODUCT, noStockProduct)))
+        .thenReturn(List.of(first, second));
+    when(stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(
+            TENANT, List.of(first.getId(), second.getId())))
+        .thenReturn(List.of(measured, missingWeight, flagged, reserved));
+
+    Map<UUID, OfferableStockSummary> summaries =
+        service.offerableSummaries(TENANT, List.of(PRODUCT, noStockProduct));
+
+    assertThat(summaries).doesNotContainKey(noStockProduct);
+    OfferableStockSummary summary = summaries.get(PRODUCT);
+    assertThat(summary.packages()).containsEntry(PackageType.ROLL, 2L).hasSize(1);
+    assertThat(summary.metres()).isEqualByComparingTo("100");
+    assertThat(summary.kilograms()).isNull();
+    assertThat(summary.unknownPieces()).isEqualTo(1);
+    verify(batchRepository)
+        .findByTenantIdAndProductIdInAndIsActiveTrueOrderById(
+            TENANT, List.of(PRODUCT, noStockProduct));
+  }
+
+  @Test
+  void offerableSummaryDoesNotReuseWeightRecordedBeforeALengthCut() {
+    Batch lot = lot(COLOR, null);
+    StockUnit remnant = stockPiece(lot, "35", "8", StockUnitStatus.AVAILABLE, false);
+    StockUnitCut cut =
+        StockUnitCut.record(
+            remnant.getId(),
+            new BigDecimal("20"),
+            new BigDecimal("15"),
+            "M",
+            UUID.randomUUID(),
+            Instant.now());
+    cut.verifyRemaining(UUID.randomUUID(), Instant.now());
+    remnant.recordLength(new BigDecimal("15"), "M");
+    when(batchRepository.findByTenantIdAndProductIdInAndIsActiveTrueOrderById(
+            TENANT, List.of(PRODUCT)))
+        .thenReturn(List.of(lot));
+    when(stockUnitRepository.findByTenantIdAndBatchIdInAndIsActiveTrue(
+            TENANT, List.of(lot.getId())))
+        .thenReturn(List.of(remnant));
+    when(cutRepository.findByTenantIdAndStockUnitIdInAndIsActiveTrue(
+            TENANT, List.of(remnant.getId())))
+        .thenReturn(List.of(cut));
+
+    OfferableStockSummary summary =
+        service.offerableSummaries(TENANT, List.of(PRODUCT)).get(PRODUCT);
+
+    assertThat(summary.packages()).containsEntry(PackageType.ROLL, 1L);
+    assertThat(summary.metres()).isEqualByComparingTo("15");
+    assertThat(summary.kilograms()).isNull();
+  }
+
   private ProposalStockQuery query(BigDecimal width, String widthUnit) {
     return new ProposalStockQuery(TENANT, PRODUCT, COLOR, width, widthUnit, CUSTOMER);
   }
@@ -330,5 +395,26 @@ class ProposalStockQueryServiceTest {
   private static BatchFinishedWidthMeasurement width(UUID batchId, String value) {
     return BatchFinishedWidthMeasurement.record(
         batchId, new BigDecimal(value), "CM", null, UUID.randomUUID(), Instant.now());
+  }
+
+  private static StockUnit stockPiece(
+      Batch lot, String metres, String kg, StockUnitStatus status, boolean flagged) {
+    StockUnit unit =
+        StockUnit.builder()
+            .batchId(lot.getId())
+            .barcode("R-" + UUID.randomUUID().toString().substring(0, 6))
+            .productType(ProductType.FABRIC)
+            .packageType(PackageType.ROLL)
+            .unit("KG")
+            .currentWeight(kg == null ? null : new BigDecimal(kg))
+            .length(new BigDecimal(metres))
+            .lengthUnit("M")
+            .status(status)
+            .qualityDisposition(QualityDisposition.RELEASED)
+            .flagged(flagged)
+            .build();
+    unit.setId(UUID.randomUUID());
+    unit.setTenantId(TENANT);
+    return unit;
   }
 }

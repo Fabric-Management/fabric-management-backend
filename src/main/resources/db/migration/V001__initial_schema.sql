@@ -1547,14 +1547,50 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
     customer_reference VARCHAR(100),
     order_type VARCHAR(20) NOT NULL DEFAULT 'SALES',
     status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+    -- Sales prepares -> planning evaluates -> customer approves; a separate axis from status.
+    flow_stage VARCHAR(30) NOT NULL DEFAULT 'DRAFT'
+        CHECK (flow_stage IN ('DRAFT', 'AWAITING_PLANNING', 'IN_PLANNING', 'PLANNED',
+                              'AWAITING_CUSTOMER_APPROVAL', 'CUSTOMER_APPROVED')),
+    -- Hand-overs to planning; a proposal belongs to the round it was made in.
+    planning_round INTEGER NOT NULL DEFAULT 0 CHECK (planning_round >= 0),
+    planning_evaluation INTEGER NOT NULL DEFAULT 0 CHECK (planning_evaluation >= 0),
+    planning_submitted_at TIMESTAMPTZ,
     order_date DATE NOT NULL,
+    -- The delivery date the customer asked for, kept as told; it never takes the meaning of the
+    -- delivery term's event.
     requested_delivery_date DATE,
-    promised_delivery_date DATE,
+    -- Current agreed committed date for the delivery event; written only by recording a delivery
+    -- commitment (sales_ord.delivery_commitment keeps the first promise and every change).
+    committed_on DATE,
     actual_delivery_date DATE,
-    total_amount NUMERIC(19,4),
-    tax_amount NUMERIC(19,4),
-    discount_amount NUMERIC(19,4),
-    currency VARCHAR(3) DEFAULT 'TRY',
+    -- Incoterms rule, named place and edition. The rule decides which event the order's dates
+    -- refer to; nothing is assumed while no term is agreed.
+    delivery_term VARCHAR(3)
+        CHECK (delivery_term IN ('EXW', 'FCA', 'CPT', 'CIP', 'DAT', 'DAP', 'DPU', 'DDP',
+                                 'FAS', 'FOB', 'CFR', 'CIF')),
+    delivery_place VARCHAR(200),
+    incoterms_version VARCHAR(20)
+        CHECK (incoterms_version IN ('INCOTERMS_2010', 'INCOTERMS_2020')),
+    -- A term is a proposal until the customer approves the sent order version, or agreed from the
+    -- start by a prior contract (reference kept). Entering a date never makes it agreed.
+    delivery_term_status VARCHAR(30)
+        CHECK (delivery_term_status IN ('PROPOSED', 'AGREED_BY_CONTRACT', 'AGREED_BY_CUSTOMER')),
+    delivery_contract_reference VARCHAR(200),
+    -- Agreed payment terms. Amounts live on the lines, each in its own agreed currency; the order
+    -- totals are derived per currency from them and are never stored here.
+    payment_terms VARCHAR(200),
+    -- Where the conversation that led to the order took place; context only. The terms the
+    -- customer accepts are recorded by the customer's approval of the sent order version.
+    agreement_context VARCHAR(30)
+        CHECK (agreement_context IN ('CUSTOMER_VISITED_US', 'WE_VISITED_CUSTOMER',
+                                     'TRADE_FAIR_OR_EVENT', 'REMOTE_MEETING', 'OTHER')),
+    agreement_context_note VARCHAR(500),
+    -- Customer contact person for the order, as chosen or typed at order entry (a snapshot; the
+    -- partner's contact list is not changed by an order).
+    contact_name VARCHAR(120),
+    contact_email VARCHAR(254),
+    contact_phone VARCHAR(30),
+    contact_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
     shipping_address VARCHAR(500),
     billing_address VARCHAR(500),
     shipping_method VARCHAR(50),
@@ -1568,7 +1604,22 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_so_trading_partner FOREIGN KEY (trading_partner_id) REFERENCES common_company.common_trading_partner(id) ON DELETE RESTRICT,
-    CONSTRAINT uk_so_tenant_order_number UNIQUE (tenant_id, order_number)
+    CONSTRAINT uk_so_tenant_order_number UNIQUE (tenant_id, order_number),
+    CONSTRAINT ck_so_agreement_context CHECK (
+        (agreement_context IS NULL AND agreement_context_note IS NULL)
+        OR (agreement_context = 'OTHER' AND agreement_context_note IS NOT NULL)
+        OR (agreement_context <> 'OTHER' AND agreement_context_note IS NULL)),
+    CONSTRAINT ck_so_delivery_term_status CHECK (
+        (delivery_term_status IS NULL AND delivery_contract_reference IS NULL)
+        OR (delivery_term_status = 'AGREED_BY_CONTRACT' AND delivery_contract_reference IS NOT NULL)
+        OR (delivery_term_status <> 'AGREED_BY_CONTRACT' AND delivery_contract_reference IS NULL)),
+    CONSTRAINT ck_so_delivery_term CHECK (
+        (delivery_term IS NULL AND delivery_place IS NULL AND incoterms_version IS NULL
+            AND delivery_term_status IS NULL)
+        OR (delivery_term IS NOT NULL AND length(trim(delivery_place)) > 0
+            AND incoterms_version IS NOT NULL AND delivery_term_status IS NOT NULL
+            AND NOT (delivery_term = 'DAT' AND incoterms_version <> 'INCOTERMS_2010')
+            AND NOT (delivery_term = 'DPU' AND incoterms_version <> 'INCOTERMS_2020')))
 );
 
 CREATE INDEX IF NOT EXISTS idx_so_tenant ON sales_ord.sales_order(tenant_id);
@@ -2917,7 +2968,11 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order_line (
     requested_qty DECIMAL(15,3) NOT NULL,
     unit VARCHAR(20) NOT NULL,
     unit_price DECIMAL(18,4),
+    -- The agreed sales currency of this line. It can be known before the price is.
     currency VARCHAR(3),
+    -- Line-level adjustments in the line currency; they need an agreed unit price.
+    discount_amount DECIMAL(18,4),
+    tax_amount DECIMAL(18,4),
     module_type VARCHAR(20)
         CONSTRAINT ck_sol_module_type CHECK (module_type IN (
             'FIBER', 'YARN', 'FABRIC', 'DYE_FINISHING'
@@ -2933,6 +2988,11 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order_line (
     -- Ensure at least one of product_id or product_desc is non-null
     CONSTRAINT ck_sol_product_or_desc CHECK (
         product_id IS NOT NULL OR product_desc IS NOT NULL
+    ),
+    CONSTRAINT ck_sol_price_has_currency CHECK (unit_price IS NULL OR currency IS NOT NULL),
+    CONSTRAINT ck_sol_adjustments CHECK (
+        (discount_amount IS NULL OR (discount_amount >= 0 AND unit_price IS NOT NULL))
+        AND (tax_amount IS NULL OR (tax_amount >= 0 AND unit_price IS NOT NULL))
     )
 );
 

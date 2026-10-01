@@ -3,13 +3,10 @@ package com.fabricmanagement.sales.orderintake.dto;
 import com.fabricmanagement.sales.orderintake.domain.AcceptanceChannel;
 import com.fabricmanagement.sales.orderintake.domain.RemainingNeed;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -55,10 +52,4 @@ public final class OrderIntakeRequests {
           boolean customerStatementConfirmed,
       @Schema(description = "Client key; repeating it returns the first result") @Size(max = 100)
           String idempotencyKey) {}
-
-  @Schema(name = "RecordAgreedQuantityToleranceRequest")
-  public record RecordAgreedTolerance(
-      @DecimalMin("0") @DecimalMax("100") BigDecimal upPct,
-      @DecimalMin("0") @DecimalMax("100") BigDecimal downPct,
-      @Size(max = 1000) String source) {}
 }

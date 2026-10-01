@@ -129,20 +129,21 @@ CREATE TABLE IF NOT EXISTS sales_ord.quantity_proposal (
 CREATE INDEX IF NOT EXISTS idx_quantity_proposal_line
     ON sales_ord.quantity_proposal (tenant_id, sales_order_line_id, evaluated_at DESC);
 
-ALTER TABLE sales_ord.sales_order
-    ADD COLUMN IF NOT EXISTS agreed_tolerance_up_pct NUMERIC(5, 2),
-    ADD COLUMN IF NOT EXISTS agreed_tolerance_down_pct NUMERIC(5, 2),
-    ADD COLUMN IF NOT EXISTS agreed_tolerance_source TEXT,
-    ADD COLUMN IF NOT EXISTS agreed_tolerance_recorded_by UUID,
-    ADD COLUMN IF NOT EXISTS agreed_tolerance_recorded_at TIMESTAMPTZ;
+-- Quantity tolerance agreed with the customer (SOI A03) is per distribution line, like its colour
+-- and price (Fatih, 2026-10-01): each line carries its own limits, who recorded them and when.
+-- The customer accepts them with the sent order version; no per-line source is kept.
+ALTER TABLE sales_ord.sales_order_line
+    ADD COLUMN IF NOT EXISTS tolerance_up_pct NUMERIC(5, 2),
+    ADD COLUMN IF NOT EXISTS tolerance_down_pct NUMERIC(5, 2),
+    ADD COLUMN IF NOT EXISTS tolerance_recorded_by UUID,
+    ADD COLUMN IF NOT EXISTS tolerance_recorded_at TIMESTAMPTZ;
 
-ALTER TABLE sales_ord.sales_order
-    ADD CONSTRAINT chk_sales_order_agreed_tolerance CHECK (
-        (agreed_tolerance_up_pct IS NULL OR agreed_tolerance_up_pct >= 0)
-        AND (agreed_tolerance_down_pct IS NULL OR agreed_tolerance_down_pct >= 0)
-        AND ((agreed_tolerance_up_pct IS NULL AND agreed_tolerance_down_pct IS NULL)
-            OR (agreed_tolerance_source IS NOT NULL AND agreed_tolerance_recorded_by IS NOT NULL
-                AND agreed_tolerance_recorded_at IS NOT NULL))
+ALTER TABLE sales_ord.sales_order_line
+    ADD CONSTRAINT chk_sales_line_tolerance CHECK (
+        (tolerance_up_pct IS NULL OR tolerance_up_pct BETWEEN 0 AND 100)
+        AND (tolerance_down_pct IS NULL OR tolerance_down_pct BETWEEN 0 AND 100)
+        AND ((tolerance_up_pct IS NULL AND tolerance_down_pct IS NULL)
+            OR (tolerance_recorded_by IS NOT NULL AND tolerance_recorded_at IS NOT NULL))
     );
 
 DO $$

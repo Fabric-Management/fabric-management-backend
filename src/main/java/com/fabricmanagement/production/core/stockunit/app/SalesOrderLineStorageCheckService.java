@@ -36,7 +36,10 @@ public class SalesOrderLineStorageCheckService {
    * @param salesOrderLineId The SalesOrderLine ID.
    * @param triggeredByStockUnitId The StockUnit ID that triggered this check.
    */
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  // Joins the caller's transaction: the listener that calls this is already post-commit and
+  // transactional, and a REQUIRES_NEW here was a third pooled connection per async listener
+  // (pool exhaustion under stock-unit event bursts). Not read-only: it publishes an event.
+  @Transactional(propagation = Propagation.REQUIRED)
   public void publishLineStoredIfAllOutputsStored(
       UUID tenantId, UUID salesOrderLineId, UUID triggeredByStockUnitId) {
 

@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
@@ -71,12 +70,7 @@ class ConfirmationGateTest {
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT);
     gate = new ConfirmationGate(acceptances, evaluation, allocation, customRequests);
-    order =
-        SalesOrder.builder()
-            .totals(OrderTotals.zero("EUR"))
-            .tradingPartnerId(UUID.randomUUID())
-            .orderNumber("SO-1")
-            .build();
+    order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
     line =
         SalesOrderLine.builder()

@@ -1,6 +1,5 @@
 package com.fabricmanagement.sales.orderintake.domain;
 
-import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +20,8 @@ public final class AcceptanceTerms {
   private AcceptanceTerms() {}
 
   public static String fingerprint(SalesOrderLine line) {
-    Money price = line.getUnitPrice();
+    // The stored price (four decimals), not Money, which rounds to the currency's minor unit.
+    BigDecimal price = line.getUnitPriceAmount();
     String canonical =
         String.join(
             "|",
@@ -32,10 +32,8 @@ public final class AcceptanceTerms {
             upper(line.getUnit()),
             plain(line.getRequestedQty()),
             Boolean.toString(line.isSingleLotRequired()),
-            price == null ? "" : plain(price.getAmount()),
-            price == null || price.getCurrency() == null
-                ? ""
-                : price.getCurrency().getCurrencyCode());
+            price == null ? "" : plain(price),
+            price == null || line.getCurrency() == null ? "" : line.getCurrency());
     return sha256(canonical);
   }
 

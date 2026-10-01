@@ -193,8 +193,8 @@ public class QuantityEvaluationService {
             stock.confirmedCompatibleGroups(),
             toneGroups,
             line.isSingleLotRequired(),
-            order.getAgreedToleranceUpPct(),
-            order.getAgreedToleranceDownPct()));
+            line.getToleranceUpPct(),
+            line.getToleranceDownPct()));
   }
 
   private QuantityEvaluator.Evaluation unknown(

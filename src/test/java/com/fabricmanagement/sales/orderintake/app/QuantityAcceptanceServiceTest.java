@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.production.core.batch.api.LotCompatibilityRequestPort;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
@@ -34,7 +33,6 @@ import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalR
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
-import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -67,8 +65,8 @@ class QuantityAcceptanceServiceTest {
   @Mock private QuantityAcceptanceRepository acceptances;
   @Mock private QuantityEvaluationService evaluation;
   @Mock private SalesOrderLineRepository lines;
-  @Mock private SalesOrderRepository orders;
-  @Mock private OrderTotalsRecalculator totals;
+  @org.mockito.Spy private LineAdjustmentGuard adjustments = new LineAdjustmentGuard();
+  @Mock private com.fabricmanagement.sales.salesorder.app.SalesOrderRevision revision;
   @Mock private LotCompatibilityRequestPort compatibilityRequests;
 
   private final java.util.Map<UUID, BigDecimal> measuredPieces = new java.util.HashMap<>();
@@ -90,16 +88,11 @@ class QuantityAcceptanceServiceTest {
             acceptances,
             evaluation,
             lines,
-            orders,
-            totals,
+            adjustments,
+            revision,
             compatibilityRequests,
             Clock.fixed(NOW, ZoneOffset.UTC));
-    order =
-        SalesOrder.builder()
-            .totals(OrderTotals.zero("EUR"))
-            .tradingPartnerId(UUID.randomUUID())
-            .orderNumber("SO-1")
-            .build();
+    order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
     line =
         SalesOrderLine.builder()
@@ -143,7 +136,25 @@ class QuantityAcceptanceServiceTest {
     assertThat(dto.remainingQuantity()).isEqualByComparingTo("288");
     assertThat(line.getRequestedQty()).isEqualByComparingTo("500");
     assertThat(dto.coversCurrentTerms()).isTrue();
-    verify(totals).recalculate(order);
+    verify(adjustments).assertFits(line);
+    verify(revision).linesChanged(order);
+  }
+
+  @Test
+  @DisplayName("While planning evaluates the order, the quantity is not changed by an acceptance")
+  void anOrderWithPlanningKeepsItsQuantity() {
+    QuantityOption above =
+        option(QuantityOption.OptionKind.ABOVE, "514", List.of(lotA), List.of(pieceA));
+    QuantityProposal proposal = latest(above);
+    stock(List.of(lot(lotA, pieceA, PieceState.ELIGIBLE)), List.of());
+    order.moveFlowTo(com.fabricmanagement.sales.salesorder.domain.OrderFlowStage.AWAITING_PLANNING);
+
+    assertThatThrownBy(
+            () ->
+                service.record(
+                    order.getId(), line.getId(), request(proposal, above, null, null), ACTOR))
+        .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class);
+    assertThat(line.getRequestedQty()).isNotEqualByComparingTo("514");
   }
 
   @Test
@@ -158,7 +169,7 @@ class QuantityAcceptanceServiceTest {
 
     assertThat(line.getRequestedQty()).isEqualByComparingTo("514");
     verify(lines).save(line);
-    verify(totals).recalculate(order);
+    verify(adjustments).assertFits(line);
   }
 
   @Test
@@ -310,7 +321,8 @@ class QuantityAcceptanceServiceTest {
 
     assertThat(requested.getRequestedQty()).isEqualByComparingTo("500");
     assertThat(saved.get().getStatus()).isEqualTo(QuantityAcceptanceStatus.WITHDRAWN);
-    verify(totals, org.mockito.Mockito.times(2)).recalculate(order);
+    verify(adjustments, org.mockito.Mockito.times(2)).assertFits(requested);
+    verify(revision, org.mockito.Mockito.times(2)).linesChanged(order);
   }
 
   @Test

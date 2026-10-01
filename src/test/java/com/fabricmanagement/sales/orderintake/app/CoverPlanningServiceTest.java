@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
+import com.fabricmanagement.common.infrastructure.security.PermissionKey;
+import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.production.core.workorder.api.query.ProductionHistoryQueryService;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.CoverPortionKind;
 import com.fabricmanagement.sales.orderintake.domain.LineGreigeCover;
@@ -20,6 +22,10 @@ import com.fabricmanagement.sales.orderintake.infra.repository.CustomerProductRe
 import com.fabricmanagement.sales.orderintake.infra.repository.LineGreigeCoverRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.LinePortionReadinessRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.OrderArrivalEstimateRepository;
+import com.fabricmanagement.sales.salesorder.app.WorkFixture;
+import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
+import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
+import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.port.LineStockPortionPort;
@@ -45,6 +51,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** SOI D5/D6: portions add up to the open quantity; dates are confirmed, never assumed. */
 @ExtendWith(MockitoExtension.class)
@@ -65,6 +73,7 @@ class CoverPlanningServiceTest {
   @Mock private DeliveryPreferenceService deliveryPreference;
   @Mock private CustomerProductRequestRepository customRequests;
 
+  private WorkFixture work;
   private CoverPlanningService service;
   private SalesOrder order;
   private SalesOrderLine line;
@@ -74,6 +83,17 @@ class CoverPlanningServiceTest {
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT);
     LineStockPortionPort stockPortion = ignored -> heldStock;
+    work = new WorkFixture(Clock.fixed(NOW, ZoneOffset.UTC));
+    work.user(
+        ACTOR,
+        "PLANNING",
+        Map.of(
+            PermissionKey.PRODUCTION_READ, DataScope.OWN,
+            PermissionKey.PRODUCTION_WRITE, DataScope.OWN,
+            PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT,
+            PermissionKey.LOGISTICS_READ, DataScope.OWN,
+            PermissionKey.LOGISTICS_PREPARE, DataScope.OWN,
+            PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT));
     service =
         new CoverPlanningService(
             access,
@@ -86,14 +106,20 @@ class CoverPlanningServiceTest {
             history,
             deliveryPreference,
             customRequests,
+            work.service,
             Clock.fixed(NOW, ZoneOffset.UTC));
     order =
         SalesOrder.builder()
-            .totals(OrderTotals.zero("EUR"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-6")
+            .status(OrderStatus.DRAFT)
             .build();
     order.setId(UUID.randomUUID());
+    // The order is with planning and ACTOR took it.
+    ReflectionTestUtils.setField(order, "flowStage", OrderFlowStage.IN_PLANNING);
+    work.order(order);
+    work.service.route(order.getId(), OrderWorkKind.PLANNING, null);
+    work.service.claim(order.getId(), OrderWorkKind.PLANNING, ACTOR);
     line =
         SalesOrderLine.builder()
             .salesOrderId(order.getId())
@@ -252,14 +278,167 @@ class CoverPlanningServiceTest {
   @Test
   void unknownStockCannotBeConfirmedReadyToShip() {
     heldStock = Optional.empty();
+    UUID warehouse = warehouseMember();
+    work.service.route(order.getId(), OrderWorkKind.SHIP_READINESS, null);
+    work.service.claim(order.getId(), OrderWorkKind.SHIP_READINESS, warehouse);
     assertThatThrownBy(
             () ->
                 service.confirmShipReadiness(
                     line.getId(),
                     new FulfilmentDtos.ConfirmReadiness(LocalDate.parse("2026-10-20"), "packed"),
-                    ACTOR))
+                    warehouse))
         .isInstanceOf(OrderIntakeException.class);
     verify(readiness, never()).save(any());
+  }
+
+  @Test
+  void planningInputOutsideTheEvaluationIsRefused() {
+    ReflectionTestUtils.setField(order, "flowStage", OrderFlowStage.PLANNED);
+    LineGreigeCover cover =
+        LineGreigeCover.confirm(
+            order.getId(),
+            line.getId(),
+            new BigDecimal("50"),
+            "M",
+            List.of(),
+            "HAM-1",
+            0,
+            null,
+            ACTOR,
+            NOW);
+    when(greigeCovers.findFirstByTenantIdAndSalesOrderLineIdAndStatus(
+            TENANT, line.getId(), LineGreigeCover.Status.ACTIVE))
+        .thenReturn(Optional.of(cover));
+
+    assertThatThrownBy(() -> service.withdrawGreigeCover(line.getId(), ACTOR))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("EVALUATION_CLOSED");
+    ReflectionTestUtils.setField(order, "flowStage", OrderFlowStage.AWAITING_PLANNING);
+    assertThatThrownBy(() -> service.withdrawGreigeCover(line.getId(), ACTOR))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("EVALUATION_NOT_STARTED");
+    ReflectionTestUtils.setField(order, "status", OrderStatus.CANCELLED);
+    assertThatThrownBy(() -> service.withdrawGreigeCover(line.getId(), ACTOR))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("ORDER_CLOSED");
+    assertThat(cover.getStatus()).isEqualTo(LineGreigeCover.Status.ACTIVE);
+    verify(greigeCovers, never()).save(any());
+  }
+
+  @Test
+  void aPlannerWithoutScopeOverTheOrderCannotWithdrawItsCover() {
+    UUID colleague =
+        work.user(
+            "PLANNING",
+            Map.of(
+                PermissionKey.PRODUCTION_READ, DataScope.OWN,
+                PermissionKey.PRODUCTION_WRITE, DataScope.OWN,
+                PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT));
+
+    assertThatThrownBy(() -> service.withdrawGreigeCover(line.getId(), colleague))
+        .isInstanceOf(
+            com.fabricmanagement.common.infrastructure.web.exception.NotFoundException.class);
+    verify(greigeCovers, never()).save(any());
+  }
+
+  @Test
+  void theArrivalEstimateNeedsShippingResponsibilityAndAnOrderInFulfilment() {
+    UUID shipper =
+        work.user(
+            "SHIPPING",
+            Map.of(
+                PermissionKey.LOGISTICS_READ, DataScope.OWN,
+                PermissionKey.LOGISTICS_WRITE, DataScope.OWN,
+                PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT));
+    var estimate =
+        new FulfilmentDtos.RecordArrivalEstimate(
+            LocalDate.parse("2026-10-22"),
+            LocalDate.parse("2026-10-24"),
+            com.fabricmanagement.sales.orderintake.domain.OrderArrivalEstimate.Source.CARRIER,
+            "TRK-1");
+
+    // Not routed: the order is not in fulfilment yet.
+    assertThatThrownBy(() -> service.recordArrival(order.getId(), estimate, shipper))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("WORK_NOT_ROUTED");
+    work.service.route(order.getId(), OrderWorkKind.ARRIVAL_ESTIMATE, null);
+    assertThatThrownBy(() -> service.recordArrival(order.getId(), estimate, shipper))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("WORK_NOT_CLAIMED");
+    work.service.claim(order.getId(), OrderWorkKind.ARRIVAL_ESTIMATE, shipper);
+    assertThatThrownBy(() -> service.recordArrival(order.getId(), estimate, shipper))
+        .isInstanceOf(OrderDomainException.class)
+        .extracting(error -> ((OrderDomainException) error).getErrorCode())
+        .isEqualTo("ORDER_NOT_IN_PROCESSING");
+    verify(arrivals, never()).save(any());
+  }
+
+  @Test
+  void readOnlyLogisticsCannotConfirmShipReadiness() {
+    UUID reader =
+        work.user("WAREHOUSE", Map.of(PermissionKey.LOGISTICS_READ, DataScope.ORGANIZATION));
+    work.service.route(order.getId(), OrderWorkKind.SHIP_READINESS, null);
+    work.service.claim(order.getId(), OrderWorkKind.SHIP_READINESS, warehouseMember());
+
+    assertThatThrownBy(
+            () ->
+                service.confirmShipReadiness(
+                    line.getId(),
+                    new FulfilmentDtos.ConfirmReadiness(LocalDate.parse("2026-10-20"), "packed"),
+                    reader))
+        .isInstanceOf(AccessDeniedException.class);
+    verify(readiness, never()).save(any());
+  }
+
+  @Test
+  void theWarehouseQueueShowsOnlyRequestsInTheUsersScope() {
+    LinePortionReadiness request =
+        LinePortionReadiness.request(
+            order.getId(), line.getId(), CoverPortionKind.FINISHED_STOCK, ACTOR, NOW);
+    when(readiness.findByTenantIdAndStatusAndPortionInOrderByRequestedAtAscIdAsc(
+            any(), any(), any()))
+        .thenReturn(List.of(request));
+    when(orders.findAllById(any())).thenReturn(List.of(order));
+    ReflectionTestUtils.setField(order, "tenantId", TENANT);
+    UUID warehouseWorker =
+        work.user(
+            "WAREHOUSE",
+            Map.of(
+                PermissionKey.LOGISTICS_READ, DataScope.OWN,
+                PermissionKey.LOGISTICS_PREPARE, DataScope.OWN,
+                PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT));
+    UUID shipping =
+        work.user("SHIPPING", Map.of(PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT));
+    work.service.route(order.getId(), OrderWorkKind.SHIP_READINESS, null);
+
+    assertThat(service.openRequests(true, shipping)).isEmpty();
+    var visible = service.openRequests(true, warehouseWorker);
+    assertThat(visible).hasSize(1);
+    assertThat(visible.getFirst().actions())
+        .anySatisfy(
+            capability -> {
+              assertThat(capability.action().name()).isEqualTo("CLAIM");
+              assertThat(capability.allowed()).isTrue();
+            })
+        .anySatisfy(
+            capability -> {
+              assertThat(capability.action().name()).isEqualTo("CONFIRM_READINESS");
+              assertThat(capability.reason()).isEqualTo("WORK_NOT_CLAIMED");
+            });
+  }
+
+  private UUID warehouseMember() {
+    return work.user(
+        "WAREHOUSE",
+        Map.of(
+            PermissionKey.LOGISTICS_READ, DataScope.OWN,
+            PermissionKey.LOGISTICS_PREPARE, DataScope.OWN,
+            PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT));
   }
 
   private static Map<CoverPortionKind, FulfilmentDtos.PortionOutlook> byKind(

@@ -16,7 +16,6 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.flowboard.routing.app.RoutingPoolConfigurationService;
 import com.fabricmanagement.flowboard.routing.app.listener.RoutingEventListener;
 import com.fabricmanagement.flowboard.routing.domain.RoutingPoolKey;
@@ -257,7 +256,6 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
                       .orderNumber("OC-" + UUID.randomUUID())
                       .orderDate(LocalDate.now())
                       .status(OrderStatus.DRAFT)
-                      .totals(OrderTotals.zero("GBP"))
                       .build());
           for (int index = 0; index < lineCount; index++) {
             var line =

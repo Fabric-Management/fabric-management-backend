@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.orderintake.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.core.workorder.api.query.ProductionHistoryQueryService;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.CoverPortionKind;
 import com.fabricmanagement.sales.orderintake.domain.CustomerProductRequest;
@@ -15,10 +16,14 @@ import com.fabricmanagement.sales.orderintake.infra.repository.CustomerProductRe
 import com.fabricmanagement.sales.orderintake.infra.repository.LineGreigeCoverRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.LinePortionReadinessRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.OrderArrivalEstimateRepository;
+import com.fabricmanagement.sales.salesorder.app.OrderWorkService;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
+import com.fabricmanagement.sales.salesorder.domain.OrderWorkAssignment;
+import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.port.LineStockPortionPort;
+import com.fabricmanagement.sales.salesorder.dto.OrderWorkDtos;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
@@ -63,6 +68,7 @@ public class CoverPlanningService {
   private final ProductionHistoryQueryService history;
   private final DeliveryPreferenceService deliveryPreference;
   private final CustomerProductRequestRepository customRequests;
+  private final OrderWorkService work;
   private final Clock clock;
 
   /** Planning or the dyehouse confirms what part of the line is made from available greige. */
@@ -71,7 +77,8 @@ public class CoverPlanningService {
       UUID lineId, FulfilmentDtos.ConfirmGreigeCover input, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrderLine line = activeLine(tenantId, lineId);
-    SalesOrder order = openOrder(tenantId, line.getSalesOrderId());
+    SalesOrder order =
+        workableOrder(tenantId, line.getSalesOrderId(), OrderWorkKind.PLANNING, actor);
     BigDecimal stock =
         stockPortion
             .ownFinishedStock(line)
@@ -115,6 +122,7 @@ public class CoverPlanningService {
   public FulfilmentDtos.LineOutlook withdrawGreigeCover(UUID lineId, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrderLine line = activeLine(tenantId, lineId);
+    workableOrder(tenantId, line.getSalesOrderId(), OrderWorkKind.PLANNING, actor);
     LineGreigeCover cover =
         greigeCovers
             .findFirstByTenantIdAndSalesOrderLineIdAndStatus(
@@ -147,6 +155,10 @@ public class CoverPlanningService {
       readiness.save(
           LinePortionReadiness.request(order.getId(), lineId, portion, actor, clock.instant()));
     }
+    if (portion == CoverPortionKind.FINISHED_STOCK) {
+      // Held stock is the warehouse's work: it goes to the warehouse team's queue.
+      work.route(order.getId(), OrderWorkKind.SHIP_READINESS, actor);
+    }
     return lineOutlook(tenantId, line);
   }
 
@@ -158,7 +170,7 @@ public class CoverPlanningService {
       throw OrderIntakeException.rule(
           "WAREHOUSE_CONFIRMS_STOCK", "Stock readiness is confirmed by the warehouse");
     }
-    return confirm(lineId, portion, input, actor);
+    return confirm(lineId, portion, input, actor, OrderWorkKind.PLANNING);
   }
 
   /** The warehouse confirms when the held stock is ready to ship (A07-b). */
@@ -167,34 +179,135 @@ public class CoverPlanningService {
       UUID lineId, FulfilmentDtos.ConfirmReadiness input, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrderLine line = activeLine(tenantId, lineId);
+    workableOrder(tenantId, line.getSalesOrderId(), OrderWorkKind.SHIP_READINESS, actor);
     boolean held =
         stockPortion.ownFinishedStock(line).map(value -> value.signum() > 0).orElse(false);
     if (!held) {
       throw OrderIntakeException.rule("NOTHING_HELD", "No stock is held for this line");
     }
-    return confirm(lineId, CoverPortionKind.FINISHED_STOCK, input, actor);
+    return confirm(
+        lineId, CoverPortionKind.FINISHED_STOCK, input, actor, OrderWorkKind.SHIP_READINESS);
   }
 
+  /**
+   * Open readiness questions the user may see: production portions of orders whose planning is in
+   * the user's scope, held stock of orders whose warehouse work is. Each carries the actions the
+   * user may take; unassigned work is offered to those who may take or assign it.
+   */
   @Transactional(readOnly = true)
-  public List<FulfilmentDtos.ReadinessRequestView> openRequests(boolean warehouse) {
+  public List<FulfilmentDtos.ReadinessRequestView> openRequests(boolean warehouse, UUID actor) {
+    UUID tenantId = TenantContext.requireTenantId();
     Set<CoverPortionKind> portions =
         warehouse
             ? EnumSet.of(CoverPortionKind.FINISHED_STOCK)
             : EnumSet.of(CoverPortionKind.FROM_GREIGE, CoverPortionKind.NEW_SUPPLY);
-    return readiness
-        .findByTenantIdAndStatusAndPortionInOrderByRequestedAtAscIdAsc(
-            TenantContext.requireTenantId(), LinePortionReadiness.Status.REQUESTED, portions)
-        .stream()
-        .map(
-            value ->
-                new FulfilmentDtos.ReadinessRequestView(
-                    value.getId(),
-                    value.getSalesOrderId(),
-                    value.getSalesOrderLineId(),
-                    value.getPortion(),
-                    value.getRequestedBy(),
-                    value.getRequestedAt()))
-        .toList();
+    OrderWorkKind kind = warehouse ? OrderWorkKind.SHIP_READINESS : OrderWorkKind.PLANNING;
+    List<LinePortionReadiness> open =
+        readiness.findByTenantIdAndStatusAndPortionInOrderByRequestedAtAscIdAsc(
+            tenantId, LinePortionReadiness.Status.REQUESTED, portions);
+    if (open.isEmpty()) {
+      return List.of();
+    }
+    Set<UUID> orderIds =
+        open.stream().map(LinePortionReadiness::getSalesOrderId).collect(Collectors.toSet());
+    Map<UUID, OrderWorkAssignment> assigned = work.assignments(kind, orderIds);
+    Map<UUID, SalesOrder> byId =
+        orders.findAllById(orderIds).stream()
+            .filter(order -> tenantId.equals(order.getTenantId()))
+            .collect(Collectors.toMap(SalesOrder::getId, Function.identity()));
+    var viewer = work.actor(actor, false);
+    OrderWorkService.ViewContext views = work.viewContext(actor);
+    List<FulfilmentDtos.ReadinessRequestView> result = new ArrayList<>();
+    for (LinePortionReadiness value : open) {
+      SalesOrder order = byId.get(value.getSalesOrderId());
+      OrderWorkAssignment assignment = assigned.get(value.getSalesOrderId());
+      OrderWorkService.WorkAccess access = work.access(assignment, kind, viewer);
+      if (order == null || !access.visible()) {
+        continue;
+      }
+      String confirmReason =
+          access.workReason() != null ? access.workReason() : planningInputReason(order);
+      List<OrderWorkDtos.Capability> actions = new ArrayList<>();
+      actions.add(
+          OrderWorkDtos.Capability.of(OrderWorkDtos.Action.CONFIRM_READINESS, confirmReason));
+      if (warehouse) {
+        actions.addAll(
+            OrderWorkService.responsibilityActions(
+                access, OrderWorkService.closedFor(kind, order)));
+      } else {
+        actions.add(
+            OrderWorkDtos.Capability.of(OrderWorkDtos.Action.CONFIRM_GREIGE_COVER, confirmReason));
+      }
+      result.add(
+          new FulfilmentDtos.ReadinessRequestView(
+              value.getId(),
+              value.getSalesOrderId(),
+              value.getSalesOrderLineId(),
+              value.getPortion(),
+              value.getRequestedBy(),
+              value.getRequestedAt(),
+              order.getOrderNumber(),
+              views.of(assignment),
+              List.copyOf(actions)));
+    }
+    return result;
+  }
+
+  /** Orders in fulfilment whose arrival estimate the user may see, with the actions on it. */
+  @Transactional(readOnly = true)
+  public List<FulfilmentDtos.ArrivalWorkItem> arrivalWork(UUID actor) {
+    UUID tenantId = TenantContext.requireTenantId();
+    var viewer = work.actor(actor, false);
+    OrderWorkService.ViewContext views = work.viewContext(actor);
+    List<FulfilmentDtos.ArrivalWorkItem> result = new ArrayList<>();
+    for (OrderWorkAssignment assignment : work.allOf(OrderWorkKind.ARRIVAL_ESTIMATE)) {
+      OrderWorkService.WorkAccess access =
+          work.access(assignment, OrderWorkKind.ARRIVAL_ESTIMATE, viewer);
+      if (!access.visible()) {
+        continue;
+      }
+      SalesOrder order =
+          orders.findByTenantIdAndId(tenantId, assignment.getSalesOrderId()).orElse(null);
+      if (order == null
+          || order.getStatus() == OrderStatus.DELIVERED
+          || order.getStatus().isTerminal()) {
+        continue;
+      }
+      String recordReason = access.workReason();
+      if (recordReason == null) {
+        recordReason = stageReason(order::assertAcceptsArrivalEstimate);
+      }
+      List<OrderWorkDtos.Capability> actions =
+          new ArrayList<>(
+              OrderWorkService.responsibilityActions(
+                  access, OrderWorkService.closedFor(OrderWorkKind.ARRIVAL_ESTIMATE, order)));
+      actions.add(OrderWorkDtos.Capability.of(OrderWorkDtos.Action.RECORD_ARRIVAL, recordReason));
+      result.add(
+          new FulfilmentDtos.ArrivalWorkItem(
+              order.getId(),
+              order.getOrderNumber(),
+              order.getStatus().name(),
+              arrivals
+                  .findFirstByTenantIdAndSalesOrderIdAndSupersededAtIsNull(tenantId, order.getId())
+                  .map(CoverPlanningService::arrivalView)
+                  .orElse(null),
+              views.of(assignment),
+              List.copyOf(actions)));
+    }
+    return result;
+  }
+
+  private static String planningInputReason(SalesOrder order) {
+    return stageReason(order::assertAcceptsPlanningInput);
+  }
+
+  private static String stageReason(Runnable check) {
+    try {
+      check.run();
+      return null;
+    } catch (OrderDomainException refused) {
+      return refused.getErrorCode();
+    }
   }
 
   /** Records the arrival estimate from a carrier or an authorised, sourced record (A07-b). */
@@ -202,11 +315,9 @@ public class CoverPlanningService {
   public FulfilmentDtos.ArrivalView recordArrival(
       UUID orderId, FulfilmentDtos.RecordArrivalEstimate input, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
-    SalesOrder order =
-        orders
-            .findByTenantIdAndId(tenantId, orderId)
-            .filter(value -> Boolean.TRUE.equals(value.getIsActive()))
-            .orElseThrow(() -> OrderIntakeException.notFound("Sales order", orderId));
+    SalesOrder order = activeOrder(tenantId, orderId);
+    work.requireWork(order.getId(), OrderWorkKind.ARRIVAL_ESTIMATE, actor);
+    order.assertAcceptsArrivalEstimate();
     arrivals
         .findFirstByTenantIdAndSalesOrderIdAndSupersededAtIsNull(tenantId, order.getId())
         .ifPresent(
@@ -266,10 +377,14 @@ public class CoverPlanningService {
   }
 
   private FulfilmentDtos.LineOutlook confirm(
-      UUID lineId, CoverPortionKind portion, FulfilmentDtos.ConfirmReadiness input, UUID actor) {
+      UUID lineId,
+      CoverPortionKind portion,
+      FulfilmentDtos.ConfirmReadiness input,
+      UUID actor,
+      OrderWorkKind kind) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrderLine line = activeLine(tenantId, lineId);
-    openOrder(tenantId, line.getSalesOrderId());
+    workableOrder(tenantId, line.getSalesOrderId(), kind, actor);
     Map<CoverPortionKind, Optional<BigDecimal>> quantities = portionQuantities(tenantId, line);
     if (exceedsOpen(quantities)) {
       throw OrderIntakeException.conflict(
@@ -394,15 +509,22 @@ public class CoverPlanningService {
         .orElseThrow(() -> OrderIntakeException.notFound("Sales-order line", lineId));
   }
 
-  private SalesOrder openOrder(UUID tenantId, UUID orderId) {
-    SalesOrder order =
-        orders
-            .findByTenantIdAndId(tenantId, orderId)
-            .orElseThrow(() -> OrderIntakeException.notFound("Sales order", orderId));
-    if (CLOSED.contains(order.getStatus())) {
-      throw OrderIntakeException.conflict("ORDER_CLOSED", "The order is " + order.getStatus());
-    }
+  /**
+   * The order whose work the user may do now: the permission was checked at the endpoint, here the
+   * user's scope over the order's work and then the flow stage.
+   */
+  private SalesOrder workableOrder(UUID tenantId, UUID orderId, OrderWorkKind kind, UUID actor) {
+    SalesOrder order = activeOrder(tenantId, orderId);
+    work.requireWork(order.getId(), kind, actor);
+    order.assertAcceptsPlanningInput();
     return order;
+  }
+
+  private SalesOrder activeOrder(UUID tenantId, UUID orderId) {
+    return orders
+        .findByTenantIdAndId(tenantId, orderId)
+        .filter(value -> Boolean.TRUE.equals(value.getIsActive()))
+        .orElseThrow(() -> OrderIntakeException.notFound("Sales order", orderId));
   }
 
   private static BigDecimal open(SalesOrderLine line) {

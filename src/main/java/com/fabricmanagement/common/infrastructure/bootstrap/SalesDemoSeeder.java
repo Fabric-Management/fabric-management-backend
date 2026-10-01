@@ -86,7 +86,6 @@ public class SalesDemoSeeder {
     req.setPartnerId(partnerId);
     req.setCustomerReference(reference);
     req.setOrderDate(orderDate);
-    req.setCurrency(currency);
     req.setNotes("Demo seeded sales order");
     req.setLines(
         List.of(

@@ -11,7 +11,6 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
@@ -63,6 +62,7 @@ class SalesOrderServiceConfirmTest {
   // SOI intake checks; a mock is a no-op that reports no blockers.
   @Mock private OrderIntakeHooks orderIntakeHooks;
 
+  @Mock private DeliveryCommitmentService deliveryCommitments;
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrderConfirmedEvent> eventCaptor;
@@ -96,7 +96,6 @@ class SalesOrderServiceConfirmTest {
   private SalesOrder createDraftOrder() {
     SalesOrder order =
         SalesOrder.builder()
-            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(partnerId)
             .orderNumber("SO-001")
             .orderType(OrderType.SALES)
@@ -118,7 +117,14 @@ class SalesOrderServiceConfirmTest {
   void governedConfirmationSkipsLegacyRuleEngineAndPublishesGovernedEvent() {
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
     when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
         .thenReturn(List.of());
@@ -138,7 +144,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     TradingPartnerDto partner = TradingPartnerDto.builder().build();
@@ -166,7 +179,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -193,7 +213,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -220,7 +247,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -244,7 +278,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -268,7 +309,14 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(true);
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(true);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
     when(partnerService.findById(any(), any())).thenReturn(Optional.empty());
     when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(any()))
@@ -281,6 +329,56 @@ class SalesOrderServiceConfirmTest {
     assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
     verify(ruleEngine, never()).processConfirmedOrder(any());
     verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void confirmOrder_checksApprovalOnceWithTheGrandTotalOfEveryAgreedCurrency() {
+    SalesOrder order = createDraftOrder();
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+    SalesOrderLine lira = pricedLine("1000", "TRY", "40");
+    SalesOrderLine dollar = pricedLine("300", "USD", "3.5");
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(any()))
+        .thenReturn(List.of(lira, dollar));
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.<List<com.fabricmanagement.common.util.Money>>any()))
+        .thenReturn(true);
+    when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
+    when(partnerService.findById(any(), any())).thenReturn(Optional.empty());
+
+    salesOrderService.confirmOrder(orderId, userId);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<com.fabricmanagement.common.util.Money>> amounts =
+        ArgumentCaptor.forClass(List.class);
+    verify(approvalPort)
+        .requiresApproval(
+            org.mockito.ArgumentMatchers.eq(tenantId),
+            org.mockito.ArgumentMatchers.eq(userId),
+            org.mockito.ArgumentMatchers.eq("SALES_ORDER"),
+            org.mockito.ArgumentMatchers.eq(orderId),
+            amounts.capture());
+    assertThat(amounts.getValue())
+        .containsExactly(
+            com.fabricmanagement.common.util.Money.of(new BigDecimal("40000"), "TRY"),
+            com.fabricmanagement.common.util.Money.of(new BigDecimal("1050"), "USD"));
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
+  }
+
+  private SalesOrderLine pricedLine(String quantity, String currency, String price) {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .salesOrderId(orderId)
+            .productId(UUID.randomUUID())
+            .requestedQty(new BigDecimal(quantity))
+            .unit("M")
+            .lineStatus(com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus.PENDING)
+            .build();
+    line.updatePricing(currency, new BigDecimal(price), null, null);
+    return line;
   }
 
   @Test
@@ -304,7 +402,13 @@ class SalesOrderServiceConfirmTest {
     SalesOrder order = createDraftOrder();
     TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any()))
+    when(approvalPort.requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
         .thenAnswer(
             invocation -> {
               assertThat((UUID) invocation.getArgument(1)).isEqualTo(userId);

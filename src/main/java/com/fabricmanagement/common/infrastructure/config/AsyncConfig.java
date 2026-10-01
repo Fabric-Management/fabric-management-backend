@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.config;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -27,7 +28,12 @@ public class AsyncConfig implements AsyncConfigurer {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(5);
     executor.setMaxPoolSize(20);
-    executor.setQueueCapacity(100);
+    // Domain events arrive in bursts (one demo seed publishes several hundred stock-unit events
+    // at commit); a 100-slot queue rejected the overflow and left those publications incomplete
+    // until the next restart. A deep queue absorbs the burst, and when even that fills the
+    // publisher runs the task itself instead of dropping it — back-pressure, never rejection.
+    executor.setQueueCapacity(2000);
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
     executor.setThreadNamePrefix("async-tenant-");
     executor.setTaskDecorator(
         new org.springframework.core.task.support.ContextPropagatingTaskDecorator());

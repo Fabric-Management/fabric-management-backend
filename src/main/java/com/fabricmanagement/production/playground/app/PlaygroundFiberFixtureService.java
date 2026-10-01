@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.playground.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.app.FiberCertificationQueryService;
 import com.fabricmanagement.product.fiber.app.FiberPlaygroundFixtureService;
@@ -17,6 +18,9 @@ import com.fabricmanagement.production.core.batch.dto.AddBatchCertificationReque
 import com.fabricmanagement.production.core.batch.dto.BatchCertificationDto;
 import com.fabricmanagement.production.core.batch.dto.BatchDto;
 import com.fabricmanagement.production.core.batch.dto.CreateBatchRequest;
+import com.fabricmanagement.production.core.stockunit.app.StockUnitService;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.playground.domain.PlaygroundFixtureItem;
 import com.fabricmanagement.production.playground.domain.PlaygroundFixtureOrigin;
 import com.fabricmanagement.production.playground.domain.PlaygroundFixtureRun;
@@ -79,6 +83,7 @@ public class PlaygroundFiberFixtureService {
   private final FiberPlaygroundFixtureService fiberFixtures;
   private final FiberCertificationQueryService certificationQueryService;
   private final BatchService batchService;
+  private final StockUnitService stockUnitService;
   private final BatchCertificationService certificationService;
   private final FiberTestResultService testResultService;
   private final Clock clock;
@@ -113,7 +118,19 @@ public class PlaygroundFiberFixtureService {
       return false;
     }
 
-    installDataset(tenantId);
+    // Bootstrap has no signed-in user. The QC results created below publish approval events whose
+    // listener records a quality decision and requires a trusted actor; without one each event
+    // failed and stayed an incomplete publication, retried forever. Attribute the fixture work to
+    // the system actor, as other system-triggered production writes do.
+    TenantContext.TenantSnapshot previous = TenantContext.capture();
+    try {
+      if (TenantContext.getCurrentUserId() == null) {
+        TenantContext.setCurrentUserId(TenantContext.SYSTEM_ACTOR_ID);
+      }
+      installDataset(tenantId);
+    } finally {
+      TenantContext.restore(previous);
+    }
     run.complete(clock.instant());
     runRepository.save(run);
     log.info("Playground fibre fixtures installed: tenant={}, origin={}", tenantId, origin);
@@ -266,20 +283,47 @@ public class PlaygroundFiberFixtureService {
             batchService
                 .findByBatchCode(fixture.code())
                 .map(BatchDto::getId)
-                .orElseGet(
-                    () ->
-                        batchService
-                            .create(
-                                CreateBatchRequest.builder()
-                                    .productId(productId)
-                                    .productType(ProductType.FIBER)
-                                    .batchCode(fixture.code())
-                                    .quantity(new BigDecimal("500.00"))
-                                    .unit("KG")
-                                    .sourceType(BatchSourceType.INITIAL_STOCK)
-                                    .remarks(SYNTHETIC_REMARK)
-                                    .build())
-                            .getId()));
+                .orElseGet(() -> createBaledBatch(fixture, productId)));
+  }
+
+  /**
+   * A fixture lot is two 250 kg bales, not a bare 500 kg figure. The approved or rejected lab
+   * result below publishes an event whose listener records a lot-level quality decision, and a
+   * decision needs physical units to release or reject: on a lot without pieces it failed with "no
+   * eligible StockUnits" and the publication stayed incomplete, retried on every restart. With
+   * bales the fixtures go through the normal QC flow the catalogue ticket asks for.
+   */
+  private UUID createBaledBatch(BatchFixture fixture, UUID productId) {
+    UUID batchId =
+        batchService
+            .create(
+                CreateBatchRequest.builder()
+                    .productId(productId)
+                    .productType(ProductType.FIBER)
+                    .batchCode(fixture.code())
+                    .quantity(new BigDecimal("500.00"))
+                    .unit("KG")
+                    .sourceType(BatchSourceType.INITIAL_STOCK)
+                    .remarks(SYNTHETIC_REMARK)
+                    .build())
+            .getId();
+    for (int bale = 1; bale <= 2; bale++) {
+      stockUnitService.create(
+          batchId,
+          ProductType.FIBER,
+          fixture.code() + "-B" + bale,
+          null,
+          PackageType.BALE,
+          new BigDecimal("250.000"),
+          null,
+          "KG",
+          null,
+          null,
+          null,
+          StockUnitSourceType.PRODUCTION,
+          batchId);
+    }
+    return batchId;
   }
 
   private void measurement(UUID tenantId, String key, UUID batchId, double moisture) {

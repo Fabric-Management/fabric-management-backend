@@ -4,6 +4,7 @@ import com.fabricmanagement.sales.orderintake.domain.CoverPortionKind;
 import com.fabricmanagement.sales.orderintake.domain.LinePortionReadiness;
 import com.fabricmanagement.sales.orderintake.domain.OrderArrivalEstimate;
 import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
+import com.fabricmanagement.sales.salesorder.dto.OrderWorkDtos;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -125,7 +126,28 @@ public final class FulfilmentDtos {
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderLineId,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) CoverPortionKind portion,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) UUID requestedBy,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Instant requestedAt) {}
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Instant requestedAt,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String orderNumber,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
+              description = "Planning for production portions, the warehouse for held stock")
+          OrderWorkDtos.AssignmentView assignment,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "What the current user may do; a null reason means allowed")
+          List<OrderWorkDtos.Capability> actions) {}
+
+  /** An order in fulfilment whose arrival estimate shipping keeps. */
+  @Schema(name = "ArrivalWorkItem")
+  public record ArrivalWorkItem(
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderId,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String orderNumber,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String orderStatus,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) ArrivalView arrival,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) OrderWorkDtos.AssignmentView assignment,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          List<OrderWorkDtos.Capability> actions) {}
 
   @Schema(name = "CorrectLineProductRequest")
   public record CorrectProduct(
