@@ -55,6 +55,7 @@ class OrderFlowServiceTest {
   @Mock private OrderFlowEventRepository events;
   @Mock private SalesOrderAccessPolicy accessPolicy;
   @Mock private TradingPartnerService partners;
+  @Mock private OrderApprovalInvalidator approvals;
 
   @Mock
   private com.fabricmanagement.sales.orderintake.infra.repository.IntakeAttachmentRepository
@@ -124,6 +125,7 @@ class OrderFlowServiceTest {
             partners,
             attachments,
             work.service,
+            approvals,
             Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
@@ -152,6 +154,55 @@ class OrderFlowServiceTest {
             OrderFlowStage.AWAITING_PLANNING, OrderFlowStage.IN_PLANNING, OrderFlowStage.PLANNED);
     // A proposal is not a promise: nothing is committed by planning.
     assertThat(order.getCommittedOn()).isNull();
+  }
+
+  @Test
+  void planningReopensAnOrderOutForTheCustomersApprovalAndTheLinkIsWithdrawn() {
+    service.submit(orderId, sales);
+    service.claim(orderId, planner);
+    service.propose(orderId, proposal(LocalDate.of(2026, 10, 20)), planner);
+    service.complete(orderId, planner);
+    order.moveFlowTo(OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
+
+    service.reopen(orderId, "Dyehouse slot moved", planner);
+
+    assertThat(order.getFlowStage()).isEqualTo(OrderFlowStage.IN_PLANNING);
+    assertThat(order.getPlanningEvaluation()).isEqualTo(1);
+    verify(approvals)
+        .withdrawOpen(orderId, "Planning reopened the evaluation: Dyehouse slot moved", planner);
+  }
+
+  @Test
+  void salesTakingBackAnOrderOutForApprovalWithdrawsItsLink() {
+    service.submit(orderId, sales);
+    service.claim(orderId, planner);
+    service.propose(orderId, proposal(LocalDate.of(2026, 10, 20)), planner);
+    service.complete(orderId, planner);
+    order.moveFlowTo(OrderFlowStage.AWAITING_INTERNAL_APPROVAL);
+
+    service.withdraw(orderId, "Customer wants another colour", sales);
+
+    assertThat(order.getFlowStage()).isEqualTo(OrderFlowStage.DRAFT);
+    verify(approvals)
+        .withdrawOpen(orderId, "Sales took the order back: Customer wants another colour", sales);
+  }
+
+  @Test
+  void anApprovedOrderIsNeitherReopenedNorTakenBack() {
+    service.submit(orderId, sales);
+    service.claim(orderId, planner);
+    service.propose(orderId, proposal(LocalDate.of(2026, 10, 20)), planner);
+    service.complete(orderId, planner);
+    order.moveFlowTo(OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
+    order.moveFlowTo(OrderFlowStage.CUSTOMER_APPROVED);
+
+    assertThatThrownBy(() -> service.reopen(orderId, "Late change", planner))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo("WRONG_STAGE"));
+    assertThatThrownBy(() -> service.withdraw(orderId, "Late change", sales))
+        .isInstanceOf(OrderDomainException.class);
+    assertThat(order.getFlowStage()).isEqualTo(OrderFlowStage.CUSTOMER_APPROVED);
   }
 
   @Test

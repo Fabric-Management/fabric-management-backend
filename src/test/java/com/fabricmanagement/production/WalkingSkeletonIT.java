@@ -214,17 +214,10 @@ class WalkingSkeletonIT {
     req.setLines(List.of(lineReq));
 
     SalesOrderDto createdOrder = salesOrderService.createOrder(req);
-    SalesOrderDto confirmedOrder =
-        salesOrderService.confirmOrder(createdOrder.getId(), adminUserId);
+    SalesOrderDto confirmedOrder = salesOrderService.confirmDemoSeedOrder(createdOrder.getId());
     assertThat(confirmedOrder.getStatus().name()).isEqualTo("CONFIRMED");
 
-    // We must manually publish the SalesOrderConfirmedEvent since confirmOrder only
-    // changes status
-    // and relies on SalesOrderService publishing it
-    // Wait, SalesOrderService.confirmOrder DOES publish SalesOrderConfirmedEvent.
-    // And it's handled
-    // async.
-    // So the listener has probably run already or is running.
+    // Confirmation publishes SalesOrderConfirmedEvent, handled asynchronously.
 
     // ----------------------------------------------------------------------------------
     // 3. WAIT & ASSERT: WorkOrder created in PENDING_APPROVAL due to Policy

@@ -208,6 +208,8 @@ public class TenantTransactionalPurgeService {
           "sales_ord.order_flow_event",
           "sales_ord.order_work_assignment_event",
           "sales_ord.order_work_assignment",
+          "sales_ord.customer_approval",
+          "sales_ord.order_version",
           "sales_ord.line_product_correction",
           "sales_ord.order_cover_case_line",
           "sales_ord.order_cover_line_result",

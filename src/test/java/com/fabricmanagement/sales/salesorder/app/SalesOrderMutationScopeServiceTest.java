@@ -57,9 +57,9 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
-            null,
             new SalesOrderAccessPolicy(
                 new SalesAccessScopeResolver(permissionEvaluator, userQueryService)),
+            null,
             null,
             null,
             null,
@@ -74,18 +74,14 @@ class SalesOrderMutationScopeServiceTest {
 
   @ParameterizedTest
   @ValueSource(
-      strings = {
-        "confirm", "process", "ship", "deliver", "cancel", "hold", "resume", "revise", "delete"
-      })
+      strings = {"process", "ship", "deliver", "cancel", "hold", "resume", "revise", "delete"})
   void nullUserIsDeniedAtEveryServiceEntry(String mutation) {
     assertDeniedWithoutChangingOrder(mutation, null);
   }
 
   @ParameterizedTest
   @ValueSource(
-      strings = {
-        "confirm", "process", "ship", "deliver", "cancel", "hold", "resume", "revise", "delete"
-      })
+      strings = {"process", "ship", "deliver", "cancel", "hold", "resume", "revise", "delete"})
   void systemContextDoesNotTransferAuthorityToOutOfScopeTargetUser(String mutation) {
     TenantContext.setCurrentUserId(SystemUser.ID);
     when(userQueryService.findPermissionIdentity(tenantId, targetUserId))
@@ -139,7 +135,6 @@ class SalesOrderMutationScopeServiceTest {
 
   private void invoke(String mutation, UUID orderId, UUID userId) {
     switch (mutation) {
-      case "confirm" -> service.confirmOrder(orderId, userId);
       case "process" -> service.startProcessing(orderId, userId);
       case "ship" -> service.shipOrder(orderId, userId);
       case "deliver" -> service.deliverOrder(orderId, userId, LocalDate.now());

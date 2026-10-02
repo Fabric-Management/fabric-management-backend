@@ -158,6 +158,31 @@ public class ApprovalGuardService {
     return true; // "Evet, onay gerektiriyor" olarak anla ve entity'ni (Örn WO) PENDING yap.
   }
 
+  /** The entity's request still waiting for a decision, if any. */
+  @Transactional(readOnly = true)
+  public java.util.Optional<UUID> pendingRequestId(
+      UUID tenantId, ApprovalEntityType entityType, UUID entityId) {
+    return requestRepo
+        .findByTenantIdAndEntityTypeAndEntityIdAndStatusAndDeletedAtIsNull(
+            tenantId, entityType, entityId, ApprovalRequestStatus.PENDING)
+        .map(ApprovalRequest::getId);
+  }
+
+  /** Cancels the entity's pending request; an approver can no longer approve or reject it. */
+  @Transactional
+  public void cancelPending(UUID tenantId, ApprovalEntityType entityType, UUID entityId) {
+    requestRepo
+        .findByTenantIdAndEntityTypeAndEntityIdAndStatusAndDeletedAtIsNull(
+            tenantId, entityType, entityId, ApprovalRequestStatus.PENDING)
+        .ifPresent(
+            request -> {
+              request.cancel();
+              requestRepo.save(request);
+              log.info(
+                  "Approval request {} for {} {} cancelled", request.getId(), entityType, entityId);
+            });
+  }
+
   private boolean isUserMatchingPolicyLevel(
       UserTrustLevel userLevel, PolicyTargetLevel policyLevel) {
     if (policyLevel == PolicyTargetLevel.ALL) return true;

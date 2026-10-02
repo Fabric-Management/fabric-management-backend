@@ -1550,7 +1550,8 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
     -- Sales prepares -> planning evaluates -> customer approves; a separate axis from status.
     flow_stage VARCHAR(30) NOT NULL DEFAULT 'DRAFT'
         CHECK (flow_stage IN ('DRAFT', 'AWAITING_PLANNING', 'IN_PLANNING', 'PLANNED',
-                              'AWAITING_CUSTOMER_APPROVAL', 'CUSTOMER_APPROVED')),
+                              'AWAITING_INTERNAL_APPROVAL', 'AWAITING_CUSTOMER_APPROVAL',
+                              'CUSTOMER_APPROVED')),
     -- Hand-overs to planning; a proposal belongs to the round it was made in.
     planning_round INTEGER NOT NULL DEFAULT 0 CHECK (planning_round >= 0),
     planning_evaluation INTEGER NOT NULL DEFAULT 0 CHECK (planning_evaluation >= 0),

@@ -97,7 +97,6 @@ class OrderIntakeReadinessServiceTest {
         .containsEntry(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.CORRECT_PRODUCT, "ORDER_WITH_PLANNING")
-        .containsEntry(OrderIntakeAction.CONFIRM_ORDER, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.EVALUATE_QUANTITY, "")
         .containsEntry(OrderIntakeAction.UPLOAD_ATTACHMENT, "")
         .containsEntry(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, "")

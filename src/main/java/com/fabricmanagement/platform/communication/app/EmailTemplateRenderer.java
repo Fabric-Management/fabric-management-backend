@@ -83,6 +83,42 @@ public class EmailTemplateRenderer {
     return render("quote-approval.html", vars);
   }
 
+  /**
+   * Render a message about a sales order to the customer's contact. Plain values are escaped here;
+   * {@code bodyHtml} is markup the caller built with its values escaped.
+   */
+  public String renderOrderMessage(
+      String sellerName,
+      String heading,
+      String bodyHtml,
+      String actionLabel,
+      String actionUrl,
+      String footnote) {
+    String seller = sellerName == null || sellerName.isBlank() ? "Fabric OS" : sellerName;
+    String action =
+        actionUrl == null || actionUrl.isBlank()
+            ? ""
+            : "<div style=\"width: 100%; margin: 0 0 24px 0; padding: 0\"><a href=\""
+                + org.springframework.web.util.HtmlUtils.htmlEscape(actionUrl)
+                + "\" style=\"display: block; width: 100%; background-color: #0f172a; color:"
+                + " #ffffff; font-size: 16px; font-weight: 500; padding: 12px 24px; border-radius:"
+                + " 8px; text-decoration: none; text-align: center; box-sizing: border-box;\">"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(
+                    actionLabel == null ? "" : actionLabel)
+                + "</a></div>";
+    Map<String, String> vars = new java.util.HashMap<>();
+    vars.put("sellerName", org.springframework.web.util.HtmlUtils.htmlEscape(seller));
+    vars.put(
+        "heading",
+        org.springframework.web.util.HtmlUtils.htmlEscape(heading == null ? "" : heading));
+    vars.put("body", bodyHtml == null ? "" : bodyHtml);
+    vars.put("action", action);
+    vars.put(
+        "footnote",
+        org.springframework.web.util.HtmlUtils.htmlEscape(footnote == null ? "" : footnote));
+    return render("order-customer-message.html", vars);
+  }
+
   /** Render added-to-organization email for existing login identities. */
   public String renderAddedToOrganization(String firstName, String orgName, String email) {
     Map<String, String> vars =

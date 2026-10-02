@@ -120,8 +120,7 @@ class SalesOrderServiceUpdateTest {
 
   @Test
   void updateOrder_nonDraftReject_throwsOrderDomainException() {
-    draftOrder.confirm(); // Transitions to CONFIRMED or pending
-    // Let's force it to CANCELLED to be safe
+    draftOrder.confirmSeededDemoOrder();
     draftOrder.cancel();
 
     when(orderRepository.findByTenantIdAndId(tenantId, orderId))

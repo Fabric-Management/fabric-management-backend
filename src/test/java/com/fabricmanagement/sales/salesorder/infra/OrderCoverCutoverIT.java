@@ -61,7 +61,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
       assertThat(activation.activate().boundarySeq()).isZero();
       UUID orderId = draft(1);
       assertThat(sequence(orderId)).isEqualTo(1L);
-      sales.confirmOrder(orderId, actor.getId());
+      sales.confirmDemoSeedOrder(orderId);
       awaitCover(orderId);
       assertThat(regime(orderId)).isEqualTo("GOVERNED");
     } finally {
@@ -91,7 +91,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
     doNothing().when(events).publish(any(DomainEvent.class));
     try {
       for (UUID orderId : List.of(earlier, equal, oldDeployment)) {
-        sales.confirmOrder(orderId, actor.getId());
+        sales.confirmDemoSeedOrder(orderId);
         assertThat(regime(orderId)).isEqualTo("LEGACY");
         verify(ruleEngine).processConfirmedOrder(argThat(order -> order.getId().equals(orderId)));
       }
@@ -215,7 +215,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
   void legacyConfirmationStillRunsRuleEnginePromotesOneDraftAndPublishesApproval()
       throws Exception {
     UUID orderId = draft(1);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     awaitLegacyProduction(orderId);
     verify(ruleEngine).processConfirmedOrder(argThat(order -> order.getId().equals(orderId)));
     assertThat(count("sales_ord.order_cover_case")).isZero();
@@ -255,7 +255,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
             10,
             48));
     UUID orderId = draft(1);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     awaitDelivery(storedEvent(SalesOrderConfirmedEvent.class, orderId));
     assertThat(
             jdbc.queryForList(
@@ -286,7 +286,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
     tx(
         () -> {
           var order = orders.findById(orderId).orElseThrow();
-          order.confirm();
+          order.confirmSeededDemoOrder();
           orders.saveAndFlush(order);
           return null;
         });

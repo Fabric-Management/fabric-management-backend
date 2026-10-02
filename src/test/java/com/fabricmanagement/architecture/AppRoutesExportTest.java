@@ -18,6 +18,7 @@ class AppRoutesExportTest {
         .isEqualTo("/sales/00000000-0000-0000-0000-000000000123");
     assertThat(AppRoutes.orderCoverDecision(orderId))
         .isEqualTo("/decisions/order-cover/00000000-0000-0000-0000-000000000123");
+    assertThat(AppRoutes.orderApproval("ab12")).isEqualTo("/orders/approve/ab12");
   }
 
   @Test

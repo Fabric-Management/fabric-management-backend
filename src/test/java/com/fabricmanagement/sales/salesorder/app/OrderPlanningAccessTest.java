@@ -67,6 +67,7 @@ class OrderPlanningAccessTest {
   @Mock private OrderFlowEventRepository events;
   @Mock private SalesOrderAccessPolicy accessPolicy;
   @Mock private TradingPartnerService partners;
+  @Mock private OrderApprovalInvalidator approvals;
   @Mock private IntakeAttachmentRepository attachments;
 
   private final UUID tenantId = UUID.randomUUID();
@@ -134,6 +135,7 @@ class OrderPlanningAccessTest {
             partners,
             attachments,
             work.service,
+            approvals,
             Clock.fixed(NOW, ZoneOffset.UTC));
     service.submit(orderId, sales);
   }

@@ -11,7 +11,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
@@ -41,8 +40,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -77,30 +74,16 @@ class SalesDemoSeederTest {
     TenantContext.clear();
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void seederPreservesRealConfirmationFlowWithAndWithoutApproval(boolean approvalRequired) {
+  @Test
+  void seederConfirmsSeededOrdersWithoutTheCustomerApprovalFlow() {
     TenantContext.setCurrentTenantId(TENANT_ID);
     TenantContext.setCurrentUserId(SystemUser.ID);
     SalesOrderRepository orders = mock(SalesOrderRepository.class);
     SalesOrderLineRepository lines = mock(SalesOrderLineRepository.class);
-    ApprovalPort approval = mock(ApprovalPort.class);
     Map<UUID, SalesOrder> stored = new LinkedHashMap<>();
     when(orders.findByTenantIdAndId(eq(TENANT_ID), any()))
         .thenAnswer(invocation -> Optional.ofNullable(stored.get(invocation.getArgument(1))));
     when(orders.save(any(SalesOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
-    when(approval.requiresApproval(
-            any(),
-            any(),
-            any(),
-            any(),
-            org.mockito.ArgumentMatchers
-                .<java.util.List<com.fabricmanagement.common.util.Money>>any()))
-        .thenAnswer(
-            invocation -> {
-              assertThat((UUID) invocation.getArgument(1)).isEqualTo(SystemUser.ID);
-              return approvalRequired;
-            });
     OrderCoverEnrolmentService enrolment = mock(OrderCoverEnrolmentService.class);
     when(enrolment.decide(any(), any()))
         .thenReturn(com.fabricmanagement.sales.salesorder.domain.OrderCoverRegime.LEGACY);
@@ -116,7 +99,6 @@ class SalesDemoSeederTest {
                 null,
                 mock(DomainEventPublisher.class),
                 null,
-                approval,
                 null,
                 mock(com.fabricmanagement.sales.salesorder.app.SalesOrderRevision.class),
                 mock(SalesOrderAccessPolicy.class),
@@ -126,8 +108,9 @@ class SalesDemoSeederTest {
                         .OrderCoverActivationRepository.class),
                 enrolment,
                 mock(com.fabricmanagement.sales.salesorder.app.OrderIntakeHooks.class),
-                mock(com.fabricmanagement.sales.orderintake.app.CustomerRequestService.class)));
-    // Isolate creation only; seedFor invokes the real demo entry and shared approval flow.
+                mock(com.fabricmanagement.sales.orderintake.app.CustomerRequestService.class),
+                mock(com.fabricmanagement.sales.salesorder.app.OrderApprovalInvalidator.class)));
+    // Isolate creation only; seedFor invokes the real demo confirmation.
     doAnswer(
             invocation -> {
               CreateSalesOrderRequest request = invocation.getArgument(0);
@@ -159,11 +142,7 @@ class SalesDemoSeederTest {
 
     assertThat(stored.values())
         .hasSize(3)
-        .allSatisfy(
-            order ->
-                assertThat(order.getStatus())
-                    .isEqualTo(
-                        approvalRequired ? OrderStatus.PENDING_APPROVAL : OrderStatus.CONFIRMED));
+        .allSatisfy(order -> assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED));
   }
 
   @Test

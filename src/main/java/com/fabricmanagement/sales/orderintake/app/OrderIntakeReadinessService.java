@@ -29,8 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OrderIntakeReadinessService {
 
-  static final String ORDER_WITH_PLANNING = "ORDER_WITH_PLANNING";
-
   private final OrderIntakeAccess access;
   private final SalesOrderLineRepository lines;
   private final QuantityAcceptanceRepository acceptances;
@@ -94,20 +92,10 @@ public class OrderIntakeReadinessService {
             .toList();
     boolean canWrite = access.canWrite(order, actor);
     List<OrderIntakeReadinessDto.Capability> capabilities =
-        capabilities(
-            draft,
-            order.getFlowStage().locksCommercialContent(),
-            canWrite,
-            blocks.isEmpty() && !orderLines.isEmpty());
-    boolean confirmable =
-        capabilities.stream()
-            .anyMatch(
-                capability ->
-                    capability.action() == OrderIntakeAction.CONFIRM_ORDER && capability.allowed());
+        capabilities(draft, order.commercialContentLock(), canWrite);
     return new OrderIntakeReadinessDto(
         order.getId(),
         order.getStatus().name(),
-        confirmable,
         deliveryPreference.preferenceOf(order.getId()),
         orderBlocks,
         lineViews,
@@ -116,59 +104,46 @@ public class OrderIntakeReadinessService {
   }
 
   /**
-   * Content actions change what planning evaluated, so they close while the order is with planning
-   * (ORDER_WITH_PLANNING); sales must withdraw it to draft first. Evaluation inputs, attachments,
-   * readiness and hold requests stay open: they inform planning rather than change the order.
+   * Content actions change what planning evaluated and the customer is asked to approve, so they
+   * close while the order is with planning or out for an approval (ORDER_WITH_PLANNING; sales
+   * withdraws it to the draft first) and once the customer approved it
+   * (ORDER_APPROVED_BY_CUSTOMER). Evaluation inputs, attachments, readiness and hold requests stay
+   * open: they inform planning rather than change the order.
    */
   private List<OrderIntakeReadinessDto.Capability> capabilities(
-      boolean draft, boolean contentLocked, boolean canWrite, boolean nothingBlocks) {
+      boolean draft, String contentLock, boolean canWrite) {
     List<OrderIntakeReadinessDto.Capability> result = new ArrayList<>();
-    result.add(draftWrite(OrderIntakeAction.EVALUATE_QUANTITY, draft, false, canWrite));
-    result.add(draftWrite(OrderIntakeAction.RECORD_STOCK_CHOICE, draft, contentLocked, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_TONE_ACCEPTANCE, contentLocked, canWrite));
-    result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, contentLocked, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, contentLocked, canWrite));
-    result.add(
-        draftWrite(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, draft, contentLocked, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, contentLocked, canWrite));
-    result.add(anyWrite(OrderIntakeAction.UPLOAD_ATTACHMENT, false, canWrite));
-    result.add(anyWrite(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, false, canWrite));
-    result.add(anyWrite(OrderIntakeAction.CORRECT_PRODUCT, contentLocked, canWrite));
-    result.add(anyWrite(OrderIntakeAction.REQUEST_HOLD, false, canWrite));
-    List<PermissionKey> confirmKeys = List.of(PermissionKey.SALES_CONFIRM);
-    String confirmReason =
-        !draft
-            ? "ORDER_NOT_DRAFT"
-            : contentLocked
-                ? ORDER_WITH_PLANNING
-                : !canWrite
-                    ? "NO_OBJECT_ACCESS"
-                    : !permissions.has(PermissionKey.SALES_CONFIRM)
-                        ? "PERMISSION_DENIED"
-                        : !nothingBlocks ? "BLOCKED" : null;
-    result.add(
-        new OrderIntakeReadinessDto.Capability(
-            OrderIntakeAction.CONFIRM_ORDER, confirmReason == null, confirmReason, confirmKeys));
+    result.add(draftWrite(OrderIntakeAction.EVALUATE_QUANTITY, draft, null, canWrite));
+    result.add(draftWrite(OrderIntakeAction.RECORD_STOCK_CHOICE, draft, contentLock, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_TONE_ACCEPTANCE, contentLock, canWrite));
+    result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, contentLock, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, contentLock, canWrite));
+    result.add(draftWrite(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, draft, contentLock, canWrite));
+    result.add(anyWrite(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, contentLock, canWrite));
+    result.add(anyWrite(OrderIntakeAction.UPLOAD_ATTACHMENT, null, canWrite));
+    result.add(anyWrite(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, null, canWrite));
+    result.add(anyWrite(OrderIntakeAction.CORRECT_PRODUCT, contentLock, canWrite));
+    result.add(anyWrite(OrderIntakeAction.REQUEST_HOLD, null, canWrite));
     return result;
   }
 
   private OrderIntakeReadinessDto.Capability draftWrite(
-      OrderIntakeAction action, boolean draft, boolean contentLocked, boolean canWrite) {
-    String reason = !draft ? "ORDER_NOT_DRAFT" : writeReason(contentLocked, canWrite);
+      OrderIntakeAction action, boolean draft, String contentLock, boolean canWrite) {
+    String reason = !draft ? "ORDER_NOT_DRAFT" : writeReason(contentLock, canWrite);
     return new OrderIntakeReadinessDto.Capability(
         action, reason == null, reason, List.of(PermissionKey.SALES_WRITE));
   }
 
   private OrderIntakeReadinessDto.Capability anyWrite(
-      OrderIntakeAction action, boolean contentLocked, boolean canWrite) {
-    String reason = writeReason(contentLocked, canWrite);
+      OrderIntakeAction action, String contentLock, boolean canWrite) {
+    String reason = writeReason(contentLock, canWrite);
     return new OrderIntakeReadinessDto.Capability(
         action, reason == null, reason, List.of(PermissionKey.SALES_WRITE));
   }
 
-  private String writeReason(boolean contentLocked, boolean canWrite) {
-    if (contentLocked) {
-      return ORDER_WITH_PLANNING;
+  private String writeReason(String contentLock, boolean canWrite) {
+    if (contentLock != null) {
+      return contentLock;
     }
     if (!canWrite) {
       return "NO_OBJECT_ACCESS";

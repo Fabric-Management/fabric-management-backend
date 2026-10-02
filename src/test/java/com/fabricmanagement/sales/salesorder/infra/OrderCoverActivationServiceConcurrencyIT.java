@@ -35,7 +35,7 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
       release.countDown();
       UUID before = insert.get(30, TimeUnit.SECONDS);
       var boundary = activate.get(30, TimeUnit.SECONDS);
-      sales.confirmOrder(before, actor.getId());
+      sales.confirmDemoSeedOrder(before);
       assertThat(regime(before)).isEqualTo("LEGACY");
       assertThat(
               jdbc.queryForObject(
@@ -78,7 +78,7 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
       release.countDown();
       var boundary = activate.get(30, TimeUnit.SECONDS);
       UUID orderId = insert.get(30, TimeUnit.SECONDS);
-      sales.confirmOrder(orderId, actor.getId());
+      sales.confirmDemoSeedOrder(orderId);
       awaitCover(orderId);
       assertThat(regime(orderId)).isEqualTo("GOVERNED");
       assertThat(

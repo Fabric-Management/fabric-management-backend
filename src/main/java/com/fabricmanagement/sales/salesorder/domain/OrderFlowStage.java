@@ -21,6 +21,11 @@ public enum OrderFlowStage {
   IN_PLANNING,
   /** Planning finished with a current proposal; ready to be sent for the customer's approval. */
   PLANNED,
+  /**
+   * The version to send needs a manager's or finance approval under the tenant's approval policy;
+   * nothing reaches the customer until it is given.
+   */
+  AWAITING_INTERNAL_APPROVAL,
   /** Sent with an approval link; waiting for the customer's representative. */
   AWAITING_CUSTOMER_APPROVAL,
   /** The customer approved the sent version; its terms are fixed. */
@@ -31,21 +36,30 @@ public enum OrderFlowStage {
           DRAFT, EnumSet.of(AWAITING_PLANNING),
           AWAITING_PLANNING, EnumSet.of(IN_PLANNING, DRAFT),
           IN_PLANNING, EnumSet.of(PLANNED, DRAFT),
-          PLANNED, EnumSet.of(AWAITING_CUSTOMER_APPROVAL, IN_PLANNING, DRAFT),
+          PLANNED,
+              EnumSet.of(
+                  AWAITING_INTERNAL_APPROVAL, AWAITING_CUSTOMER_APPROVAL, IN_PLANNING, DRAFT),
+          AWAITING_INTERNAL_APPROVAL,
+              EnumSet.of(AWAITING_CUSTOMER_APPROVAL, PLANNED, IN_PLANNING, DRAFT),
           AWAITING_CUSTOMER_APPROVAL, EnumSet.of(CUSTOMER_APPROVED, IN_PLANNING, DRAFT),
           CUSTOMER_APPROVED, EnumSet.noneOf(OrderFlowStage.class));
 
   /**
-   * While planning evaluates the order or the customer is asked to approve it, what was evaluated
-   * (products, quantities, tolerances, prices, delivery term, customer requests) does not change;
-   * it is changed by taking the order back to the draft. After the customer's approval, changes
-   * follow the approved-order rules instead.
+   * While planning evaluates the order, a manager approves it or the customer is asked to approve
+   * it, what was evaluated (products, quantities, tolerances, prices, delivery term, customer
+   * requests) does not change; it is changed by taking the order back to the draft.
    */
   public boolean locksCommercialContent() {
     return this == AWAITING_PLANNING
         || this == IN_PLANNING
         || this == PLANNED
+        || this == AWAITING_INTERNAL_APPROVAL
         || this == AWAITING_CUSTOMER_APPROVAL;
+  }
+
+  /** A version of the order is out for an approval (internal or the customer's). */
+  public boolean awaitsApproval() {
+    return this == AWAITING_INTERNAL_APPROVAL || this == AWAITING_CUSTOMER_APPROVAL;
   }
 
   public boolean canMoveTo(OrderFlowStage next) {

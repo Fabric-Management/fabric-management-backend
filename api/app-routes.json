@@ -4,4 +4,7 @@
 }, {
   "name" : "orderCoverDecision",
   "template" : "/decisions/order-cover/{orderId}"
+}, {
+  "name" : "orderApproval",
+  "template" : "/orders/approve/{token}"
 } ]

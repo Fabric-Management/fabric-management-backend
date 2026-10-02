@@ -320,39 +320,6 @@ public class SalesOrder extends BaseEntity {
   // Business Methods
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Mark order as pending approval. */
-  public void pendingApproval() {
-    if (status != OrderStatus.DRAFT) {
-      throw new OrderDomainException(
-          "Only DRAFT orders can be sent for approval. Current: " + status);
-    }
-    this.status = OrderStatus.PENDING_APPROVAL;
-  }
-
-  /** Reject the order during approval. */
-  public void reject(String reason) {
-    if (status != OrderStatus.PENDING_APPROVAL) {
-      throw new OrderDomainException(
-          "Only PENDING_APPROVAL orders can be rejected. Current: " + status);
-    }
-    this.status = OrderStatus.REJECTED;
-    this.rejectionReason = reason;
-  }
-
-  /**
-   * The approval arrived, but the order-intake conditions of confirmation no longer hold (stock
-   * taken, acceptance stale). The order goes back to draft with the reason so it is decided again
-   * (SOI D4).
-   */
-  public void returnToDraftAfterApproval(String reason) {
-    if (status != OrderStatus.PENDING_APPROVAL) {
-      throw new OrderDomainException(
-          "Only PENDING_APPROVAL orders return to draft after approval. Current: " + status, 409);
-    }
-    this.status = OrderStatus.DRAFT;
-    this.rejectionReason = reason;
-  }
-
   /** Revise a rejected order back to DRAFT. */
   public void reviseRejected() {
     if (status != OrderStatus.REJECTED) {
@@ -471,21 +438,55 @@ public class SalesOrder extends BaseEntity {
     return status.isTerminal() || status == OrderStatus.SHIPPED;
   }
 
+  /** The order's content is with planning or out for an approval; it changes in the draft. */
+  public static final String WITH_PLANNING = "ORDER_WITH_PLANNING";
+
+  /** The customer approved the order; its content changes only through a revision. */
+  public static final String APPROVED_BY_CUSTOMER = "ORDER_APPROVED_BY_CUSTOMER";
+
   /**
-   * Rejects a change to what planning evaluated while the order is with planning or the customer
-   * (see {@link OrderFlowStage#locksCommercialContent()}).
+   * Why what planning evaluated and the customer is asked to approve (products, quantities,
+   * tolerances, prices, delivery term, customer requests) cannot change now, or null when it can.
+   * While the order is with planning or out for an approval it changes by taking the order back to
+   * the draft; once the customer approved it (or it was confirmed) it is fixed.
    */
-  public void assertCommercialContentEditable() {
+  public String commercialContentLock() {
     OrderFlowStage stage = flowStage == null ? OrderFlowStage.DRAFT : flowStage;
-    if (stage.locksCommercialContent()) {
+    if (stage == OrderFlowStage.CUSTOMER_APPROVED || CONFIRMED_OR_LATER.contains(status)) {
+      return APPROVED_BY_CUSTOMER;
+    }
+    return stage.locksCommercialContent() ? WITH_PLANNING : null;
+  }
+
+  /** Rejects a change to the order's commercial content (see {@link #commercialContentLock()}). */
+  public void assertCommercialContentEditable() {
+    String lock = commercialContentLock();
+    if (APPROVED_BY_CUSTOMER.equals(lock)) {
+      throw OrderDomainException.stage(
+          APPROVED_BY_CUSTOMER,
+          "Order "
+              + orderNumber
+              + " was approved by the customer: its content changes only through a revision the"
+              + " customer approves");
+    }
+    if (lock != null) {
       throw OrderDomainException.withPlanning(
           "Order "
               + orderNumber
               + " is "
-              + stage
+              + flowStage
               + ": take it back to the draft with a reason to change what was evaluated");
     }
   }
+
+  private static final java.util.Set<OrderStatus> CONFIRMED_OR_LATER =
+      java.util.EnumSet.of(
+          OrderStatus.CONFIRMED,
+          OrderStatus.IN_PROGRESS,
+          OrderStatus.PARTIALLY_SHIPPED,
+          OrderStatus.SHIPPED,
+          OrderStatus.DELIVERED,
+          OrderStatus.ON_HOLD);
 
   /** Statuses in which an approved or confirmed order is being fulfilled. */
   private static final java.util.Set<OrderStatus> PROCESSING =
@@ -510,7 +511,7 @@ public class SalesOrder extends BaseEntity {
     if (stage == OrderFlowStage.IN_PLANNING || PROCESSING.contains(status)) {
       return;
     }
-    if (stage == OrderFlowStage.PLANNED || stage == OrderFlowStage.AWAITING_CUSTOMER_APPROVAL) {
+    if (stage == OrderFlowStage.PLANNED || stage.awaitsApproval()) {
       throw com.fabricmanagement.sales.common.exception.OrderDomainException.stage(
           "EVALUATION_CLOSED",
           "Planning finished this evaluation; reopen it with a reason before changing its basis");
@@ -575,27 +576,32 @@ public class SalesOrder extends BaseEntity {
     this.deadline = cmd.deadline();
   }
 
-  /** Confirm the order (DRAFT → CONFIRMED). */
-  public void confirm() {
+  /**
+   * The customer approved the sent version (the flow is at {@link
+   * OrderFlowStage#CUSTOMER_APPROVED}): the order is confirmed and its delivery term agreed. The
+   * caller has re-checked that the approved terms can still be met.
+   */
+  public void confirmByCustomer() {
     if (status != OrderStatus.DRAFT) {
-      if (status == OrderStatus.PENDING_APPROVAL) {
-        throw new OrderDomainException(
-            "Order is awaiting approval; cannot be confirmed manually", 409);
-      }
-      throw new OrderDomainException(
-          String.format("Order can only be confirmed from DRAFT status. Current: %s", status), 409);
+      throw OrderDomainException.stage(
+          "ORDER_NOT_DRAFT", "Order " + orderNumber + " is " + status + ": not awaiting approval");
+    }
+    if (flowStage != OrderFlowStage.CUSTOMER_APPROVED) {
+      throw OrderDomainException.stage(
+          "NOT_APPROVED_BY_CUSTOMER", "Order " + orderNumber + " is " + flowStage);
     }
     this.status = OrderStatus.CONFIRMED;
+    markDeliveryTermAgreedByCustomer();
   }
 
-  /** Confirm the order from approval workflow (PENDING_APPROVAL → CONFIRMED). */
-  public void confirmFromApproval() {
-    if (status != OrderStatus.PENDING_APPROVAL) {
+  /**
+   * Demo data only: confirms a seeded order without the planning and customer approval flow, so a
+   * fresh playground has orders in fulfilment. No API reaches it.
+   */
+  public void confirmSeededDemoOrder() {
+    if (status != OrderStatus.DRAFT) {
       throw new OrderDomainException(
-          String.format(
-              "Order can only be confirmed from PENDING_APPROVAL status in this workflow. Current: %s",
-              status),
-          409);
+          String.format("Order can only be confirmed from DRAFT status. Current: %s", status), 409);
     }
     this.status = OrderStatus.CONFIRMED;
   }

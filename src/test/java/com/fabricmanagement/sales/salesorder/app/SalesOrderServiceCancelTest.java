@@ -39,6 +39,7 @@ class SalesOrderServiceCancelTest {
   @Mock private OrderIntakeHooks orderIntakeHooks;
 
   @Mock private DeliveryCommitmentService deliveryCommitments;
+  @Mock private OrderApprovalInvalidator approvalInvalidator;
   @InjectMocks private SalesOrderService salesOrderService;
 
   private final UUID userId = UUID.randomUUID();
@@ -90,6 +91,9 @@ class SalesOrderServiceCancelTest {
     assertThat(event.getOrderNumber()).isEqualTo("SO-123");
     assertThat(event.getCancelledLineIds()).containsExactly(line.getId());
     assertThat(event.getTenantId()).isEqualTo(tenantId);
+    // A link out with the customer stops counting, and a change request is followed up.
+    verify(approvalInvalidator).withdrawOpen(orderId, "The order was cancelled", userId);
+    verify(approvalInvalidator).resolveChangeRequests(orderId);
   }
 
   @Test

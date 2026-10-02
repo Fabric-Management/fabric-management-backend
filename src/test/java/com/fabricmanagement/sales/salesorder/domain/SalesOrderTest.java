@@ -128,52 +128,105 @@ class SalesOrderTest {
   }
 
   @Test
-  void confirm_whenDraft_updatesStatusToConfirmed() {
+  void seededDemoOrderIsConfirmedFromDraft() {
     SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).build();
-    order.confirm();
-    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
-  }
-
-  @Test
-  void confirm_whenPendingApproval_throwsException() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
-    assertThatThrownBy(() -> order.confirm())
-        .isInstanceOf(OrderDomainException.class)
-        .hasMessageContaining("Order is awaiting approval; cannot be confirmed manually")
-        .extracting("httpStatus")
-        .isEqualTo(409);
-  }
-
-  @Test
-  void confirmFromApproval_whenPendingApproval_updatesStatusToConfirmed() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
-    order.confirmFromApproval();
+    order.confirmSeededDemoOrder();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
 
   @ParameterizedTest
   @EnumSource(
       value = OrderStatus.class,
-      names = {"PENDING_APPROVAL"},
+      names = {"DRAFT"},
       mode = EnumSource.Mode.EXCLUDE)
-  void confirmFromApproval_whenNotPendingApproval_throwsException(OrderStatus status) {
+  void seededDemoOrderIsNotConfirmedTwice(OrderStatus status) {
     SalesOrder order = SalesOrder.builder().status(status).build();
-    assertThatThrownBy(() -> order.confirmFromApproval())
+    assertThatThrownBy(order::confirmSeededDemoOrder)
         .isInstanceOf(OrderDomainException.class)
-        .hasMessageContaining("Order can only be confirmed from PENDING_APPROVAL status");
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderFlowStage.class,
+      names = {"CUSTOMER_APPROVED"},
+      mode = EnumSource.Mode.EXCLUDE)
+  void onlyTheCustomersApprovalConfirmsAnOrder(OrderFlowStage stage) {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).flowStage(stage).build();
+    assertThatThrownBy(order::confirmByCustomer)
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("NOT_APPROVED_BY_CUSTOMER"));
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.DRAFT);
+  }
+
+  @Test
+  void approvedOrderIsConfirmedWithItsTermAgreedByTheCustomer() {
+    SalesOrder order =
+        SalesOrder.builder()
+            .status(OrderStatus.DRAFT)
+            .flowStage(OrderFlowStage.CUSTOMER_APPROVED)
+            .build();
+    order.applyDeliveryTerms(
+        DeliveryTerms.of(DeliveryTerm.FCA, "Felixstowe", IncotermsVersion.INCOTERMS_2020));
+    order.applyDeliveryTermStatus(null, null);
+
+    order.confirmByCustomer();
+
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    assertThat(order.getDeliveryTermStatus()).isEqualTo(DeliveryTermStatus.AGREED_BY_CUSTOMER);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderFlowStage.class,
+      names = {
+        "AWAITING_PLANNING",
+        "IN_PLANNING",
+        "PLANNED",
+        "AWAITING_INTERNAL_APPROVAL",
+        "AWAITING_CUSTOMER_APPROVAL"
+      })
+  void contentIsLockedWhileWithPlanningOrOutForAnApproval(OrderFlowStage stage) {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).flowStage(stage).build();
+    assertThat(order.commercialContentLock()).isEqualTo(SalesOrder.WITH_PLANNING);
+    assertThatThrownBy(order::assertCommercialContentEditable)
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo("ORDER_WITH_PLANNING"));
+  }
+
+  @Test
+  void contentIsLockedAfterTheCustomersApproval() {
+    SalesOrder approved =
+        SalesOrder.builder()
+            .status(OrderStatus.CONFIRMED)
+            .flowStage(OrderFlowStage.CUSTOMER_APPROVED)
+            .build();
+    assertThatThrownBy(approved::assertCommercialContentEditable)
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("ORDER_APPROVED_BY_CUSTOMER"));
   }
 
   @ParameterizedTest
   @EnumSource(
       value = OrderStatus.class,
-      names = {"DRAFT", "PENDING_APPROVAL"},
-      mode = EnumSource.Mode.EXCLUDE)
-  void confirm_whenNotDraftOrPendingApproval_throwsException(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
-    assertThatThrownBy(() -> order.confirm())
-        .isInstanceOf(OrderDomainException.class)
-        .extracting("httpStatus")
-        .isEqualTo(409);
+      names = {"CONFIRMED", "IN_PROGRESS", "PARTIALLY_SHIPPED", "SHIPPED", "DELIVERED", "ON_HOLD"})
+  void aConfirmedOrderIsLockedWhateverItsFlowStage(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).flowStage(OrderFlowStage.DRAFT).build();
+    assertThat(order.commercialContentLock()).isEqualTo(SalesOrder.APPROVED_BY_CUSTOMER);
+  }
+
+  @Test
+  void aDraftIsEditable() {
+    SalesOrder order =
+        SalesOrder.builder().status(OrderStatus.DRAFT).flowStage(OrderFlowStage.DRAFT).build();
+    assertThat(order.commercialContentLock()).isNull();
+    order.assertCommercialContentEditable();
   }
 
   @Test

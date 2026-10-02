@@ -46,12 +46,32 @@ public class OrderFlowService {
   /** The stages planning works on; sales does not edit the order while it is here. */
   static final String WRONG_STAGE = "WRONG_STAGE";
 
-  /** Unassigned planning is taken while waiting, during the evaluation or awaiting the customer. */
+  /** Unassigned planning is taken while waiting, during the evaluation or awaiting an approval. */
   static final Set<OrderFlowStage> CLAIMABLE =
       EnumSet.of(
           OrderFlowStage.AWAITING_PLANNING,
           OrderFlowStage.IN_PLANNING,
           OrderFlowStage.PLANNED,
+          OrderFlowStage.AWAITING_INTERNAL_APPROVAL,
+          OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
+
+  /**
+   * A finished evaluation is reopened before what it rests on changes, also after the order went
+   * out for an approval: the sent version is then taken back.
+   */
+  static final Set<OrderFlowStage> REOPENABLE =
+      EnumSet.of(
+          OrderFlowStage.PLANNED,
+          OrderFlowStage.AWAITING_INTERNAL_APPROVAL,
+          OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
+
+  /** Planning keeps the order in its queue until the customer decides. */
+  static final Set<OrderFlowStage> IN_PLANNING_QUEUE =
+      EnumSet.of(
+          OrderFlowStage.AWAITING_PLANNING,
+          OrderFlowStage.IN_PLANNING,
+          OrderFlowStage.PLANNED,
+          OrderFlowStage.AWAITING_INTERNAL_APPROVAL,
           OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
 
   private static final Set<OrderWorkDtos.Action> PLANNING_ACTIONS =
@@ -78,6 +98,7 @@ public class OrderFlowService {
   private final com.fabricmanagement.sales.orderintake.infra.repository.IntakeAttachmentRepository
       attachments;
   private final OrderWorkService work;
+  private final OrderApprovalInvalidator approvals;
   private final Clock clock;
 
   // ── Sales ──────────────────────────────────────────────────────────────
@@ -122,6 +143,11 @@ public class OrderFlowService {
     if (order.getFlowStage() != OrderFlowStage.AWAITING_PLANNING && isBlank(reason)) {
       throw new OrderDomainException("Say why the order is taken back from planning");
     }
+    // A version out for an approval no longer describes the order sales is about to change.
+    approvals.withdrawOpen(
+        order.getId(),
+        isBlank(reason) ? "Sales took the order back" : "Sales took the order back: " + reason,
+        actor);
     move(order, OrderFlowStage.DRAFT, reason, actor);
     work.releaseForFlow(order.getId(), OrderWorkKind.PLANNING, reason, actor);
     return view(orderId, actor);
@@ -139,7 +165,8 @@ public class OrderFlowService {
     UUID tenantId = TenantContext.requireTenantId();
     List<SalesOrder> queued =
         orders
-            .findByTenantIdAndFlowStageInAndIsActiveTrueOrderByCreatedAtAsc(tenantId, WITH_PLANNING)
+            .findByTenantIdAndFlowStageInAndIsActiveTrueOrderByCreatedAtAsc(
+                tenantId, IN_PLANNING_QUEUE)
             .stream()
             // A cancelled or closed order has nothing left to plan.
             .filter(order -> !order.getStatus().isTerminal())
@@ -293,8 +320,7 @@ public class OrderFlowService {
             !WITH_PLANNING.contains(stage) ? WRONG_STAGE : workReason));
     result.add(
         OrderWorkDtos.Capability.of(
-            OrderWorkDtos.Action.REOPEN,
-            stage != OrderFlowStage.PLANNED ? WRONG_STAGE : workReason));
+            OrderWorkDtos.Action.REOPEN, !REOPENABLE.contains(stage) ? WRONG_STAGE : workReason));
     return List.copyOf(result);
   }
 
@@ -349,15 +375,25 @@ public class OrderFlowService {
 
   /**
    * The responsible planner reopens a finished evaluation with a reason, before changing what the
-   * proposal rests on. The proposal stays in the history; completing needs a current one again.
+   * proposal rests on. The proposal stays in the history; completing needs a current one again. A
+   * version out for an internal or the customer's approval is taken back: its link stops working.
    */
   @Transactional
   public OrderFlowDtos.QueueItem reopen(UUID orderId, String reason, UUID actor) {
     SalesOrder order = planningWork(orderId, actor);
-    requireStage(order, OrderFlowStage.PLANNED);
+    if (!REOPENABLE.contains(order.getFlowStage())) {
+      throw OrderDomainException.stage(
+          WRONG_STAGE,
+          "Order "
+              + order.getOrderNumber()
+              + " is "
+              + order.getFlowStage()
+              + ": there is no finished evaluation to reopen");
+    }
     if (isBlank(reason)) {
       throw new OrderDomainException("Say why the evaluation is reopened");
     }
+    approvals.withdrawOpen(order.getId(), "Planning reopened the evaluation: " + reason, actor);
     // The earlier proposal stays in the history but no longer completes planning.
     order.startNewEvaluation();
     move(order, OrderFlowStage.IN_PLANNING, reason, actor);

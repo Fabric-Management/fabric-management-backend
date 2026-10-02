@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.CommitmentChangeOrigin;
+import com.fabricmanagement.sales.salesorder.domain.CommitmentChannel;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryCommitment;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
@@ -15,6 +16,7 @@ import com.fabricmanagement.sales.salesorder.dto.DeliveryCommitmentDtos.RecordDe
 import com.fabricmanagement.sales.salesorder.infra.repository.DeliveryCommitmentRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -115,6 +117,51 @@ public class DeliveryCommitmentService {
       history.add(recorded);
     }
     return view(order.getId(), history);
+  }
+
+  /**
+   * Records the date the customer agreed by approving a sent version of {@code order} (locked by
+   * the caller): the first promise, or a change to the current one when the date or term differs.
+   * The approval is the agreement evidence: who approved, through which channel and when.
+   */
+  public DeliveryCommitment recordCustomerApproval(
+      SalesOrder order,
+      LocalDate committedOn,
+      String customerContact,
+      CommitmentChannel channel,
+      int versionNo,
+      UUID recordedBy,
+      java.time.Instant agreedAt) {
+    UUID tenantId = TenantContext.requireTenantId();
+    DeliveryCommitment previous =
+        commitments
+            .findFirstByTenantIdAndSalesOrderIdOrderBySequenceDesc(tenantId, order.getId())
+            .orElse(null);
+    DeliveryTerms terms = order.getDeliveryTerms();
+    if (previous != null
+        && previous.getCommittedOn().equals(committedOn)
+        && previous.termsOf().equals(terms)) {
+      return previous;
+    }
+    DeliveryCommitment recorded =
+        commitments.save(
+            DeliveryCommitment.record(
+                order.getId(),
+                previous,
+                new DeliveryCommitment.Agreement(
+                    committedOn,
+                    terms,
+                    previous == null
+                        ? CommitmentChangeOrigin.INITIAL
+                        : CommitmentChangeOrigin.SELLER_REVISION,
+                    previous == null ? null : "The customer approved order version " + versionNo,
+                    customerContact,
+                    channel,
+                    agreedAt),
+                recordedBy,
+                clock.instant()));
+    order.applyCommittedDate(recorded.getCommittedOn());
+    return recorded;
   }
 
   /**

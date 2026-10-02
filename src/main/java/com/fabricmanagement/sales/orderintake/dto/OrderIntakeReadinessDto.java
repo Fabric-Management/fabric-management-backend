@@ -10,14 +10,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * What stands between a draft and its confirmation, and what the current user may do about it (SOI
- * D4, IK-11). The frontend shows this as is; it derives neither rules nor permissions.
+ * What stands between a draft and the customer's approval, and what the current user may do about
+ * it (SOI D4, IK-11). An order is confirmed only by the customer's approval of the sent version.
+ * The frontend shows this as is; it derives neither rules nor permissions.
  */
 @Schema(name = "OrderIntakeReadiness")
 public record OrderIntakeReadinessDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderId,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String orderStatus,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean confirmable,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PartialDeliveryPreference partialDelivery,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Block> orderBlocks,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Line> lines,

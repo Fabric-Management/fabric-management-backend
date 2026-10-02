@@ -9,5 +9,9 @@ public enum CommitmentChannel {
   EMAIL,
   MESSAGE,
   IN_PERSON,
-  DOCUMENT
+  DOCUMENT,
+  /** The customer approved the sent order version through the e-mailed link and one-time code. */
+  APPROVAL_LINK,
+  /** The customer approved the sent order version from their own customer account. */
+  CUSTOMER_ACCOUNT
 }

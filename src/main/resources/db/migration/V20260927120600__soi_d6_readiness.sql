@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS sales_ord.delivery_commitment (
     reason VARCHAR(1000),
     customer_contact VARCHAR(200) NOT NULL CHECK (length(trim(customer_contact)) > 0),
     channel VARCHAR(20) NOT NULL
-        CHECK (channel IN ('PHONE', 'EMAIL', 'MESSAGE', 'IN_PERSON', 'DOCUMENT')),
+        CHECK (channel IN ('PHONE', 'EMAIL', 'MESSAGE', 'IN_PERSON', 'DOCUMENT',
+                           'APPROVAL_LINK', 'CUSTOMER_ACCOUNT')),
     agreed_at TIMESTAMPTZ NOT NULL,
     recorded_by UUID NOT NULL,
     recorded_at TIMESTAMPTZ NOT NULL,
@@ -234,13 +235,125 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_work_assignment_event (
 CREATE INDEX IF NOT EXISTS idx_order_work_assignment_event_order
     ON sales_ord.order_work_assignment_event (tenant_id, sales_order_id, occurred_at DESC);
 
+-- A version of the order as sent to the customer, append-only: the content the customer saw and
+-- approved never changes; a change to the order makes a new version.
+CREATE TABLE IF NOT EXISTS sales_ord.order_version (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    version_no INTEGER NOT NULL CHECK (version_no > 0),
+    kind VARCHAR(20) NOT NULL CHECK (kind IN ('INFORMATION', 'APPROVAL')),
+    planning_round INTEGER NOT NULL CHECK (planning_round >= 0),
+    planning_evaluation INTEGER NOT NULL CHECK (planning_evaluation >= 0),
+    delivery_proposal_id UUID,
+    content JSONB NOT NULL,
+    content_hash VARCHAR(64) NOT NULL CHECK (length(content_hash) = 64),
+    frozen_by UUID NOT NULL,
+    frozen_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT uq_order_version_tenant_id UNIQUE (tenant_id, id),
+    CONSTRAINT uq_order_version_no UNIQUE (tenant_id, sales_order_id, version_no),
+    CONSTRAINT fk_order_version_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    CONSTRAINT chk_order_version_proposal CHECK ((kind = 'APPROVAL') = (delivery_proposal_id IS NOT NULL))
+);
+
+-- One request for the customer's approval of a sent version. The e-mailed link (verified with a
+-- one-time code) and the customer's account decide the same row; only hashes of the link, the code
+-- and the verified session are stored.
+CREATE TABLE IF NOT EXISTS sales_ord.customer_approval (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    order_version_id UUID NOT NULL,
+    version_no INTEGER NOT NULL CHECK (version_no > 0),
+    status VARCHAR(30) NOT NULL
+        CHECK (status IN ('AWAITING_INTERNAL_APPROVAL', 'INTERNAL_REJECTED', 'SENT', 'APPROVED',
+                          'APPROVED_NOT_FULFILLABLE', 'CHANGES_REQUESTED', 'WITHDRAWN')),
+    recipient_name VARCHAR(200),
+    recipient_email VARCHAR(255) NOT NULL,
+    proposal_valid_until TIMESTAMPTZ NOT NULL,
+    link_valid_hours INTEGER NOT NULL CHECK (link_valid_hours BETWEEN 1 AND 168),
+    requested_by UUID NOT NULL,
+    requested_at TIMESTAMPTZ NOT NULL,
+    internal_approval_request_id UUID,
+    internal_decided_at TIMESTAMPTZ,
+    internal_rejection_reason VARCHAR(1000),
+    token_hash VARCHAR(64),
+    link_expires_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
+    sent_by UUID,
+    links_issued INTEGER NOT NULL DEFAULT 0 CHECK (links_issued >= 0),
+    code_hash VARCHAR(64),
+    code_sent_at TIMESTAMPTZ,
+    code_expires_at TIMESTAMPTZ,
+    codes_sent INTEGER NOT NULL DEFAULT 0 CHECK (codes_sent >= 0),
+    code_attempts INTEGER NOT NULL DEFAULT 0 CHECK (code_attempts >= 0),
+    session_hash VARCHAR(64),
+    session_expires_at TIMESTAMPTZ,
+    decision_channel VARCHAR(20) CHECK (decision_channel IN ('EMAIL_LINK', 'CUSTOMER_ACCOUNT')),
+    decided_at TIMESTAMPTZ,
+    decided_by_name VARCHAR(200),
+    decided_by_email VARCHAR(255),
+    decided_by_user_id UUID,
+    customer_note VARCHAR(2000),
+    decision_detail VARCHAR(1000),
+    ip_address VARCHAR(64),
+    user_agent VARCHAR(500),
+    closed_reason VARCHAR(1000),
+    closed_at TIMESTAMPTZ,
+    closed_by UUID,
+    changes_resolved_at TIMESTAMPTZ,
+    CONSTRAINT fk_customer_approval_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    CONSTRAINT fk_customer_approval_version FOREIGN KEY (tenant_id, order_version_id)
+        REFERENCES sales_ord.order_version (tenant_id, id),
+    CONSTRAINT chk_customer_approval_link CHECK (
+        status NOT IN ('SENT', 'APPROVED', 'APPROVED_NOT_FULFILLABLE', 'CHANGES_REQUESTED')
+        OR (token_hash IS NOT NULL AND link_expires_at IS NOT NULL AND sent_at IS NOT NULL)),
+    CONSTRAINT chk_customer_approval_decision CHECK (
+        status NOT IN ('APPROVED', 'APPROVED_NOT_FULFILLABLE', 'CHANGES_REQUESTED')
+        OR (decided_at IS NOT NULL AND decision_channel IS NOT NULL)),
+    CONSTRAINT chk_customer_approval_changes CHECK (
+        status <> 'CHANGES_REQUESTED' OR length(trim(customer_note)) > 0),
+    CONSTRAINT chk_customer_approval_link_validity CHECK (
+        link_expires_at IS NULL OR link_expires_at <= proposal_valid_until)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_approval_token
+    ON sales_ord.customer_approval (token_hash) WHERE token_hash IS NOT NULL;
+-- At most one request is open (waiting for the internal approval or the customer) per order.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_approval_open
+    ON sales_ord.customer_approval (tenant_id, sales_order_id)
+    WHERE status IN ('AWAITING_INTERNAL_APPROVAL', 'SENT');
+CREATE INDEX IF NOT EXISTS idx_customer_approval_order
+    ON sales_ord.customer_approval (tenant_id, sales_order_id, requested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_customer_approval_changes
+    ON sales_ord.customer_approval (tenant_id, decided_at)
+    WHERE status = 'CHANGES_REQUESTED' AND changes_resolved_at IS NULL;
+
 DO $$
 DECLARE t TEXT;
 BEGIN
     FOREACH t IN ARRAY ARRAY['sales_ord.line_portion_readiness', 'sales_ord.order_arrival_estimate',
                              'sales_ord.delivery_commitment', 'sales_ord.delivery_proposal',
                              'sales_ord.order_flow_event', 'sales_ord.order_work_assignment',
-                             'sales_ord.order_work_assignment_event'] LOOP
+                             'sales_ord.order_work_assignment_event', 'sales_ord.order_version',
+                             'sales_ord.customer_approval'] LOOP
         EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', t);
         EXECUTE format('ALTER TABLE %s FORCE ROW LEVEL SECURITY', t);
         EXECUTE format($p$CREATE POLICY rls_tenant_isolation ON %s FOR ALL
@@ -250,20 +363,25 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_app') THEN
         -- The commitment history is append-only for the application.
         GRANT SELECT, INSERT ON sales_ord.delivery_commitment, sales_ord.delivery_proposal,
-            sales_ord.order_flow_event, sales_ord.order_work_assignment_event TO fabric_app;
+            sales_ord.order_flow_event, sales_ord.order_work_assignment_event,
+            sales_ord.order_version TO fabric_app;
         REVOKE UPDATE, DELETE ON sales_ord.delivery_commitment, sales_ord.delivery_proposal,
-            sales_ord.order_flow_event, sales_ord.order_work_assignment_event FROM fabric_app;
+            sales_ord.order_flow_event, sales_ord.order_work_assignment_event,
+            sales_ord.order_version FROM fabric_app;
         GRANT SELECT, INSERT, UPDATE ON sales_ord.line_portion_readiness,
-            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment TO fabric_app;
+            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment,
+            sales_ord.customer_approval TO fabric_app;
         REVOKE DELETE ON sales_ord.line_portion_readiness,
-            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment FROM fabric_app;
+            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment,
+            sales_ord.customer_approval FROM fabric_app;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
         GRANT SELECT, INSERT, UPDATE, DELETE ON sales_ord.line_portion_readiness,
-            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment TO fabric_system;
+            sales_ord.order_arrival_estimate, sales_ord.order_work_assignment,
+            sales_ord.customer_approval TO fabric_system;
         GRANT SELECT, INSERT, DELETE ON sales_ord.delivery_commitment,
             sales_ord.delivery_proposal, sales_ord.order_flow_event,
-            sales_ord.order_work_assignment_event TO fabric_system;
+            sales_ord.order_work_assignment_event, sales_ord.order_version TO fabric_system;
     END IF;
 END $$;
 
@@ -273,3 +391,7 @@ COMMENT ON TABLE sales_ord.order_arrival_estimate IS
     'Expected arrival at the customer from a carrier or an authorised sourced record (SOI A07-b).';
 COMMENT ON TABLE sales_ord.delivery_commitment IS
     'Append-only delivery promises agreed with the buyer; the first promise and every change are kept.';
+COMMENT ON TABLE sales_ord.order_version IS
+    'Append-only versions of an order as sent to the customer; an approval binds to one version.';
+COMMENT ON TABLE sales_ord.customer_approval IS
+    'A request for the customer''s approval of a sent order version: link, one-time code, decision.';

@@ -1,6 +1,5 @@
 package com.fabricmanagement.sales.salesorder.app;
 
-import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -12,7 +11,6 @@ import com.fabricmanagement.sales.orderintake.app.CustomerRequestService;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
-import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotal;
 import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -70,7 +68,6 @@ public class SalesOrderService {
   private final RequirementProfileService requirementProfileService;
   private final DomainEventPublisher domainEventPublisher;
   private final DocumentNumberGenerator documentNumberGenerator;
-  private final ApprovalPort approvalPort;
   private final SalesOrderTotalsQuery totalsQuery;
   private final SalesOrderRevision revision;
   private final SalesOrderAccessPolicy accessPolicy;
@@ -81,6 +78,7 @@ public class SalesOrderService {
   private final OrderCoverEnrolmentService orderCoverEnrolmentService;
   private final OrderIntakeHooks orderIntakeHooks;
   private final CustomerRequestService customerRequestService;
+  private final OrderApprovalInvalidator approvalInvalidator;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -568,61 +566,27 @@ public class SalesOrderService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Confirm an order.
-   *
-   * @param orderId Order ID
-   * @return Updated order DTO
+   * The customer approved the sent version and the flow moved to the customer's approval: the order
+   * is confirmed and its accepted pieces are held, in the caller's transaction. Nothing else
+   * confirms an order; there is no manual confirmation.
    */
   @Transactional
-  public SalesOrderDto confirmOrder(UUID orderId, UUID currentUserId) {
-    UUID tenantId = TenantContext.requireTenantId();
-
-    SalesOrder order = getOrderOrThrow(tenantId, orderId);
-    requireWriteAccess(tenantId, currentUserId, order);
-    // An order with planning or awaiting the customer is not confirmed past them.
-    order.assertCommercialContentEditable();
-    return confirmOrderFlow(order, tenantId, currentUserId);
+  public SalesOrderDto confirmApprovedByCustomer(SalesOrder order) {
+    order.confirmByCustomer();
+    return finalizeConfirmation(order, TenantContext.requireTenantId());
   }
 
-  /** Confirm a demo order, preserving approval rules but not applying user object scope. */
+  /**
+   * Confirms a seeded order without the planning and customer approval flow, for demo data and test
+   * fixtures; no endpoint reaches it. The order-intake conditions still apply.
+   */
   @Transactional
   public SalesOrderDto confirmDemoSeedOrder(UUID orderId) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
-    return confirmOrderFlow(order, tenantId, TenantContext.getCurrentUserId());
-  }
-
-  private SalesOrderDto confirmOrderFlow(SalesOrder order, UUID tenantId, UUID approvalActorId) {
-    if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
-          "Order is awaiting approval; cannot be confirmed manually", 409);
-    }
-
-    if (order.getStatus() == OrderStatus.DRAFT) {
-      // SOI D4/D7: intake conditions are checked before an approval is requested.
-      orderIntakeHooks.checkConfirmable(
-          order,
-          lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId()));
-      boolean needsApproval = requiresApproval(tenantId, approvalActorId, order);
-
-      if (needsApproval) {
-        log.info(
-            "Sales order {} requires approval, moving to PENDING_APPROVAL", order.getOrderNumber());
-        order.pendingApproval();
-        SalesOrder saved = orderRepository.save(order);
-        TradingPartnerDto partner =
-            partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
-        List<SalesOrderLineResponse> lineResponses =
-            lineRepository
-                .findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId())
-                .stream()
-                .map(this::mapLineToResponse)
-                .toList();
-        return SalesOrderDto.from(saved, partner, lineResponses, totalsOf(saved));
-      }
-    }
-
-    order.confirm();
+    orderIntakeHooks.checkConfirmable(
+        order, lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId()));
+    order.confirmSeededDemoOrder();
     return finalizeConfirmation(order, tenantId);
   }
 
@@ -658,38 +622,6 @@ public class SalesOrderService {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
     return moduleTypes.size() == 1 ? moduleTypes.iterator().next() : null;
-  }
-
-  /** Confirm an order as SystemUser (called after approval callback). */
-  @Transactional
-  public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
-    return TenantContext.executeInTenantContext(
-        TenantContext.requireTenantId(),
-        () -> {
-          TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
-          UUID tenantId = TenantContext.requireTenantId();
-          SalesOrder order = getOrderOrThrow(tenantId, orderId);
-          if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
-            // SOI D4: stock or acceptances may have changed while the approval was pending.
-            List<String> blockers =
-                orderIntakeHooks.confirmationBlockers(
-                    order,
-                    lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
-                        order.getId()));
-            if (!blockers.isEmpty()) {
-              order.returnToDraftAfterApproval(
-                  "ORDER_INTAKE_BLOCKED_AFTER_APPROVAL: " + String.join("; ", blockers));
-              SalesOrder saved = orderRepository.save(order);
-              log.warn(
-                  "Approved sales order {} returned to draft; intake conditions no longer hold: {}",
-                  saved.getOrderNumber(),
-                  blockers);
-              return summary(saved);
-            }
-          }
-          order.confirmFromApproval();
-          return finalizeConfirmation(order, tenantId);
-        });
   }
 
   private SalesOrderDto finalizeConfirmation(SalesOrder order, UUID tenantId) {
@@ -755,16 +687,6 @@ public class SalesOrderService {
     List<SalesOrderLineResponse> lineResponses =
         orderLines.stream().map(this::mapLineToResponse).toList();
     return SalesOrderDto.from(saved, partner, lineResponses, totalsOf(saved));
-  }
-
-  /** Reject an order (called after approval rejection callback). */
-  @Transactional
-  public void rejectOrder(UUID orderId, String reason) {
-    UUID tenantId = TenantContext.requireTenantId();
-    SalesOrder order = getOrderOrThrow(tenantId, orderId);
-    order.reject(reason);
-    orderRepository.save(order);
-    log.info("Sales order rejected: uid={}, reason={}", order.getUid(), reason);
   }
 
   /**
@@ -847,6 +769,9 @@ public class SalesOrderService {
     order.cancel();
     SalesOrder saved = orderRepository.save(order);
     orderIntakeHooks.releaseOnCancellation(activeLineIds, currentUserId);
+    // A link out with the customer, or a version waiting for an internal approval, stops counting.
+    approvalInvalidator.withdrawOpen(saved.getId(), "The order was cancelled", currentUserId);
+    approvalInvalidator.resolveChangeRequests(saved.getId());
 
     domainEventPublisher.publish(
         new SalesOrderCancelledEvent(
@@ -1007,15 +932,6 @@ public class SalesOrderService {
    * module evaluates each threshold in its policy's currency, converting and summing these amounts,
    * so a policy in one currency also governs orders priced in others.
    */
-  private boolean requiresApproval(UUID tenantId, UUID actorId, SalesOrder order) {
-    return approvalPort.requiresApproval(
-        tenantId,
-        actorId,
-        "SALES_ORDER",
-        order.getId(),
-        totalsOf(order).totals().stream().map(OrderCurrencyTotal::grandTotalMoney).toList());
-  }
-
   /**
    * The agreed tolerance of a line is recorded by whoever saves it, at that moment. Where it was
    * agreed is recorded by the customer's approval of the sent order version.

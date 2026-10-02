@@ -44,6 +44,11 @@ public class OrderDomainException extends DomainException {
     return new OrderDomainException(message, code, 409);
   }
 
+  /** A rule the request breaks, with a code the client can tell apart. */
+  public static OrderDomainException rule(String code, String message) {
+    return new OrderDomainException(message, code, 400);
+  }
+
   public OrderDomainException(String message, Throwable cause) {
     super(message, "ORDER_RULE_VIOLATION", 400, cause);
   }

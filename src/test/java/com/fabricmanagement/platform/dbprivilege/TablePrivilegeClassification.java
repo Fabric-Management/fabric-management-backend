@@ -50,6 +50,7 @@ final class TablePrivilegeClassification {
     entries.put("sales_ord.delivery_proposal", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_flow_event", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_work_assignment_event", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("sales_ord.order_version", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("production.prod_product_finished_width", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.prod_product_sales_unit", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.stock_unit_cut", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
@@ -67,6 +68,7 @@ final class TablePrivilegeClassification {
     entries.put("sales_ord.line_portion_readiness", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_arrival_estimate", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_work_assignment", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.customer_approval", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put(
         "production.production_execution_batch_color_archive",
         TablePrivilegeClass.READ_ONLY_ARCHIVE);

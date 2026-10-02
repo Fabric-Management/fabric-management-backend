@@ -127,8 +127,8 @@ class DomainEventsPublicationIT {
 
   @Test
   @Commit
-  @DisplayName("confirmOrder publishes SalesOrderConfirmedEvent and routes after commit")
-  void confirmOrder_publishesSalesOrderConfirmedEvent() {
+  @DisplayName("Confirmation publishes SalesOrderConfirmedEvent and routes after commit")
+  void confirmation_publishesSalesOrderConfirmedEvent() {
     TenantContext.setCurrentTenantId(tenantId);
     TenantContext.setCurrentUserId(userId);
 
@@ -148,7 +148,7 @@ class DomainEventsPublicationIT {
     req.setRequestedDeliveryDate(delivery);
 
     SalesOrderDto created = salesOrderService.createOrder(req);
-    SalesOrderDto confirmed = salesOrderService.confirmOrder(created.getId(), userId);
+    SalesOrderDto confirmed = salesOrderService.confirmDemoSeedOrder(created.getId());
 
     assertThat(confirmed.getStatus().name()).isEqualTo("CONFIRMED");
 

@@ -24,4 +24,13 @@ public interface ApprovalPort {
       String entityType,
       UUID entityId,
       java.util.List<com.fabricmanagement.common.util.Money> amounts);
+
+  /** The pending approval request for the entity, if one waits for a decision. */
+  java.util.Optional<UUID> pendingRequestId(UUID tenantId, String entityType, UUID entityId);
+
+  /**
+   * Cancels the entity's pending approval request, if any: what it asked about changed or was
+   * withdrawn, so an approval of it must no longer count.
+   */
+  void cancelPending(UUID tenantId, String entityType, UUID entityId);
 }

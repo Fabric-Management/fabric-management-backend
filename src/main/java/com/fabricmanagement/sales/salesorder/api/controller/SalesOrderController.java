@@ -174,15 +174,6 @@ public class SalesOrderController {
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  @PostMapping("/{id}/confirm")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'confirm')")
-  @Operation(summary = "Confirm an order")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(
-      @PathVariable UUID id, Authentication authentication) {
-    return ResponseEntity.ok(
-        ApiResponse.success(orderService.confirmOrder(id, currentUserId(authentication))));
-  }
-
   @PostMapping("/{id}/process")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Start processing an order")

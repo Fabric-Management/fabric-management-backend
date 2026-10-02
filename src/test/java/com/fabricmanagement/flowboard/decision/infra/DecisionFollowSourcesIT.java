@@ -257,7 +257,7 @@ class DecisionFollowSourcesIT extends OrderCoverIntegrationSupport {
     activation.activate();
     UUID orderId = draft(1);
     jdbc.update("update sales_ord.sales_order set created_by=? where id=?", createdBy, orderId);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     return awaitCover(orderId);
   }
 

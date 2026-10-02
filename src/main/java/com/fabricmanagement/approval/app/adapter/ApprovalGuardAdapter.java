@@ -41,4 +41,16 @@ public class ApprovalGuardAdapter implements ApprovalPort {
     ApprovalEntityType type = ApprovalEntityType.valueOf(entityType);
     return approvalGuardService.checkAndEnforceApproval(tenantId, userId, type, entityId, amounts);
   }
+
+  @Override
+  public java.util.Optional<UUID> pendingRequestId(
+      UUID tenantId, String entityType, UUID entityId) {
+    return approvalGuardService.pendingRequestId(
+        tenantId, ApprovalEntityType.valueOf(entityType), entityId);
+  }
+
+  @Override
+  public void cancelPending(UUID tenantId, String entityType, UUID entityId) {
+    approvalGuardService.cancelPending(tenantId, ApprovalEntityType.valueOf(entityType), entityId);
+  }
 }

@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(124)
+        .hasSize(134)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(124);
+    assertThat(expected).hasSize(134);
   }
 
   @Test
@@ -276,7 +276,6 @@ class SalesEndpointAuthorizationArchTest {
         Category.MUTATION,
         "updateOrder",
         "deleteOrder",
-        "confirmOrder",
         "startProcessing",
         "shipOrder",
         "deliverOrder",
@@ -381,6 +380,30 @@ class SalesEndpointAuthorizationArchTest {
         "confirmProductionReadiness",
         "confirmShipReadiness",
         "recordArrivalEstimate");
+    // SOI C: sending the order for the customer's approval; the customer's public page.
+    add(
+        result,
+        "CustomerApprovalController",
+        Category.TRANSACTIONAL_READ,
+        "getCustomerApproval",
+        "listCustomerChangeRequests");
+    add(
+        result,
+        "CustomerApprovalController",
+        Category.MUTATION,
+        "sendOrderInformation",
+        "sendOrderForApproval",
+        "resendOrderApprovalLink");
+    add(
+        result,
+        "PublicOrderApprovalController",
+        Category.PUBLIC_TOKEN,
+        "getOrderApprovalLink",
+        "sendOrderApprovalCode",
+        "verifyOrderApprovalCode",
+        "getOrderApprovalVersion",
+        "approveOrderVersion",
+        "requestOrderChanges");
     return Map.copyOf(result);
   }
 

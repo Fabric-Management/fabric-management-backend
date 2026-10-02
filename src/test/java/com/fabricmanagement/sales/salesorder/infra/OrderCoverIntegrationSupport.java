@@ -339,7 +339,7 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
   protected Cover governed(int lineCount) {
     activation.activate();
     UUID orderId = draft(lineCount);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     return awaitCover(orderId);
   }
 

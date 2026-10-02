@@ -99,7 +99,6 @@ public enum PermissionKey {
   SALES_APPROVE("sales:approve", EnforcedBy.ANNOTATION, ""),
   SALES_ASSIGN_OWNER("sales:assign-owner", EnforcedBy.ANNOTATION, ""),
   SALES_CANCEL("sales:cancel", EnforcedBy.ANNOTATION, ""),
-  SALES_CONFIRM("sales:confirm", EnforcedBy.ANNOTATION, ""),
   SALES_DELETE("sales:delete", EnforcedBy.ANNOTATION, ""),
   SALES_READ("sales:read", EnforcedBy.ANNOTATION, ""),
   SALES_SHIP("sales:ship", EnforcedBy.ANNOTATION, ""),

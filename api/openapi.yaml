@@ -84,6 +84,8 @@ tags:
   name: Fiber Request
 - description: Sales-readable lot and piece projection
   name: Sales Lot
+- description: Sending the order for the customer's approval
+  name: Customer Approval
 - description: Contact operations
   name: Contact
 - description: Canonical permission vocabulary
@@ -235,6 +237,8 @@ tags:
   name: Sample Management
 - description: Production Output operations
   name: Production Output
+- description: Customer-facing order approval
+  name: Public Order Approvals
 - description: Kullanici dashboard yapilandirmasi ve widget yonetimi
   name: FlowBoard — Dashboard
 - description: Tenant-specific quality grading system management
@@ -42914,6 +42918,451 @@ paths:
       summary: Replace a yarn article spec
       tags:
       - Yarn Articles
+  /api/v1/public/sales/order-approvals/{token}:
+    get:
+      operationId: getOrderApprovalLink
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalLink"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Who asks for the approval and of which order; no content before the
+        code
+      tags:
+      - Public Order Approvals
+  /api/v1/public/sales/order-approvals/{token}/approve:
+    post:
+      operationId: approveOrderVersion
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderApprovalSession"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalLink"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Approve the sent order
+      tags:
+      - Public Order Approvals
+  /api/v1/public/sales/order-approvals/{token}/code:
+    post:
+      operationId: sendOrderApprovalCode
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalLink"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: E-mail a one-time code to the address the link went to
+      tags:
+      - Public Order Approvals
+  /api/v1/public/sales/order-approvals/{token}/request-changes:
+    post:
+      operationId: requestOrderChanges
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderApprovalChangeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalLink"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Ask for changes to the sent order, saying what should change"
+      tags:
+      - Public Order Approvals
+  /api/v1/public/sales/order-approvals/{token}/verify:
+    post:
+      operationId: verifyOrderApprovalCode
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderApprovalVerifyCode"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalVerified"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Check the code; a right one opens the order and starts a session
+      tags:
+      - Public Order Approvals
+  /api/v1/public/sales/order-approvals/{token}/version:
+    post:
+      operationId: getOrderApprovalVersion
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderApprovalSession"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderApprovalVersion"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The sent order again, within the verified session"
+      tags:
+      - Public Order Approvals
   /api/v1/public/sales/quotes/approve:
     post:
       operationId: approve
@@ -47927,6 +48376,70 @@ paths:
         ones
       tags:
       - Custom Request Evaluation
+  /api/v1/sales/order-intake/customer-change-requests:
+    get:
+      operationId: listCustomerChangeRequests
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListCustomerChangeRequestItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: The customers' change requests sales has not followed up yet
+      tags:
+      - Customer Approval
   /api/v1/sales/order-intake/lines/{lineId}/greige-cover:
     post:
       operationId: confirmGreigeCover
@@ -48312,6 +48825,302 @@ paths:
       summary: "Record when the goods are expected at the customer, with its source"
       tags:
       - Fulfilment Planning
+  /api/v1/sales/order-intake/orders/{orderId}/customer-approval:
+    get:
+      operationId: getCustomerApproval
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerApprovalState"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Versions sent to the customer, approval requests and your actions"
+      tags:
+      - Customer Approval
+  /api/v1/sales/order-intake/orders/{orderId}/customer-approval/information:
+    post:
+      operationId: sendOrderInformation
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerApprovalState"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Send the draft's details to the customer for information (nothing to
+        approve)
+      tags:
+      - Customer Approval
+  /api/v1/sales/order-intake/orders/{orderId}/customer-approval/resend:
+    post:
+      operationId: resendOrderApprovalLink
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendCustomerApproval"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerApprovalState"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Send a new approval link for the same version, possibly to a corrected\
+        \ address"
+      tags:
+      - Customer Approval
+  /api/v1/sales/order-intake/orders/{orderId}/customer-approval/send:
+    post:
+      operationId: sendOrderForApproval
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendForCustomerApproval"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCustomerApprovalState"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Send the evaluated order for the customer's approval
+      tags:
+      - Customer Approval
   /api/v1/sales/order-intake/orders/{orderId}/work/{kind}:
     get:
       operationId: getOrderLogisticsWork
@@ -49697,77 +50506,6 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Cancel an order
-      tags:
-      - Sales Orders
-  /api/v1/sales/orders/{id}/confirm:
-    post:
-      operationId: confirmOrder
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseSalesOrderDto"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Confirm an order
       tags:
       - Sales Orders
   /api/v1/sales/orders/{id}/deliver:
@@ -56150,6 +56888,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseCustomerApprovalState:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CustomerApprovalState"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseCustomerCommercialAssignmentResponse:
       type: object
       properties:
@@ -56980,6 +57736,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CustomerAccountTeamCandidateResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListCustomerChangeRequestItem:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerChangeRequestItem"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -58804,6 +59580,60 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/OnboardingStatusResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderApprovalLink:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderApprovalLink"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderApprovalVerified:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderApprovalVerified"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderApprovalVersion:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderApprovalVersion"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -62778,6 +63608,8 @@ components:
       - MESSAGE
       - IN_PERSON
       - DOCUMENT
+      - APPROVAL_LINK
+      - CUSTOMER_ACCOUNT
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -65864,6 +66696,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CustomerAccountTeamMemberResponse"
+    CustomerApprovalAction:
+      type: string
+      enum:
+      - SEND_INFORMATION
+      - SEND_FOR_APPROVAL
+      - RESEND_LINK
+    CustomerApprovalCapability:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/CustomerApprovalAction"
+        allowed:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - action
+      - allowed
+    CustomerApprovalChannel:
+      type: string
+      enum:
+      - EMAIL_LINK
+      - CUSTOMER_ACCOUNT
     CustomerApprovalRequest:
       type: object
       properties:
@@ -65884,6 +66739,148 @@ components:
           minLength: 0
       required:
       - token
+    CustomerApprovalState:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerApprovalCapability"
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerApprovalView"
+        contactEmail:
+          type: string
+        contactName:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+        stage:
+          $ref: "#/components/schemas/OrderFlowStage"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderVersionView"
+      required:
+      - actions
+      - approvals
+      - orderId
+      - stage
+      - versions
+    CustomerApprovalStatus:
+      type: string
+      enum:
+      - AWAITING_INTERNAL_APPROVAL
+      - INTERNAL_REJECTED
+      - SENT
+      - APPROVED
+      - APPROVED_NOT_FULFILLABLE
+      - CHANGES_REQUESTED
+      - WITHDRAWN
+    CustomerApprovalView:
+      type: object
+      properties:
+        closedAt:
+          type: string
+          format: date-time
+        closedReason:
+          type: string
+        customerNote:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        decidedByEmail:
+          type: string
+        decidedByName:
+          type: string
+        decisionChannel:
+          $ref: "#/components/schemas/CustomerApprovalChannel"
+        decisionDetail:
+          type: string
+        id:
+          type: string
+          format: uuid
+        internalApprovalRequired:
+          type: boolean
+        internalDecidedAt:
+          type: string
+          format: date-time
+        internalRejectionReason:
+          type: string
+        linkExpired:
+          type: boolean
+        linkExpiresAt:
+          type: string
+          format: date-time
+        linksIssued:
+          type: integer
+          format: int32
+        openChangeRequest:
+          type: boolean
+        proposalValidUntil:
+          type: string
+          format: date-time
+        recipientEmail:
+          type: string
+        recipientName:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/CustomerApprovalStatus"
+        versionNo:
+          type: integer
+          format: int32
+      required:
+      - id
+      - internalApprovalRequired
+      - linkExpired
+      - linksIssued
+      - openChangeRequest
+      - proposalValidUntil
+      - recipientEmail
+      - requestedAt
+      - status
+      - versionNo
+    CustomerChangeRequestItem:
+      type: object
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        customerName:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        decidedByEmail:
+          type: string
+        decidedByName:
+          type: string
+        note:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        versionNo:
+          type: integer
+          format: int32
+      required:
+      - approvalId
+      - decidedAt
+      - note
+      - orderId
+      - orderNumber
+      - versionNo
     CustomerCommercialAssignmentResponse:
       type: object
       properties:
@@ -69989,6 +70986,104 @@ components:
           type: string
       required:
       - productType
+    OrderApprovalChangeRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        session:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - note
+      - session
+    OrderApprovalLink:
+      type: object
+      properties:
+        codeSentAt:
+          type: string
+          format: date-time
+        customerName:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        linkExpiresAt:
+          type: string
+          format: date-time
+        nextCodeAllowedAt:
+          type: string
+          format: date-time
+        orderNumber:
+          type: string
+        recipientEmailMasked:
+          type: string
+        sellerName:
+          type: string
+        state:
+          $ref: "#/components/schemas/OrderApprovalLinkState"
+      required:
+      - orderNumber
+      - recipientEmailMasked
+      - state
+    OrderApprovalLinkState:
+      type: string
+      enum:
+      - OPEN
+      - EXPIRED
+      - APPROVED
+      - APPROVED_NOT_FULFILLABLE
+      - CHANGES_REQUESTED
+      - CLOSED
+    OrderApprovalSession:
+      type: object
+      properties:
+        session:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - session
+    OrderApprovalVerified:
+      type: object
+      properties:
+        session:
+          type: string
+        sessionExpiresAt:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/OrderApprovalVersion"
+      required:
+      - session
+      - sessionExpiresAt
+      - version
+    OrderApprovalVerifyCode:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          pattern: "\\d{6}"
+      required:
+      - code
+    OrderApprovalVersion:
+      type: object
+      properties:
+        content:
+          $ref: "#/components/schemas/OrderVersionContent"
+        link:
+          $ref: "#/components/schemas/OrderApprovalLink"
+        versionNo:
+          type: integer
+          format: int32
+      required:
+      - content
+      - link
+      - versionNo
     OrderCoverCase:
       type: object
       properties:
@@ -70623,6 +71718,7 @@ components:
       - AWAITING_PLANNING
       - IN_PLANNING
       - PLANNED
+      - AWAITING_INTERNAL_APPROVAL
       - AWAITING_CUSTOMER_APPROVAL
       - CUSTOMER_APPROVED
     OrderFlowView:
@@ -70666,7 +71762,6 @@ components:
       - REQUEST_READINESS_CONFIRMATION
       - CORRECT_PRODUCT
       - REQUEST_HOLD
-      - CONFIRM_ORDER
     OrderIntakeAvailability:
       type: object
       properties:
@@ -70830,8 +71925,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OrderIntakeCapability"
-        confirmable:
-          type: boolean
         evaluatedAt:
           type: string
           format: date-time
@@ -70852,7 +71945,6 @@ components:
           format: uuid
       required:
       - capabilities
-      - confirmable
       - evaluatedAt
       - lines
       - orderBlocks
@@ -70947,6 +72039,195 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MarginWarningDto"
+    OrderVersionContact:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+    OrderVersionContent:
+      type: object
+      properties:
+        contact:
+          $ref: "#/components/schemas/OrderVersionContact"
+        customRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderVersionRequest"
+        customerName:
+          type: string
+        customerReference:
+          type: string
+        delivery:
+          $ref: "#/components/schemas/OrderVersionTerms"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderVersionLine"
+        orderDate:
+          type: string
+          format: date
+        orderNumber:
+          type: string
+        partialDelivery:
+          type: string
+        paymentTerms:
+          type: string
+        proposal:
+          $ref: "#/components/schemas/OrderVersionProposal"
+        requestedDeliveryDate:
+          type: string
+          format: date
+        sellerName:
+          type: string
+        totals:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderVersionTotal"
+        unpricedLineCount:
+          type: integer
+          format: int32
+      required:
+      - customRequests
+      - lines
+      - orderNumber
+      - totals
+      - unpricedLineCount
+    OrderVersionKind:
+      type: string
+      enum:
+      - INFORMATION
+      - APPROVAL
+    OrderVersionLine:
+      type: object
+      properties:
+        colour:
+          type: string
+        currency:
+          type: string
+        discount:
+          type: number
+        finishedWidth:
+          type: number
+        finishedWidthUnit:
+          type: string
+        lineId:
+          type: string
+          format: uuid
+        product:
+          type: string
+        quantity:
+          type: number
+        requestedDeliveryDate:
+          type: string
+          format: date
+        tax:
+          type: number
+        toleranceDownPct:
+          type: number
+        toleranceUpPct:
+          type: number
+        unit:
+          type: string
+        unitPrice:
+          type: number
+    OrderVersionProposal:
+      type: object
+      properties:
+        event:
+          $ref: "#/components/schemas/DeliveryEvent"
+        proposalId:
+          type: string
+          format: uuid
+        proposedOn:
+          type: string
+          format: date
+        validUntil:
+          type: string
+          format: date-time
+    OrderVersionRequest:
+      type: object
+      properties:
+        colourNote:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: number
+        requestId:
+          type: string
+          format: uuid
+        requestedDeliveryDate:
+          type: string
+          format: date
+        unit:
+          type: string
+        width:
+          type: number
+        widthUnit:
+          type: string
+    OrderVersionTerms:
+      type: object
+      properties:
+        contractReference:
+          type: string
+        event:
+          $ref: "#/components/schemas/DeliveryEvent"
+        place:
+          type: string
+        status:
+          $ref: "#/components/schemas/DeliveryTermStatus"
+        term:
+          $ref: "#/components/schemas/DeliveryTerm"
+        version:
+          $ref: "#/components/schemas/IncotermsVersion"
+    OrderVersionTotal:
+      type: object
+      properties:
+        currency:
+          type: string
+        discount:
+          type: number
+        subtotal:
+          type: number
+        tax:
+          type: number
+        total:
+          type: number
+      required:
+      - currency
+      - discount
+      - subtotal
+      - tax
+      - total
+    OrderVersionView:
+      type: object
+      properties:
+        frozenAt:
+          type: string
+          format: date-time
+        frozenBy:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/OrderVersionKind"
+        recipientEmail:
+          type: string
+        versionNo:
+          type: integer
+          format: int32
+      required:
+      - frozenAt
+      - frozenBy
+      - id
+      - kind
+      - versionNo
     OrderWorkAction:
       type: string
       enum:
@@ -72829,7 +74110,6 @@ components:
       - sales:approve
       - sales:assign-owner
       - sales:cancel
-      - sales:confirm
       - sales:delete
       - sales:read
       - sales:ship
@@ -76327,6 +77607,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UnmodelledSpecConstraint"
+    ResendCustomerApproval:
+      type: object
+      properties:
+        recipientEmail:
+          type: string
+          format: email
+          maxLength: 255
+          minLength: 0
+        recipientName:
+          type: string
+          maxLength: 200
+          minLength: 0
     ReserveRequest:
       type: object
       properties:
@@ -77415,6 +78707,15 @@ components:
       - organizationName
       - organizationType
       - taxId
+    SendForCustomerApproval:
+      type: object
+      properties:
+        linkValidHours:
+          type: integer
+          format: int32
+          description: "How long the link lasts, in hours; 48 when omitted"
+          maximum: 168
+          minimum: 1
     SendQuoteRequest:
       type: object
       properties:
