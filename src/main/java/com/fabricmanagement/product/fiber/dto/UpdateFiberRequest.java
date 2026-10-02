@@ -1,6 +1,7 @@
 package com.fabricmanagement.product.fiber.dto;
 
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -29,9 +30,23 @@ public class UpdateFiberRequest {
   @NotBlank(message = "Fiber name is required")
   private String fiberName;
 
-  /** Null means no change; a value declares a previously undeclared pure fiber exactly once. */
+  /**
+   * Null means no change; a value declares a previously undeclared own pure fibre exactly once.
+   * Shared catalogue fibres are read-only ({@code FIBER_SHARED_READ_ONLY}).
+   */
+  @Schema(nullable = true)
   private MaterialSource materialSource;
 
+  /**
+   * Blend composition {@code Fiber.id -> percentage}. Null keeps the saved composition; an empty
+   * map or a pure/blend kind change is rejected. Changing it keeps the name unless the name is
+   * updated too; existing batches keep their own composition snapshot.
+   */
+  @Schema(
+      nullable = true,
+      description =
+          "Null = unchanged. Blend only: new composition keyed by component Fiber.id; empty map"
+              + " rejected")
   private Map<UUID, BigDecimal> composition;
 
   private String remarks;

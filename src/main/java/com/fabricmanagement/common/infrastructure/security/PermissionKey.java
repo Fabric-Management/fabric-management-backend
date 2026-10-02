@@ -57,6 +57,14 @@ public enum PermissionKey {
       EnforcedBy.ANNOTATION,
       "Mirrors logistics:cancel: MANAGER / WAREHOUSE / ORGANIZATION (PERM-CAT-1)."),
   LOGISTICS_DELIVER("logistics:deliver", EnforcedBy.ANNOTATION, ""),
+  LOGISTICS_ASSIGN(
+      "logistics:assign",
+      EnforcedBy.ANNOTATION,
+      "Assign, reassign or release warehouse and shipping work on an order, with a reason."),
+  LOGISTICS_CLAIM(
+      "logistics:claim",
+      EnforcedBy.ANNOTATION,
+      "See unassigned warehouse or shipping work routed to the team and take it explicitly."),
   LOGISTICS_PREPARE("logistics:prepare", EnforcedBy.ANNOTATION, ""),
   LOGISTICS_READ("logistics:read", EnforcedBy.ANNOTATION, ""),
   LOGISTICS_SHIP("logistics:ship", EnforcedBy.ANNOTATION, ""),
@@ -66,6 +74,14 @@ public enum PermissionKey {
   MEMBERS_WRITE("members:write", EnforcedBy.JAVA, ""),
   PROCUREMENT_READ("procurement:read", EnforcedBy.ANNOTATION, ""),
   PROCUREMENT_WRITE("procurement:write", EnforcedBy.ANNOTATION, ""),
+  PRODUCTION_ASSIGN(
+      "production:assign",
+      EnforcedBy.ANNOTATION,
+      "Assign, reassign or release an order's planning, with a reason."),
+  PRODUCTION_CLAIM(
+      "production:claim",
+      EnforcedBy.ANNOTATION,
+      "See unassigned orders routed to planning and take one for evaluation."),
   PRODUCTION_READ(
       "production:read",
       EnforcedBy.ANNOTATION,
@@ -83,7 +99,6 @@ public enum PermissionKey {
   SALES_APPROVE("sales:approve", EnforcedBy.ANNOTATION, ""),
   SALES_ASSIGN_OWNER("sales:assign-owner", EnforcedBy.ANNOTATION, ""),
   SALES_CANCEL("sales:cancel", EnforcedBy.ANNOTATION, ""),
-  SALES_CONFIRM("sales:confirm", EnforcedBy.ANNOTATION, ""),
   SALES_DELETE("sales:delete", EnforcedBy.ANNOTATION, ""),
   SALES_READ("sales:read", EnforcedBy.ANNOTATION, ""),
   SALES_SHIP("sales:ship", EnforcedBy.ANNOTATION, ""),

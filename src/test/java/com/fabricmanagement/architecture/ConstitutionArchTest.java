@@ -89,12 +89,11 @@ class ConstitutionArchTest {
   @Test
   void salesOrderInternalEntriesHaveOnlyAllowListedDirectProductionCallers() {
     String service = "com.fabricmanagement.sales.salesorder.app.SalesOrderService";
-    String listener =
-        "com.fabricmanagement.sales.salesorder.app.listener.SalesOrderApprovalEventListener";
+    // Only the customer's approval confirms an order; demo data is seeded confirmed.
     Map<String, String> callers =
         Map.of(
-            "confirmOrderAsSystem", listener,
-            "rejectOrder", listener,
+            "confirmApprovedByCustomer",
+                "com.fabricmanagement.sales.salesorder.app.CustomerApprovalDecisionService",
             "confirmDemoSeedOrder",
                 "com.fabricmanagement.common.infrastructure.bootstrap.SalesDemoSeeder");
 
@@ -1097,10 +1096,13 @@ class ConstitutionArchTest {
       //   - YarnLegacyBackfillRunner    : YARN-1D tenant enumeration before RLS-true backfill
       //   - YarnBlankDesignationRemediationRunner : YARN-1E convergent tenant remediation
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
+      //   - PublicOrderApprovalService   : Public order approval link→tenant lookup, same pattern
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
       //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
       // reconciliation
+      //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
+      // (golden-template / playground source are other tenants); explicit tenant_id filter
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -1137,6 +1139,8 @@ class ConstitutionArchTest {
               .and()
               .doNotHaveSimpleName("QuoteApprovalService")
               .and()
+              .doNotHaveSimpleName("PublicOrderApprovalService")
+              .and()
               .doNotHaveSimpleName("QuoteRetentionPurgeJob")
               .and()
               .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
@@ -1148,6 +1152,11 @@ class ConstitutionArchTest {
               // reported an empty queue. It reads its due list as fabric_system, then processes
               // each row inside that row's own tenant context.
               .doNotHaveSimpleName("EmailOutboxService")
+              .and()
+              // TASK-TEMPLATE-TENANCY-1: reads another tenant's keyed task templates (golden or the
+              // playground source), read-only, filtered by tenant_id. Target writes stay on
+              // fabric_app (onboarding / backfill) or inside the clone's own system transaction.
+              .doNotHaveSimpleName("CatalogueSourceReader")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()

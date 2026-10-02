@@ -1,24 +1,18 @@
 package com.fabricmanagement.platform.auth.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import java.util.UUID;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Password reset request.
+ * Starts a password reset for an email address.
  *
- * <p>Contains the authUserId from masked contact selection and the contact type (EMAIL or PHONE)
- * for verification.
- *
- * <p><b>Performance Optimization:</b>
- *
- * <p>Uses authUserId for direct lookup instead of masked contact matching, significantly improving
- * performance and security.
+ * <p>The response is the same whether or not an account uses this address, so the request cannot be
+ * used to find out which addresses are registered.
  */
 @Data
 @Builder
@@ -26,15 +20,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PasswordResetRequest {
 
-  /**
-   * AuthUser ID from masked contact selection. Used for direct lookup - more secure and performant
-   * than masked value matching.
-   */
-  @NotNull(message = "Auth user ID is required")
-  private UUID authUserId;
-
-  /** Contact type: "EMAIL" or "PHONE" Used for validation and user-friendly messaging. */
-  @NotBlank(message = "Contact type is required")
-  @Pattern(regexp = "EMAIL|PHONE", message = "Contact type must be EMAIL or PHONE")
-  private String contactType;
+  /** Email address the person signs in with. */
+  @NotBlank(message = "Email is required")
+  @Email(message = "Invalid email format")
+  @Size(max = 320, message = "Email is too long")
+  private String contactValue;
 }

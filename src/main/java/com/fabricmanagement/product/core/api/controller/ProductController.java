@@ -3,11 +3,14 @@ package com.fabricmanagement.product.core.api.controller;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.core.app.ProductSalesDefinitionService;
 import com.fabricmanagement.product.core.app.ProductService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductAttributeDto;
 import com.fabricmanagement.product.core.dto.ProductDto;
+import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
+import com.fabricmanagement.product.core.dto.UpdateProductSalesDefinitionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
   private final ProductService productService;
+  private final ProductSalesDefinitionService salesDefinitionService;
 
   @Operation(summary = "Create Product")
   @PostMapping
@@ -98,6 +102,27 @@ public class ProductController {
           String scope) {
     List<ProductAttributeDto> attributes = productService.getAttributes(scope);
     return ResponseEntity.ok(ApiResponse.success(attributes));
+  }
+
+  @Operation(
+      operationId = "getProductSalesDefinition",
+      summary = "Units and finished widths the product may be ordered in")
+  @GetMapping("/{id}/sales-definition")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  public ResponseEntity<ApiResponse<ProductSalesDefinitionDto>> getSalesDefinition(
+      @Parameter(description = "Product ID") @PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(salesDefinitionService.get(id)));
+  }
+
+  @Operation(
+      operationId = "replaceProductSalesDefinition",
+      summary = "Replace the extra sales units and finished widths of a product")
+  @PutMapping("/{id}/sales-definition")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  public ResponseEntity<ApiResponse<ProductSalesDefinitionDto>> replaceSalesDefinition(
+      @Parameter(description = "Product ID") @PathVariable UUID id,
+      @Valid @RequestBody UpdateProductSalesDefinitionRequest request) {
+    return ResponseEntity.ok(ApiResponse.success(salesDefinitionService.replace(id, request)));
   }
 
   @Operation(summary = "Deactivate Product")

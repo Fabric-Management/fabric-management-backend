@@ -69,7 +69,7 @@ class EstimatedMarginServiceTest {
             .tradingPartnerId(partnerId)
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
-            .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
+            .netRevenues(java.util.List.of(Money.of(new BigDecimal("100.00"), "USD")))
             .status("CONFIRMED")
             .build();
 
@@ -90,8 +90,8 @@ class EstimatedMarginServiceTest {
 
     when(exchangeRateService.convert(
             eq(tenantId),
-            eq(orderDto.netRevenue().getAmount()),
-            eq(orderDto.netRevenue().getCurrency().getCurrencyCode()),
+            eq(orderDto.netRevenues().getFirst().getAmount()),
+            eq(orderDto.netRevenues().getFirst().getCurrency().getCurrencyCode()),
             eq(tenantCurrency),
             any()))
         .thenReturn(ConvertedMoney.sameUnit(new BigDecimal("100.00"), "USD"));
@@ -136,7 +136,7 @@ class EstimatedMarginServiceTest {
             .orderNumber("SO-002")
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
-            .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
+            .netRevenues(java.util.List.of(Money.of(new BigDecimal("100.00"), "USD")))
             .status("CONFIRMED")
             .build();
 
@@ -146,8 +146,8 @@ class EstimatedMarginServiceTest {
 
     when(exchangeRateService.convert(
             eq(tenantId),
-            eq(orderDto.netRevenue().getAmount()),
-            eq(orderDto.netRevenue().getCurrency().getCurrencyCode()),
+            eq(orderDto.netRevenues().getFirst().getAmount()),
+            eq(orderDto.netRevenues().getFirst().getCurrency().getCurrencyCode()),
             eq(tenantCurrency),
             any()))
         .thenReturn(ConvertedMoney.sameUnit(new BigDecimal("100.00"), "USD"));
@@ -176,7 +176,7 @@ class EstimatedMarginServiceTest {
             .tradingPartnerId(partnerId)
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
-            .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
+            .netRevenues(java.util.List.of(Money.of(new BigDecimal("100.00"), "USD")))
             .status("CONFIRMED")
             .build();
 

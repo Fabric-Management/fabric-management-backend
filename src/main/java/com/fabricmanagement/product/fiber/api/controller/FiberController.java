@@ -3,6 +3,7 @@ package com.fabricmanagement.product.fiber.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.product.fiber.app.FiberCatalogQueryService;
 import com.fabricmanagement.product.fiber.app.FiberIsoCodeService;
+import com.fabricmanagement.product.fiber.app.FiberReferenceQueryService;
 import com.fabricmanagement.product.fiber.app.FiberService;
 import com.fabricmanagement.product.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.product.fiber.dto.FiberCatalogSummaryDto;
@@ -11,8 +12,6 @@ import com.fabricmanagement.product.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
 import com.fabricmanagement.product.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.product.fiber.dto.UpdateFiberRequest;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCertificationRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -26,7 +25,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Fiber Controller - REST API for fiber management.
+ * Fiber Controller - REST API for fiber management (FIBER-CATALOG-1: shared catalogue + tenant
+ * blends; shared rows are read-only for tenants and carry backend capabilities).
  *
  * <p>Security uses department-aware checks via {@code PermissionEvaluator}. WRITE = create / update
  * / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept). READ = any authenticated
@@ -42,8 +42,7 @@ public class FiberController {
   private final FiberService fiberService;
   private final FiberCatalogQueryService fiberCatalogQueryService;
   private final FiberIsoCodeService fiberIsoCodeService;
-  private final FiberCategoryRepository fiberCategoryRepository;
-  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberReferenceQueryService referenceQueryService;
 
   @PostMapping
   @PreAuthorize("@auth.can(authentication, 'fiber', 'write')")
@@ -139,16 +138,12 @@ public class FiberController {
   @GetMapping("/categories")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<List<FiberCategoryDto>>> getCategories() {
-    List<FiberCategoryDto> categories =
-        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
-    return ResponseEntity.ok(ApiResponse.success(categories));
+    return ResponseEntity.ok(ApiResponse.success(referenceQueryService.listCategories()));
   }
 
   /**
-   * Task F1: ISO codes with optional baseOnly filter.
-   *
-   * <p>When baseOnly=true, returns only official ISO 2076 codes (52 records). When false, returns
-   * all active codes.
+   * Shared ISO codes (one row per code, catalogue owner). {@code baseOnly=true} keeps only codes
+   * classified as official in the existing catalogue metadata.
    */
   @GetMapping("/iso-codes")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
@@ -161,10 +156,6 @@ public class FiberController {
   @GetMapping("/certifications")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<List<FiberCertificationDto>>> getCertifications() {
-    List<FiberCertificationDto> certifications =
-        fiberCertificationRepository.findByIsActiveTrue().stream()
-            .map(FiberCertificationDto::from)
-            .toList();
-    return ResponseEntity.ok(ApiResponse.success(certifications));
+    return ResponseEntity.ok(ApiResponse.success(referenceQueryService.listCertificationSchemes()));
   }
 }

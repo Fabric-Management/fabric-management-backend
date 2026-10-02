@@ -3,6 +3,7 @@ package com.fabricmanagement.production.core.batch.app.adapter;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
@@ -12,6 +13,7 @@ import com.fabricmanagement.product.core.app.ProductEvidenceQueryService;
 import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
 import com.fabricmanagement.product.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
@@ -71,6 +73,7 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   @Autowired private ProductRepository products;
   @Autowired private QualityGradeRepository grades;
   @Autowired private FiberCertificationRepository fiberCertifications;
+  @Autowired private SystemTransactionExecutor systemTransactions;
   @Autowired private TenantRepository tenants;
   @Autowired private EntityManager entityManager;
   @Autowired private PlatformTransactionManager transactionManager;
@@ -390,12 +393,7 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     Batch batch = batch(product, BatchStatus.AVAILABLE);
     batch.assignColor(cardX);
     piece(batch, grade(true, 1), "100");
-    FiberCertification gotsCertification =
-        fiberCertifications.saveAndFlush(
-            FiberCertification.builder()
-                .certificationCode("GOTS")
-                .certificationName("GOTS fixture")
-                .build());
+    FiberCertification gotsCertification = sharedScheme("GOTS", "GOTS fixture");
     certifications.saveAndFlush(
         BatchCertification.builder()
             .batch(batch)
@@ -453,11 +451,8 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
   void acceptedFixtureCertificatePolicyEvaluatesSetsWithoutOpeningTheGotsBoundary() {
     Product product = product();
     FiberCertification fixture =
-        fiberCertifications.saveAndFlush(
-            FiberCertification.builder()
-                .certificationCode(FixtureBatchCertificateEvidencePolicy.SCHEME)
-                .certificationName("Accepted certificate-policy fixture")
-                .build());
+        sharedScheme(
+            FixtureBatchCertificateEvidencePolicy.SCHEME, "Accepted certificate-policy fixture");
 
     Batch renewed = eligibleBatch(product);
     certificate(
@@ -1116,5 +1111,32 @@ class OrderCoverEvidenceAdapterIT extends AbstractIntegrationTest {
     FixtureBatchCertificateEvidencePolicy acceptedFixtureCertificatePolicy() {
       return new FixtureBatchCertificateEvidencePolicy();
     }
+  }
+
+  /**
+   * FIBER-CATALOG-1: certification schemes are one shared dictionary owned by the catalogue; a
+   * tenant can no longer own a scheme row. Reuses the shared scheme or publishes the test-only one
+   * as the owner (idempotent across test methods sharing the container).
+   */
+  private FiberCertification sharedScheme(String code, String name) {
+    systemTransactions.executeInTransaction(
+        jdbc -> {
+          jdbc.update(
+              "INSERT INTO production.prod_fiber_certification "
+                  + "(id, tenant_id, uid, certification_code, certification_name, is_active) "
+                  + "SELECT gen_random_uuid(), ?, ?, ?, ?, TRUE "
+                  + "WHERE NOT EXISTS (SELECT 1 FROM production.prod_fiber_certification "
+                  + "WHERE tenant_id = ? AND certification_code = ?)",
+              FiberCatalog.OWNER_ID,
+              "IT-FCER-" + code,
+              code,
+              name,
+              FiberCatalog.OWNER_ID,
+              code);
+          return null;
+        });
+    return fiberCertifications
+        .findByTenantIdAndCertificationCodeAndIsActiveTrue(FiberCatalog.OWNER_ID, code)
+        .orElseThrow();
   }
 }

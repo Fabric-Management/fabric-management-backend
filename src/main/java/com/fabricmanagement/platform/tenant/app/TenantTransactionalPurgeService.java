@@ -132,6 +132,14 @@ public class TenantTransactionalPurgeService {
           "iwm.lot_end_rule",
           "iwm.return_rate_rule",
           "iwm.warehouse_location",
+          "production.batch_finished_width_measurement",
+          "production.lot_compatibility_request",
+          "production.lot_compatibility_confirmation",
+          "production.stock_unit_cut",
+          "production.stock_unit_allocation",
+          "production.work_order_hold",
+          "production.playground_fixture_item",
+          "production.playground_fixture_run",
           "production.production_output_item",
           "production.production_output_record",
           "production.work_order_output",
@@ -170,6 +178,8 @@ public class TenantTransactionalPurgeService {
           "production.prod_yarn_spinning_system",
           "production.prod_property_definition",
           "production.prod_yarn_certification",
+          "production.prod_product_finished_width",
+          "production.prod_product_sales_unit",
           "procurement.supplier_quote_token",
           "procurement.supplier_quote_line",
           "procurement.supplier_quote",
@@ -181,6 +191,26 @@ public class TenantTransactionalPurgeService {
           "procurement.purchase_order",
           "flowboard.decision_follow_suppression",
           "flowboard.decision_follow",
+          "sales_ord.quantity_acceptance",
+          "sales_ord.quantity_proposal",
+          "sales_ord.customer_tone_acceptance",
+          "sales_ord.customer_request_decision",
+          "sales_ord.customer_request_revision",
+          "sales_ord.customer_request_evaluation",
+          "sales_ord.intake_attachment",
+          "sales_ord.customer_product_request",
+          "sales_ord.order_delivery_preference",
+          "sales_ord.line_greige_cover",
+          "sales_ord.line_portion_readiness",
+          "sales_ord.order_arrival_estimate",
+          "sales_ord.delivery_commitment",
+          "sales_ord.delivery_proposal",
+          "sales_ord.order_flow_event",
+          "sales_ord.order_work_assignment_event",
+          "sales_ord.order_work_assignment",
+          "sales_ord.customer_approval",
+          "sales_ord.order_version",
+          "sales_ord.line_product_correction",
           "sales_ord.order_cover_case_line",
           "sales_ord.order_cover_line_result",
           "sales_ord.order_cover_result",
@@ -520,6 +550,10 @@ public class TenantTransactionalPurgeService {
         tenantId);
   }
 
+  // The shared fibre catalogue (prod_fiber_category, prod_fiber_iso_code,
+  // prod_fiber_certification, canonical prod_fiber/prod_product) is owned by the golden template
+  // and never purged with a tenant (FIBER-CATALOG-1). Tenant-owned fibres and products below
+  // are deleted by tenant_id only.
   private void deleteProductReferenceRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
     delete(
@@ -555,12 +589,6 @@ public class TenantTransactionalPurgeService {
     delete(
         jdbc,
         rows,
-        "production.prod_fiber_certification",
-        "DELETE FROM production.prod_fiber_certification WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
         "production.prod_fiber_quality_standard",
         "DELETE FROM production.prod_fiber_quality_standard WHERE tenant_id = ?",
         tenantId);
@@ -575,18 +603,6 @@ public class TenantTransactionalPurgeService {
         rows,
         "production.prod_product",
         "DELETE FROM production.prod_product WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
-        "production.prod_fiber_iso_code",
-        "DELETE FROM production.prod_fiber_iso_code WHERE tenant_id = ?",
-        tenantId);
-    delete(
-        jdbc,
-        rows,
-        "production.prod_fiber_category",
-        "DELETE FROM production.prod_fiber_category WHERE tenant_id = ?",
         tenantId);
     delete(
         jdbc,

@@ -1,7 +1,11 @@
 package com.fabricmanagement.product.fiber.dto;
 
 import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
+import com.fabricmanagement.product.fiber.domain.FiberQualityTargetType;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,7 +21,29 @@ public class FiberQualityStandardDto {
   private UUID id;
   private UUID tenantId;
   private String uid;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+  private FiberQualityTargetType targetType;
+
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      nullable = true,
+      description = "Shared ISO code id; set only when targetType=ISO_CODE")
   private UUID isoCodeId;
+
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      nullable = true,
+      description = "Target Fiber.id; set only when targetType=FIBER")
+  private UUID fiberId;
+
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      nullable = true,
+      description =
+          "FIBER target only: server-captured composition {Fiber.id: percentage}; read-only")
+  private Map<UUID, BigDecimal> targetComposition;
+
   private String standardName;
   private Boolean isDefault;
 
@@ -59,7 +85,10 @@ public class FiberQualityStandardDto {
         .id(entity.getId())
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
-        .isoCodeId(entity.getIsoCode() != null ? entity.getIsoCode().getId() : null)
+        .targetType(entity.getTargetType())
+        .isoCodeId(entity.getIsoCodeId())
+        .fiberId(entity.getFiberId())
+        .targetComposition(entity.getTargetComposition())
         .standardName(entity.getStandardName())
         .isDefault(entity.getIsDefault())
         .finenessMin(entity.getFinenessMin())

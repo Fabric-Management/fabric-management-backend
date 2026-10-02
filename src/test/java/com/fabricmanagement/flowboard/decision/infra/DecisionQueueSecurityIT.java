@@ -230,7 +230,7 @@ class DecisionQueueSecurityIT extends OrderCoverIntegrationSupport {
         .onOpened(any(OrderCoverCaseOpenedEvent.class));
     activation.activate();
     UUID orderId = draft(1);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     UUID caseId =
         jdbc.queryForObject(
             "select id from sales_ord.order_cover_case where sales_order_id=?",

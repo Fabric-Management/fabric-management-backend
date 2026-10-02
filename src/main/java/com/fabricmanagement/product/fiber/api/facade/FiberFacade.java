@@ -1,6 +1,7 @@
 package com.fabricmanagement.product.fiber.api.facade;
 
 import com.fabricmanagement.product.fiber.dto.CreateFiberRequest;
+import com.fabricmanagement.product.fiber.dto.FiberCatalogReferenceDto;
 import com.fabricmanagement.product.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
 import java.util.List;
@@ -72,11 +73,23 @@ public interface FiberFacade {
   List<FiberCategoryDto> listActiveCategories();
 
   /**
-   * Find fibers by multiple product IDs (batch lookup). Includes both tenant-specific and global
-   * system fibers. Primarily used for cross-reference searches in the product module.
+   * Find fibers by multiple product IDs (batch lookup) within the current tenant and the shared
+   * catalogue. Primarily used for cross-reference searches in the product module.
    *
    * @param productIds Collection of product IDs to search
    * @return Matching fibers as DTOs
    */
   List<FiberDto> findByProductIds(java.util.Collection<java.util.UUID> productIds);
+
+  /**
+   * Exact canonical shared pure fibre for a shared ISO code (e.g. {@code CO}). Callers that need a
+   * specific material look it up by code, never by list position or name (FIBER-CATALOG-1).
+   */
+  Optional<FiberCatalogReferenceDto> findCanonicalByIsoCode(String isoCode);
+
+  /**
+   * Product id of the current tenant's active blend with exactly this composition ({@code Fiber.id
+   * -> percentage}); empty when the tenant has no such blend. Never creates one.
+   */
+  Optional<UUID> findOwnBlendProductId(java.util.Map<UUID, java.math.BigDecimal> composition);
 }

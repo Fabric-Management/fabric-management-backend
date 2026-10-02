@@ -7,7 +7,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** Domain event published when a new Fiber is created. */
+/**
+ * Domain event published when a new Fiber is created. {@code fiberIsoCodeId} is the shared ISO code
+ * of a pure fibre and null for a blend (FIBER-CATALOG-1).
+ */
 @Getter
 public class FiberCreatedEvent extends DomainEvent {
 

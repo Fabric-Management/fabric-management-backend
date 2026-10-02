@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class VerificationCodeService {
 
   private final VerificationCodeRepository verificationCodeRepository;
+  private final VerificationCodeAttemptService attemptRecorder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${application.verification.code-length:6}")
@@ -48,6 +49,9 @@ public class VerificationCodeService {
     verificationCodeRepository.deleteByTenantIdAndContactValueAndType(tenantId, contactValue, type);
 
     VerificationCode entity = VerificationCode.create(contactValue, hash, type, codeExpiryMinutes);
+    // Anonymous callers (registration, password reset) have no TenantContext; the row must still
+    // carry the tenant this method resolves, or persisting it fails and no code is ever sent.
+    entity.setTenantId(tenantId);
     verificationCodeRepository.save(entity);
 
     log.info(
@@ -111,14 +115,15 @@ public class VerificationCodeService {
     }
 
     if (!verificationCode.matches(rawCode, passwordEncoder)) {
-      verificationCode.incrementAttempt();
-      verificationCodeRepository.save(verificationCode);
+      // Recorded in its own transaction: the exception below rolls back the caller's
+      // transaction, and the attempt must survive that or the limit never applies.
+      int attempts = attemptRecorder.recordFailedAttempt(verificationCode.getId());
       log.warn(
           "Verification code mismatch: tenantId={}, contact={}, type={}, attempts={}",
           tenantId,
           maskContact(contactValue),
           type,
-          verificationCode.getAttemptCount());
+          attempts);
       throw new PlatformDomainException(
           "Verification code is invalid or expired", "AUTH_VERIFICATION_CODE_INVALID", 400);
     }

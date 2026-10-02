@@ -151,21 +151,21 @@ class RevenueBacklogServiceTest {
             AnalyticsSalesOrderDto.builder()
                 .orderId(UUID.randomUUID())
                 .tradingPartnerId(CUSTOMER_1)
-                .netRevenue(Money.of(new BigDecimal("100"), "USD"))
+                .netRevenues(java.util.List.of(Money.of(new BigDecimal("100"), "USD")))
                 .status("CONFIRMED")
                 .build(),
             // Needs FX conversion
             AnalyticsSalesOrderDto.builder()
                 .orderId(UUID.randomUUID())
                 .tradingPartnerId(CUSTOMER_2)
-                .netRevenue(Money.of(new BigDecimal("2000"), "EUR"))
+                .netRevenues(java.util.List.of(Money.of(new BigDecimal("2000"), "EUR")))
                 .status("IN_PROGRESS")
                 .build(),
             // Excluded (Delivered)
             AnalyticsSalesOrderDto.builder()
                 .orderId(UUID.randomUUID())
                 .tradingPartnerId(CUSTOMER_1)
-                .netRevenue(Money.of(new BigDecimal("1000"), "USD"))
+                .netRevenues(java.util.List.of(Money.of(new BigDecimal("1000"), "USD")))
                 .status("DELIVERED")
                 .build());
 
@@ -207,5 +207,57 @@ class RevenueBacklogServiceTest {
     // Check warnings for FX
     assertThat(response.warnings()).hasSize(1);
     assertThat(response.warnings().get(0).code()).isEqualTo("MISSING_EXCHANGE_RATE");
+  }
+
+  @Test
+  void aMixedCurrencyOrderConvertsEachCurrencyAndCountsOnce() {
+    when(reportingCurrencyPort.getReportingCurrency(TENANT_ID)).thenReturn("USD");
+    when(analyticsFinancePort.getIssuedRevenueByCustomer(any(), any(), any(), any()))
+        .thenReturn(new AnalyticsRevenueResponse(List.of(), List.of()));
+    when(analyticsSalesOrderPort.getOrdersForAnalytics(TENANT_ID))
+        .thenReturn(
+            List.of(
+                AnalyticsSalesOrderDto.builder()
+                    .orderId(UUID.randomUUID())
+                    .tradingPartnerId(CUSTOMER_1)
+                    .netRevenues(
+                        List.of(
+                            Money.of(new BigDecimal("100"), "USD"),
+                            Money.of(new BigDecimal("50"), "EUR")))
+                    .status("CONFIRMED")
+                    .build()));
+    when(tradingPartnerResolver.resolveDisplayNames(TENANT_ID, List.of(CUSTOMER_1)))
+        .thenReturn(Map.of(CUSTOMER_1, "Cust A"));
+    when(exchangeRateService.convert(
+            eq(TENANT_ID), any(BigDecimal.class), eq("USD"), eq("USD"), any()))
+        .thenReturn(
+            ConvertedMoney.of(
+                new BigDecimal("100"),
+                "USD",
+                new BigDecimal("100"),
+                "USD",
+                BigDecimal.ONE,
+                LocalDate.now(clock)));
+    when(exchangeRateService.convert(
+            eq(TENANT_ID), any(BigDecimal.class), eq("EUR"), eq("USD"), any()))
+        .thenReturn(
+            ConvertedMoney.of(
+                new BigDecimal("50"),
+                "EUR",
+                new BigDecimal("55"),
+                "USD",
+                new BigDecimal("1.1"),
+                LocalDate.now(clock)));
+
+    RevenueBacklogResponse response = service.getTrends(1);
+
+    assertThat(response.backlogByCustomer())
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.committedOrderValue()).isEqualByComparingTo("155");
+              assertThat(row.orderCount()).isEqualTo(1);
+            });
+    assertThat(response.warnings()).isEmpty();
   }
 }

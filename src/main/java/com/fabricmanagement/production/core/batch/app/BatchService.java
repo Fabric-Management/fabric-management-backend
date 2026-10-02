@@ -5,10 +5,10 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.product.color.api.query.ColorQueryService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
-import com.fabricmanagement.product.fiber.domain.Fiber;
 import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchCertification;
+import com.fabricmanagement.production.core.batch.domain.BatchCompositionSnapshot;
 import com.fabricmanagement.production.core.batch.domain.BatchReservation;
 import com.fabricmanagement.production.core.batch.domain.BatchStatus;
 import com.fabricmanagement.production.core.batch.domain.CreateBatchCommand;
@@ -69,15 +69,7 @@ public class BatchService {
     }
 
     Map<String, Object> attributes = resolveAttributes(request);
-    if (request.getComposition() != null && !request.getComposition().isEmpty()) {
-      Map<String, Object> compMap = new HashMap<>();
-      for (Map.Entry<UUID, BigDecimal> e : request.getComposition().entrySet()) {
-        compMap.put(e.getKey().toString(), e.getValue());
-      }
-      attributes.put("composition", compMap);
-    }
-
-    UUID qualityStandardId = resolveQualityStandardId(request);
+    UUID qualityStandardId = resolveFiberQuality(tenantId, request, attributes);
     UUID colorId = requireActiveColor(request.getColorId());
 
     Batch batch =
@@ -134,34 +126,41 @@ public class BatchService {
   }
 
   /**
-   * Resolves qualityStandardId for batch creation. If request has qualityStandardId, validate and
-   * use it. If null and FIBER: apply default profile for product's ISO code. If no default, skip.
+   * FIBER batches (FIBER-CATALOG-1): validates the optional composition override exactly like any
+   * composition, stores the effective composition snapshot (also when no override was supplied) and
+   * resolves the quality profile with the shared resolver. An explicit profile must be the tenant's
+   * active profile and must apply to this exact input; otherwise the exact FIBER default, then the
+   * ISO default for a pure fibre at 100%, else none (pending/manual review). A FIBER product
+   * without a fibre definition has unknown composition: no snapshot, no profile.
    */
-  private UUID resolveQualityStandardId(CreateBatchRequest request) {
-    if (request.getQualityStandardId() != null) {
-      UUID tenantId = TenantContext.requireTenantId();
-      if (fiberQualityQueryService
-          .findQualityStandardById(tenantId, request.getQualityStandardId())
-          .isEmpty()) {
-        throw new BatchDomainException(
-            "Quality standard not found: " + request.getQualityStandardId());
-      }
-      return request.getQualityStandardId();
-    }
+  private UUID resolveFiberQuality(
+      UUID tenantId, CreateBatchRequest request, Map<String, Object> attributes) {
     if (request.getProductType() != ProductType.FIBER) {
+      if (request.getComposition() != null) {
+        throw new BatchDomainException("A composition override is only valid for FIBER batches");
+      }
+      if (request.getQualityStandardId() != null) {
+        throw new BatchDomainException("Fibre quality profiles apply to FIBER batches only");
+      }
       return null;
     }
-    UUID tenantId = TenantContext.requireTenantId();
-    Optional<Fiber> fiberOpt = fiberQualityQueryService.findByProductId(request.getProductId());
-    if (fiberOpt.isEmpty()) {
+    if (request.getComposition() == null
+        && request.getQualityStandardId() == null
+        && fiberQualityQueryService.findByProductId(tenantId, request.getProductId()).isEmpty()) {
+      log.warn(
+          "FIBER product {} has no fibre definition; batch composition stays unknown",
+          request.getProductId());
       return null;
     }
-    UUID isoCodeId = fiberOpt.get().getFiberIsoCodeId();
-    if (isoCodeId == null) {
-      return null;
-    }
+    FiberQualityQueryService.EffectiveComposition effective =
+        fiberQualityQueryService.resolveEffectiveComposition(
+            tenantId, request.getProductId(), request.getComposition());
+    attributes.put(
+        BatchCompositionSnapshot.ATTRIBUTE_KEY,
+        BatchCompositionSnapshot.toAttribute(effective.composition()));
     return fiberQualityQueryService
-        .findDefaultQualityStandard(tenantId, isoCodeId)
+        .resolve(tenantId, effective, request.getQualityStandardId())
+        .profileOptional()
         .map(FiberQualityStandard::getId)
         .orElse(null);
   }
@@ -177,47 +176,25 @@ public class BatchService {
   }
 
   /**
-   * Resolve effective composition: Batch.attributes.composition if present, else Fiber.composition.
-   * Returns empty map for non-FIBER or when neither has composition.
+   * Effective composition shown for a batch: the stored snapshot. A FIBER batch created before
+   * snapshots (no attribute) shows its fibre definition; a malformed snapshot shows nothing, since
+   * an unknown composition must not be presented as a pure one.
    */
   private Map<UUID, BigDecimal> resolveComposition(Batch batch) {
     if (batch.getProductType() != ProductType.FIBER) {
       return Map.of();
     }
-    Object compObj =
-        batch.getAttributes() != null ? batch.getAttributes().get("composition") : null;
-    if (compObj instanceof Map) {
-      Map<?, ?> compMap = (Map<?, ?>) compObj;
-      if (!compMap.isEmpty()) {
-        Map<UUID, BigDecimal> result = new HashMap<>();
-        for (Map.Entry<?, ?> e : compMap.entrySet()) {
-          try {
-            UUID key =
-                e.getKey() instanceof UUID
-                    ? (UUID) e.getKey()
-                    : UUID.fromString(String.valueOf(e.getKey()));
-            BigDecimal val =
-                e.getValue() instanceof BigDecimal
-                    ? (BigDecimal) e.getValue()
-                    : new BigDecimal(String.valueOf(e.getValue()));
-            result.put(key, val);
-          } catch (Exception ex) {
-            log.warn(
-                "Invalid composition entry in batch {}: key={}, value={}. Error: {}",
-                batch.getId(),
-                e.getKey(),
-                e.getValue(),
-                ex.getMessage());
-          }
-        }
-        return result;
-      }
+    if (BatchCompositionSnapshot.isRecorded(batch.getAttributes())) {
+      return BatchCompositionSnapshot.read(batch.getAttributes())
+          .orElseGet(
+              () -> {
+                log.error("Malformed composition snapshot on batch {}", batch.getId());
+                return Map.of();
+              });
     }
-    // batch.productId is a prod_product.id; a Fiber is reached through Fiber.productId
-    // (BATCH-FK-1).
     return fiberQualityQueryService
-        .findByProductId(batch.getProductId())
-        .map(Fiber::getComposition)
+        .definitionComposition(batch.getTenantId(), batch.getProductId())
+        .map(FiberQualityQueryService.EffectiveComposition::composition)
         .orElse(Map.of());
   }
 
@@ -247,6 +224,13 @@ public class BatchService {
         .findById(id)
         .filter(batch -> batch.getTenantId().equals(tenantId))
         .map(this::toBatchDto);
+  }
+
+  /** Tenant-scoped lookup by batch code (used by idempotent demo fixtures). */
+  @Transactional(readOnly = true)
+  public Optional<BatchDto> findByBatchCode(String batchCode) {
+    UUID tenantId = TenantContext.requireTenantId();
+    return batchRepository.findByTenantIdAndBatchCode(tenantId, batchCode).map(this::toBatchDto);
   }
 
   @Transactional(readOnly = true)

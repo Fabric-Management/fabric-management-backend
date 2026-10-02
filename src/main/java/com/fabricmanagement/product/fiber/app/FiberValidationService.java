@@ -1,225 +1,163 @@
 package com.fabricmanagement.product.fiber.app;
 
 import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
+import com.fabricmanagement.product.fiber.domain.FiberComposition;
+import com.fabricmanagement.product.fiber.domain.FiberStatus;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Fiber Validation Service - Business rule validations for fibers.
+ * Composition rules (FIBER-CATALOG-1), shared by blend definitions, batch overrides and quality
+ * applicability queries.
  *
- * <p>Centralizes all validation logic for fiber creation/updates.
+ * <p>Percentages use exact BigDecimal arithmetic: nulls are rejected, every share is positive and
+ * at most 100, and the sum is exactly 100 with no tolerance. Components are Fiber IDs resolved in
+ * one bulk query within {@code {current tenant, catalogue owner}}; a missing ID, another tenant's
+ * private fibre and a Product ID supplied as a Fiber ID are all reported as not found, without
+ * revealing ownership.
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class FiberValidationService {
 
   private final FiberRepository fiberRepository;
 
-  // =====================================================
-  // VALIDATION RULES FOR BLENDED FIBERS
-  // =====================================================
+  /** Normalised composition together with its resolved component fibres. */
+  public record ResolvedComposition(Map<UUID, BigDecimal> composition, Map<UUID, Fiber> fibers) {}
+
+  /** A catalogue blend: at least two distinct active pure fibres, application limits apply. */
+  @Transactional(readOnly = true)
+  public ResolvedComposition validateBlendDefinition(
+      Map<UUID, BigDecimal> composition, UUID tenantId) {
+    requireEntries(composition);
+    if (composition.size() < FiberConstants.MIN_BLEND_COMPONENTS) {
+      throw new FiberDomainException(
+          "A blend requires at least two distinct pure fibres",
+          "FIBER_BLEND_MIN_COMPONENTS",
+          400,
+          new Object[] {FiberConstants.MIN_BLEND_COMPONENTS, composition.size()});
+    }
+    validateShares(composition);
+    return new ResolvedComposition(
+        FiberComposition.normalize(composition), resolveComponents(composition, tenantId));
+  }
 
   /**
-   * Validate composition percentages.
-   *
-   * <p>Rules:
-   *
-   * <ul>
-   *   <li>Total must be exactly 100%
-   *   <li>No negative percentages
-   *   <li>No zero percentages
-   *   <li>Each percentage ≤ 100%
-   * </ul>
+   * A physical (batch) composition: either one pure fibre at exactly 100% or a mixture that obeys
+   * the blend-definition share rules.
    */
   @Transactional(readOnly = true)
-  public void validateCompositionPercentages(Map<UUID, BigDecimal> composition) {
+  public ResolvedComposition validateEffectiveComposition(
+      Map<UUID, BigDecimal> composition, UUID tenantId) {
+    requireEntries(composition);
+    validateShares(composition);
+    return new ResolvedComposition(
+        FiberComposition.normalize(composition), resolveComponents(composition, tenantId));
+  }
+
+  private static void requireEntries(Map<UUID, BigDecimal> composition) {
     if (composition == null || composition.isEmpty()) {
       throw new FiberDomainException("Composition cannot be empty", "FIBER_COMPOSITION_EMPTY", 400);
     }
+  }
 
-    // Check total is 100%
-    double total = composition.values().stream().mapToDouble(BigDecimal::doubleValue).sum();
-
-    if (Math.abs(total - FiberConstants.TOTAL_PERCENTAGE) > FiberConstants.PERCENTAGE_TOLERANCE) {
+  private static void validateShares(Map<UUID, BigDecimal> composition) {
+    if (composition.size() > FiberConstants.MAX_BLEND_COMPONENTS) {
       throw new FiberDomainException(
-          "Composition percentages must sum to exactly 100%",
-          "FIBER_COMPOSITION_TOTAL_NOT_100", 400, new Object[] {total});
+          "Composition exceeds the maximum number of components",
+          "FIBER_COMPOSITION_MAX_COMPONENTS_EXCEEDED",
+          400,
+          new Object[] {FiberConstants.MAX_BLEND_COMPONENTS, composition.size()});
     }
-
-    // Check each percentage
+    BigDecimal total = BigDecimal.ZERO;
     for (Map.Entry<UUID, BigDecimal> entry : composition.entrySet()) {
+      if (entry.getKey() == null) {
+        throw new FiberDomainException(
+            "Every composition entry needs a Fiber id",
+            "FIBER_COMPOSITION_COMPONENT_REQUIRED",
+            400);
+      }
       BigDecimal percentage = entry.getValue();
-
-      // No negative percentages
-      if (percentage.compareTo(BigDecimal.ZERO) < 0) {
+      if (percentage == null) {
+        throw new FiberDomainException(
+            "Every composition entry needs a percentage",
+            "FIBER_COMPOSITION_PERCENTAGE_REQUIRED",
+            400,
+            new Object[] {entry.getKey()});
+      }
+      if (percentage.signum() < 0) {
         throw new FiberDomainException(
             "Percentage cannot be negative",
             "FIBER_COMPOSITION_NEGATIVE_PERCENTAGE",
             400,
             new Object[] {percentage});
       }
-
-      // No zero percentages (use composition at all)
-      if (percentage.compareTo(BigDecimal.ZERO) == 0) {
+      if (percentage.signum() == 0) {
         throw new FiberDomainException(
             "Composition entries cannot be 0%", "FIBER_COMPOSITION_ZERO_PERCENTAGE", 400);
       }
-
-      // No percentages over 100%
-      BigDecimal maxPercentage = BigDecimal.valueOf(FiberConstants.TOTAL_PERCENTAGE);
-      if (percentage.compareTo(maxPercentage) > 0) {
+      if (percentage.compareTo(FiberComposition.HUNDRED) > 0) {
         throw new FiberDomainException(
             "Percentage cannot exceed 100%",
             "FIBER_COMPOSITION_MAX_EXCEEDED", 400, new Object[] {percentage});
       }
-    }
-  }
-
-  /**
-   * Validate minimum composition ratio.
-   *
-   * <p>Rule: No single fiber can be less than 5% (to avoid trace amounts).
-   */
-  @Transactional(readOnly = true)
-  public void validateMinimumRatio(Map<UUID, BigDecimal> composition, double minPercentage) {
-    for (Map.Entry<UUID, BigDecimal> entry : composition.entrySet()) {
-      BigDecimal percentage = entry.getValue();
-
-      if (percentage.doubleValue() < minPercentage) {
+      if (composition.size() > 1
+          && percentage.compareTo(FiberConstants.MIN_COMPONENT_PERCENTAGE) < 0) {
         throw new FiberDomainException(
-            "Fiber percentage too low",
+            "Component share is below the current minimum",
             "FIBER_COMPOSITION_MIN_RATIO_NOT_MET",
             400,
-            new Object[] {minPercentage, percentage.doubleValue()});
+            new Object[] {FiberConstants.MIN_COMPONENT_PERCENTAGE, percentage});
       }
+      total = total.add(percentage);
     }
-  }
-
-  /**
-   * Validate maximum number of components in blend.
-   *
-   * <p>Rule: Blended fiber cannot have more than 5 components.
-   */
-  @Transactional(readOnly = true)
-  public void validateMaxComponents(Map<UUID, BigDecimal> composition, int maxComponents) {
-    if (composition.size() > maxComponents) {
+    if (total.compareTo(FiberComposition.HUNDRED) != 0) {
       throw new FiberDomainException(
-          "Blend cannot have more than maximum allowed components",
-          "FIBER_COMPOSITION_MAX_COMPONENTS_EXCEEDED",
-          400,
-          new Object[] {maxComponents, composition.size()});
+          "Composition percentages must sum to exactly 100%",
+          "FIBER_COMPOSITION_TOTAL_NOT_100", 400, new Object[] {total.toPlainString()});
     }
   }
 
-  /**
-   * Validate that base fibers are not circular references.
-   *
-   * <p>Rule: Base fiber cannot be another blended fiber (to prevent recursion).
-   */
-  @Transactional(readOnly = true)
-  public void validateNoCircularReferences(Map<UUID, BigDecimal> composition) {
-    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
-
-    for (Fiber baseFiber : baseFibers) {
-      if (baseFiber.isBlended()) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Base fiber '%s' is also a blend. Cannot blend already-blended fibers.",
-                baseFiber.getFiberName()));
+  /** One bulk resolution; every requested ID must be a visible, active, pure fibre. */
+  private Map<UUID, Fiber> resolveComponents(Map<UUID, BigDecimal> composition, UUID tenantId) {
+    Map<UUID, Fiber> found =
+        fiberRepository
+            .findScopedWithReferences(FiberCatalog.readScope(tenantId), composition.keySet())
+            .stream()
+            .collect(Collectors.toMap(Fiber::getId, Function.identity()));
+    for (UUID id : composition.keySet()) {
+      Fiber fiber = found.get(id);
+      if (fiber == null) {
+        throw new FiberDomainException(
+            "Composition component is not an available fibre",
+            "FIBER_COMPONENT_NOT_FOUND",
+            400,
+            new Object[] {id});
+      }
+      if (!Boolean.TRUE.equals(fiber.getIsActive()) || fiber.getStatus() != FiberStatus.ACTIVE) {
+        throw new FiberDomainException(
+            "Composition component is inactive or obsolete",
+            "FIBER_COMPONENT_INACTIVE",
+            400,
+            new Object[] {id});
+      }
+      if (fiber.isBlended() || fiber.getFiberIsoCode() == null) {
+        throw new FiberDomainException(
+            "Composition components must be pure fibres; blends cannot be nested",
+            "FIBER_COMPONENT_NOT_PURE",
+            400,
+            new Object[] {id});
       }
     }
-  }
-
-  /**
-   * Validate that base fibers are accessible to the current tenant.
-   *
-   * <p>Rule: All base fibers must belong to the current tenant. Each tenant has its own cloned
-   * fiber catalog — no cross-tenant access allowed.
-   */
-  @Transactional(readOnly = true)
-  public void validateTenantConsistency(Map<UUID, BigDecimal> composition, UUID currentTenantId) {
-    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
-
-    for (Fiber baseFiber : baseFibers) {
-      UUID fiberTenantId = baseFiber.getTenantId();
-      if (!currentTenantId.equals(fiberTenantId)) {
-        throw new IllegalArgumentException(
-            "All base fibers must belong to your organization's catalog");
-      }
-    }
-  }
-
-  /**
-   * Validate that base fibers are active.
-   *
-   * <p>Rule: Cannot create blend from deactivated fibers.
-   */
-  @Transactional(readOnly = true)
-  public void validateBaseFibersActive(Map<UUID, BigDecimal> composition) {
-    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
-
-    if (baseFibers.size() != composition.size()) {
-      throw new IllegalArgumentException("One or more base fibers not found in the system");
-    }
-
-    for (Fiber baseFiber : baseFibers) {
-      if (!Boolean.TRUE.equals(baseFiber.getIsActive())) {
-        throw new IllegalArgumentException(
-            String.format("Base fiber '%s' is not active", baseFiber.getFiberName()));
-      }
-    }
-  }
-
-  /**
-   * Validate fiber name format.
-   *
-   * <p>Rule: Fiber name must be 3-255 characters.
-   */
-  public void validateFiberNameFormat(String fiberName) {
-    if (fiberName == null || fiberName.isBlank()) {
-      return;
-    }
-
-    if (fiberName.length() < FiberConstants.MIN_FIBER_NAME_LENGTH
-        || fiberName.length() > FiberConstants.MAX_FIBER_NAME_LENGTH) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Fiber name must be between %d and %d characters",
-              FiberConstants.MIN_FIBER_NAME_LENGTH, FiberConstants.MAX_FIBER_NAME_LENGTH));
-    }
-  }
-
-  /**
-   * Validate category compatibility with composition.
-   *
-   * <p>Rule: Blended fiber category should be compatible with base fiber categories.
-   */
-  @Transactional(readOnly = true)
-  public void validateCategoryCompatibility(
-      UUID blendedCategoryId, Map<UUID, BigDecimal> composition) {
-    if (blendedCategoryId == null) {
-      throw new IllegalArgumentException("Blended fiber category must be specified for validation");
-    }
-
-    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
-    for (Fiber baseFiber : baseFibers) {
-      if (baseFiber.getFiberCategory() == null) {
-        log.warn(
-            "Base fiber '{}' has no category assigned. Category compatibility skipped for this component.",
-            baseFiber.getFiberName());
-      }
-    }
-    // Further complex category compatibility rules (e.g. blend can't be natural if
-    // components are synthetic)
-    // can be added here matching business requirements.
+    return found;
   }
 }

@@ -37,4 +37,7 @@ public class CreateSalesProductRequest {
 
   // Json string
   String photos;
+
+  @Schema(description = "Trading partner this entry is private to; omit for the general catalogue")
+  UUID customerId;
 }

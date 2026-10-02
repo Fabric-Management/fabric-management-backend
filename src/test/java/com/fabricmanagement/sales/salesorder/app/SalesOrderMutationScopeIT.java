@@ -1,7 +1,6 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
@@ -21,7 +20,6 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
@@ -41,7 +39,6 @@ import com.fabricmanagement.platform.user.domain.UserDepartment;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -62,7 +59,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -191,7 +187,7 @@ class SalesOrderMutationScopeIT {
   @ParameterizedTest
   @EnumSource(
       value = Mutation.class,
-      names = {"CONFIRM", "SHIP", "CANCEL", "DELETE"})
+      names = {"SHIP", "CANCEL", "DELETE"})
   void globalWriteDoesNotReplaceMissingActionPair(Mutation mutation) throws Exception {
     grant(mutation, null, DataScope.GLOBAL);
     assertDeniedAndUnchanged(mutation, createOrder(mutation, colleague));
@@ -200,7 +196,7 @@ class SalesOrderMutationScopeIT {
   @ParameterizedTest
   @EnumSource(
       value = Mutation.class,
-      names = {"CONFIRM", "SHIP", "CANCEL", "DELETE"})
+      names = {"SHIP", "CANCEL", "DELETE"})
   void actionPairDoesNotReplaceMissingWritePair(Mutation mutation) throws Exception {
     grant(mutation, DataScope.GLOBAL, null);
     assertDeniedAndUnchanged(mutation, createOrder(mutation, actor));
@@ -209,7 +205,7 @@ class SalesOrderMutationScopeIT {
   @ParameterizedTest
   @EnumSource(
       value = Mutation.class,
-      names = {"CONFIRM", "SHIP", "CANCEL", "DELETE"})
+      names = {"SHIP", "CANCEL", "DELETE"})
   void ownActionWithGlobalWriteAllowsAnotherCreator(Mutation mutation) throws Exception {
     grant(mutation, DataScope.OWN, DataScope.GLOBAL);
     assertAllowed(mutation, createOrder(mutation, colleague));
@@ -218,7 +214,7 @@ class SalesOrderMutationScopeIT {
   @ParameterizedTest
   @EnumSource(
       value = Mutation.class,
-      names = {"CONFIRM", "SHIP", "CANCEL", "DELETE"})
+      names = {"SHIP", "CANCEL", "DELETE"})
   void globalActionWithOwnWriteStillDeniesAnotherCreator(Mutation mutation) throws Exception {
     grant(mutation, DataScope.GLOBAL, DataScope.OWN);
     assertDeniedAndUnchanged(mutation, createOrder(mutation, colleague));
@@ -272,17 +268,6 @@ class SalesOrderMutationScopeIT {
   }
 
   @Test
-  void deniedConfirmDoesNotRequestApprovalRunRulesOrPublishEvents() throws Exception {
-    grant(Mutation.CONFIRM, DataScope.GLOBAL, DataScope.OWN);
-    SalesOrder order = createOrder(Mutation.CONFIRM, colleague);
-    clearInvocations(approvalPort, ruleEngine, eventPublisher);
-    assertDeniedAndUnchanged(Mutation.CONFIRM, order);
-    verify(approvalPort, never()).requiresApproval(any(), any(), any(), any(), any(), any());
-    verify(ruleEngine, never()).processConfirmedOrder(any());
-    verify(eventPublisher, never()).publish(any());
-  }
-
-  @Test
   void deniedCancelDoesNotPublishCancellation() throws Exception {
     grant(Mutation.CANCEL, DataScope.GLOBAL, DataScope.OWN);
     SalesOrder order = createOrder(Mutation.CANCEL, colleague);
@@ -292,42 +277,18 @@ class SalesOrderMutationScopeIT {
   }
 
   @Test
-  void approvalCallbacksPreserveAcceptRejectAndDraftRejection() {
-    SalesOrder accepted = createOrder(Mutation.CONFIRM, actor);
-    accepted.pendingApproval();
-    salesOrderRepository.saveAndFlush(accepted);
-    orderService.confirmOrderAsSystem(accepted.getId());
-    assertThat(reload(accepted).getStatus()).isEqualTo(OrderStatus.CONFIRMED);
-
-    SalesOrder rejected = createOrder(Mutation.CONFIRM, actor);
-    rejected.pendingApproval();
-    salesOrderRepository.saveAndFlush(rejected);
-    orderService.rejectOrder(rejected.getId(), "Approval rejected");
-    assertThat(reload(rejected).getStatus()).isEqualTo(OrderStatus.REJECTED);
-    assertThat(reload(rejected).getRejectionReason()).isEqualTo("Approval rejected");
-
-    SalesOrder draft = createOrder(Mutation.CONFIRM, actor);
-    Snapshot before = snapshot(draft);
-    assertThatThrownBy(() -> orderService.confirmOrderAsSystem(draft.getId()))
-        .isInstanceOfSatisfying(
-            OrderDomainException.class,
-            exception -> assertThat(exception.getHttpStatus()).isEqualTo(409));
-    assertThat(snapshot(draft)).isEqualTo(before);
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void demoEntryPreservesBothApprovalBranchesWithoutUserPermissions(boolean approvalRequired) {
-    SalesOrder order = createOrder(Mutation.CONFIRM, actor);
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            invocation -> {
-              assertThat((UUID) invocation.getArgument(1)).isEqualTo(actor.id());
-              return approvalRequired;
-            });
+  void demoEntryConfirmsSeededDraftWithoutUserPermissionsOrApprovalPolicy() {
+    SalesOrder order = createOrder(Mutation.DELETE, actor);
     orderService.confirmDemoSeedOrder(order.getId());
-    assertThat(reload(order).getStatus())
-        .isEqualTo(approvalRequired ? OrderStatus.PENDING_APPROVAL : OrderStatus.CONFIRMED);
+    assertThat(reload(order).getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    verify(approvalPort, never())
+        .requiresApproval(
+            any(),
+            any(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers
+                .<java.util.List<com.fabricmanagement.common.util.Money>>any());
   }
 
   private void grant(Mutation mutation, DataScope actionScope, DataScope writeScope) {
@@ -425,13 +386,13 @@ class SalesOrderMutationScopeIT {
             .statusBeforeHold(mutation == Mutation.RESUME ? OrderStatus.CONFIRMED : null)
             .rejectionReason(mutation == Mutation.REVISE ? "Rejected fixture" : null)
             .orderDate(LocalDate.now())
-            .totals(OrderTotals.zero("GBP"))
             .build();
     order = salesOrderRepository.saveAndFlush(order);
     for (int index = 0; index < 2; index++) {
       lineRepository.saveAndFlush(
           SalesOrderLine.builder()
               .salesOrderId(order.getId())
+              .productId(UUID.randomUUID())
               .productDesc("Scope fixture " + index)
               .requestedQty(BigDecimal.TEN)
               .unit("KG")
@@ -490,7 +451,6 @@ class SalesOrderMutationScopeIT {
   private record TestUser(UUID tenantId, UUID id, List<String> departmentCodes) {}
 
   private enum Mutation {
-    CONFIRM("confirm", "confirm", OrderStatus.DRAFT, OrderStatus.CONFIRMED),
     PROCESS("process", "write", OrderStatus.CONFIRMED, OrderStatus.IN_PROGRESS),
     SHIP("ship", "ship", OrderStatus.IN_PROGRESS, OrderStatus.SHIPPED),
     DELIVER("deliver", "write", OrderStatus.SHIPPED, OrderStatus.DELIVERED),

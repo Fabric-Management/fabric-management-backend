@@ -1,7 +1,8 @@
 package com.fabricmanagement.product.fiber.dto;
 
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
-import jakarta.validation.constraints.NotBlank;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;
@@ -49,35 +50,55 @@ public class CreateFiberRequest {
   private String unit;
 
   /**
-   * Fiber Category ID (optional for blended fibers — backend derives MIXED_BLEND).
-   *
-   * <p>Required for pure fibers. For blended fibers, backend auto-resolves to MIXED_BLEND.
+   * Shared fibre category. Required for a canonical pure fibre (catalogue owner only). A blend
+   * always uses the shared MIXED_BLEND category; any other value is rejected.
    */
+  @Schema(
+      nullable = true,
+      description =
+          "Pure (catalogue owner only): shared category matching the ISO code's fibre type. Blend:"
+              + " omit, or the shared MIXED_BLEND id")
   private UUID fiberCategoryId;
 
   /**
-   * Fiber ISO Code ID (optional for blended fibers — backend derives from primary component).
-   *
-   * <p>Required for pure fibers. For blended fibers, backend uses the highest-percentage base
-   * fiber's ISO code.
+   * Shared ISO code of a canonical pure fibre. A blend has no ISO code of its own: sending one is
+   * rejected with {@code FIBER_BLEND_ISO_FORBIDDEN}.
    */
+  @Schema(
+      nullable = true,
+      description =
+          "Pure (catalogue owner only): shared ISO code id. Blend: must be absent"
+              + " (FIBER_BLEND_ISO_FORBIDDEN)")
   private UUID fiberIsoCodeId;
 
-  @NotBlank(message = "Fiber name is required")
+  /**
+   * Display name. Required for a canonical pure fibre; optional for a blend, where the backend
+   * defaults it to the canonical composition label (e.g. {@code 60% CO / 40% PES}).
+   */
+  @Schema(
+      nullable = true,
+      maxLength = 255,
+      description = "Required for a pure fibre; optional for a blend (defaults to the label)")
+  @Size(max = 255, message = "Fiber name must be at most 255 characters")
   private String fiberName;
 
-  /** Declared origin for a pure fiber; forbidden when composition is non-empty. */
+  /**
+   * Must be absent: a blend cannot carry one material source ({@code
+   * FIBER_BLEND_MATERIAL_SOURCE_FORBIDDEN}) and a canonical shared fibre stays undeclared. Private
+   * source variants come from the reviewed fiber request flow.
+   */
+  @Schema(nullable = true, description = "Must be absent; see the fiber request flow")
   private MaterialSource materialSource;
 
   /**
-   * Composition map: baseFiberId → percentage (optional).
-   *
-   * <p><b>Pure fiber:</b> null or empty
-   *
-   * <p><b>Blended fiber:</b> Map with base fiber IDs and percentages (must sum to 100%)
-   *
-   * <p>Example: {cottonId: 60.0, viscoseId: 40.0}
+   * Composition {@code Fiber.id -> percentage} (never Product ids). Non-empty means a blend: at
+   * least two distinct active pure fibres (shared or own), exact decimal sum 100.
    */
+  @Schema(
+      nullable = true,
+      description =
+          "Blend composition keyed by component Fiber.id (never Product.id); exact decimal sum"
+              + " 100, 2-5 components, each at least 5. Empty/absent = canonical pure fibre")
   private Map<UUID, BigDecimal> composition;
 
   private String remarks;

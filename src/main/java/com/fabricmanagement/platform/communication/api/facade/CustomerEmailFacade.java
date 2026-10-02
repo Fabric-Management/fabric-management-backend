@@ -27,4 +27,25 @@ public class CustomerEmailFacade {
         emailTemplateRenderer.renderQuoteApproval(heading, body, cta, expires, approvalUrl);
     notificationService.sendNotificationSync(tenantId, recipient, subject, message);
   }
+
+  /**
+   * Sends a message about a sales order to the customer's contact. {@code bodyHtml} is markup the
+   * caller built with every value escaped; {@code actionUrl} may be null for a message without a
+   * button. The message is queued in the caller's transaction.
+   */
+  public void sendOrderMessage(
+      UUID tenantId,
+      String recipient,
+      String subject,
+      String sellerName,
+      String heading,
+      String bodyHtml,
+      String actionLabel,
+      String actionUrl,
+      String footnote) {
+    String message =
+        emailTemplateRenderer.renderOrderMessage(
+            sellerName, heading, bodyHtml, actionLabel, actionUrl, footnote);
+    notificationService.sendNotificationSync(tenantId, recipient, subject, message);
+  }
 }

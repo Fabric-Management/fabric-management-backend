@@ -57,6 +57,7 @@ class SalesProductServiceTest {
             null,
             null,
             null,
+            null,
             null);
     when(repository.save(any(SalesProduct.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));

@@ -61,7 +61,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
       assertThat(activation.activate().boundarySeq()).isZero();
       UUID orderId = draft(1);
       assertThat(sequence(orderId)).isEqualTo(1L);
-      sales.confirmOrder(orderId, actor.getId());
+      sales.confirmDemoSeedOrder(orderId);
       awaitCover(orderId);
       assertThat(regime(orderId)).isEqualTo("GOVERNED");
     } finally {
@@ -91,7 +91,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
     doNothing().when(events).publish(any(DomainEvent.class));
     try {
       for (UUID orderId : List.of(earlier, equal, oldDeployment)) {
-        sales.confirmOrder(orderId, actor.getId());
+        sales.confirmDemoSeedOrder(orderId);
         assertThat(regime(orderId)).isEqualTo("LEGACY");
         verify(ruleEngine).processConfirmedOrder(argThat(order -> order.getId().equals(orderId)));
       }
@@ -140,15 +140,23 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
   }
 
   @Test
-  void freeTextGovernedLineIsUnresolvedWithoutAnEarlyProductionTask() throws Exception {
+  void unregisteredProductGovernedLineIsUnresolvedWithoutAnEarlyProductionTask() throws Exception {
     var cover = governed(1);
     awaitDelivery(storedEvent(SalesOrderConfirmedEvent.class, cover.orderId()));
+    // A line always names a product (SOI K02); the fixture's product is not registered, so the
+    // cover evidence stays unknown exactly like the former description-only line.
+    UUID productId =
+        jdbc.queryForObject(
+            "select product_id from sales_ord.sales_order_line where id=?",
+            UUID.class,
+            cover.lineIds().getFirst());
+    assertThat(productId).isNotNull();
     assertThat(
             jdbc.queryForObject(
-                "select product_id from sales_ord.sales_order_line where id=?",
-                UUID.class,
-                cover.lineIds().getFirst()))
-        .isNull();
+                "select count(*) from production.prod_product where id=?",
+                Integer.class,
+                productId))
+        .isZero();
     assertThat(
             jdbc.queryForList(
                 "select sales_order_line_id from sales_ord.order_cover_case_line where case_id=?"
@@ -207,7 +215,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
   void legacyConfirmationStillRunsRuleEnginePromotesOneDraftAndPublishesApproval()
       throws Exception {
     UUID orderId = draft(1);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     awaitLegacyProduction(orderId);
     verify(ruleEngine).processConfirmedOrder(argThat(order -> order.getId().equals(orderId)));
     assertThat(count("sales_ord.order_cover_case")).isZero();
@@ -247,7 +255,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
             10,
             48));
     UUID orderId = draft(1);
-    sales.confirmOrder(orderId, actor.getId());
+    sales.confirmDemoSeedOrder(orderId);
     awaitDelivery(storedEvent(SalesOrderConfirmedEvent.class, orderId));
     assertThat(
             jdbc.queryForList(
@@ -278,7 +286,7 @@ class OrderCoverCutoverIT extends OrderCoverIntegrationSupport {
     tx(
         () -> {
           var order = orders.findById(orderId).orElseThrow();
-          order.confirm();
+          order.confirmSeededDemoOrder();
           orders.saveAndFlush(order);
           return null;
         });

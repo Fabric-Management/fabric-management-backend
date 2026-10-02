@@ -2,7 +2,6 @@ package com.fabricmanagement.platform.auth.api.controller;
 
 import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.common.util.WebRequestUtils;
 import com.fabricmanagement.platform.auth.app.PasswordResetService;
 import com.fabricmanagement.platform.auth.app.PasswordSetupService;
@@ -10,7 +9,6 @@ import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.PasswordResetRequest;
 import com.fabricmanagement.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
-import com.fabricmanagement.platform.auth.dto.UserContactInfoResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Password setup (with token) and password reset (request code, verify and reset).
  *
- * <p>Base path: /api/auth
+ * <p>Base path: /api/v1/auth
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -62,45 +60,22 @@ public class PasswordController {
                 : "Welcome back! You're all set."));
   }
 
-  @GetMapping("/user/{contactValue}/masked-contacts")
-  public ResponseEntity<ApiResponse<UserContactInfoResponse>> getMaskedContacts(
-      @PathVariable String contactValue) {
-    log.info("Getting masked contacts: contactValue={}", PiiMaskingUtil.maskEmail(contactValue));
-    UserContactInfoResponse response = passwordResetService.getMaskedContacts(contactValue);
-    return ResponseEntity.ok(ApiResponse.success(response));
-  }
-
+  /** Always answers the same way, whether or not an account uses the address. */
   @PostMapping("/password-reset/request")
   public ResponseEntity<ApiResponse<String>> requestPasswordReset(
       @Valid @RequestBody PasswordResetRequest request) {
-    log.info(
-        "Password reset request: authUserId={}, contactType={}",
-        request.getAuthUserId(),
-        request.getContactType());
     String message = passwordResetService.requestPasswordReset(request);
     return ResponseEntity.ok(ApiResponse.success(message));
   }
 
+  /**
+   * Sets the new password. The client signs in afterwards with the new password through the normal
+   * login, so MFA and organization selection still apply.
+   */
   @PostMapping("/password-reset/verify")
-  public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
-      @Valid @RequestBody PasswordResetVerifyRequest request,
-      HttpServletRequest httpRequest,
-      HttpServletResponse httpResponse) {
-    log.info("Password reset verification: authUserId={}, code=***", request.getAuthUserId());
-    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
-    String userAgent = httpRequest.getHeader("User-Agent");
-    LoginResponse response =
-        passwordResetService.verifyAndResetPassword(request, ipAddress, userAgent);
-
-    if (response.getAccessToken() != null || response.getRefreshToken() != null) {
-      authCookieSupport.addAuthCookies(
-          httpResponse, response.getAccessToken(), response.getRefreshToken());
-      response.setAccessToken(null);
-      response.setRefreshToken(null);
-    }
-
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            response, "Password reset successful! You have been automatically logged in."));
+  public ResponseEntity<ApiResponse<Void>> verifyPasswordReset(
+      @Valid @RequestBody PasswordResetVerifyRequest request) {
+    passwordResetService.resetPassword(request);
+    return ResponseEntity.ok(ApiResponse.success(null, "Password has been reset."));
   }
 }

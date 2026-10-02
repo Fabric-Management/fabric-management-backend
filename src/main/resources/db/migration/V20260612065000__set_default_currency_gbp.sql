@@ -13,5 +13,4 @@ ALTER TABLE i18n.tenant_locale_config ALTER COLUMN currency SET DEFAULT 'GBP';
 
 -- Initial schema had currency VARCHAR(3) DEFAULT 'TRY' in:
 ALTER TABLE finance.finance_invoice ALTER COLUMN currency SET DEFAULT 'GBP';
-ALTER TABLE sales_ord.sales_order ALTER COLUMN currency SET DEFAULT 'GBP';
 ALTER TABLE logistics.logistics_shipment ALTER COLUMN currency SET DEFAULT 'GBP';

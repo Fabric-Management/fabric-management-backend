@@ -1,24 +1,27 @@
 package com.fabricmanagement.product.fiber.infra.repository;
 
 import com.fabricmanagement.product.fiber.domain.reference.FiberCertification;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Shared certification-scheme dictionary (a scheme name is not a certificate). Every query names
+ * the catalogue owner explicitly (FIBER-CATALOG-1).
+ */
 @Repository
 public interface FiberCertificationRepository extends JpaRepository<FiberCertification, UUID> {
 
-  List<FiberCertification> findByIsActiveTrue();
+  List<FiberCertification> findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(UUID catalogOwnerId);
 
-  /** Tenant-scoped active certifications — prevents double rows when RLS carve-out is active. */
-  List<FiberCertification> findByTenantIdAndIsActiveTrue(UUID tenantId);
+  List<FiberCertification> findAllByTenantIdAndIdInAndIsActiveTrue(
+      UUID catalogOwnerId, Collection<UUID> ids);
 
-  List<FiberCertification> findAllByIdInAndIsActiveTrue(java.util.Collection<UUID> ids);
+  Optional<FiberCertification> findByTenantIdAndIdAndIsActiveTrue(UUID catalogOwnerId, UUID id);
 
-  /** Find certification by id only if it is active (used when adding to batch). */
-  Optional<FiberCertification> findByIdAndIsActiveTrue(UUID id);
-
-  Optional<FiberCertification> findByCertificationCode(String certificationCode);
+  Optional<FiberCertification> findByTenantIdAndCertificationCodeAndIsActiveTrue(
+      UUID catalogOwnerId, String certificationCode);
 }

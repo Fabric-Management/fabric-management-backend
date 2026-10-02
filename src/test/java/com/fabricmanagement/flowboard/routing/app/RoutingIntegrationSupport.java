@@ -5,7 +5,6 @@ import static org.mockito.Mockito.doThrow;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.flowboard.routing.app.listener.RoutingEventListener;
 import com.fabricmanagement.flowboard.routing.domain.*;
 import com.fabricmanagement.flowboard.routing.domain.event.*;
@@ -146,7 +145,6 @@ abstract class RoutingIntegrationSupport extends AbstractIntegrationTest {
                 .orderNumber("RT-" + UUID.randomUUID())
                 .status(OrderStatus.DRAFT)
                 .orderDate(LocalDate.now())
-                .totals(OrderTotals.zero("GBP"))
                 .build());
     return provisioning.createOrSynchronizeActive(
         new TaskCreation(

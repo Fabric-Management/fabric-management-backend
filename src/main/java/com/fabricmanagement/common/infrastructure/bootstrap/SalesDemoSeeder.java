@@ -1,10 +1,8 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
-import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
@@ -14,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,14 +43,15 @@ public class SalesDemoSeeder {
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void seedFor(UUID tenantId) {
-    List<ProductDto> fibers =
-        productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
-    if (fibers.isEmpty()) {
-      log.warn("No template fibers found; skipping sales demo orders for tenant: {}", tenantId);
+    // FIBER-CATALOG-1: exact shared cotton (CO) and polyester (PES), not list positions.
+    Optional<ProductDto> cotton = productFacade.findCanonicalFiberProduct("CO");
+    Optional<ProductDto> polyester = productFacade.findCanonicalFiberProduct("PES");
+    if (cotton.isEmpty() || polyester.isEmpty()) {
+      log.warn("Shared CO/PES fibres not published; skipping sales demo orders: {}", tenantId);
       return;
     }
-    ProductDto fiber1 = fibers.get(0);
-    ProductDto fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
+    ProductDto fiber1 = cotton.get();
+    ProductDto fiber2 = polyester.get();
 
     UUID cAnadolu = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_ANADOLU);
     UUID cEuropa = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_EUROPA);
@@ -86,7 +86,6 @@ public class SalesDemoSeeder {
     req.setPartnerId(partnerId);
     req.setCustomerReference(reference);
     req.setOrderDate(orderDate);
-    req.setCurrency(currency);
     req.setNotes("Demo seeded sales order");
     req.setLines(
         List.of(

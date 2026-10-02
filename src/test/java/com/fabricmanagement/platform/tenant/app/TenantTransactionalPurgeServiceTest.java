@@ -296,17 +296,31 @@ class TenantTransactionalPurgeServiceTest {
         .isLessThan(indexOf(sql, "DELETE FROM production.color WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.color WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
-    assertThat(indexOf(sql, "DELETE FROM production.prod_fiber_certification WHERE tenant_id = ?"))
-        .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"));
     assertThat(
             indexOf(sql, "DELETE FROM production.prod_fiber_quality_standard WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
-    assertThat(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"))
-        .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber_iso_code WHERE tenant_id = ?"));
-    assertThat(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"))
-        .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber_category WHERE tenant_id = ?"));
+    // FIBER-CATALOG-1: the fibre reference dictionaries are one shared catalogue owned by the
+    // platform; go-real never deletes (or re-creates) them for a tenant.
+    assertThat(sql)
+        .noneMatch(statement -> statement.contains("production.prod_fiber_category"))
+        .noneMatch(statement -> statement.contains("production.prod_fiber_iso_code"))
+        .noneMatch(statement -> statement.contains("production.prod_fiber_certification"));
+  }
+
+  @Test
+  void shouldPurgePlaygroundFixtureItemsBeforeTheirRunMarker() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("production.playground_fixture_item"))
+        .isNotNegative()
+        .isLessThan(tables.indexOf("production.playground_fixture_run"));
+    assertThat(tables)
+        .doesNotContain(
+            "production.prod_fiber_category",
+            "production.prod_fiber_iso_code",
+            "production.prod_fiber_certification");
   }
 
   @Test

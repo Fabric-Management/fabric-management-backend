@@ -1,6 +1,5 @@
 package com.fabricmanagement.product.fiber.app;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
 import com.fabricmanagement.product.core.dto.ProductAttributeDto;
 import com.fabricmanagement.product.fiber.dto.FiberCatalogSummaryDto;
@@ -8,22 +7,17 @@ import com.fabricmanagement.product.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.product.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
 import com.fabricmanagement.product.fiber.dto.FiberIsoCodeDto;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.product.fiber.infra.repository.FiberCertificationRepository;
-import com.fabricmanagement.product.fiber.infra.repository.FiberIsoCodeRepository;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Application-layer query service that aggregates fiber catalog data from multiple domains.
+ * One-shot catalogue load for the UI (FIBER-CATALOG-1): the shared reference catalogue (one row per
+ * code, owned by the catalogue owner), product attributes, and every fibre the tenant can see (its
+ * own plus the shared canonical fibres).
  *
- * <p>This service exists to break the circular dependency between FiberService and ProductService.
- * FiberService provides core fiber CRUD; ProductFacade provides cross-module product attributes.
- * Neither should depend on the other — this orchestrator composes both into a single catalog
- * response for the UI.
+ * <p>Exists to break the circular dependency between FiberService and ProductService.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,37 +25,14 @@ public class FiberCatalogQueryService {
 
   private final FiberService fiberService;
   private final ProductFacade productFacade;
-  private final FiberCategoryRepository fiberCategoryRepository;
-  private final FiberIsoCodeRepository fiberIsoCodeRepository;
-  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberReferenceQueryService referenceQueryService;
 
-  /**
-   * Catalog summary: reference data + all fibers (tenant + platform seed) for one-shot UI load.
-   *
-   * <p>Reference data (categories, ISO codes, certifications) is queried with explicit tenant_id
-   * filter to return only the tenant's own cloned copies. RLS carve-out makes template rows visible
-   * for FK resolution (shared fibers reference template's reference data), but we don't want double
-   * rows in the listing (8 cloned + 8 template = 16 would be wrong).
-   *
-   * <p>Fibers use tenantScope (own + template) because shared canonical fibers are NOT cloned.
-   */
   @Transactional(readOnly = true)
   public FiberCatalogSummaryDto getCatalogSummary() {
-    UUID tenantId = TenantContext.requireTenantId();
-
-    List<FiberCategoryDto> categories =
-        fiberCategoryRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .map(FiberCategoryDto::from)
-            .toList();
-    List<FiberIsoCodeDto> isoCodes =
-        fiberIsoCodeRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .map(FiberIsoCodeDto::from)
-            .toList();
+    List<FiberCategoryDto> categories = referenceQueryService.listCategories();
+    List<FiberIsoCodeDto> isoCodes = referenceQueryService.listIsoCodes(false);
+    List<FiberCertificationDto> certifications = referenceQueryService.listCertificationSchemes();
     List<ProductAttributeDto> attributes = productFacade.getAttributes("FIBER");
-    List<FiberCertificationDto> certifications =
-        fiberCertificationRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .map(FiberCertificationDto::from)
-            .toList();
     List<FiberDto> fibers = fiberService.getAll();
     return FiberCatalogSummaryDto.builder()
         .categories(categories)

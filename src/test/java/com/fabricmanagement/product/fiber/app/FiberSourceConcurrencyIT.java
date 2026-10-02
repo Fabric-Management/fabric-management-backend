@@ -38,8 +38,6 @@ class FiberSourceConcurrencyIT extends FiberSourceIntegrationSupport {
   void requestPartialIndexLeavesOnePendingAndSurfacesOneDuplicate409() throws Exception {
     UUID tenantId = insertTenant("request-race");
     UUID actorId = UUID.randomUUID();
-    insertCategory(tenantId, CATEGORY);
-    insertIso(tenantId, "PES", CATEGORY);
 
     List<Throwable> results =
         runTogether(() -> submit(tenantId, actorId), () -> submit(tenantId, actorId));
@@ -66,8 +64,8 @@ class FiberSourceConcurrencyIT extends FiberSourceIntegrationSupport {
   @Test
   void pureFiberVariantPartialIndexAllowsOnlyOneConcurrentCreation() throws Exception {
     UUID tenantId = insertTenant("variant-race");
-    UUID categoryId = insertCategory(tenantId, CATEGORY);
-    UUID isoId = insertIso(tenantId, "PES", CATEGORY);
+    UUID categoryId = sharedCategoryId(CATEGORY);
+    UUID isoId = sharedIsoId("PES");
 
     List<Throwable> results =
         runTogether(
@@ -91,9 +89,7 @@ class FiberSourceConcurrencyIT extends FiberSourceIntegrationSupport {
   void optimisticDeclarationRaceCommitsOneChangeAndOneActorCorrectAudit() throws Exception {
     UUID tenantId = insertTenant("declaration-race");
     UUID actorId = UUID.randomUUID();
-    UUID categoryId = insertCategory(tenantId, CATEGORY);
-    UUID isoId = insertIso(tenantId, "PES", CATEGORY);
-    UUID fiberId = insertPureFiber(tenantId, categoryId, isoId, "Legacy PES", null);
+    UUID fiberId = insertPrivateVariant(tenantId, "PES", CATEGORY, "Legacy PES", null);
     CountDownLatch loaded = new CountDownLatch(2);
     CountDownLatch mutate = new CountDownLatch(1);
 

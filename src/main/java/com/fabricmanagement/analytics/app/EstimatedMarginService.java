@@ -74,16 +74,21 @@ public class EstimatedMarginService {
       List<MarginWarningDto> warnings = new ArrayList<>();
       boolean costIncomplete = false;
 
-      // Revenue conversion
-      var revenueResult =
-          exchangeRateService.convert(
-              tenantId,
-              order.netRevenue().getAmount(),
-              order.netRevenue().getCurrency().getCurrencyCode(),
-              reportingCurrency,
-              now);
-
-      Money convertedRevenue = Money.of(revenueResult.getConvertedAmount(), reportingCurrency);
+      // Revenue conversion: each agreed currency is converted on its own, then summed.
+      BigDecimal revenueAmount = BigDecimal.ZERO;
+      for (Money net : order.netRevenues()) {
+        revenueAmount =
+            revenueAmount.add(
+                exchangeRateService
+                    .convert(
+                        tenantId,
+                        net.getAmount(),
+                        net.getCurrency().getCurrencyCode(),
+                        reportingCurrency,
+                        now)
+                    .getConvertedAmount());
+      }
+      Money convertedRevenue = Money.of(revenueAmount, reportingCurrency);
 
       // Cost resolution and conversion
       Money convertedCost = null;

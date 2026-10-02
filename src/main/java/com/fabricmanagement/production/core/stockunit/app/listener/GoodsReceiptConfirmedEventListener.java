@@ -9,6 +9,7 @@ import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQu
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
+import com.fabricmanagement.production.core.batch.app.FiberBatchSnapshotter;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.core.batch.domain.CreateBatchCommand;
@@ -57,6 +58,7 @@ public class GoodsReceiptConfirmedEventListener {
   private final BatchPrimaryMeasureService primaryMeasureService;
   private final ApplicationEventPublisher eventPublisher;
   private final IdempotentEventHandler idempotentHandler;
+  private final FiberBatchSnapshotter fiberBatchSnapshotter;
 
   @ApplicationModuleListener
   public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
@@ -335,7 +337,9 @@ public class GoodsReceiptConfirmedEventListener {
                 null,
                 null,
                 null,
-                Map.of(),
+                // FIBER-CATALOG-1: purchased fibre keeps the definition's composition snapshot.
+                fiberBatchSnapshotter.withDefinitionSnapshot(
+                    tenantId, productId, productType, Map.of()),
                 BatchSourceType.PURCHASE,
                 event.getReceiptId(),
                 null));

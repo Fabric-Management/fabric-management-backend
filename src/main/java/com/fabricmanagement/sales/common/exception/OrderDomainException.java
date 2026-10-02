@@ -17,6 +17,38 @@ public class OrderDomainException extends DomainException {
     super(message, "ORDER_RULE_VIOLATION", httpStatus);
   }
 
+  private OrderDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
+
+  /**
+   * The order is with planning, so what planning evaluated cannot change until sales withdraws it
+   * to the draft with a reason.
+   */
+  public static OrderDomainException withPlanning(String message) {
+    return new OrderDomainException(message, "ORDER_WITH_PLANNING", 409);
+  }
+
+  /** Someone else holds the work, or the caller already does. */
+  public static OrderDomainException workTaken(String message) {
+    return new OrderDomainException(message, "WORK_ALREADY_TAKEN", 409);
+  }
+
+  /** The work has no responsible person yet; it has to be claimed or assigned first. */
+  public static OrderDomainException workNotClaimed(String message) {
+    return new OrderDomainException(message, "WORK_NOT_CLAIMED", 409);
+  }
+
+  /** The order's flow stage or status does not allow this step now. */
+  public static OrderDomainException stage(String code, String message) {
+    return new OrderDomainException(message, code, 409);
+  }
+
+  /** A rule the request breaks, with a code the client can tell apart. */
+  public static OrderDomainException rule(String code, String message) {
+    return new OrderDomainException(message, code, 400);
+  }
+
   public OrderDomainException(String message, Throwable cause) {
     super(message, "ORDER_RULE_VIOLATION", 400, cause);
   }

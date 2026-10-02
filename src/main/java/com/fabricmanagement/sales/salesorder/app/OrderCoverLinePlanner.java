@@ -6,7 +6,9 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.dto.OrderCoverEvidenceDto;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /** Pure line-level order-cover decision shared by reads, previews and settlement. */
 public final class OrderCoverLinePlanner {
@@ -23,7 +25,8 @@ public final class OrderCoverLinePlanner {
       SalesOrderLine orderLine,
       OrderCoverEvidenceDto.Line evidenceLine,
       BooleanSupplier activeReservation,
-      BooleanSupplier activeProduction) {
+      BooleanSupplier activeProduction,
+      Supplier<Optional<BigDecimal>> ownFinishedStock) {
     LineAssessment structural = assess(scopeLine, orderLine, evidenceLine, false, false);
     if (!structural.selectable()) return structural;
     if (activeReservation.getAsBoolean()) {
@@ -32,16 +35,38 @@ public final class OrderCoverLinePlanner {
     if (activeProduction.getAsBoolean()) {
       return blocked(BlockCode.ACTIVE_PRODUCTION_EXISTS, List.of());
     }
-    return structural;
+    // The structural result already carries the open quantity; the scope line is read only once.
+    return withOwnFinishedStock(structural, ownFinishedStock.get().orElse(null));
   }
 
-  /** Pure form over already-known facts; used by the lazy entry point above and by unit tests. */
+  /** Pure form for a line without a finished-stock portion (unit tests of the structural rules). */
   public static LineAssessment assess(
       OrderCoverCaseLine scopeLine,
       SalesOrderLine orderLine,
       OrderCoverEvidenceDto.Line evidenceLine,
       boolean activeReservation,
       boolean activeProduction) {
+    return assess(
+        scopeLine, orderLine, evidenceLine, activeReservation, activeProduction, BigDecimal.ZERO);
+  }
+
+  /**
+   * Pure form over already-known facts; used by the lazy entry point above and by unit tests.
+   *
+   * <p>SOI D5 (R12, K10): the production quantity is the open quantity minus the finished stock
+   * already held for this line at confirmation. The line's own hold is not a block; an unknown hold
+   * is, because planning it would risk covering the need twice. Evidence stock that is not held is
+   * never subtracted: it may be taken by another order.
+   *
+   * @param ownFinishedStock finished stock held for this line, in the line unit; null = unknown
+   */
+  public static LineAssessment assess(
+      OrderCoverCaseLine scopeLine,
+      SalesOrderLine orderLine,
+      OrderCoverEvidenceDto.Line evidenceLine,
+      boolean activeReservation,
+      boolean activeProduction,
+      BigDecimal ownFinishedStock) {
     if (scopeLine == null || orderLine == null || evidenceLine == null || !scopeLine.unresolved()) {
       return blocked(BlockCode.LINE_NOT_OPEN, List.of());
     }
@@ -74,7 +99,25 @@ public final class OrderCoverLinePlanner {
     boolean rationaleRequired =
         shortfall.state() != OrderCoverEvidenceDto.Knowledge.KNOWN
             || new BigDecimal(shortfall.value()).signum() <= 0;
-    return new LineAssessment(true, null, List.of(), unresolved, rationaleRequired);
+    return withOwnFinishedStock(
+        new LineAssessment(true, null, List.of(), unresolved, rationaleRequired), ownFinishedStock);
+  }
+
+  /**
+   * Subtracts the finished stock already held for the line from an open, selectable line's quantity
+   * (SOI D5). Applied once, after the structural and live checks.
+   */
+  private static LineAssessment withOwnFinishedStock(
+      LineAssessment open, BigDecimal ownFinishedStock) {
+    if (ownFinishedStock == null) {
+      return blocked(BlockCode.COVER_PORTION_UNKNOWN, List.of());
+    }
+    BigDecimal productionQuantity = open.productionQuantity().subtract(ownFinishedStock);
+    if (productionQuantity.signum() <= 0) {
+      return blocked(BlockCode.COVERED_BY_STOCK, List.of());
+    }
+    return new LineAssessment(
+        true, null, List.of(), productionQuantity, open.rationaleRequiredIfSelected());
   }
 
   public static SelectionAssessment assessSelection(List<LineAssessment> assessments) {
@@ -95,7 +138,11 @@ public final class OrderCoverLinePlanner {
     REQUIREMENT_INCOMPLETE,
     LINE_ALREADY_FULFILLED,
     ACTIVE_RESERVATION_EXISTS,
-    ACTIVE_PRODUCTION_EXISTS
+    ACTIVE_PRODUCTION_EXISTS,
+    /** The finished stock held for the line at confirmation covers the open quantity. */
+    COVERED_BY_STOCK,
+    /** The line's held stock cannot be expressed in the line unit; planning would double count. */
+    COVER_PORTION_UNKNOWN
   }
 
   public record LineAssessment(

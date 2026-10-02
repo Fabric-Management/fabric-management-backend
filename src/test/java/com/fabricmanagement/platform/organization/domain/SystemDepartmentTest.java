@@ -21,7 +21,9 @@ class SystemDepartmentTest {
             "DYEING",
             "GARMENT",
             "QUALITY",
+            "PLANNING",
             "WAREHOUSE",
+            "SHIPPING",
             "FINANCE",
             "HR",
             "PROCUREMENT");

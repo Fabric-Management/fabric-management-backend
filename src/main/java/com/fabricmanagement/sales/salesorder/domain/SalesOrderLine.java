@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -19,8 +20,9 @@ import org.hibernate.annotations.Type;
 /**
  * A single product line within a SalesOrder.
  *
- * <p>Each line may reference a {@code Product} entity (via productId) or use a free-text {@code
- * productDesc}. At least one must be non-null (validated in service layer).
+ * <p>Each line is one distribution of a catalogue product (SOI K04): the product, colour, finished
+ * width, unit, quantity, price and optional delivery date. {@code productId} is mandatory (SOI
+ * K02); {@code productDesc} is an optional line note and never a substitute for the product.
  *
  * <p>On {@code SalesOrderConfirmed}, the RuleEngine will:
  *
@@ -47,7 +49,7 @@ import org.hibernate.annotations.Type;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class SalesOrderLine extends BaseEntity {
+public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
 
   // ── References ───────────────────────────────────────────────────────────
 
@@ -55,24 +57,53 @@ public class SalesOrderLine extends BaseEntity {
   @Column(name = "sales_order_id", nullable = false)
   private UUID salesOrderId;
 
-  /**
-   * FK → Product. Optional — use productDesc when product is not yet catalogued. At least one of
-   * productId / productDesc must be non-null.
-   */
-  @Column(name = "product_id")
+  /** FK → Product. Mandatory: a catalogue line always names a product (SOI K02). */
+  @Column(name = "product_id", nullable = false)
   private UUID productId;
 
-  /**
-   * Free-text product description. Used when no Product entity exists yet (custom / prototype
-   * orders).
-   */
+  /** Optional line note. Never a substitute for {@link #productId}. */
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;
+
+  // ── Distribution (SOI K04/K05) ───────────────────────────────────────────
+
+  /** Colour card of this distribution; must be an active tenant colour card when present. */
+  @Column(name = "color_id")
+  private UUID colorId;
+
+  /** Finished (not greige) width; one of the product's defined widths (SOI K11, R05). */
+  @Column(name = "finished_width", precision = 8, scale = 2)
+  private BigDecimal finishedWidth;
+
+  @Column(name = "finished_width_unit", length = 10)
+  private String finishedWidthUnit;
+
+  /** Customer-requested delivery date of this distribution, when it differs per distribution. */
+  @Column(name = "requested_delivery_date")
+  private java.time.LocalDate requestedDeliveryDate;
+
+  /** The customer requires the whole distribution from a single dye lot (SOI R11). */
+  @Column(name = "single_lot_required", nullable = false)
+  @Builder.Default
+  private boolean singleLotRequired = false;
 
   // ── Quantities & Pricing ─────────────────────────────────────────────────
 
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
+
+  /**
+   * Quantity first requested by the customer. Immutable: proposals and accepted quantities are
+   * recorded separately and never overwrite it (SOI K08).
+   */
+  @Column(
+      name = "initial_requested_qty",
+      nullable = false,
+      updatable = false,
+      precision = 15,
+      scale = 3)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal initialRequestedQty;
 
   @Column(name = "shipped_qty", nullable = false, precision = 15, scale = 3)
   @Builder.Default
@@ -81,18 +112,169 @@ public class SalesOrderLine extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
-  @Embedded
-  @AttributeOverrides({
-    @AttributeOverride(
-        name = "amount",
-        column = @Column(name = "unit_price", precision = 18, scale = 4)),
-    @AttributeOverride(name = "currency", column = @Column(name = "currency", length = 3))
-  })
+  /**
+   * The agreed sales currency of this line (ISO 4217). Lines of one order may use different
+   * currencies; it can be known before the price is agreed.
+   */
+  @Column(name = "currency", length = 3)
   @Setter(AccessLevel.NONE)
-  private Money unitPrice;
+  private String currency;
 
+  /** Agreed unit price exactly as stored (4 decimals). Amount arithmetic uses this, not Money. */
+  @Column(name = "unit_price", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal unitPriceAmount;
+
+  /** Discount on this line, in the line currency. Requires an agreed unit price. */
+  @Column(name = "discount_amount", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal discountAmountValue;
+
+  /** Tax on this line, in the line currency. Requires an agreed unit price. */
+  @Column(name = "tax_amount", precision = 18, scale = 4)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal taxAmountValue;
+
+  /**
+   * Agreed unit price as {@link Money}, or {@code null} while not agreed. {@link Money} rounds to
+   * the currency's minor unit, so it is for display and comparison only: totals and validation use
+   * {@link #getUnitPriceAmount()}.
+   */
+  public Money getUnitPrice() {
+    return unitPriceAmount == null ? null : Money.of(unitPriceAmount, currency);
+  }
+
+  public Money getDiscountAmount() {
+    return discountAmountValue == null ? null : Money.of(discountAmountValue, currency);
+  }
+
+  public Money getTaxAmount() {
+    return taxAmountValue == null ? null : Money.of(taxAmountValue, currency);
+  }
+
+  /** Keeps the agreed currency and adjustments; a cleared price also clears the adjustments. */
   public void updateUnitPrice(Money price) {
-    this.unitPrice = price;
+    updatePricing(
+        price != null ? price.getCurrency().getCurrencyCode() : currency,
+        price != null ? price.getAmount() : null,
+        price != null ? discountAmountValue : null,
+        price != null ? taxAmountValue : null);
+  }
+
+  /** Replaces the commercial terms of this line after checking them against its quantity. */
+  public void updatePricing(
+      String newCurrency, BigDecimal unitPrice, BigDecimal discount, BigDecimal tax) {
+    validatePricing(requestedQty, newCurrency, unitPrice, discount, tax);
+    this.currency = newCurrency;
+    this.unitPriceAmount = unitPrice;
+    this.discountAmountValue = discount;
+    this.taxAmountValue = tax;
+  }
+
+  /** A changed quantity must still carry the recorded discount (SOI R08). */
+  public void assertAdjustmentsFitQuantity() {
+    validatePricing(requestedQty, currency, unitPriceAmount, discountAmountValue, taxAmountValue);
+  }
+
+  /**
+   * Commercial rules of a line: a price needs a currency; discount and tax need a price, cannot be
+   * negative, and the discount cannot exceed the line amount.
+   */
+  public static void validatePricing(
+      BigDecimal quantity,
+      String currency,
+      BigDecimal unitPrice,
+      BigDecimal discount,
+      BigDecimal tax) {
+    if (unitPrice != null && (currency == null || currency.isBlank())) {
+      throw new OrderDomainException("A priced line must name its currency");
+    }
+    if (unitPrice != null && unitPrice.signum() < 0) {
+      throw new OrderDomainException("Unit price cannot be negative");
+    }
+    if ((discount != null || tax != null) && unitPrice == null) {
+      throw new OrderDomainException("Discount and tax need an agreed unit price");
+    }
+    if ((discount != null && discount.signum() < 0) || (tax != null && tax.signum() < 0)) {
+      throw new OrderDomainException("Discount and tax cannot be negative");
+    }
+    if (discount != null
+        && quantity != null
+        && discount.compareTo(unitPrice.multiply(quantity)) > 0) {
+      throw new OrderDomainException("Line discount cannot exceed the line amount");
+    }
+  }
+
+  // ── Agreed quantity tolerance (SOI A03), per distribution ────────────────
+
+  /** How far above the requested quantity the customer accepts, in percent. */
+  @Column(name = "tolerance_up_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal toleranceUpPct;
+
+  /** How far below the requested quantity the customer accepts, in percent. */
+  @Column(name = "tolerance_down_pct", precision = 5, scale = 2)
+  @Setter(AccessLevel.NONE)
+  private BigDecimal toleranceDownPct;
+
+  @Column(name = "tolerance_recorded_by")
+  @Setter(AccessLevel.NONE)
+  private UUID toleranceRecordedBy;
+
+  @Column(name = "tolerance_recorded_at")
+  @Setter(AccessLevel.NONE)
+  private java.time.Instant toleranceRecordedAt;
+
+  /**
+   * Records the quantity tolerance agreed for this distribution, or clears it when both limits are
+   * null. The recorder and time are kept with it; where it was agreed is the order's agreement
+   * source. Re-recording the same limits keeps the original recorder and time, so an unrelated edit
+   * does not rewrite provenance.
+   */
+  public void recordTolerance(
+      BigDecimal upPct, BigDecimal downPct, UUID actor, java.time.Instant at) {
+    if (upPct == null && downPct == null) {
+      toleranceUpPct = null;
+      toleranceDownPct = null;
+      toleranceRecordedBy = null;
+      toleranceRecordedAt = null;
+      return;
+    }
+    validateTolerance(upPct, downPct);
+    if (sameAmount(upPct, toleranceUpPct) && sameAmount(downPct, toleranceDownPct)) {
+      return;
+    }
+    if (actor == null || at == null) {
+      throw new OrderDomainException("An agreed tolerance needs its recorder and time");
+    }
+    toleranceUpPct = upPct;
+    toleranceDownPct = downPct;
+    toleranceRecordedBy = actor;
+    toleranceRecordedAt = at;
+  }
+
+  /** Limits are 0–100%. */
+  public static void validateTolerance(BigDecimal upPct, BigDecimal downPct) {
+    for (BigDecimal pct : new BigDecimal[] {upPct, downPct}) {
+      if (pct != null && (pct.signum() < 0 || pct.compareTo(BigDecimal.valueOf(100)) > 0)) {
+        throw new OrderDomainException("An agreed tolerance is between 0 and 100 percent");
+      }
+    }
+  }
+
+  private static boolean sameAmount(BigDecimal left, BigDecimal right) {
+    return left == null ? right == null : right != null && left.compareTo(right) == 0;
+  }
+
+  /** Lombok fills the rest of the builder; a {@link Money} price sets amount and currency. */
+  public static class SalesOrderLineBuilder {
+    public SalesOrderLineBuilder unitPrice(Money price) {
+      this.unitPriceAmount = price == null ? null : price.getAmount();
+      if (price != null) {
+        this.currency = price.getCurrency().getCurrencyCode();
+      }
+      return this;
+    }
   }
 
   public void attachRequirementProfile(RequirementProfileSnapshot snapshot) {
@@ -112,12 +294,6 @@ public class SalesOrderLine extends BaseEntity {
     requirementProfileVersion = snapshot.profileVersion();
     requirementProfileFingerprint = snapshot.fingerprint();
     requirementProfileSnapshot = snapshot;
-  }
-
-  public String getCurrency() {
-    return unitPrice != null && unitPrice.getCurrency() != null
-        ? unitPrice.getCurrency().getCurrencyCode()
-        : null;
   }
 
   @ElementCollection
@@ -240,9 +416,37 @@ public class SalesOrderLine extends BaseEntity {
     return true;
   }
 
-  /** Validates that at least one of productId / productDesc is present. */
+  /**
+   * Replaces the product after a traced correction (SOI R19). The requirement profile was resolved
+   * for the old product, so it is dropped and must be resolved again from a new basis.
+   */
+  public void correctProduct(UUID newProductId) {
+    if (newProductId == null || newProductId.equals(productId)) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "A product correction names a different product");
+    }
+    this.productId = newProductId;
+    this.requirementProfileId = null;
+    this.requirementProfileVersion = null;
+    this.requirementProfileFingerprint = null;
+    this.requirementProfileSnapshot = null;
+  }
+
+  /** A line is valid only when it names a product (SOI K02). */
   public boolean isValid() {
-    return productId != null || (productDesc != null && !productDesc.isBlank());
+    return productId != null;
+  }
+
+  /** Records the first requested quantity once; later quantity changes never overwrite it. */
+  public void captureInitialRequestIfAbsent() {
+    if (initialRequestedQty == null) {
+      initialRequestedQty = requestedQty;
+    }
+  }
+
+  /** True when the line carries a finished-width requirement. */
+  public boolean hasFinishedWidth() {
+    return finishedWidth != null;
   }
 
   /**
@@ -278,9 +482,14 @@ public class SalesOrderLine extends BaseEntity {
   @PrePersist
   @PreUpdate
   private void validateEntity() {
+    captureInitialRequestIfAbsent();
     if (!isValid()) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
-          "Either productId or productDesc must be provided for SalesOrderLine");
+          "A sales-order line must name a product");
+    }
+    if ((finishedWidth == null) != (finishedWidthUnit == null)) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Finished width and its unit must be given together");
     }
     if (Boolean.TRUE.equals(getIsActive())
         && (requestedQty == null || requestedQty.compareTo(BigDecimal.ZERO) <= 0)) {

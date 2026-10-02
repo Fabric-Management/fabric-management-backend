@@ -30,6 +30,11 @@ public interface SalesOrderRepository
 
   Optional<SalesOrder> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  /** Orders at the given flow stages, oldest first: the planning queue. */
+  List<SalesOrder> findByTenantIdAndFlowStageInAndIsActiveTrueOrderByCreatedAtAsc(
+      UUID tenantId,
+      Collection<com.fabricmanagement.sales.salesorder.domain.OrderFlowStage> stages);
+
   List<SalesOrder> findAllByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
   @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
@@ -94,9 +99,9 @@ public interface SalesOrderRepository
       SELECT o FROM SalesOrder o
       WHERE o.tenantId = :tenantId
       AND o.isActive = true
-      AND o.promisedDeliveryDate < :date
+      AND o.committedOn < :date
       AND o.status NOT IN ('DELIVERED', 'CANCELLED')
-      ORDER BY o.promisedDeliveryDate ASC
+      ORDER BY o.committedOn ASC
       """)
   List<SalesOrder> findOverdueOrders(
       @Param("tenantId") UUID tenantId, @Param("date") LocalDate date);

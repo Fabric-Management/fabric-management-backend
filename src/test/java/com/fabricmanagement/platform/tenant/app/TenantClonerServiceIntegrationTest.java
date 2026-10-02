@@ -220,13 +220,20 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
             });
 
     // CR-8: Assert reference table cloning
-    // Fiber categories
-    Integer fiberCatCount =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM production.prod_fiber_category WHERE tenant_id = ?",
-            Integer.class,
-            pg.getId());
-    assertThat(fiberCatCount).as("Fiber categories should be cloned").isGreaterThanOrEqualTo(0);
+    // FIBER-CATALOG-1: fibre categories, ISO codes and certification schemes are one shared
+    // catalogue owned by the platform and are never cloned into a tenant.
+    for (String sharedTable :
+        List.of(
+            "production.prod_fiber_category",
+            "production.prod_fiber_iso_code",
+            "production.prod_fiber_certification")) {
+      Integer clonedRows =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM " + sharedTable + " WHERE tenant_id = ?",
+              Integer.class,
+              pg.getId());
+      assertThat(clonedRows).as(sharedTable + " must not be cloned").isZero();
+    }
 
     // Notification templates
     Integer notifCount =

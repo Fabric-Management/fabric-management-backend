@@ -1654,7 +1654,8 @@ class QuoteServiceTest {
         "{}",
         "[]",
         true,
-        tenantId);
+        tenantId,
+        null);
   }
 
   private PricingResult pricingResult() {

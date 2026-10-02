@@ -7,6 +7,7 @@ import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.domain.Fiber;
+import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.product.fiber.domain.FiberStatus;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.product.yarn.domain.SourceDesignationPolicy;
@@ -444,8 +445,10 @@ public class YarnArticleService implements YarnArticleSpecHistoryQuery {
     if (fiberId == null) {
       throw new YarnDomainException("I14", "I14: composition Fiber is required");
     }
+    // Shared pure fibres and the tenant's own pure variants are accepted; a blend is rejected
+    // before its (null) ISO code is ever dereferenced (FIBER-CATALOG-1).
     return fiberRepository
-        .findByTenantIdInAndId(List.of(tenantId, TenantContext.TEMPLATE_TENANT_ID), fiberId)
+        .findByTenantIdInAndId(FiberCatalog.readScope(tenantId), fiberId)
         .filter(fiber -> Boolean.TRUE.equals(fiber.getIsActive()))
         .filter(fiber -> fiber.getStatus() == FiberStatus.ACTIVE)
         .filter(Fiber::isPure)

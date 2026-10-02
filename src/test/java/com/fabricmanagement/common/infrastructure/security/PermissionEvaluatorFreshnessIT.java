@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.flowboard.routing.domain.port.out.SalesOrderWriteScopePort;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
@@ -198,7 +197,6 @@ class PermissionEvaluatorFreshnessIT {
             .orderNumber("SO-FRESH-" + suffix)
             .status(OrderStatus.DRAFT)
             .orderDate(LocalDate.now())
-            .totals(OrderTotals.zero("GBP"))
             .build());
   }
 

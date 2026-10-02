@@ -20,7 +20,9 @@ import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchSourceType;
@@ -94,6 +96,9 @@ class WalkingSkeletonIT {
       conn.createStatement()
           .execute(
               "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'test'");
+      conn.createStatement()
+          .execute(
+              "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'");
     } catch (java.sql.SQLException e) {
       throw new RuntimeException("Failed to create fabric_app role", e);
     }
@@ -106,10 +111,15 @@ class WalkingSkeletonIT {
     registry.add("spring.flyway.url", postgres::getJdbcUrl);
     registry.add("spring.flyway.user", postgres::getUsername);
     registry.add("spring.flyway.password", postgres::getPassword);
+    // TASK-TEMPLATE-TENANCY-1: the catalogue backfill reads golden through the system datasource at
+    // startup; as in production, that role must bypass RLS (fabric_app would see no golden rows).
+    registry.add("application.system-datasource.username", () -> "fabric_system");
+    registry.add("application.system-datasource.password", () -> "system_test");
   }
 
   @Autowired private TradingPartnerService tradingPartnerService;
   @Autowired private SalesOrderService salesOrderService;
+  @Autowired private ProductRepository productRepository;
   @Autowired private WorkOrderRepository workOrderRepository;
   @Autowired private WorkOrderService workOrderService;
   @Autowired private ApprovalRequestRepository approvalRequestRepository;
@@ -190,9 +200,11 @@ class WalkingSkeletonIT {
     req.setOrderDate(LocalDate.now());
     req.setRequestedDeliveryDate(LocalDate.now().plusDays(10));
 
-    // Add exactly one line
+    // Add exactly one line; a catalogue line always names a product (SOI K02).
+    Product wsFabric = productRepository.saveAndFlush(Product.create(ProductType.FABRIC, "KG"));
     SalesOrderLineRequest lineReq =
         SalesOrderLineRequest.builder()
+            .productId(wsFabric.getId())
             .productDesc("Premium WS Fabric")
             .requestedQty(new BigDecimal("1000.00"))
             .unit("KG")
@@ -202,17 +214,10 @@ class WalkingSkeletonIT {
     req.setLines(List.of(lineReq));
 
     SalesOrderDto createdOrder = salesOrderService.createOrder(req);
-    SalesOrderDto confirmedOrder =
-        salesOrderService.confirmOrder(createdOrder.getId(), adminUserId);
+    SalesOrderDto confirmedOrder = salesOrderService.confirmDemoSeedOrder(createdOrder.getId());
     assertThat(confirmedOrder.getStatus().name()).isEqualTo("CONFIRMED");
 
-    // We must manually publish the SalesOrderConfirmedEvent since confirmOrder only
-    // changes status
-    // and relies on SalesOrderService publishing it
-    // Wait, SalesOrderService.confirmOrder DOES publish SalesOrderConfirmedEvent.
-    // And it's handled
-    // async.
-    // So the listener has probably run already or is running.
+    // Confirmation publishes SalesOrderConfirmedEvent, handled asynchronously.
 
     // ----------------------------------------------------------------------------------
     // 3. WAIT & ASSERT: WorkOrder created in PENDING_APPROVAL due to Policy
@@ -314,10 +319,10 @@ class WalkingSkeletonIT {
         .hasSizeGreaterThanOrEqualTo(2);
     UUID fiberProductId1 = seededFiberProductIds.get(0);
     UUID fiberProductId2 = seededFiberProductIds.get(1);
-    // The output batch is typed YARN in the domain while its product_id remains one of the seeded
-    // fibre products; the FK constrains the table, not the product type.
-    UUID outputProductId =
-        seededFiberProductIds.size() > 2 ? seededFiberProductIds.get(2) : fiberProductId1;
+    // The work order serves the sales line, so it must produce the line's current product (SOI
+    // D8 hold guard). The output batch stays typed YARN in the domain; the FK constrains the
+    // table, not the product type.
+    UUID outputProductId = wsFabric.getId();
 
     Batch rawBatch1 =
         Batch.create(

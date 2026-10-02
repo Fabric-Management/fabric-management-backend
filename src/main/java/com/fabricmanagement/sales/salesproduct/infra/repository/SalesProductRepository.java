@@ -19,11 +19,17 @@ public interface SalesProductRepository extends JpaRepository<SalesProduct, UUID
 
   Optional<SalesProduct> findByTenantIdAndProductIdAndIsActiveTrue(UUID tenantId, UUID productId);
 
+  /** Active catalogue entries of these products (general and customer-specific). */
+  List<SalesProduct> findAllByTenantIdAndProductIdInAndIsActiveTrue(
+      UUID tenantId, java.util.Collection<UUID> productIds);
+
+  /** The general (not customer-specific) active catalogue entry used for list pricing. */
   @Query(
       """
       SELECT pc FROM SalesProduct pc
       WHERE pc.tenantId = :tenantId
         AND pc.productId = :productId
+        AND pc.customerId IS NULL
         AND pc.isActive = true
       """)
   Optional<SalesProduct> findActiveByProductId(

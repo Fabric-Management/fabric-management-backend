@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.lead.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.fabricmanagement.platform.lead.domain.Lead;
 import com.fabricmanagement.platform.lead.infra.repository.LeadRepository;
 import com.fabricmanagement.platform.tenant.app.TenantResetService;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -92,6 +94,11 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
     assertThat(commonLeadRlsEnabled()).isFalse();
     assertThat(commonLeadRlsPolicyCount()).isZero();
 
+    // Signup seeds the playground and starts asynchronous follow-ups (QC decisions on the seeded
+    // lots, order routing, ...). A reset racing them would delete parents while a listener is
+    // still writing children; this test is about the lead surviving a reset, so it waits.
+    awaitTenantEventsSettled(tenantId);
+
     tenantResetService.reset(
         new AuthenticatedUserContext(ownerId, "ADMIN", List.of(), null, tenantId));
 
@@ -101,6 +108,22 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
     assertThat(leadRepository.findByTrialTenantId(tenantId))
         .extracting(Lead::getId)
         .contains(lead.getId());
+  }
+
+  /** Every event publication of the tenant has been delivered, and stays so for a moment. */
+  private void awaitTenantEventsSettled(UUID tenantId) {
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .during(Duration.ofMillis(500))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForObject(
+                            "SELECT count(*) FROM event_publication"
+                                + " WHERE serialized_event LIKE ? AND completion_date IS NULL",
+                            Integer.class,
+                            "%" + tenantId + "%"))
+                    .isZero());
   }
 
   private void stubEmailRendering() {

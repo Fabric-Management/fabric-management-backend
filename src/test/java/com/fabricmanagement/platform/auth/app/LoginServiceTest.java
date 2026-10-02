@@ -2,9 +2,12 @@ package com.fabricmanagement.platform.auth.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
@@ -21,10 +24,8 @@ import com.fabricmanagement.platform.auth.infra.repository.LoginIdentityReposito
 import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
-import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
-import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserContact;
@@ -52,11 +53,9 @@ class LoginServiceTest {
   @Mock private RefreshTokenRepository refreshTokenRepository;
   @Mock private UserFacade userFacade;
   @Mock private UserRepository userRepository;
-  @Mock private OrganizationFacade organizationFacade;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private JwtService jwtService;
   @Mock private DomainEventPublisher eventPublisher;
-  @Mock private ContactService contactService;
   @Mock private VerificationCodeManager verificationCodeManager;
   @Mock private TotpMfaService totpMfaService;
   @Mock private TrustedDeviceService trustedDeviceService;
@@ -117,7 +116,6 @@ class LoginServiceTest {
 
     when(loginIdentityRepository.findByEmail("admin@example.com"))
         .thenReturn(Optional.of(identity));
-    when(resolutionService.validate(identity)).thenReturn(AuthValidationResult.valid());
     when(passwordEncoder.matches("bad-password", "hash")).thenReturn(false);
     doAnswer(
             invocation -> {
@@ -149,6 +147,7 @@ class LoginServiceTest {
 
     when(loginIdentityRepository.findByEmail("admin@example.com"))
         .thenReturn(Optional.of(identity));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
     when(resolutionService.validate(identity))
         .thenReturn(AuthValidationResult.passwordResetRequired());
 
@@ -161,6 +160,94 @@ class LoginServiceTest {
             exception ->
                 assertThat(((PlatformDomainException) exception).getErrorCode())
                     .isEqualTo("AUTH_PASSWORD_RESET_REQUIRED"));
+  }
+
+  @Test
+  void missingAccountAndWrongPasswordGiveTheSameResponse() {
+    LoginIdentity identity = identity(UUID.randomUUID(), "admin@example.com", "hash");
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(loginIdentityRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+    when(passwordEncoder.matches("bad-password", "hash")).thenReturn(false);
+
+    PlatformDomainException wrongPassword =
+        loginFailure(loginRequest("admin@example.com", "bad-password"));
+    PlatformDomainException missingAccount =
+        loginFailure(loginRequest("nobody@example.com", "bad-password"));
+
+    assertSameExternalResponse(missingAccount, wrongPassword);
+    assertThat(missingAccount.getErrorCode()).isEqualTo("AUTH_INVALID_CREDENTIALS");
+    assertThat(missingAccount.getHttpStatus()).isEqualTo(401);
+  }
+
+  @Test
+  void missingAccountStillSpendsAPasswordCheck() {
+    when(loginIdentityRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+    when(passwordEncoder.encode(any())).thenReturn("placeholder-hash");
+
+    loginFailure(loginRequest("nobody@example.com", "some-password"));
+
+    verify(passwordEncoder).matches("some-password", "placeholder-hash");
+  }
+
+  @Test
+  void missingAccountDoesNotLookUpOrganizationsByEmailDomain() {
+    when(loginIdentityRepository.findByEmail("someone@acme.example")).thenReturn(Optional.empty());
+
+    PlatformDomainException failure =
+        loginFailure(loginRequest("someone@acme.example", "some-password"));
+
+    assertThat(failure.getMessage()).isEqualTo("Invalid credentials");
+    verifyNoInteractions(userRepository);
+  }
+
+  @Test
+  void lockedAccountAnswersLikeAWrongPasswordEvenWithTheRightPassword() {
+    LoginIdentity identity = identity(UUID.randomUUID(), "admin@example.com", "hash");
+    identity.recordFailedLogin(1, 600);
+    LoginIdentity other = identity(UUID.randomUUID(), "other@example.com", "other-hash");
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(loginIdentityRepository.findByEmail("other@example.com")).thenReturn(Optional.of(other));
+    when(passwordEncoder.matches("bad-password", "other-hash")).thenReturn(false);
+
+    PlatformDomainException locked = loginFailure(loginRequest("admin@example.com", "secret"));
+    PlatformDomainException wrongPassword =
+        loginFailure(loginRequest("other@example.com", "bad-password"));
+
+    assertSameExternalResponse(locked, wrongPassword);
+    verify(passwordEncoder, never()).matches("secret", "hash");
+    verify(resolutionService, never()).validate(identity);
+  }
+
+  @Test
+  void accountStatusIsNotRevealedToAWrongPassword() {
+    LoginIdentity identity = identity(UUID.randomUUID(), "admin@example.com", "hash");
+    identity.setEmailVerified(false);
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(passwordEncoder.matches("bad-password", "hash")).thenReturn(false);
+
+    PlatformDomainException failure =
+        loginFailure(loginRequest("admin@example.com", "bad-password"));
+
+    assertThat(failure.getErrorCode()).isEqualTo("AUTH_INVALID_CREDENTIALS");
+    verify(resolutionService, never()).validate(identity);
+  }
+
+  @Test
+  void accountStatusIsReportedWithItsOwnCodeAfterTheRightPassword() {
+    LoginIdentity identity = identity(UUID.randomUUID(), "admin@example.com", "hash");
+    identity.setEmailVerified(false);
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+    when(resolutionService.validate(identity)).thenReturn(AuthValidationResult.notVerified());
+
+    PlatformDomainException failure = loginFailure(loginRequest("admin@example.com", "secret"));
+
+    assertThat(failure.getErrorCode()).isEqualTo("AUTH_ACCOUNT_NOT_VERIFIED");
+    assertThat(failure.getHttpStatus()).isEqualTo(400);
   }
 
   @Test
@@ -194,6 +281,20 @@ class LoginServiceTest {
     assertThat(response.getUser()).isSameAs(userDto);
     verify(userFacade).findById(defaultTenantId, defaultUserId);
     verify(tenantSessionBinder).bindToCurrentSession(defaultTenantId);
+  }
+
+  private PlatformDomainException loginFailure(LoginRequest request) {
+    Throwable thrown = catchThrowable(() -> loginService.login(request, "127.0.0.1", "agent"));
+    assertThat(thrown).isInstanceOf(PlatformDomainException.class);
+    return (PlatformDomainException) thrown;
+  }
+
+  private static void assertSameExternalResponse(
+      PlatformDomainException actual, PlatformDomainException expected) {
+    assertThat(actual.getErrorCode()).isEqualTo(expected.getErrorCode());
+    assertThat(actual.getHttpStatus()).isEqualTo(expected.getHttpStatus());
+    assertThat(actual.getMessage()).isEqualTo(expected.getMessage());
+    assertThat(actual.getArgs()).isEqualTo(expected.getArgs());
   }
 
   private LoginRequest loginRequest(String email, String password) {

@@ -3,7 +3,6 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
@@ -114,10 +113,13 @@ class ProcurementDemoSeederTest {
 
   @Test
   void seedFor_createsProcurementDatasetAndIsIdempotent() {
-    ProductDto cotton = product("Aegean Cotton Fiber");
-    ProductDto blend = product("Combed Cotton Blend");
-    when(productFacade.findByType(eq(TenantContext.TEMPLATE_TENANT_ID), eq(ProductType.FIBER)))
-        .thenReturn(List.of(cotton, blend));
+    // FIBER-CATALOG-1: exact shared CO/PES; without a real tenant 60/40 blend the second line
+    // is plain polyester and is described as polyester, never as a cotton blend.
+    ProductDto cotton = product("Cotton (100%)");
+    ProductDto polyester = product("Polyester (100%)");
+    when(productFacade.findCanonicalFiberProduct("CO")).thenReturn(Optional.of(cotton));
+    when(productFacade.findCanonicalFiberProduct("PES")).thenReturn(Optional.of(polyester));
+    when(productFacade.findOwnBlendOfCanonicalFibers(any())).thenReturn(Optional.empty());
     when(userRepository.findFirstByTenantIdAndFirstNameAndLastNameAndIsActiveTrue(
             TENANT_ID, "Yolanda", "Bidwell"))
         .thenReturn(Optional.of(user(UUID.randomUUID())));
@@ -306,6 +308,11 @@ class ProcurementDemoSeederTest {
 
     verify(supplierRFQService, times(2)).createRfq(any(CreateSupplierRFQRequest.class));
     verify(supplierQuoteService, times(2)).createQuote(any(CreateSupplierQuoteRequest.class));
+    assertThat(rfqs.values())
+        .flatExtracting(SupplierRFQ::getLines)
+        .extracting(SupplierRFQLine::getProductDesc)
+        .contains("Polyester staple fibre (PES)")
+        .noneMatch(description -> description.toLowerCase().contains("blend"));
     verify(purchaseOrderService, times(1))
         .createPurchaseOrder(any(CreatePurchaseOrderRequest.class));
     verify(goodsReceiptService, times(1)).createGoodsReceipt(any(CreateGoodsReceiptRequest.class));
@@ -317,8 +324,8 @@ class ProcurementDemoSeederTest {
   void seedFor_neverThrowsWhenDependencyFails() {
     when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_ANATOLIA))
         .thenReturn(List.of());
-    when(productFacade.findByType(eq(TenantContext.TEMPLATE_TENANT_ID), eq(ProductType.FIBER)))
-        .thenThrow(new IllegalStateException("template unavailable"));
+    when(productFacade.findCanonicalFiberProduct(any()))
+        .thenThrow(new IllegalStateException("catalogue unavailable"));
 
     assertThatCode(() -> seeder.seedFor(TENANT_ID)).doesNotThrowAnyException();
   }

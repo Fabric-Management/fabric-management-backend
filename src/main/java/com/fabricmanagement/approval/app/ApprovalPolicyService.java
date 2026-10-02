@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ApprovalPolicyService {
 
   private final ApprovalPolicyRepository policyRepo;
+  private final com.fabricmanagement.costing.app.exchange.ExchangeRateService exchangeRates;
+  private final java.time.Clock clock;
 
   /** Bir tenant'a ait aktif/pasif tüm politikaları listeler. */
   @Transactional(readOnly = true)
@@ -44,6 +46,56 @@ public class ApprovalPolicyService {
     return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream()
         .filter(p -> p.matchesAmount(amount, currency))
         .findFirst();
+  }
+
+  /**
+   * Picks the active policy for an entity that amounts to several currencies. A threshold is
+   * compared with the sum of all amounts converted into the policy's currency, so a TRY threshold
+   * also governs a USD or mixed order. If a rate is missing the policy is treated as applying: an
+   * approval control that cannot prove the amount is below its threshold must not let it pass.
+   */
+  @Transactional(readOnly = true)
+  public Optional<ApprovalPolicy> getActivePolicyFor(
+      UUID tenantId,
+      ApprovalEntityType entityType,
+      List<com.fabricmanagement.common.util.Money> amounts) {
+    java.time.LocalDate today = java.time.LocalDate.now(clock);
+    return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream()
+        .filter(policy -> appliesTo(tenantId, policy, amounts, today))
+        .findFirst();
+  }
+
+  private boolean appliesTo(
+      UUID tenantId,
+      ApprovalPolicy policy,
+      List<com.fabricmanagement.common.util.Money> amounts,
+      java.time.LocalDate today) {
+    if (policy.getMinAmountThreshold() == null || amounts.isEmpty()) {
+      return policy.matchesAmount(null, null);
+    }
+    BigDecimal total = BigDecimal.ZERO;
+    for (com.fabricmanagement.common.util.Money amount : amounts) {
+      try {
+        total =
+            total.add(
+                exchangeRates
+                    .convert(
+                        tenantId,
+                        amount.getAmount(),
+                        amount.getCurrency().getCurrencyCode(),
+                        policy.getCurrency(),
+                        today)
+                    .getConvertedAmount());
+      } catch (com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException ex) {
+        log.warn(
+            "No {} -> {} rate for approval policy {}; treating it as applying",
+            amount.getCurrency().getCurrencyCode(),
+            policy.getCurrency(),
+            policy.getId());
+        return true;
+      }
+    }
+    return policy.matchesAmount(total, policy.getCurrency());
   }
 
   /**

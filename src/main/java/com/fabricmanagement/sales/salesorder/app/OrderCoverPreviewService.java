@@ -44,6 +44,7 @@ public class OrderCoverPreviewService {
   private final OrderCoverCapabilityPort capabilities;
   private final SalesOrderReservationPort reservations;
   private final ProductionOrderPort production;
+  private final com.fabricmanagement.sales.salesorder.domain.port.LineStockPortionPort stockPortion;
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public OrderCoverSelectionPreview preview(
@@ -101,7 +102,8 @@ public class OrderCoverPreviewService {
               line,
               evidenceLine,
               () -> reservations.hasActiveReservation(lineId),
-              () -> production.hasActiveProduction(tenant, lineId));
+              () -> production.hasActiveProduction(tenant, lineId),
+              () -> stockPortion.ownFinishedStock(line));
       assessments.add(assessment);
       if (!assessment.selectable()) {
         return OrderCoverSelectionPreview.rejected(

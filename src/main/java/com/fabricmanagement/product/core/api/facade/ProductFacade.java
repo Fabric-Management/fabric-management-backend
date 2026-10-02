@@ -3,7 +3,9 @@ package com.fabricmanagement.product.core.api.facade;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductDto;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -90,4 +92,17 @@ public interface ProductFacade {
       String productScope,
       String description,
       Integer displayOrder);
+
+  /**
+   * Product of the canonical shared pure fibre with this shared ISO code (e.g. {@code CO}), looked
+   * up exactly by code, never by list position or name (FIBER-CATALOG-1).
+   */
+  Optional<ProductDto> findCanonicalFiberProduct(String isoCode);
+
+  /**
+   * Product of the current tenant's active blend made of exactly these canonical shared fibres,
+   * given as shared ISO code -> percentage; empty when the tenant has no such blend. Never creates
+   * one.
+   */
+  Optional<ProductDto> findOwnBlendOfCanonicalFibers(Map<String, BigDecimal> percentageByIsoCode);
 }

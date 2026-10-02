@@ -27,10 +27,16 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.product.color.app.ColorPartnerRefQueryService;
+import com.fabricmanagement.product.color.app.ColorPartnerRefService;
 import com.fabricmanagement.product.color.app.ColorService;
 import com.fabricmanagement.product.color.domain.Color;
 import com.fabricmanagement.product.color.domain.ColorCardSpec;
+import com.fabricmanagement.product.color.domain.ColorPartnerRef;
+import com.fabricmanagement.product.color.domain.ColorStandardStatus;
 import com.fabricmanagement.product.color.domain.ColorType;
+import com.fabricmanagement.product.color.domain.PartnerRole;
+import com.fabricmanagement.product.color.dto.CreateColorPartnerRefRequest;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
@@ -69,6 +75,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,12 +85,15 @@ class SalesQuoteDemoSeederTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID EMMA_ID = UUID.randomUUID();
   private static final UUID SANDRA_ID = UUID.randomUUID();
+  private static final UUID AEGEAN_ID = UUID.randomUUID();
   private static final LocalDate TODAY = LocalDate.of(2026, 7, 8);
 
   @Mock private TradingPartnerService tradingPartnerService;
   @Mock private ProductFacade productFacade;
   @Mock private QualityGradeService qualityGradeService;
   @Mock private ColorService colorService;
+  @Mock private ColorPartnerRefService colorPartnerRefService;
+  @Mock private ColorPartnerRefQueryService colorPartnerRefQueryService;
   @Mock private BatchService batchService;
   @Mock private StockUnitService stockUnitService;
   @Mock private SalesProductService salesProductService;
@@ -111,6 +121,8 @@ class SalesQuoteDemoSeederTest {
             productFacade,
             qualityGradeService,
             colorService,
+            colorPartnerRefService,
+            colorPartnerRefQueryService,
             batchService,
             stockUnitService,
             salesProductService,
@@ -160,46 +172,107 @@ class SalesQuoteDemoSeederTest {
             anyBoolean());
     assertThat(saleableCaptor.getAllValues()).containsSequence(true, true, false);
 
-    verify(colorService, times(4)).create(any(), any(), any());
+    // Every colour card is a full spec: family, type and notes are set; the two undyed cards
+    // (PFD / GREIGE) carry no hex, Pantone, target Lab or tolerance; Navy and Indigo carry a
+    // complete synthetic standard and are the only cards approved.
+    verify(colorService, never()).create(any(String.class), any(String.class), any(String.class));
     ArgumentCaptor<ColorCardSpec> colorSpecCaptor = ArgumentCaptor.forClass(ColorCardSpec.class);
-    verify(colorService).create(colorSpecCaptor.capture());
-    assertThat(colorSpecCaptor.getValue().code()).isEqualTo("PFD-00");
-    assertThat(colorSpecCaptor.getValue().colorType()).isEqualTo(ColorType.PFD);
-    assertThat(colorSpecCaptor.getValue().colorHex()).isNull();
-    assertThat(colorSpecCaptor.getValue().pantoneCode()).isNull();
-    assertThat(colorSpecCaptor.getValue().targetLabL()).isNull();
-    assertThat(colorSpecCaptor.getValue().deltaETolerance()).isNull();
+    verify(colorService, times(7)).create(colorSpecCaptor.capture());
+    List<ColorCardSpec> specs = colorSpecCaptor.getAllValues();
+    assertThat(specs)
+        .extracting(ColorCardSpec::code)
+        .containsExactly(
+            "NAVY-01", "ECRU-02", "CHAR-03", "PFD-00", "GREIGE-00", "RUST-04", "IND-05");
+    assertThat(specs).allSatisfy(spec -> assertThat(spec.colorType()).isNotNull());
+    assertThat(specs)
+        .filteredOn(
+            spec -> spec.colorType() == ColorType.PFD || spec.colorType() == ColorType.GREIGE)
+        .hasSize(2)
+        .allSatisfy(
+            spec -> {
+              assertThat(spec.colorHex()).isNull();
+              assertThat(spec.pantoneCode()).isNull();
+              assertThat(spec.targetLabL()).isNull();
+              assertThat(spec.deltaETolerance()).isNull();
+            });
+    assertThat(specs)
+        .filteredOn(spec -> spec.code().equals("NAVY-01") || spec.code().equals("IND-05"))
+        .allSatisfy(
+            spec -> {
+              assertThat(spec.pantoneCode()).isNotBlank();
+              assertThat(spec.targetLabL()).isNotNull();
+              assertThat(spec.targetLabA()).isNotNull();
+              assertThat(spec.targetLabB()).isNotNull();
+              assertThat(spec.deltaETolerance()).isPositive();
+              assertThat(spec.deltaEFormula()).isNotNull();
+            });
+    // Indigo is the shade of a package-dyed yarn lot: DYED, not YARN_DYED (a fabric made from
+    // pre-dyed yarn).
+    assertThat(specs)
+        .filteredOn(spec -> spec.code().equals("IND-05"))
+        .singleElement()
+        .extracting(ColorCardSpec::colorType)
+        .isEqualTo(ColorType.DYED);
+    verify(colorService, times(2)).approve(any(UUID.class));
+
     verify(productFacade, times(3)).createProduct(any(CreateProductRequest.class));
     verify(salesProductService, times(3)).createEntry(any());
 
-    // Six piece-backed lots are released through an explicit immutable QC decision. The raw-cotton
-    // scalar lot has no physical units and remains pending.
+    // Seven piece-backed lots are released through an explicit immutable QC decision. The
+    // raw-cotton scalar lot has no physical units and remains pending.
     ArgumentCaptor<CreateBatchRequest> batchCaptor =
         ArgumentCaptor.forClass(CreateBatchRequest.class);
-    verify(batchService, times(7)).create(batchCaptor.capture());
-    verify(batchService, times(6)).releaseFromQc(any(UUID.class));
-    // Regression guard: production_execution_batch.chk_batch_unit admits canonical batch units;
-    // demo lots currently remain weight-based, while FABRIC purchase lots may use M.
+    verify(batchService, times(8)).create(batchCaptor.capture());
+    verify(batchService, times(7)).releaseFromQc(any(UUID.class));
+    // Regression guard: fabric lots must be booked in metres. BatchPrimaryMeasureService reads
+    // "MT" as a metric tonne, so a fabric lot in MT fails the first coverage check and rolls the
+    // whole seed back — the playground then has no colours at all.
     assertThat(batchCaptor.getAllValues())
-        .extracting(CreateBatchRequest::getUnit)
-        .allMatch(List.of("KG", "MT", "PIECE", "M")::contains);
+        .filteredOn(request -> request.getProductType() == ProductType.FABRIC)
+        .isNotEmpty()
+        .allSatisfy(request -> assertThat(request.getUnit()).isEqualTo("M"));
+    assertThat(batchCaptor.getAllValues())
+        .filteredOn(request -> request.getProductType() != ProductType.FABRIC)
+        .allSatisfy(request -> assertThat(request.getUnit()).isEqualTo("KG"));
 
     assertThat(batchCaptor.getAllValues())
         .extracting(CreateBatchRequest::getColorId)
         .filteredOn(java.util.Objects::nonNull)
-        .hasSize(6);
+        .hasSize(7);
+    // Every lot is looked up by code before it is booked.
+    verify(batchService, times(8)).findByBatchCode(any(String.class));
     assertThat(batchCaptor.getAllValues())
         .filteredOn(request -> "LOT-24040".equals(request.getBatchCode()))
         .singleElement()
         .extracting(CreateBatchRequest::getColorId)
         .isNull();
 
-    // 16 + 24 + 3 + 18 rolls, 48 yarn cartons, 2 waste rolls — all born pending, then graded.
-    verify(stockUnitService, times(111))
+    // 16 + 24 + 3 + 18 rolls, 48 PFD + 24 Indigo yarn cartons, 2 waste rolls — all born pending,
+    // then graded.
+    verify(stockUnitService, times(135))
         .create(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             any());
-    verify(stockUnitService, times(111)).changeGrade(any(), any(), any(), any());
+    verify(stockUnitService, times(135)).changeGrade(any(), any(), any(), any());
+
+    // Partner colour codes: Albion names Navy (primary + previous-season alias) and Ecru; the yarn
+    // supplier names Indigo. Relationships are created once, aliases added once.
+    ArgumentCaptor<CreateColorPartnerRefRequest> refCaptor =
+        ArgumentCaptor.forClass(CreateColorPartnerRefRequest.class);
+    verify(colorPartnerRefService, times(3)).create(any(UUID.class), refCaptor.capture());
+    assertThat(refCaptor.getAllValues())
+        .extracting(CreateColorPartnerRefRequest::role)
+        .containsExactly(PartnerRole.CUSTOMER, PartnerRole.CUSTOMER, PartnerRole.SUPPLIER);
+    assertThat(refCaptor.getAllValues())
+        .extracting(request -> request.initialPrimaryCode().externalCode())
+        .containsExactly("ALB-NVY-26", "ALB-ECR-26", "AYM-IND-2201");
+    assertThat(refCaptor.getAllValues().get(2).partnerId()).isEqualTo(AEGEAN_ID);
+    verify(colorPartnerRefService, times(1))
+        .addCode(
+            any(UUID.class),
+            any(UUID.class),
+            org.mockito.ArgumentMatchers.argThat(
+                request -> "SS26-NAVY".equals(request.externalCode())));
 
     // Emma's open quote + the demo user's draft quote.
     ArgumentCaptor<QuoteCreateRequest> quoteCaptor =
@@ -335,19 +408,6 @@ class SalesQuoteDemoSeederTest {
             });
 
     when(colorService.list(true)).thenReturn(List.of());
-    when(colorService.create(any(), any(), any()))
-        .thenAnswer(
-            invocation -> {
-              Color colour =
-                  Color.builder()
-                      .code(invocation.getArgument(0))
-                      .name(invocation.getArgument(1))
-                      .colorHex(invocation.getArgument(2))
-                      .build();
-              colour.setId(UUID.randomUUID());
-              colour.setTenantId(TENANT_ID);
-              return colour;
-            });
     when(colorService.create(any(ColorCardSpec.class)))
         .thenAnswer(
             invocation -> {
@@ -356,6 +416,43 @@ class SalesQuoteDemoSeederTest {
               colour.setId(UUID.randomUUID());
               return colour;
             });
+    when(colorService.approve(any(UUID.class)))
+        .thenAnswer(
+            invocation -> {
+              Color colour = Color.create(TENANT_ID, SalesQuoteDemoSeeder.NAVY_SPEC);
+              colour.setId(invocation.getArgument(0));
+              colour.approve();
+              assertThat(colour.getStandardStatus()).isEqualTo(ColorStandardStatus.APPROVED);
+              return colour;
+            });
+    when(colorPartnerRefQueryService.list(any(UUID.class), any())).thenReturn(Page.empty());
+    when(colorPartnerRefService.create(any(UUID.class), any(CreateColorPartnerRefRequest.class)))
+        .thenAnswer(
+            invocation -> {
+              UUID colourId = invocation.getArgument(0);
+              CreateColorPartnerRefRequest request = invocation.getArgument(1);
+              ColorPartnerRef ref =
+                  ColorPartnerRef.create(
+                      TENANT_ID,
+                      colourId,
+                      request.partnerId(),
+                      request.role(),
+                      request.deltaETolerance(),
+                      request.initialPrimaryCode().externalCode(),
+                      request.initialPrimaryCode().externalName());
+              ref.setId(UUID.randomUUID());
+              return ref;
+            });
+    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_AEGEAN))
+        .thenReturn(
+            List.of(
+                TradingPartnerDto.builder()
+                    .id(AEGEAN_ID)
+                    .displayName(ProcurementDemoSeeder.SUPPLIER_AEGEAN)
+                    .partnerType(PartnerType.SUPPLIER)
+                    .build()));
+    when(salesProductService.getActiveCatalogForModule("FABRIC")).thenReturn(List.of());
+    when(batchService.findByBatchCode(any(String.class))).thenReturn(Optional.empty());
 
     when(productFacade.createProduct(any(CreateProductRequest.class)))
         .thenAnswer(
@@ -368,8 +465,7 @@ class SalesQuoteDemoSeederTest {
                   .build();
             });
 
-    when(discountPolicyService.getActivePolicy("FABRIC"))
-        .thenThrow(new IllegalArgumentException("No active discount policy"));
+    when(discountPolicyService.findActivePolicy("FABRIC")).thenReturn(Optional.empty());
 
     when(batchService.create(any(CreateBatchRequest.class)))
         .thenAnswer(

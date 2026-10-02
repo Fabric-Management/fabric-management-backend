@@ -57,6 +57,7 @@ class OrderCoverServiceTest {
             reservations,
             events,
             Clock.fixed(Instant.parse("2026-09-19T12:00:00Z"), ZoneOffset.UTC),
+            line -> java.util.Optional.of(java.math.BigDecimal.ZERO),
             fulfilmentLock);
   }
 

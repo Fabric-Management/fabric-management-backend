@@ -236,13 +236,13 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "Product reference data is deleted by dedicated product-reference cleanup.");
     tables.put(
         "production.prod_fiber_category",
-        "Product reference data is deleted by dedicated product-reference cleanup.");
+        "Shared fibre catalogue: owned by the golden template only and never purged (FIBER-CATALOG-1).");
     tables.put(
         "production.prod_fiber_certification",
-        "Product reference data is deleted by dedicated product-reference cleanup.");
+        "Shared certification-scheme dictionary: golden-template owned, never purged (FIBER-CATALOG-1).");
     tables.put(
         "production.prod_fiber_iso_code",
-        "Product reference data is deleted by dedicated product-reference cleanup.");
+        "Shared ISO catalogue: golden-template owned, never purged (FIBER-CATALOG-1).");
     tables.put(
         "production.prod_fiber_quality_standard",
         "Product reference data is deleted by dedicated product-reference cleanup.");

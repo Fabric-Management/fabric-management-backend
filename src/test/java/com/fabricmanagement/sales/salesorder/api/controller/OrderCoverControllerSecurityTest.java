@@ -1,8 +1,11 @@
 package com.fabricmanagement.sales.salesorder.api.controller;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 class OrderCoverControllerSecurityTest {
@@ -57,6 +61,22 @@ class OrderCoverControllerSecurityTest {
                         UUID.randomUUID(), 1, List.of(UUID.randomUUID()))))
         .isInstanceOf(NotFoundException.class)
         .hasMessage("Sales order not found");
+    verifyNoInteractions(query, evidence, preview);
+  }
+
+  @Test
+  void refreshingEvidenceWithOnlyReadGrantsIsRefusedBeforeAnythingIsStored() {
+    OrderCoverQueryService query = mock(OrderCoverQueryService.class);
+    OrderCoverEvidenceService evidence = mock(OrderCoverEvidenceService.class);
+    OrderCoverPreviewService preview = mock(OrderCoverPreviewService.class);
+    SpELPermissionEvaluator permissions = mock(SpELPermissionEvaluator.class);
+    when(permissions.can(any(), eq("flowboard"), eq("read"))).thenReturn(true);
+    when(permissions.can(any(), eq("sales"), eq("read"))).thenReturn(true);
+    when(permissions.can(any(), eq("sales"), eq("write"))).thenReturn(false);
+    var controller = new OrderCoverController(query, evidence, preview, permissions);
+
+    assertThatThrownBy(() -> controller.refreshOrderCoverEvidence(UUID.randomUUID()))
+        .isInstanceOf(AccessDeniedException.class);
     verifyNoInteractions(query, evidence, preview);
   }
 

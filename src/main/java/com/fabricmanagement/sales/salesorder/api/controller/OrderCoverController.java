@@ -53,10 +53,12 @@ public class OrderCoverController {
     return ResponseEntity.ok(ApiResponse.success(query.detail(orderId, actor())));
   }
 
+  /** Computing evidence stores a new revision, so it needs write access to the order. */
   @PostMapping("/evidence")
   public ResponseEntity<ApiResponse<OrderCoverEvidenceDto>> refreshOrderCoverEvidence(
       @PathVariable UUID orderId) {
     assertReadGrants();
+    assertWriteGrant();
     UUID actor = actor();
     OrderCoverDetail detail = query.detail(orderId, actor);
     String key = TenantContext.requireTenantId() + ":" + actor + ":" + detail.caseData().id();
@@ -82,6 +84,12 @@ public class OrderCoverController {
         && authentication.getDetails() instanceof AuthenticatedUserContext context)
       return context.userId();
     throw new NotFoundException("Authenticated user context not found");
+  }
+
+  private void assertWriteGrant() {
+    if (!permissions.can(SecurityContextHolder.getContext().getAuthentication(), "sales", "write"))
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Refreshing order-cover evidence needs sales write access");
   }
 
   private void assertReadGrants() {

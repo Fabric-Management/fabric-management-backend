@@ -299,7 +299,13 @@ class PermissionTemplateSeederTest {
               .filter(row -> "fiber".equals(row.getResource()) && action.equals(row.getAction()))
               .filter(row -> productionDepartments.contains(row.getDepartmentCode()))
               .map(PermissionTemplateSeederTest::matrixKey)
-              .collect(java.util.stream.Collectors.toSet());
+              .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
+      // Production planning holds production grants of its own: it plans orders, not fiber.
+      rows.stream()
+          .filter(row -> "PLANNING".equals(row.getDepartmentCode()))
+          .filter(row -> "production".equals(row.getResource()) && action.equals(row.getAction()))
+          .map(PermissionTemplateSeederTest::matrixKey)
+          .forEach(expected::add);
       assertThat(
               rows.stream()
                   .filter(

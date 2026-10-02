@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.infra.repository;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,10 @@ public interface SalesOrderLineRepository extends JpaRepository<SalesOrderLine, 
       UUID tenantId, UUID salesOrderId);
 
   List<SalesOrderLine> findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(UUID salesOrderId);
+
+  /** Active lines of several orders at once, so a page of orders loads its totals in one query. */
+  List<SalesOrderLine> findByTenantIdAndSalesOrderIdInAndIsActiveTrue(
+      UUID tenantId, Collection<UUID> salesOrderIds);
 
   List<SalesOrderLine> findByLineStatusAndIsActiveTrue(SalesOrderLineStatus lineStatus);
 

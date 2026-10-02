@@ -14,6 +14,18 @@ public interface TenantQueryPort {
   /** Tüm aktif tenant'ları döndürür (scheduled job tenant iterasyonu). */
   List<TenantReference> findAllActiveTenants();
 
+  /**
+   * Every tenant that is not deleted ({@code deleted_at IS NULL}), whatever its status or active
+   * flag. Used where a tenant must be provisioned even while suspended (TASK-TEMPLATE-TENANCY-1).
+   */
+  List<TenantReference> findAllLiveTenants();
+
+  /**
+   * The tenant that playground tenants are cloned from, resolved exactly as the playground clone
+   * resolves it; empty if it does not exist or is deleted.
+   */
+  Optional<TenantReference> findPlaygroundSourceTenant();
+
   /** ID listesine göre tenant bilgisi döndürür (batch DTO enrichment). */
   List<TenantReference> findAllByIds(Collection<UUID> tenantIds);
 

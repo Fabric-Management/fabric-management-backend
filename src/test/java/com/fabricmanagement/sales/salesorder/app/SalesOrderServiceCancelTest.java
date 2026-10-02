@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -36,6 +35,11 @@ class SalesOrderServiceCancelTest {
   @Mock private DomainEventPublisher domainEventPublisher;
   @Mock private SalesOrderAccessPolicy accessPolicy;
 
+  // SOI intake checks; a mock is a no-op that reports no blockers.
+  @Mock private OrderIntakeHooks orderIntakeHooks;
+
+  @Mock private DeliveryCommitmentService deliveryCommitments;
+  @Mock private OrderApprovalInvalidator approvalInvalidator;
   @InjectMocks private SalesOrderService salesOrderService;
 
   private final UUID userId = UUID.randomUUID();
@@ -51,7 +55,6 @@ class SalesOrderServiceCancelTest {
 
     order =
         SalesOrder.builder()
-            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .status(OrderStatus.IN_PROGRESS)
@@ -88,6 +91,9 @@ class SalesOrderServiceCancelTest {
     assertThat(event.getOrderNumber()).isEqualTo("SO-123");
     assertThat(event.getCancelledLineIds()).containsExactly(line.getId());
     assertThat(event.getTenantId()).isEqualTo(tenantId);
+    // A link out with the customer stops counting, and a change request is followed up.
+    verify(approvalInvalidator).withdrawOpen(orderId, "The order was cancelled", userId);
+    verify(approvalInvalidator).resolveChangeRequests(orderId);
   }
 
   @Test

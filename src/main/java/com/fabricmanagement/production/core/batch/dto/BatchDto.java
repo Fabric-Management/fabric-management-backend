@@ -99,12 +99,13 @@ public class BatchDto {
   private String remarks;
 
   /**
-   * Resolved composition: Batch.attributes.composition if present, else Fiber.composition. Map of
-   * baseFiberId → percentage. Empty for pure fibers. Only meaningful when productType = FIBER.
+   * Effective composition snapshot of a FIBER batch ({@code Fiber.id -> percentage}), captured at
+   * creation: {@code {fiberId: 100}} for a pure fibre. Later catalogue edits do not change it.
    */
   @Schema(
       description =
-          "Resolved composition. Map of Base Fiber ID to percentage. Empty for pure fibers.")
+          "FIBER only: effective composition snapshot keyed by component Fiber.id, captured at"
+              + " creation ({fiberId: 100} for a pure fibre). Empty when unknown or not FIBER")
   private Map<UUID, BigDecimal> composition;
 
   @Schema(description = "Detailed specifications for FIBER batches. Null for other product types.")

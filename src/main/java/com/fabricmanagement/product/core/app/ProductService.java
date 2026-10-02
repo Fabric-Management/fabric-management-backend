@@ -15,9 +15,12 @@ import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.infra.repository.ProductAttributeRepository;
 import com.fabricmanagement.product.core.infra.repository.ProductRepository;
 import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.product.fiber.dto.FiberCatalogReferenceDto;
 import com.fabricmanagement.product.fiber.dto.FiberDto;
 import com.fabricmanagement.product.yarn.api.facade.YarnFacade;
 import com.fabricmanagement.product.yarn.dto.YarnArticleSummaryDto;
+import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -175,8 +178,37 @@ public class ProductService implements ProductFacade {
 
   @Override
   @Transactional(readOnly = true)
+  public Optional<ProductDto> findCanonicalFiberProduct(String isoCode) {
+    UUID tenantId = TenantContext.requireTenantId();
+    return fiberFacade
+        .findCanonicalByIsoCode(isoCode)
+        .flatMap(reference -> findById(tenantId, reference.productId()));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<ProductDto> findOwnBlendOfCanonicalFibers(
+      Map<String, BigDecimal> percentageByIsoCode) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Map<UUID, BigDecimal> composition = new HashMap<>();
+    for (var entry : percentageByIsoCode.entrySet()) {
+      Optional<UUID> fiberId =
+          fiberFacade.findCanonicalByIsoCode(entry.getKey()).map(FiberCatalogReferenceDto::fiberId);
+      if (fiberId.isEmpty()) {
+        return Optional.empty();
+      }
+      composition.put(fiberId.get(), entry.getValue());
+    }
+    return fiberFacade
+        .findOwnBlendProductId(composition)
+        .flatMap(productId -> findById(tenantId, productId));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public boolean exists(UUID tenantId, UUID id) {
-    return productRepository.existsByTenantIdAndId(tenantId, id);
+    // Same read scope as findById: own products plus the shared catalogue (FIBER-CATALOG-1).
+    return productRepository.findByTenantIdInAndId(tenantScope(tenantId), id).isPresent();
   }
 
   @Transactional
@@ -263,9 +295,9 @@ public class ProductService implements ProductFacade {
    * <p>This ensures tenant users see both their own products and the platform seed products.
    */
   private List<UUID> tenantScope(UUID tenantId) {
-    return List.of(
-        tenantId,
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID);
+    // The shared catalogue owner reads only its own rows (no duplicated scope entry).
+    UUID owner = TenantContext.TEMPLATE_TENANT_ID;
+    return owner.equals(tenantId) ? List.of(owner) : List.of(tenantId, owner);
   }
 
   /**
@@ -282,7 +314,8 @@ public class ProductService implements ProductFacade {
         && !com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID
             .equals(currentTenant)) {
       throw new ForbiddenOperationException(
-          "Template products are read-only and cannot be modified by tenants.");
+          "Shared catalogue products are read-only and cannot be modified by tenants.",
+          "PRODUCT_SHARED_READ_ONLY");
     }
   }
 }

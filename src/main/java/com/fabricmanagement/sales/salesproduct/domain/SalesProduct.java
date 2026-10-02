@@ -25,6 +25,13 @@ public class SalesProduct extends BaseEntity {
   @Column(name = "product_name", length = 255)
   private String productName;
 
+  /**
+   * Trading partner this catalogue entry is private to; {@code null} for the general catalogue. A
+   * customer-specific product never appears in another customer's picker (SOI K17).
+   */
+  @Column(name = "customer_id")
+  private UUID customerId;
+
   @Column(name = "module_type", nullable = false, length = 50)
   private String moduleType;
 

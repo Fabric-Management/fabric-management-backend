@@ -64,8 +64,36 @@ public class ApprovalGuardService {
       String currency) {
 
     // 1. Policy var mı? (Yoksa direkt geçer)
-    ApprovalPolicy policy =
-        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null);
+    return enforce(
+        tenantId,
+        userId,
+        entityType,
+        entityId,
+        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null));
+  }
+
+  /** Multi-currency variant: thresholds are evaluated in each policy's own currency. */
+  @Transactional
+  public boolean checkAndEnforceApproval(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      java.util.List<com.fabricmanagement.common.util.Money> amounts) {
+    return enforce(
+        tenantId,
+        userId,
+        entityType,
+        entityId,
+        policyService.getActivePolicyFor(tenantId, entityType, amounts).orElse(null));
+  }
+
+  private boolean enforce(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      ApprovalPolicy policy) {
     if (policy == null) {
       log.debug("No active policy found for {} in tenant {}, continuing", entityType, tenantId);
       return false;
@@ -128,6 +156,31 @@ public class ApprovalGuardService {
             notifyRecipients));
 
     return true; // "Evet, onay gerektiriyor" olarak anla ve entity'ni (Örn WO) PENDING yap.
+  }
+
+  /** The entity's request still waiting for a decision, if any. */
+  @Transactional(readOnly = true)
+  public java.util.Optional<UUID> pendingRequestId(
+      UUID tenantId, ApprovalEntityType entityType, UUID entityId) {
+    return requestRepo
+        .findByTenantIdAndEntityTypeAndEntityIdAndStatusAndDeletedAtIsNull(
+            tenantId, entityType, entityId, ApprovalRequestStatus.PENDING)
+        .map(ApprovalRequest::getId);
+  }
+
+  /** Cancels the entity's pending request; an approver can no longer approve or reject it. */
+  @Transactional
+  public void cancelPending(UUID tenantId, ApprovalEntityType entityType, UUID entityId) {
+    requestRepo
+        .findByTenantIdAndEntityTypeAndEntityIdAndStatusAndDeletedAtIsNull(
+            tenantId, entityType, entityId, ApprovalRequestStatus.PENDING)
+        .ifPresent(
+            request -> {
+              request.cancel();
+              requestRepo.save(request);
+              log.info(
+                  "Approval request {} for {} {} cancelled", request.getId(), entityType, entityId);
+            });
   }
 
   private boolean isUserMatchingPolicyLevel(

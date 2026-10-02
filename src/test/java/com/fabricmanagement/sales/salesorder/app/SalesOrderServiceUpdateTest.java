@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,9 +12,7 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
-import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
@@ -60,7 +59,10 @@ class SalesOrderServiceUpdateTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private SalesOrderAccessPolicy accessPolicy;
   @Mock private RequirementProfileService requirementProfileService;
+  @Mock private OrderIntakeHooks orderIntakeHooks;
+  @Mock private SalesOrderRevision revision;
 
+  @Mock private DeliveryCommitmentService deliveryCommitments;
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrder> orderCaptor;
@@ -76,7 +78,6 @@ class SalesOrderServiceUpdateTest {
     TenantContext.setCurrentUserId(currentUserId);
     draftOrder =
         SalesOrder.builder()
-            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .orderType(OrderType.SALES)
@@ -114,12 +115,12 @@ class SalesOrderServiceUpdateTest {
 
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    verify(revision, never()).linesChanged(any());
   }
 
   @Test
   void updateOrder_nonDraftReject_throwsOrderDomainException() {
-    draftOrder.confirm(); // Transitions to CONFIRMED or pending
-    // Let's force it to CANCELLED to be safe
+    draftOrder.confirmSeededDemoOrder();
     draftOrder.cancel();
 
     when(orderRepository.findByTenantIdAndId(tenantId, orderId))
@@ -127,12 +128,66 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(new ArrayList<>());
 
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("does not allow editing");
+  }
+
+  @Test
+  void updateOrder_setsTheDeliveryTermAsAProposalAndKeepsTheRequestedDateAsTold() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+    when(orderRepository.save(any())).thenReturn(draftOrder);
+    UpdateSalesOrderRequest request = updateRequest(new ArrayList<>());
+    request.setDeliveryTerm(com.fabricmanagement.sales.salesorder.domain.DeliveryTerm.FCA);
+    request.setDeliveryPlace(" Mill gate, Bradford ");
+    request.setRequestedDeliveryDate(java.time.LocalDate.of(2026, 10, 20));
+
+    salesOrderService.updateOrder(orderId, currentUserId, request);
+
+    var expected =
+        com.fabricmanagement.sales.salesorder.domain.DeliveryTerms.of(
+            com.fabricmanagement.sales.salesorder.domain.DeliveryTerm.FCA,
+            "Mill gate, Bradford",
+            null);
+    verify(deliveryCommitments).assertTermsEditable(draftOrder, expected);
+    assertThat(draftOrder.getDeliveryTerms()).isEqualTo(expected);
+    assertThat(draftOrder.getDeliveryEvent())
+        .isEqualTo(com.fabricmanagement.sales.salesorder.domain.DeliveryEvent.HANDED_TO_CARRIER);
+    assertThat(draftOrder.getDeliveryTermStatus())
+        .isEqualTo(com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus.PROPOSED);
+    assertThat(draftOrder.getRequestedDeliveryDate())
+        .isEqualTo(java.time.LocalDate.of(2026, 10, 20));
+  }
+
+  @Test
+  void updateOrder_anOrderWithPlanningIsNotEditedUntilWithdrawn() {
+    draftOrder.moveFlowTo(
+        com.fabricmanagement.sales.salesorder.domain.OrderFlowStage.AWAITING_PLANNING);
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+
+    assertThatThrownBy(
+            () ->
+                salesOrderService.updateOrder(
+                    orderId, currentUserId, updateRequest(new ArrayList<>())))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("withdraw");
+    verify(orderRepository, never()).save(any());
+  }
+
+  @Test
+  void updateOrder_aNamedPlaceWithoutATermIsRejectedBeforeAnythingChanges() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+    UpdateSalesOrderRequest request = updateRequest(new ArrayList<>());
+    request.setDeliveryPlace("Mill gate");
+
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
+        .isInstanceOf(OrderDomainException.class);
+    verify(orderRepository, never()).save(any());
   }
 
   @Test
@@ -152,7 +207,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(new ArrayList<>()); // Empty lines
 
     salesOrderService.updateOrder(orderId, currentUserId, request);
@@ -162,7 +216,7 @@ class SalesOrderServiceUpdateTest {
   }
 
   @Test
-  void updateOrder_currencyMismatchOnLine_throws() {
+  void updateOrder_pricedLineWithoutCurrency_throws() {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId))
         .thenReturn(Optional.of(draftOrder));
     when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
@@ -170,19 +224,19 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderLineRequest lineReq = new UpdateSalesOrderLineRequest();
     lineReq.setUnitPrice(BigDecimal.TEN);
-    lineReq.setCurrency("USD");
+    lineReq.setRequestedQty(BigDecimal.ONE);
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(lineReq));
 
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
-        .isInstanceOf(CurrencyMismatchException.class);
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("must name its currency");
   }
 
   @Test
-  void updateOrder_calculatesTotalFromLines_skipsNullUnitPrice() {
+  void updateOrder_totalsPerCurrencyFromLines_countsUnpricedSeparately() {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId))
         .thenReturn(Optional.of(draftOrder));
 
@@ -222,7 +276,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(req1, req2));
 
     when(lineRepository.save(any()))
@@ -242,13 +295,21 @@ class SalesOrderServiceUpdateTest {
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
 
-    salesOrderService.updateOrder(orderId, currentUserId, request);
+    var updated = salesOrderService.updateOrder(orderId, currentUserId, request);
 
-    verify(orderRepository).save(orderCaptor.capture());
-    SalesOrder savedOrder = orderCaptor.getValue();
-
-    // (10 * 5) = 50. The other line has null unitPrice and should be skipped.
-    assertThat(savedOrder.getTotals().getTotalAmount().getAmount()).isEqualByComparingTo("50");
+    // (10 * 5) = 50 TRY. The unpriced line is counted, never read as zero.
+    assertThat(updated.getTotals())
+        .singleElement()
+        .satisfies(
+            total -> {
+              assertThat(total.currency()).isEqualTo("TRY");
+              assertThat(total.grandTotal()).isEqualByComparingTo("50");
+            });
+    assertThat(updated.getUnpricedLineCount()).isEqualTo(1);
+    // A line-only change still moves the order version before any line is written.
+    var order = org.mockito.Mockito.inOrder(revision, lineRepository);
+    order.verify(revision).linesChanged(draftOrder);
+    order.verify(lineRepository).save(any());
   }
 
   @Test
@@ -338,7 +399,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(new ArrayList<>());
 
     salesOrderService.updateOrder(orderId, currentUserId, request);
@@ -366,7 +426,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(existingReq, newReq));
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
@@ -398,7 +457,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(keepReq));
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
@@ -427,7 +485,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(req));
 
     when(orderRepository.save(any())).thenReturn(draftOrder);
@@ -449,7 +506,6 @@ class SalesOrderServiceUpdateTest {
 
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(List.of(req));
 
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
@@ -513,7 +569,6 @@ class SalesOrderServiceUpdateTest {
   private UpdateSalesOrderRequest updateRequest(List<UpdateSalesOrderLineRequest> lines) {
     UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
     request.setVersion(1L);
-    request.setCurrency("TRY");
     request.setLines(lines);
     return request;
   }
@@ -534,6 +589,7 @@ class SalesOrderServiceUpdateTest {
       UUID id, ModuleType moduleType, BigDecimal requestedQty, Money unitPrice) {
     SalesOrderLine line =
         SalesOrderLine.builder()
+            .productId(UUID.randomUUID())
             .productDesc("Cotton fabric")
             .requestedQty(requestedQty)
             .unit("KG")

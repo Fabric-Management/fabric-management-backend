@@ -8,7 +8,11 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Step 10: Clone permission templates from the golden-template to the new tenant.
+ * Step 10: Clone permission templates and the sales ownership policy from the golden-template to
+ * the new tenant. Both are template-owned governance every later step and listener reads: without
+ * the ownership policy, every customer relationship the tenant (or its demo data) establishes fails
+ * in the async ownership listener. The legacy playground clone and start-up reference provisioning
+ * already copy the policy; self-service onboarding did not.
  *
  * <p>This step uses BYPASSRLS (SystemTransactionExecutor) to read permission templates from the
  * TEMPLATE tenant and insert them into the new tenant's scope. This ensures that non-ADMIN users
@@ -47,6 +51,11 @@ public class CloneTemplatePermissionsStep implements OnboardingStep {
 
     int clonedCount =
         tenantClonerService.clonePermissionTemplatesToTenant(templateTenantId, targetTenantId);
+    int ownershipPolicies = tenantClonerService.cloneOwnershipPolicyToTenant(targetTenantId);
+    log.info(
+        "CloneTemplatePermissionsStep: ownership policy provisioned={} for tenant ({})",
+        ownershipPolicies,
+        targetTenantId);
     log.info(
         "CloneTemplatePermissionsStep: Cloned {} permission templates from TEMPLATE ({}) to new tenant ({})",
         clonedCount,

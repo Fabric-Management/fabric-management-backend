@@ -228,24 +228,4 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Count users in organization. */
   long countByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
-
-  /**
-   * Find any user with contacts in the given email domain. Used for providing context-aware error
-   * messages during login.
-   *
-   * <p><b>Note:</b> This is a cross-tenant check (not tenant-scoped) because we want to find any
-   * user with this domain for better error message context.
-   *
-   * @param domain Email domain (e.g., "gmail.com", "company.com")
-   * @return Optional user if found (returns first match)
-   */
-  @Query(
-      "SELECT DISTINCT u FROM User u "
-          + "LEFT JOIN FETCH u.role "
-          + "JOIN UserContact uc ON u.id = uc.userId "
-          + "JOIN com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE c.contactType = 'EMAIL' "
-          + "AND c.contactValue LIKE CONCAT('%@', :domain) "
-          + "ORDER BY u.createdAt ASC")
-  Optional<User> findAnyByEmailDomain(@Param("domain") String domain);
 }

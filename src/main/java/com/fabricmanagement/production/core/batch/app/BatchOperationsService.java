@@ -2,8 +2,10 @@ package com.fabricmanagement.production.core.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.domain.BatchCompositionSnapshot;
 import com.fabricmanagement.production.core.batch.domain.BatchOverrideLog;
 import com.fabricmanagement.production.core.batch.domain.BatchStatus;
 import com.fabricmanagement.production.core.batch.domain.CreateBatchCommand;
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +66,7 @@ public class BatchOperationsService {
   private final WarehouseLocationPort warehouseLocationPort;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final QualityDecisionService qualityDecisionService;
+  private final FiberBatchSnapshotter fiberBatchSnapshotter;
 
   // ── Blend ─────────────────────────────────────────────────────────────────
 
@@ -133,7 +137,9 @@ public class BatchOperationsService {
                 request.getLocationId(),
                 null,
                 request.getRemarks(),
-                new HashMap<>(),
+                // FIBER-CATALOG-1: the output records what was mixed, from the inputs.
+                fiberBatchSnapshotter.withBlendSnapshot(
+                    request.getProductType(), blendInputs(request, parentBatches), new HashMap<>()),
                 request.getSourceType(),
                 request.getSourceId(),
                 null));
@@ -182,6 +188,23 @@ public class BatchOperationsService {
         savedChild.getBatchCode(),
         request.getParents().size());
     return batchService.toBatchDto(savedChild);
+  }
+
+  /** Each parent's recorded composition with its consumption share; null when not a FIBER lot. */
+  private static List<BatchCompositionSnapshot.InputShare> blendInputs(
+      CreateBlendedBatchRequest request, List<Batch> parents) {
+    List<BatchCompositionSnapshot.InputShare> inputs = new ArrayList<>();
+    for (int i = 0; i < parents.size(); i++) {
+      Batch parent = parents.get(i);
+      Map<UUID, BigDecimal> composition =
+          parent.getProductType() == ProductType.FIBER
+              ? BatchCompositionSnapshot.read(parent.getAttributes()).orElse(null)
+              : null;
+      inputs.add(
+          new BatchCompositionSnapshot.InputShare(
+              composition, request.getParents().get(i).getConsumptionPercentage()));
+    }
+    return inputs;
   }
 
   // ── Inventory Adjustment ───────────────────────────────────────────────────

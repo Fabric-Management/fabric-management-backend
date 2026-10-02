@@ -4,6 +4,8 @@ import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeede
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
+import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort;
+import com.fabricmanagement.platform.tenant.domain.port.TenantCatalogueProvisioningPort;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -20,8 +22,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TenantClonerService {
 
+  /** The tenant playground tenants are cloned from (chain: golden-template → it → playground). */
+  public static final String PLAYGROUND_SOURCE_SLUG = "nexus-fabrics";
+
   private final SystemTransactionExecutor systemTransactionExecutor;
   private final DemoTransactionSeeder demoTransactionSeeder;
+  private final TenantCatalogueProvisioningPort catalogueProvisioning;
+  private final PlaygroundFixtureProvisioningPort playgroundFixtures;
 
   /**
    * Find the TEMPLATE tenant ID. Returns null if no template tenant exists.
@@ -360,8 +367,9 @@ public class TenantClonerService {
   }
 
   /**
-   * Clone production reference data (categories, ISO codes, certifications, attributes) from the
-   * golden-template to a target tenant.
+   * Clone tenant-owned production reference data (product attributes, yarn certifications,
+   * property/yarn system catalogues) from the golden-template to a target tenant. The shared fibre
+   * catalogue (categories, ISO codes, certification schemes) is not copied (FIBER-CATALOG-1).
    *
    * <p>Idempotent: legacy reference tables are copied only when empty; Property Registry and yarn
    * system catalogues are repaired key-by-key so a partially provisioned tenant is completed. Uses
@@ -381,27 +389,8 @@ public class TenantClonerService {
         jdbc -> {
           int tablesCloned = 0;
 
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_category",
-                  "uid, category_code, category_name, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_certification",
-                  "uid, certification_code, certification_name, certifying_body, description, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
-          tablesCloned +=
-              cloneIfEmpty(
-                  jdbc,
-                  "production.prod_fiber_iso_code",
-                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
-                  goldenTemplateId,
-                  targetTenantId);
+          // Fibre categories, ISO codes and certification schemes are one shared catalogue
+          // owned by the golden template (FIBER-CATALOG-1); they are read, never copied.
           tablesCloned +=
               cloneIfEmpty(
                   jdbc,
@@ -462,8 +451,9 @@ public class TenantClonerService {
               //    itself provisioned from golden-template)
               var results =
                   jdbc.queryForList(
-                      "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
-                      UUID.class);
+                      "SELECT id FROM common_tenant.common_tenant WHERE slug = ? LIMIT 1",
+                      UUID.class,
+                      PLAYGROUND_SOURCE_SLUG);
               UUID templateTenantId = results.isEmpty() ? null : results.getFirst();
 
               if (templateTenantId == null) {
@@ -650,18 +640,8 @@ public class TenantClonerService {
               // 4. Clone Reference Data Tables (No internal hierarchical dependencies)
 
               // 5. PRODUCTION MASTERDATA
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_category",
-                  "uid, category_code, category_name, description, is_active",
-                  templateTenantId,
-                  newTenantId);
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_certification",
-                  "uid, certification_code, certification_name, certifying_body, description, is_active",
-                  templateTenantId,
-                  newTenantId);
+              // Fibre categories, ISO codes and certification schemes are one shared catalogue
+              // owned by the golden template (FIBER-CATALOG-1); they are read, never copied.
               cloneTableWithoutFKs(
                   jdbc,
                   "production.prod_yarn_certification",
@@ -672,13 +652,6 @@ public class TenantClonerService {
                   jdbc,
                   "production.prod_product_attribute",
                   "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
-                  templateTenantId,
-                  newTenantId);
-
-              cloneTableWithoutFKs(
-                  jdbc,
-                  "production.prod_fiber_iso_code",
-                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
                   templateTenantId,
                   newTenantId);
 
@@ -714,6 +687,15 @@ public class TenantClonerService {
                   templateTenantId,
                   newTenantId);
 
+              // Module-owned catalogues (TASK-TEMPLATE-TENANCY-1): joins this transaction, so a
+              // failed clone leaves no task templates behind.
+              catalogueProvisioning.provisionPlaygroundFromSource(
+                  templateTenantId, newTenantId, uid);
+
+              // FIBER-CATALOG-1: trusted initial-provisioning marker for the playground fibre
+              // fixtures, committed atomically with the new PLAYGROUND tenant.
+              playgroundFixtures.registerLegacyPlaygroundCreation(newTenantId);
+
               log.info("Cloning completed for playground tenant: {}", newTenantId);
 
               // We can't return the full JPA entity. The caller usually just needs the ID or simple
@@ -722,6 +704,17 @@ public class TenantClonerService {
               tenant.setId(newTenantId);
               return tenant;
             });
+
+    // Playground fibre fixtures first: dependent demo transactions refer to them. A failure
+    // leaves the marker PENDING for a retry of this same provisioning.
+    try {
+      playgroundFixtures.provisionLegacyPlayground(clonedTenant.getId());
+    } catch (RuntimeException fixtureFailure) {
+      log.error(
+          "Playground fibre fixtures failed for tenant {}; marker stays PENDING",
+          clonedTenant.getId(),
+          fixtureFailure);
+    }
 
     // Execute Seeder AFTER tenant is fully committed to DB
     demoTransactionSeeder.seedFor(clonedTenant.getId());
@@ -751,6 +744,23 @@ public class TenantClonerService {
                 + "SELECT gen_random_uuid(), ?, %s, now(), now(), 0 FROM %s WHERE tenant_id = ?",
             tableName, columns, columns, tableName);
     jdbc.update(sql, newTenantId, templateId);
+  }
+
+  /**
+   * Gives a newly onboarded tenant the golden template's sales ownership policy. Every customer
+   * relationship a tenant establishes is resolved against this policy; without it the ownership
+   * listener fails on every event and the publications stay incomplete. Idempotent.
+   *
+   * @return 1 when a policy was created, 0 when the tenant already had one
+   */
+  public int cloneOwnershipPolicyToTenant(UUID targetTenantId) {
+    UUID goldenTemplateId = findTemplateTenantId();
+    if (goldenTemplateId == null || targetTenantId == null) {
+      log.warn("Golden Template not found — cannot provision ownership policy.");
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId));
   }
 
   private int cloneOwnershipPolicyIfMissing(

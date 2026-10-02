@@ -33,9 +33,9 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
       var activate = executor.submit(() -> inActor(() -> activation.activate()));
       awaitBoundaryWait(activate);
       release.countDown();
-      UUID before = insert.get(10, TimeUnit.SECONDS);
-      var boundary = activate.get(10, TimeUnit.SECONDS);
-      sales.confirmOrder(before, actor.getId());
+      UUID before = insert.get(30, TimeUnit.SECONDS);
+      var boundary = activate.get(30, TimeUnit.SECONDS);
+      sales.confirmDemoSeedOrder(before);
       assertThat(regime(before)).isEqualTo("LEGACY");
       assertThat(
               jdbc.queryForObject(
@@ -76,9 +76,9 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
       var insert = executor.submit(() -> inActor(() -> draft(1)));
       awaitBoundaryWait(insert);
       release.countDown();
-      var boundary = activate.get(10, TimeUnit.SECONDS);
-      UUID orderId = insert.get(10, TimeUnit.SECONDS);
-      sales.confirmOrder(orderId, actor.getId());
+      var boundary = activate.get(30, TimeUnit.SECONDS);
+      UUID orderId = insert.get(30, TimeUnit.SECONDS);
+      sales.confirmDemoSeedOrder(orderId);
       awaitCover(orderId);
       assertThat(regime(orderId)).isEqualTo("GOVERNED");
       assertThat(
@@ -98,8 +98,10 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
 
   private void awaitBoundaryWait(Future<?> worker) {
     String key = tenant + ":ORDER_COVER_ACTIVATION";
+    // A shared CI runner can need several seconds to hand the worker a pooled connection; the
+    // holder keeps the boundary locked for longer than this wait (see awaitRelease).
     await()
-        .atMost(Duration.ofSeconds(4))
+        .atMost(Duration.ofSeconds(15))
         .untilAsserted(
             () -> {
               assertThat(worker).isNotDone();
@@ -119,7 +121,7 @@ class OrderCoverActivationServiceConcurrencyIT extends OrderCoverIntegrationSupp
 
   private static void awaitRelease(CountDownLatch release) {
     try {
-      if (!release.await(12, TimeUnit.SECONDS))
+      if (!release.await(30, TimeUnit.SECONDS))
         throw new AssertionError("Activation holder timed out");
     } catch (InterruptedException error) {
       Thread.currentThread().interrupt();

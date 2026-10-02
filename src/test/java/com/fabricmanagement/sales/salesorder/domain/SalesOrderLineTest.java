@@ -178,11 +178,131 @@ class SalesOrderLineTest {
     assertThat(line.isOverShipped()).isFalse();
   }
 
+  @Test
+  void validateEntity_rejectsALineWithoutProductEvenWithADescription() {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .productDesc("Navy satin like the customer's swatch")
+            .requestedQty(new BigDecimal("500"))
+            .unit("M")
+            .build();
+
+    assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(line, "validateEntity"))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("must name a product");
+  }
+
+  @Test
+  void initialRequestIsCapturedOnceAndSurvivesLaterQuantityChanges() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("500"));
+    ReflectionTestUtils.invokeMethod(line, "validateEntity");
+
+    line.setRequestedQty(new BigDecimal("514"));
+    ReflectionTestUtils.invokeMethod(line, "validateEntity");
+
+    assertThat(line.getInitialRequestedQty()).isEqualByComparingTo("500");
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("514");
+  }
+
+  @Test
+  void validateEntity_requiresFinishedWidthAndUnitTogether() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("500"));
+    line.setFinishedWidth(new BigDecimal("160"));
+
+    assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(line, "validateEntity"))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Finished width and its unit");
+  }
+
   private SalesOrderLine lineWithRequestedQty(BigDecimal requestedQty) {
     return SalesOrderLine.builder()
+        .productId(UUID.randomUUID())
         .productDesc("Cotton fabric")
         .requestedQty(requestedQty)
         .unit("KG")
         .build();
+  }
+
+  @Test
+  void pricing_keepsTheAgreedCurrencyBeforeThePriceIsAgreed() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+
+    line.updatePricing("USD", null, null, null);
+
+    assertThat(line.getCurrency()).isEqualTo("USD");
+    assertThat(line.getUnitPrice()).isNull();
+  }
+
+  @Test
+  void pricing_rejectsAPriceWithoutCurrencyAndAdjustmentsWithoutPrice() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+
+    assertThatThrownBy(() -> line.updatePricing(null, BigDecimal.TEN, null, null))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("must name its currency");
+    assertThatThrownBy(() -> line.updatePricing("EUR", null, null, BigDecimal.ONE))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("need an agreed unit price");
+    assertThatThrownBy(() -> line.updatePricing("EUR", BigDecimal.TEN, new BigDecimal("-1"), null))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("cannot be negative");
+  }
+
+  @Test
+  void pricing_discountMustFitTheLineAmountAlsoAfterAQuantityChange() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+    line.updatePricing("EUR", new BigDecimal("2.00"), new BigDecimal("150"), new BigDecimal("10"));
+    assertThat(line.getDiscountAmount().getAmount()).isEqualByComparingTo("150");
+    assertThat(line.getTaxAmount().getCurrency().getCurrencyCode()).isEqualTo("EUR");
+
+    line.setRequestedQty(new BigDecimal("50"));
+
+    assertThatThrownBy(line::assertAdjustmentsFitQuantity)
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("cannot exceed the line amount");
+  }
+
+  @Test
+  void clearingThePriceClearsTheAdjustmentsButKeepsTheCurrency() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+    line.updatePricing("TRY", new BigDecimal("40"), new BigDecimal("100"), new BigDecimal("800"));
+
+    line.updateUnitPrice(null);
+
+    assertThat(line.getCurrency()).isEqualTo("TRY");
+    assertThat(line.getDiscountAmount()).isNull();
+    assertThat(line.getTaxAmount()).isNull();
+  }
+
+  @Test
+  void tolerance_keepsItsProvenanceWhenTheSameTermsAreSavedAgain() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+    UUID first = UUID.randomUUID();
+    java.time.Instant at = java.time.Instant.parse("2026-10-01T10:00:00Z");
+    line.recordTolerance(new BigDecimal("5"), new BigDecimal("3"), first, at);
+
+    line.recordTolerance(
+        new BigDecimal("5.00"), new BigDecimal("3"), UUID.randomUUID(), at.plusSeconds(60));
+
+    assertThat(line.getToleranceRecordedBy()).isEqualTo(first);
+    assertThat(line.getToleranceRecordedAt()).isEqualTo(at);
+  }
+
+  @Test
+  void tolerance_isBetweenZeroAndAHundredAndClearedWithBothLimits() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+
+    assertThatThrownBy(
+            () ->
+                line.recordTolerance(
+                    new BigDecimal("101"), null, UUID.randomUUID(), java.time.Instant.now()))
+        .isInstanceOf(OrderDomainException.class);
+
+    line.recordTolerance(
+        new BigDecimal("5"), new BigDecimal("5"), UUID.randomUUID(), java.time.Instant.now());
+    line.recordTolerance(null, null, null, null);
+    assertThat(line.getToleranceUpPct()).isNull();
+    assertThat(line.getToleranceDownPct()).isNull();
+    assertThat(line.getToleranceRecordedBy()).isNull();
   }
 }

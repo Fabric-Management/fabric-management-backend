@@ -5,33 +5,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Shared ISO fibre codes: one row per code, owned by the catalogue owner. Every query names that
+ * owner explicitly (FIBER-CATALOG-1). Approval never inserts here; new codes are platform catalogue
+ * releases.
+ */
 @Repository
 public interface FiberIsoCodeRepository extends JpaRepository<FiberIsoCode, UUID> {
 
-  List<FiberIsoCode> findByIsActiveTrue();
+  List<FiberIsoCode> findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(UUID catalogOwnerId);
 
-  /** Tenant-scoped active ISO codes — prevents double rows when RLS carve-out is active. */
-  List<FiberIsoCode> findByTenantIdAndIsActiveTrue(UUID tenantId);
+  /** {@code baseOnly=true}: codes classified as official, within the shared owner. */
+  List<FiberIsoCode> findByTenantIdAndIsOfficialIsoTrueAndIsActiveTrueOrderByDisplayOrderAsc(
+      UUID catalogOwnerId);
 
-  /** Task F1: Only official ISO 2076 codes (52 records). Used when baseOnly=true. */
-  List<FiberIsoCode> findByIsOfficialIsoTrueAndIsActiveTrue();
+  Optional<FiberIsoCode> findByTenantIdAndId(UUID catalogOwnerId, UUID id);
 
-  Optional<FiberIsoCode> findByIsoCode(String isoCode);
-
-  /** Exact tenant-owned ISO lookup used by write paths; never relies on shared-read RLS. */
-  Optional<FiberIsoCode> findByTenantIdAndIsoCodeIgnoreCase(UUID tenantId, String isoCode);
-
-  /** Serializes creation of one semantic ISO code inside the current transaction. */
-  @Query(
-      value =
-          "SELECT pg_advisory_xact_lock(hashtext(CAST(:tenantId AS text) || ':' || upper(:isoCode)))",
-      nativeQuery = true)
-  void acquireCreationLock(@Param("tenantId") UUID tenantId, @Param("isoCode") String isoCode);
-
-  /** Case-insensitive check: ISO code already exists in catalog. */
-  boolean existsByIsoCodeIgnoreCase(String isoCode);
+  /** Codes are normalised (trim + upper) at every boundary; lookup stays case-insensitive. */
+  Optional<FiberIsoCode> findByTenantIdAndIsoCodeIgnoreCase(UUID catalogOwnerId, String isoCode);
 }

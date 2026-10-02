@@ -30,6 +30,7 @@ public class OrderCoverService implements OrderCoverCommandPort {
   private final SalesOrderReservationPort reservations;
   private final com.fabricmanagement.common.infrastructure.events.DomainEventPublisher events;
   private final Clock clock;
+  private final com.fabricmanagement.sales.salesorder.domain.port.LineStockPortionPort stockPortion;
   private final com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock
       fulfilmentLock;
 
@@ -88,7 +89,8 @@ public class OrderCoverService implements OrderCoverCommandPort {
               line,
               lineEvidence,
               () -> reservations.hasActiveReservation(lineId),
-              () -> production.hasActiveProduction(tenantId, lineId));
+              () -> production.hasActiveProduction(tenantId, lineId),
+              () -> stockPortion.ownFinishedStock(line));
       if (!assessment.selectable()) return rejected(LegacyRejectionCode.of(assessment));
       plans.add(new Plan(scopeLine, line, lineEvidence, assessment));
     }
