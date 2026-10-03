@@ -56325,6 +56325,9 @@ components:
           format: int32
         title:
           type: string
+        traceId:
+          type: string
+          description: Reference of this failure that also appears in the server log. Present on server errors.
         type:
           type: string
           format: uri
