@@ -7,10 +7,8 @@ import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
 import com.fabricmanagement.sales.salesorder.domain.OrderVersion;
 import com.fabricmanagement.sales.salesorder.domain.OrderVersionKind;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -48,10 +46,6 @@ public final class CustomerApprovalDtos {
           @Min(1)
           @Max(CustomerApproval.MAX_LINK_HOURS)
           Integer linkValidHours) {}
-
-  @Schema(name = "ResendCustomerApproval")
-  public record Resend(
-      @Size(max = 200) String recipientName, @Email @Size(max = 255) String recipientEmail) {}
 
   @Schema(name = "CustomerApprovalView")
   public record ApprovalView(
@@ -134,8 +128,19 @@ public final class CustomerApprovalDtos {
   public record State(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID orderId,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) OrderFlowStage stage,
-      String contactName,
+      @Schema(description = "The order's day-to-day contact; receives information drafts only")
+          String contactName,
       String contactEmail,
+      @Schema(
+              description =
+                  "The representative a request for approval would go to now: the designated approver"
+                      + " under a valid authority; empty while there is none")
+          String approverName,
+      @Schema(
+              description =
+                  "The address the approver's authority was granted for; empty when the customer's"
+                      + " card now shows another address for the approver")
+          String approverEmail,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ApprovalView> approvals,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<VersionView> versions,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Capability> actions) {}

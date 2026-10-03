@@ -16,9 +16,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * One request for the customer's approval of a sent {@link OrderVersion}. The link, the one-time
- * code and the customer account all lead here, so the version is approved once whichever door the
- * representative used. Only hashes of the link, the code and the verified session are kept.
+ * One request for the customer's approval of a sent {@link OrderVersion}, to the representative
+ * holding the approval authority it names, at the address that authority was granted for. Today the
+ * e-mailed link with its one-time code is the only door; a customer account will lead here too once
+ * the signed-in person is matched to the authority (ADR-0014 OD-13). Only hashes of the link, the
+ * code and the verified session are kept.
  */
 @Entity
 @Table(name = "customer_approval", schema = "sales_ord")
@@ -45,14 +47,23 @@ public class CustomerApproval extends BaseEntity {
   @Column(name = "version_no", nullable = false, updatable = false)
   private int versionNo;
 
+  /**
+   * The representative's approval authority the request was sent under (ADR-0014 D4). The link, the
+   * code and a decision work only while this very authority is valid; a later grant to the same
+   * person never revives a request sent under one that ended.
+   */
+  @Column(name = "approval_authority_id", nullable = false, updatable = false)
+  private UUID approvalAuthorityId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 30)
   private CustomerApprovalStatus status;
 
-  @Column(name = "recipient_name", length = 200)
+  @Column(name = "recipient_name", length = 200, updatable = false)
   private String recipientName;
 
-  @Column(name = "recipient_email", nullable = false, length = 255)
+  /** The address the request's authority was granted for; it never changes (ADR-0014 OD-13). */
+  @Column(name = "recipient_email", nullable = false, updatable = false, length = 255)
   private String recipientEmail;
 
   /** Planning's proposal ends here; no link outlives it. */
@@ -172,12 +183,14 @@ public class CustomerApproval extends BaseEntity {
   }
 
   /**
-   * Asks the order's contact to approve {@code version}. It waits for the internal approval or the
-   * link, whichever comes next; the link lasts {@code linkValidHours} but never beyond the
+   * Asks the customer's representative holding {@code approvalAuthorityId} to approve {@code
+   * version}, at the address that authority was granted for. It waits for the internal approval or
+   * the link, whichever comes next; the link lasts {@code linkValidHours} but never beyond the
    * proposal's validity.
    */
   public static CustomerApproval request(
       OrderVersion version,
+      UUID approvalAuthorityId,
       String recipientName,
       String recipientEmail,
       Instant proposalValidUntil,
@@ -189,6 +202,9 @@ public class CustomerApproval extends BaseEntity {
     }
     if (requestedBy == null || now == null || proposalValidUntil == null) {
       throw new IllegalArgumentException("Actor, time and the proposal's validity are required");
+    }
+    if (approvalAuthorityId == null) {
+      throw new IllegalArgumentException("The approver's authority is required");
     }
     int hours = linkValidHours == null ? DEFAULT_LINK_HOURS : linkValidHours;
     if (hours < 1 || hours > MAX_LINK_HOURS) {
@@ -202,6 +218,7 @@ public class CustomerApproval extends BaseEntity {
     value.salesOrderId = version.getSalesOrderId();
     value.orderVersionId = version.getId();
     value.versionNo = version.getVersionNo();
+    value.approvalAuthorityId = approvalAuthorityId;
     value.status = CustomerApprovalStatus.AWAITING_INTERNAL_APPROVAL;
     value.recipientName = trimmed(recipientName);
     value.recipientEmail = requireEmail(recipientEmail);
@@ -248,11 +265,12 @@ public class CustomerApproval extends BaseEntity {
   }
 
   /**
-   * Issues a new link (the first, or a resend that replaces the earlier one, possibly to a
-   * corrected address). An earlier code or verified session no longer counts.
+   * Issues a new link (the first, or a resend that replaces the earlier one). An earlier code or
+   * verified session no longer counts. The link goes to the representative at the address their
+   * authority was granted for, fixed when the request was made: nobody else and no other address
+   * can be named here.
    */
-  public void issueLink(
-      String tokenHash, String recipientName, String recipientEmail, UUID actor, Instant now) {
+  public void issueLink(String tokenHash, UUID actor, Instant now) {
     boolean first = status == CustomerApprovalStatus.AWAITING_INTERNAL_APPROVAL;
     if (!first && status != CustomerApprovalStatus.SENT) {
       throw OrderDomainException.stage(
@@ -275,10 +293,6 @@ public class CustomerApproval extends BaseEntity {
     this.sentAt = now;
     this.sentBy = actor;
     this.linksIssued = linksIssued + 1;
-    if (recipientEmail != null && !recipientEmail.isBlank()) {
-      this.recipientEmail = requireEmail(recipientEmail);
-      this.recipientName = trimmed(recipientName);
-    }
     clearCode();
   }
 

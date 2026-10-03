@@ -63,6 +63,10 @@ class SalesOrderServiceUpdateTest {
   @Mock private SalesOrderRevision revision;
 
   @Mock private DeliveryCommitmentService deliveryCommitments;
+
+  @Mock private LineAllocationPolicy lineAllocations;
+  @Mock private OrderCreationReplay creationReplay;
+
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrder> orderCaptor;
@@ -492,6 +496,37 @@ class SalesOrderServiceUpdateTest {
     salesOrderService.updateOrder(orderId, currentUserId, request);
 
     verify(existingLine).setRequestedQty(BigDecimal.TEN);
+  }
+
+  @Test
+  void updateOrder_aLineItsDeliveriesNoLongerFitIsRejectedBeforeItChanges() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+    SalesOrderLine existingLine = mock(SalesOrderLine.class);
+    when(existingLine.getId()).thenReturn(UUID.randomUUID());
+    org.mockito.Mockito.lenient().when(existingLine.getIsActive()).thenReturn(true);
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(existingLine));
+    UpdateSalesOrderLineRequest req = new UpdateSalesOrderLineRequest();
+    req.setId(existingLine.getId());
+    req.setRequestedQty(new BigDecimal("60"));
+    req.setUnit("M");
+    req.setCurrency("GBP");
+    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
+    request.setVersion(1L);
+    request.setLines(List.of(req));
+    org.mockito.Mockito.doThrow(
+            OrderDomainException.rule(
+                "LINE_QUANTITY_BELOW_ALLOCATED",
+                "Deliveries carry 80 M of this line: reduce their allocations first"))
+        .when(lineAllocations)
+        .assertChange(existingLine, new BigDecimal("60"), "M");
+
+    assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, currentUserId, request))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("reduce their allocations");
+    verify(existingLine, never()).setRequestedQty(any());
+    verify(existingLine, never()).setUnit(any());
   }
 
   @Test

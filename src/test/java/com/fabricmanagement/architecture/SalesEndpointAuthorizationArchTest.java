@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(134)
+        .hasSize(147)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(134);
+    assertThat(expected).hasSize(147);
   }
 
   @Test
@@ -231,6 +231,31 @@ class SalesEndpointAuthorizationArchTest {
         "DeliveryCommitmentController",
         Category.TRANSACTIONAL_READ,
         "getDeliveryCommitments");
+    add(
+        result,
+        "OrderPartiesController",
+        Category.TRANSACTIONAL_READ,
+        "getOrderParties",
+        "listApprovalAuthorities");
+    add(
+        result,
+        "OrderPartiesController",
+        Category.MUTATION,
+        "setOrderBillTo",
+        "setOrderRequestedDate",
+        "setOrderReleasePolicy",
+        "setOrderApprover",
+        "grantApprovalAuthority",
+        "revokeApprovalAuthority");
+    add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
+    add(
+        result,
+        "OrderDeliveryController",
+        Category.MUTATION,
+        "createOrderDelivery",
+        "updateOrderDelivery",
+        "deleteOrderDelivery",
+        "setOrderDeliveryAllocations");
     add(result, "SalesQualityGradeController", Category.REFERENCE_READ, "listSalesGrades");
     add(result, "SalesLotController", Category.REFERENCE_READ, "listSalesLots");
     add(

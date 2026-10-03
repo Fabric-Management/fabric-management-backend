@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.api.facade;
 
+import com.fabricmanagement.platform.communication.app.EmailOutboxService;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import java.util.UUID;
@@ -13,6 +14,7 @@ public class CustomerEmailFacade {
 
   private final NotificationService notificationService;
   private final EmailTemplateRenderer emailTemplateRenderer;
+  private final EmailOutboxService emailOutbox;
 
   public void sendQuoteApprovalEmail(
       UUID tenantId,
@@ -31,7 +33,9 @@ public class CustomerEmailFacade {
   /**
    * Sends a message about a sales order to the customer's contact. {@code bodyHtml} is markup the
    * caller built with every value escaped; {@code actionUrl} may be null for a message without a
-   * button. The message is queued in the caller's transaction.
+   * button. The message is always queued in the outbox within the caller's transaction, whatever
+   * {@code application.email.use-outbox} says: a rolled-back step sends nothing, and the caller
+   * never holds its locks while a mail server answers. The outbox worker sends it after the commit.
    */
   public void sendOrderMessage(
       UUID tenantId,
@@ -46,6 +50,6 @@ public class CustomerEmailFacade {
     String message =
         emailTemplateRenderer.renderOrderMessage(
             sellerName, heading, bodyHtml, actionLabel, actionUrl, footnote);
-    notificationService.sendNotificationSync(tenantId, recipient, subject, message);
+    emailOutbox.queueEmail(tenantId, recipient, subject, message);
   }
 }

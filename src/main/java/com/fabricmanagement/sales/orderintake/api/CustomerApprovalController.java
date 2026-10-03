@@ -69,12 +69,15 @@ public class CustomerApprovalController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(
       operationId = "resendOrderApprovalLink",
-      summary = "Send a new approval link for the same version, possibly to a corrected address")
+      summary = "Send a new approval link for the same version to the same representative",
+      description =
+          "The link goes to the representative whose approval authority the request was sent"
+              + " under, at that authority's e-mail address as it reads now. Another recipient"
+              + " needs another authorised approver and a new request.")
   public ResponseEntity<ApiResponse<CustomerApprovalDtos.State>> resendOrderApprovalLink(
-      @PathVariable UUID orderId,
-      @Valid @RequestBody(required = false) CustomerApprovalDtos.Resend request) {
+      @PathVariable UUID orderId) {
     return ResponseEntity.ok(
-        ApiResponse.success(service.resend(orderId, request, OrderIntakeActor.current())));
+        ApiResponse.success(service.resend(orderId, OrderIntakeActor.current())));
   }
 
   @GetMapping("/api/v1/sales/order-intake/customer-change-requests")

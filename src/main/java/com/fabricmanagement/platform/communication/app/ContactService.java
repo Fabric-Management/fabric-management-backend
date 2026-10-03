@@ -1,10 +1,12 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.CommonDomainException;
 import com.fabricmanagement.common.util.PhoneValidationUtil;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import com.fabricmanagement.platform.communication.domain.event.ContactPointChangedEvent;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +42,7 @@ public class ContactService {
   private static final Pattern EXTENSION_PATTERN = Pattern.compile("^[0-9]{1,10}$");
 
   private final ContactRepository contactRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public Contact createContact(
@@ -183,6 +186,8 @@ public class ContactService {
       throw new CommonDomainException("Contact does not belong to current tenant");
     }
 
+    String valueBefore = contact.getContactValue();
+    ContactType typeBefore = contact.getContactType();
     String normalizedValue =
         normalizeContactValue(contact.getContactValue(), contact.getContactType());
     validateContactValue(normalizedValue, contact.getContactType());
@@ -192,6 +197,7 @@ public class ContactService {
     // Mark contact as verified
     contact.verify();
     Contact savedContact = contactRepository.save(contact);
+    publishIfAddressChanged(savedContact, valueBefore, typeBefore);
 
     // Note: With user-based authentication, AuthUser is linked to User, not
     // Contact.
@@ -241,6 +247,8 @@ public class ContactService {
 
     contact.delete();
     contactRepository.save(contact);
+    eventPublisher.publish(
+        new ContactPointChangedEvent(tenantId, contactId, ContactPointChangedEvent.DELETED));
   }
 
   /**
@@ -268,6 +276,8 @@ public class ContactService {
     }
 
     boolean changed = false;
+    String valueBefore = contact.getContactValue();
+    ContactType typeBefore = contact.getContactType();
     ContactType resolvedType = contactType != null ? contactType : contact.getContactType();
 
     if (contactValue != null) {
@@ -289,7 +299,36 @@ public class ContactService {
       changed = true;
     }
 
-    return changed ? contactRepository.save(contact) : contact;
+    if (!changed) {
+      return contact;
+    }
+    Contact saved = contactRepository.save(contact);
+    publishIfAddressChanged(saved, valueBefore, typeBefore);
+    return saved;
+  }
+
+  /**
+   * Tells the modules that rested something on this contact point's earlier address — an approval
+   * authority, for one — that it now reaches another address. Published in this transaction, so
+   * their synchronous listeners end it in the same commit. A change of letter case in an e-mail
+   * address reaches the same mailbox and is not reported.
+   */
+  private void publishIfAddressChanged(
+      Contact contact, String valueBefore, ContactType typeBefore) {
+    String valueAfter = contact.getContactValue();
+    boolean sameType = typeBefore == contact.getContactType();
+    boolean sameValue =
+        valueBefore != null
+            && valueAfter != null
+            && (contact.getContactType() == ContactType.EMAIL
+                ? valueBefore.trim().equalsIgnoreCase(valueAfter.trim())
+                : valueBefore.trim().equals(valueAfter.trim()));
+    if (sameType && sameValue) {
+      return;
+    }
+    eventPublisher.publish(
+        new ContactPointChangedEvent(
+            contact.getTenantId(), contact.getId(), ContactPointChangedEvent.ADDRESS_CHANGED));
   }
 
   private String maskContactValue(String contactValue) {
