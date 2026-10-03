@@ -239,6 +239,98 @@ public class SalesOrder extends BaseEntity {
   private boolean contactWhatsapp = false;
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Parties, requested date and release policy (ADR-0014 D4, D7, D9)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Client-chosen key of the create request: repeating the request (a retried autosave) returns
+   * this order instead of creating a second one (ADR-0014 D10).
+   */
+  @Column(name = "creation_key", updatable = false)
+  private UUID creationKey;
+
+  /**
+   * Fingerprint of the create request that used {@link #creationKey}: the same key with different
+   * content is a conflict, never a silent return of an unrelated order.
+   */
+  @Column(name = "creation_request_hash", updatable = false, length = 64)
+  private String creationRequestHash;
+
+  /** Whether the customer asked for a date; the order-level value is the deliveries' default. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "requested_date_status", length = 20)
+  private RequestedDateStatus requestedDateStatus;
+
+  /** The event the customer meant by the requested date; never converted by the delivery term. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "requested_delivery_event", length = 40)
+  private RequestedDeliveryEvent requestedDeliveryEvent;
+
+  /** Where the customer said the requested event happens; apart from the term's named place. */
+  @Column(name = "requested_delivery_place", length = RequestedDate.MAX_PLACE)
+  private String requestedDeliveryPlace;
+
+  /** Who is invoiced; not decided while null. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "bill_to_mode", length = 20)
+  private PartyMode billToMode;
+
+  @Column(name = "bill_to_partner_id")
+  private UUID billToPartnerId;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(name = "name", column = @Column(name = "bill_to_name", length = 200)),
+    @AttributeOverride(
+        name = "contactName",
+        column = @Column(name = "bill_to_contact_name", length = 120)),
+    @AttributeOverride(name = "email", column = @Column(name = "bill_to_email", length = 254)),
+    @AttributeOverride(name = "phone", column = @Column(name = "bill_to_phone", length = 30))
+  })
+  private PartySnapshot billToParty;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "line1",
+        column = @Column(name = "bill_to_address_line1", length = 200)),
+    @AttributeOverride(
+        name = "line2",
+        column = @Column(name = "bill_to_address_line2", length = 200)),
+    @AttributeOverride(name = "city", column = @Column(name = "bill_to_city", length = 100)),
+    @AttributeOverride(name = "region", column = @Column(name = "bill_to_region", length = 100)),
+    @AttributeOverride(
+        name = "postalCode",
+        column = @Column(name = "bill_to_postal_code", length = 20)),
+    @AttributeOverride(
+        name = "countryCode",
+        column = @Column(name = "bill_to_country_code", length = 2)),
+    @AttributeOverride(
+        name = "sourceAddressId",
+        column = @Column(name = "bill_to_address_source_id"))
+  })
+  private AddressSnapshot billToAddress;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "bill_to_relationship", length = 30)
+  private BillToRelationship billToRelationship;
+
+  @Column(name = "bill_to_reason", length = BillTo.MAX_REASON)
+  private String billToReason;
+
+  /** All production quantities are released together when the customer requires it (OD-8). */
+  @Column(name = "release_together", nullable = false)
+  @Builder.Default
+  private boolean releaseTogether = false;
+
+  /**
+   * The customer contact designated to approve this order; must hold an approval authority (D4).
+   * Not part of the commercial content: who approves is not something the customer agrees to.
+   */
+  @Column(name = "approver_contact_id")
+  private UUID approverContactId;
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Shipping
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -322,7 +414,7 @@ public class SalesOrder extends BaseEntity {
 
   /** Revise a rejected order back to DRAFT. */
   public void reviseRejected() {
-    if (status != OrderStatus.REJECTED) {
+    if (!status.canRevise()) {
       throw new OrderDomainException(
           String.format(
               "Cannot revise order %s: only REJECTED orders can be revised. Current: %s",
@@ -546,6 +638,135 @@ public class SalesOrder extends BaseEntity {
     this.committedOn = committedOn;
   }
 
+  /** The order-level delivery term with its standing; the default of every delivery. */
+  public DeliveryTermSetting getDeliveryTermSetting() {
+    return deliveryTerm == null
+        ? DeliveryTermSetting.NONE
+        : new DeliveryTermSetting(
+            getDeliveryTerms(), deliveryTermStatus, deliveryContractReference);
+  }
+
+  /** The order-level requested date with its event; the default of every delivery. */
+  public RequestedDate getRequestedDate() {
+    return new RequestedDate(
+        requestedDateStatus, requestedDeliveryDate, requestedDeliveryEvent, requestedDeliveryPlace);
+  }
+
+  /** Sets the order-level requested date (validated by {@link RequestedDate#of}). */
+  public void applyRequestedDate(RequestedDate value) {
+    assertCommercialContentEditable();
+    RequestedDate date = value == null ? RequestedDate.UNKNOWN : value;
+    this.requestedDateStatus = date.status();
+    this.requestedDeliveryDate = date.date();
+    this.requestedDeliveryEvent = date.event();
+    this.requestedDeliveryPlace = date.place();
+  }
+
+  /**
+   * The order form that knows only a date (no status, event or place). A date makes the status
+   * "requested"; an event and place chosen earlier are kept, otherwise the customer's meaning is
+   * recorded as not stated ({@link RequestedDeliveryEvent#UNSPECIFIED}) rather than guessed.
+   * Clearing the date makes it unknown again, except an explicit "not requested", which an absent
+   * date confirms.
+   */
+  void syncLegacyRequestedDate(LocalDate date) {
+    if (date == null) {
+      if (requestedDateStatus == RequestedDateStatus.REQUESTED) {
+        this.requestedDateStatus = null;
+        this.requestedDeliveryEvent = null;
+        this.requestedDeliveryPlace = null;
+      }
+      this.requestedDeliveryDate = null;
+      return;
+    }
+    if (requestedDateStatus != RequestedDateStatus.REQUESTED || requestedDeliveryEvent == null) {
+      this.requestedDateStatus = RequestedDateStatus.REQUESTED;
+      this.requestedDeliveryEvent = RequestedDeliveryEvent.UNSPECIFIED;
+      this.requestedDeliveryPlace = null;
+    }
+    this.requestedDeliveryDate = date;
+  }
+
+  /** The requested date entered with a new order from the order form. */
+  public void initialiseRequestedDate(LocalDate date) {
+    syncLegacyRequestedDate(date);
+  }
+
+  /** Who is invoiced, as recorded. */
+  public BillTo getBillTo() {
+    return new BillTo(
+        new PartyReference(billToMode, billToPartnerId, billToParty),
+        billToAddress,
+        billToRelationship,
+        billToReason);
+  }
+
+  /**
+   * Sets who is invoiced (validated by {@link BillTo#of} against this order's customer). It is
+   * commercial content: it changes only while the order is in sales' draft.
+   */
+  public void applyBillTo(BillTo value) {
+    assertCommercialContentEditable();
+    BillTo billTo = value == null ? BillTo.NONE : value;
+    PartyReference party = billTo.party();
+    if (party.mode() == PartyMode.PARTNER && party.partnerId().equals(tradingPartnerId)) {
+      throw new OrderDomainException("That partner is the customer: choose the customer instead");
+    }
+    this.billToMode = party.mode();
+    this.billToPartnerId = party.partnerId();
+    this.billToParty = party.snapshot();
+    this.billToAddress = billTo.address();
+    this.billToRelationship = billTo.relationship();
+    this.billToReason = billTo.reason();
+  }
+
+  /** Whether all production quantities are released together (OD-8). */
+  public void applyReleaseTogether(boolean value) {
+    assertCommercialContentEditable();
+    this.releaseTogether = value;
+  }
+
+  /**
+   * Designates the customer contact who approves this order. Only a contact of this order's
+   * customer holding an authority valid on {@code day} qualifies (OD-3c). While a request for the
+   * customer's approval is out, the approver does not change: the request goes to one person.
+   */
+  public void designateApprover(ApprovalAuthority authority, LocalDate day) {
+    assertApproverChangeable();
+    if (authority == null) {
+      throw new IllegalArgumentException("Authority is required");
+    }
+    if (!tradingPartnerId.equals(authority.getTradingPartnerId())) {
+      throw OrderDomainException.rule(
+          "APPROVER_NOT_CUSTOMER_CONTACT",
+          "The approver must be a contact of this order's customer");
+    }
+    if (!authority.isActiveOn(day)) {
+      throw OrderDomainException.rule(
+          "APPROVAL_AUTHORITY_INACTIVE", "This contact holds no approval authority valid today");
+    }
+    this.approverContactId = authority.getContactId();
+  }
+
+  /** Removes the designated approver. */
+  public void clearApprover() {
+    assertApproverChangeable();
+    this.approverContactId = null;
+  }
+
+  private void assertApproverChangeable() {
+    if (flowStage == OrderFlowStage.AWAITING_CUSTOMER_APPROVAL) {
+      throw OrderDomainException.stage(
+          "CUSTOMER_APPROVAL_OPEN",
+          "Order "
+              + orderNumber
+              + " is out for the customer's approval: withdraw it before changing the approver");
+    }
+    if (isClosedForWork()) {
+      throw OrderDomainException.stage("ORDER_CLOSED", "Order " + orderNumber + " is " + status);
+    }
+  }
+
   public void updateDraft(SalesOrderUpdateCommand cmd) {
     if (!status.canEdit()) {
       throw new OrderDomainException(
@@ -558,7 +779,7 @@ public class SalesOrder extends BaseEntity {
     }
     this.customerReference = cmd.customerReference();
     this.orderDate = cmd.orderDate();
-    this.requestedDeliveryDate = cmd.requestedDeliveryDate();
+    syncLegacyRequestedDate(cmd.requestedDeliveryDate());
     applyDeliveryTerms(cmd.deliveryTerms());
     applyDeliveryTermStatus(cmd.deliveryTermStatus(), cmd.deliveryContractReference());
     this.paymentTerms = cmd.paymentTerms();
@@ -608,7 +829,7 @@ public class SalesOrder extends BaseEntity {
 
   /** Start processing (CONFIRMED → IN_PRODUCTION). */
   public void startProcessing() {
-    if (status != OrderStatus.CONFIRMED) {
+    if (!status.canStartProcessing()) {
       throw new OrderDomainException(
           String.format(
               "Cannot start processing order %s: current status is %s (must be CONFIRMED)",
@@ -643,7 +864,7 @@ public class SalesOrder extends BaseEntity {
 
   /** Mark as delivered. */
   public void deliver(LocalDate deliveryDate) {
-    if (status != OrderStatus.SHIPPED) {
+    if (!status.canDeliver()) {
       throw new OrderDomainException(
           String.format(
               "Cannot deliver order %s: current status is %s (must be SHIPPED)",
@@ -667,7 +888,7 @@ public class SalesOrder extends BaseEntity {
 
   /** Put order on hold. */
   public void hold() {
-    if (status.isTerminal() || status == OrderStatus.ON_HOLD) {
+    if (!status.canHold()) {
       throw new OrderDomainException(
           String.format(
               "Cannot hold order %s: status %s is terminal or already ON_HOLD",
@@ -680,7 +901,7 @@ public class SalesOrder extends BaseEntity {
 
   /** Resume an order from hold. */
   public void resume() {
-    if (status != OrderStatus.ON_HOLD) {
+    if (!status.canResume()) {
       throw new OrderDomainException(
           String.format(
               "Cannot resume order %s: current status is %s (must be ON_HOLD)",
