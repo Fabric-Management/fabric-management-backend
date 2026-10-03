@@ -281,6 +281,9 @@ CREATE TABLE IF NOT EXISTS sales_ord.customer_approval (
     version BIGINT NOT NULL DEFAULT 0,
     sales_order_id UUID NOT NULL,
     order_version_id UUID NOT NULL,
+    -- ADR-0014 D4: the representative's approval authority the request was sent under; the link,
+    -- code and a decision work only while this very authority is valid (FK added below).
+    approval_authority_id UUID NOT NULL,
     version_no INTEGER NOT NULL CHECK (version_no > 0),
     status VARCHAR(30) NOT NULL
         CHECK (status IN ('AWAITING_INTERNAL_APPROVAL', 'INTERNAL_REJECTED', 'SENT', 'APPROVED',
@@ -346,6 +349,197 @@ CREATE INDEX IF NOT EXISTS idx_customer_approval_changes
     ON sales_ord.customer_approval (tenant_id, decided_at)
     WHERE status = 'CHANGES_REQUESTED' AND changes_resolved_at IS NULL;
 
+-- ADR-0014 D4 (OD-3c): a customer contact's authority to approve orders and request changes,
+-- granted with its basis by an authorised sales manager. The grant is never edited; revocation is
+-- recorded once. At most one authority per contact is open (not revoked).
+CREATE TABLE IF NOT EXISTS sales_ord.customer_approval_authority (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    trading_partner_id UUID NOT NULL,
+    -- The person who holds the authority; contact_id is that person's e-mail contact point and
+    -- authorised_email the address it read when the authority was granted. Requests go only to
+    -- that address; a contact point that reads another address no longer carries the authority
+    -- until it is granted again (ADR-0014 OD-13).
+    representative_name VARCHAR(200) NOT NULL CHECK (length(trim(representative_name)) > 0),
+    contact_id UUID NOT NULL,
+    authorised_email VARCHAR(255) NOT NULL CHECK (authorised_email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+    basis VARCHAR(30) NOT NULL
+        CHECK (basis IN ('WRITTEN_MANDATE', 'CUSTOMER_CORRESPONDENCE', 'CONTRACT_CLAUSE',
+                         'COMPANY_REGISTER', 'OTHER')),
+    basis_reference VARCHAR(500) NOT NULL CHECK (length(trim(basis_reference)) > 0),
+    valid_from DATE NOT NULL,
+    valid_until DATE,
+    granted_by UUID NOT NULL,
+    granted_at TIMESTAMPTZ NOT NULL,
+    revoked_by UUID,
+    revoked_at TIMESTAMPTZ,
+    revocation_reason VARCHAR(500),
+    -- Why it ended: revoked by a user, or its contact point changed or was removed (OD-13). Every
+    -- ending is permanent; a contact point changed back does not revive the authority.
+    revocation_cause VARCHAR(30)
+        CHECK (revocation_cause IN ('REVOKED', 'CONTACT_ADDRESS_CHANGED', 'CONTACT_REMOVED')),
+    CONSTRAINT uq_customer_approval_authority_tenant_id UNIQUE (tenant_id, id),
+    CONSTRAINT fk_customer_approval_authority_partner FOREIGN KEY (trading_partner_id)
+        REFERENCES common_company.common_trading_partner (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_customer_approval_authority_validity CHECK (
+        valid_until IS NULL OR valid_until >= valid_from),
+    CONSTRAINT chk_customer_approval_authority_revocation CHECK (
+        (revoked_at IS NULL AND revoked_by IS NULL AND revocation_reason IS NULL
+            AND revocation_cause IS NULL)
+        OR (revoked_at IS NOT NULL AND revoked_by IS NOT NULL AND revocation_cause IS NOT NULL
+            AND length(trim(revocation_reason)) > 0))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_approval_authority_open
+    ON sales_ord.customer_approval_authority (tenant_id, trading_partner_id, contact_id)
+    WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_customer_approval_authority_partner
+    ON sales_ord.customer_approval_authority (tenant_id, trading_partner_id, granted_at DESC);
+-- A change of a contact point ends the open authorities bound to it.
+CREATE INDEX IF NOT EXISTS idx_customer_approval_authority_contact_open
+    ON sales_ord.customer_approval_authority (tenant_id, contact_id)
+    WHERE revoked_at IS NULL;
+-- A request for the customer's approval names the authority it was sent under.
+ALTER TABLE sales_ord.customer_approval
+    ADD CONSTRAINT fk_customer_approval_authority FOREIGN KEY (tenant_id, approval_authority_id)
+        REFERENCES sales_ord.customer_approval_authority (tenant_id, id);
+CREATE INDEX IF NOT EXISTS idx_customer_approval_by_authority
+    ON sales_ord.customer_approval (tenant_id, approval_authority_id);
+
+-- ADR-0014 D8: one delivery of an order. The consignee may be a third party the customer nominates
+-- (registered partner or a snapshot kept on the delivery); receiving goods grants no authority.
+-- Term and requested date follow the order-level default or are the delivery's own (source kept).
+CREATE TABLE IF NOT EXISTS sales_ord.order_delivery (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    sequence_no INTEGER NOT NULL CHECK (sequence_no > 0),
+    consignee_mode VARCHAR(20) CHECK (consignee_mode IN ('CUSTOMER', 'PARTNER', 'SNAPSHOT')),
+    consignee_partner_id UUID,
+    consignee_name VARCHAR(200),
+    consignee_contact_name VARCHAR(120),
+    consignee_email VARCHAR(254),
+    consignee_phone VARCHAR(30),
+    ship_to_line1 VARCHAR(200),
+    ship_to_line2 VARCHAR(200),
+    ship_to_city VARCHAR(100),
+    ship_to_region VARCHAR(100),
+    ship_to_postal_code VARCHAR(20),
+    ship_to_country_code VARCHAR(2),
+    ship_to_source_address_id UUID,
+    term_source VARCHAR(20) NOT NULL DEFAULT 'ORDER_DEFAULT'
+        CHECK (term_source IN ('ORDER_DEFAULT', 'OVERRIDE')),
+    delivery_term VARCHAR(3)
+        CHECK (delivery_term IN ('EXW', 'FCA', 'CPT', 'CIP', 'DAT', 'DAP', 'DPU', 'DDP',
+                                 'FAS', 'FOB', 'CFR', 'CIF')),
+    delivery_place VARCHAR(200),
+    incoterms_version VARCHAR(20)
+        CHECK (incoterms_version IN ('INCOTERMS_2010', 'INCOTERMS_2020')),
+    delivery_term_status VARCHAR(30)
+        CHECK (delivery_term_status IN ('PROPOSED', 'AGREED_BY_CONTRACT', 'AGREED_BY_CUSTOMER')),
+    delivery_contract_reference VARCHAR(200),
+    requested_date_source VARCHAR(20) NOT NULL DEFAULT 'ORDER_DEFAULT'
+        CHECK (requested_date_source IN ('ORDER_DEFAULT', 'OVERRIDE')),
+    requested_date_status VARCHAR(20)
+        CHECK (requested_date_status IN ('REQUESTED', 'NOT_REQUESTED')),
+    requested_date DATE,
+    requested_place VARCHAR(200),
+    requested_event VARCHAR(40)
+        CHECK (requested_event IN ('AVAILABLE_FOR_COLLECTION', 'HANDED_TO_CARRIER', 'ALONGSIDE_VESSEL',
+                                   'ON_BOARD_VESSEL', 'READY_FOR_UNLOADING_AT_DESTINATION',
+                                   'UNLOADED_AT_DESTINATION', 'RECEIVED_BY_CONSIGNEE', 'UNSPECIFIED')),
+    transport_preference VARCHAR(100),
+    -- OD-8: ships only when every quantity allocated to it is ready.
+    ship_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT uq_order_delivery_tenant_id UNIQUE (tenant_id, id),
+    CONSTRAINT uq_order_delivery_sequence UNIQUE (tenant_id, sales_order_id, sequence_no),
+    CONSTRAINT fk_order_delivery_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    CONSTRAINT fk_order_delivery_consignee_partner FOREIGN KEY (consignee_partner_id)
+        REFERENCES common_company.common_trading_partner (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_order_delivery_consignee CHECK (
+        (consignee_mode IS NULL AND consignee_partner_id IS NULL AND consignee_name IS NULL)
+        OR (consignee_mode = 'CUSTOMER' AND consignee_partner_id IS NULL
+            AND consignee_name IS NULL)
+        OR (consignee_mode = 'PARTNER' AND consignee_partner_id IS NOT NULL
+            AND consignee_name IS NULL)
+        OR (consignee_mode = 'SNAPSHOT' AND consignee_partner_id IS NULL
+            AND length(trim(consignee_name)) > 0)),
+    CONSTRAINT chk_order_delivery_consignee_details CHECK (
+        consignee_name IS NOT NULL
+        OR (consignee_contact_name IS NULL AND consignee_email IS NULL AND consignee_phone IS NULL)),
+    CONSTRAINT chk_order_delivery_ship_to CHECK (
+        (ship_to_line1 IS NULL AND ship_to_line2 IS NULL AND ship_to_city IS NULL
+            AND ship_to_region IS NULL AND ship_to_postal_code IS NULL
+            AND ship_to_country_code IS NULL AND ship_to_source_address_id IS NULL)
+        -- A draft keeps a partial address; completeness is asked by the gate that needs it.
+        OR ship_to_country_code IS NULL OR ship_to_country_code ~ '^[A-Z]{2}$'),
+    CONSTRAINT chk_order_delivery_term CHECK (
+        (term_source = 'ORDER_DEFAULT' AND delivery_term IS NULL AND delivery_place IS NULL
+            AND incoterms_version IS NULL AND delivery_term_status IS NULL
+            AND delivery_contract_reference IS NULL)
+        OR (term_source = 'OVERRIDE' AND delivery_term IS NOT NULL
+            AND length(trim(delivery_place)) > 0 AND incoterms_version IS NOT NULL
+            AND delivery_term_status IS NOT NULL
+            AND NOT (delivery_term = 'DAT' AND incoterms_version <> 'INCOTERMS_2010')
+            AND NOT (delivery_term = 'DPU' AND incoterms_version <> 'INCOTERMS_2020')
+            AND ((delivery_term_status = 'AGREED_BY_CONTRACT')
+                 = (delivery_contract_reference IS NOT NULL)))),
+    CONSTRAINT chk_order_delivery_requested CHECK (
+        (requested_date_source = 'ORDER_DEFAULT' AND requested_date_status IS NULL
+            AND requested_date IS NULL AND requested_event IS NULL AND requested_place IS NULL)
+        OR (requested_date_source = 'OVERRIDE' AND requested_date_status = 'REQUESTED'
+            AND requested_date IS NOT NULL AND requested_event IS NOT NULL)
+        OR (requested_date_source = 'OVERRIDE' AND requested_date_status = 'NOT_REQUESTED'
+            AND requested_date IS NULL AND requested_event IS NULL AND requested_place IS NULL))
+);
+
+-- How much of a line goes in a delivery, in the line's unit. The allocations of a line never
+-- exceed its quantity (checked by the application under the order lock); the rest is unallocated.
+CREATE TABLE IF NOT EXISTS sales_ord.order_line_allocation (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    line_id UUID NOT NULL,
+    delivery_id UUID NOT NULL,
+    quantity NUMERIC(15, 3) NOT NULL CHECK (quantity > 0),
+    CONSTRAINT uq_order_line_allocation_tenant_id UNIQUE (tenant_id, id),
+    CONSTRAINT uq_order_line_allocation_pair UNIQUE (tenant_id, delivery_id, line_id),
+    CONSTRAINT fk_order_line_allocation_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    CONSTRAINT fk_order_line_allocation_line FOREIGN KEY (tenant_id, line_id)
+        REFERENCES sales_ord.sales_order_line (tenant_id, id),
+    CONSTRAINT fk_order_line_allocation_delivery FOREIGN KEY (tenant_id, delivery_id)
+        REFERENCES sales_ord.order_delivery (tenant_id, id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_order_line_allocation_order
+    ON sales_ord.order_line_allocation (tenant_id, sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_order_line_allocation_line
+    ON sales_ord.order_line_allocation (tenant_id, line_id);
+
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -353,7 +547,9 @@ BEGIN
                              'sales_ord.delivery_commitment', 'sales_ord.delivery_proposal',
                              'sales_ord.order_flow_event', 'sales_ord.order_work_assignment',
                              'sales_ord.order_work_assignment_event', 'sales_ord.order_version',
-                             'sales_ord.customer_approval'] LOOP
+                             'sales_ord.customer_approval',
+                             'sales_ord.customer_approval_authority',
+                             'sales_ord.order_delivery', 'sales_ord.order_line_allocation'] LOOP
         EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', t);
         EXECUTE format('ALTER TABLE %s FORCE ROW LEVEL SECURITY', t);
         EXECUTE format($p$CREATE POLICY rls_tenant_isolation ON %s FOR ALL
@@ -374,6 +570,12 @@ BEGIN
         REVOKE DELETE ON sales_ord.line_portion_readiness,
             sales_ord.order_arrival_estimate, sales_ord.order_work_assignment,
             sales_ord.customer_approval FROM fabric_app;
+        -- An approval authority is granted and revoked once; never deleted by the application.
+        GRANT SELECT, INSERT, UPDATE ON sales_ord.customer_approval_authority TO fabric_app;
+        REVOKE DELETE ON sales_ord.customer_approval_authority FROM fabric_app;
+        -- Deliveries and allocations are draft content: edited and removed with the draft.
+        GRANT SELECT, INSERT, UPDATE, DELETE ON sales_ord.order_delivery,
+            sales_ord.order_line_allocation TO fabric_app;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
         GRANT SELECT, INSERT, UPDATE, DELETE ON sales_ord.line_portion_readiness,
@@ -382,6 +584,10 @@ BEGIN
         GRANT SELECT, INSERT, DELETE ON sales_ord.delivery_commitment,
             sales_ord.delivery_proposal, sales_ord.order_flow_event,
             sales_ord.order_work_assignment_event, sales_ord.order_version TO fabric_system;
+        GRANT SELECT, INSERT, DELETE ON sales_ord.customer_approval_authority TO fabric_system;
+        REVOKE UPDATE ON sales_ord.customer_approval_authority FROM fabric_system;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON sales_ord.order_delivery,
+            sales_ord.order_line_allocation TO fabric_system;
     END IF;
 END $$;
 
@@ -393,5 +599,11 @@ COMMENT ON TABLE sales_ord.delivery_commitment IS
     'Append-only delivery promises agreed with the buyer; the first promise and every change are kept.';
 COMMENT ON TABLE sales_ord.order_version IS
     'Append-only versions of an order as sent to the customer; an approval binds to one version.';
+COMMENT ON TABLE sales_ord.customer_approval_authority IS
+    'A customer contact''s authority to approve orders, with its basis; revoked once (ADR-0014 D4).';
+COMMENT ON TABLE sales_ord.order_delivery IS
+    'One delivery of an order: consignee, place, term, requested date, ship-complete (ADR-0014 D8).';
+COMMENT ON TABLE sales_ord.order_line_allocation IS
+    'How much of an order line goes in a delivery, in the line''s unit (ADR-0014 D8).';
 COMMENT ON TABLE sales_ord.customer_approval IS
     'A request for the customer''s approval of a sent order version: link, one-time code, decision.';

@@ -69,6 +69,7 @@ final class TablePrivilegeClassification {
     entries.put("sales_ord.order_arrival_estimate", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_work_assignment", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.customer_approval", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.customer_approval_authority", TablePrivilegeClass.CLOSE_ONCE_LEDGER);
     entries.put(
         "production.production_execution_batch_color_archive",
         TablePrivilegeClass.READ_ONLY_ARCHIVE);

@@ -74,6 +74,7 @@ public class CustomerApprovalService {
   private final OrderApprovalInvalidator invalidator;
   private final OrderFlowRecorder flow;
   private final Clock clock;
+  private final ApproverAuthorities approvers;
 
   // ── Sales ──────────────────────────────────────────────────────────────
 
@@ -132,6 +133,7 @@ public class CustomerApprovalService {
       throw refusal(reason, order);
     }
     DeliveryProposal offered = proposal.orElseThrow();
+    ApproverAuthorities.Approver approver = approvers.resolve(order).approver();
     OrderVersionSnapshotter.Snapshot snapshot = snapshotter.snapshot(tenantId, order, offered);
     OrderVersion version =
         versions.save(
@@ -151,8 +153,9 @@ public class CustomerApprovalService {
     CustomerApproval approval =
         CustomerApproval.request(
             version,
-            order.getContactName(),
-            order.getContactEmail(),
+            approver.authorityId(),
+            approver.name(),
+            approver.email(),
             offered.getValidUntil(),
             input == null ? null : input.linkValidHours(),
             actor,
@@ -181,7 +184,7 @@ public class CustomerApprovalService {
           "Version " + version.getVersionNo() + " waits for the internal approval",
           actor);
     } else {
-      sendLink(tenantId, approval, snapshot.content(), null, null, actor);
+      sendLink(tenantId, order, approval, snapshot.content(), actor);
       flow.move(
           order,
           OrderFlowStage.AWAITING_CUSTOMER_APPROVAL,
@@ -192,12 +195,14 @@ public class CustomerApprovalService {
   }
 
   /**
-   * Sends a new link for the same version, to the same or a corrected address. The earlier link,
-   * code and session stop working; the version and its validity do not change.
+   * Sends a new link for the same version to the same representative, at the address their
+   * authority was granted for. The earlier link, code and session stop working; the version and its
+   * validity do not change. Nobody else and no other address can be named: another recipient needs
+   * another authorised approver and a new request, and an address changed on the customer's card
+   * needs the authority granted again at that address (ADR-0014 D4, OD-13).
    */
   @Transactional
-  public CustomerApprovalDtos.State resend(
-      UUID orderId, CustomerApprovalDtos.Resend input, UUID actor) {
+  public CustomerApprovalDtos.State resend(UUID orderId, UUID actor) {
     SalesOrder order = writableLocked(orderId, actor);
     UUID tenantId = TenantContext.requireTenantId();
     CustomerApproval approval = openApproval(tenantId, order.getId()).orElse(null);
@@ -206,13 +211,7 @@ public class CustomerApprovalService {
       throw refusal(reason, order);
     }
     OrderVersion version = versionOf(tenantId, approval);
-    sendLink(
-        tenantId,
-        approval,
-        version.getContent(),
-        input == null ? null : input.recipientName(),
-        input == null ? null : input.recipientEmail(),
-        actor);
+    sendLink(tenantId, order, approval, version.getContent(), actor);
     return state(order, actor);
   }
 
@@ -286,9 +285,26 @@ public class CustomerApprovalService {
       flow.move(order, OrderFlowStage.IN_PLANNING, reason, SystemUser.ID);
       return;
     }
+    String authorityBlock = approvers.block(approval, now);
+    if (authorityBlock != null) {
+      String reason =
+          (ApproverAuthorities.APPROVER_EMAIL_CHANGED.equals(authorityBlock)
+              ? "The representative's e-mail address changed on the customer's card while"
+                  + " version "
+                  + approval.getVersionNo()
+                  + " waited for the internal approval; grant the authority again at the new"
+                  + " address and send again"
+              : "The representative's approval authority ended while version "
+                  + approval.getVersionNo()
+                  + " waited for the internal approval; designate an authorised approver and"
+                  + " send again");
+      approval.withdraw(reason, SystemUser.ID, now);
+      approvals.save(approval);
+      flow.move(order, OrderFlowStage.PLANNED, OrderFlowRecorder.clip(reason), SystemUser.ID);
+      return;
+    }
     approval.internallyApproved(now);
-    sendLink(
-        tenantId, approval, versionOf(tenantId, approval).getContent(), null, null, SystemUser.ID);
+    sendLink(tenantId, order, approval, versionOf(tenantId, approval).getContent(), SystemUser.ID);
     flow.move(
         order,
         OrderFlowStage.AWAITING_CUSTOMER_APPROVAL,
@@ -327,20 +343,21 @@ public class CustomerApprovalService {
 
   // ── Internals ──────────────────────────────────────────────────────────
 
+  /**
+   * Issues the link to the request's representative at the address the authority was granted for.
+   * The authority is held locked while the link is issued, so a revocation either came first and
+   * refuses this, or waits until the link is recorded (ADR-0014 OD-13).
+   */
   private void sendLink(
       UUID tenantId,
+      SalesOrder order,
       CustomerApproval approval,
       OrderVersionContent content,
-      String recipientName,
-      String recipientEmail,
       UUID actor) {
+    Instant now = clock.instant();
+    approvers.holdValid(approval, now);
     String token = randomHex();
-    approval.issueLink(
-        OrderVersionSnapshotter.sha256(token),
-        recipientName,
-        recipientEmail,
-        actor,
-        clock.instant());
+    approval.issueLink(OrderVersionSnapshotter.sha256(token), actor, now);
     approvals.save(approval);
     mailer.sendApprovalRequest(
         tenantId,
@@ -380,11 +397,14 @@ public class CustomerApprovalService {
             CustomerApprovalDtos.Capability.of(
                 CustomerApprovalDtos.Action.RESEND_LINK,
                 access != null ? access : resendBlock(order, open, now)));
+    ApproverAuthorities.Approver approver = approvers.resolve(order).approver();
     return new CustomerApprovalDtos.State(
         order.getId(),
         order.getFlowStage(),
         order.getContactName(),
         order.getContactEmail(),
+        approver == null ? null : approver.name(),
+        approver == null ? null : approver.email(),
         all.stream().map(value -> CustomerApprovalDtos.ApprovalView.of(value, now)).toList(),
         versions.findByTenantIdAndSalesOrderIdOrderByVersionNoDesc(tenantId, order.getId()).stream()
             .map(CustomerApprovalDtos.VersionView::of)
@@ -427,8 +447,9 @@ public class CustomerApprovalService {
     if (order.getFlowStage() != OrderFlowStage.PLANNED) {
       return OrderFlowService.WRONG_STAGE;
     }
-    if (!hasEmail(order)) {
-      return "CONTACT_EMAIL_REQUIRED";
+    String approver = approvers.resolve(order).block();
+    if (approver != null) {
+      return approver;
     }
     if (proposal == null) {
       return "PROPOSAL_MISSING";
@@ -457,13 +478,16 @@ public class CustomerApprovalService {
   }
 
   /** Why a new link cannot be sent now, or null. */
-  private static String resendBlock(SalesOrder order, CustomerApproval open, Instant now) {
+  private String resendBlock(SalesOrder order, CustomerApproval open, Instant now) {
     if (order.getFlowStage() != OrderFlowStage.AWAITING_CUSTOMER_APPROVAL
         || open == null
         || open.getStatus() != CustomerApprovalStatus.SENT) {
       return OrderFlowService.WRONG_STAGE;
     }
-    return open.getProposalValidUntil().isAfter(now) ? null : "PROPOSAL_EXPIRED";
+    if (!open.getProposalValidUntil().isAfter(now)) {
+      return "PROPOSAL_EXPIRED";
+    }
+    return approvers.block(open, now);
   }
 
   private OrderDomainException refusal(String reason, SalesOrder order) {
@@ -473,6 +497,13 @@ public class CustomerApprovalService {
           case OrderFlowService.WRONG_STAGE ->
               "Order " + order.getOrderNumber() + " is " + order.getFlowStage();
           case "CONTACT_EMAIL_REQUIRED" -> "The order's contact needs an e-mail address";
+          case ApproverAuthorities.APPROVER_REQUIRED ->
+              "Designate the customer's approver: a representative with an approval authority";
+          case ApproverAuthorities.AUTHORITY_INACTIVE ->
+              "The approver's authority is not valid; designate an authorised approver";
+          case ApproverAuthorities.APPROVER_EMAIL_CHANGED ->
+              "The approver's e-mail contact point changed on the customer's card, which ended"
+                  + " the authority; grant a new authority at the confirmed address";
           case "PROPOSAL_MISSING" -> "Planning has not proposed a date";
           case "PROPOSAL_STALE" ->
               "Planning's proposal no longer applies to the order; planning proposes again";

@@ -79,6 +79,8 @@ public class SalesOrderService {
   private final OrderIntakeHooks orderIntakeHooks;
   private final CustomerRequestService customerRequestService;
   private final OrderApprovalInvalidator approvalInvalidator;
+  private final LineAllocationPolicy lineAllocations;
+  private final OrderCreationReplay creationReplay;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -93,9 +95,27 @@ public class SalesOrderService {
   @Transactional
   public SalesOrderDto createOrder(CreateSalesOrderRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
+    // ADR-0014 D2: no order exists without its customer, whoever calls this.
+    if (request.getPartnerId() == null) {
+      throw OrderDomainException.rule(
+          "CUSTOMER_REQUIRED", "Choose the customer before the order is saved");
+    }
 
     // Resolve partner ID (handles both new and legacy IDs)
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
+    // ADR-0014 D10: a repeated create (a retried autosave) returns the order it created; repeats
+    // with one key are serialised, and the same key with different content is a conflict.
+    String creationFingerprint = null;
+    if (request.getIdempotencyKey() != null) {
+      creationFingerprint = creationReplay.fingerprint(request);
+      Optional<SalesOrder> created =
+          creationReplay.claim(tenantId, request.getIdempotencyKey(), creationFingerprint);
+      if (created.isPresent()) {
+        return findById(created.get().getId(), TenantContext.getCurrentUserId())
+            .orElseThrow(
+                () -> new OrderDomainException("The order created by this request is not visible"));
+      }
+    }
     orderIntakeHooks.validateLines(tenantId, tradingPartnerId, request.getLines());
     DeliveryTerms terms =
         DeliveryTerms.of(
@@ -133,7 +153,8 @@ public class SalesOrderService {
             .customerReference(request.getCustomerReference())
             .orderType(request.getOrderType())
             .orderDate(request.getOrderDate())
-            .requestedDeliveryDate(request.getRequestedDeliveryDate())
+            .creationKey(request.getIdempotencyKey())
+            .creationRequestHash(creationFingerprint)
             .paymentTerms(request.getPaymentTerms())
             .contactName(blankToNull(request.getContactName()))
             .contactEmail(blankToNull(request.getContactEmail()))
@@ -154,6 +175,7 @@ public class SalesOrderService {
     order.applyDeliveryTermStatus(
         request.getDeliveryTermStatus(), request.getDeliveryContractReference());
     order.applyAgreementContext(request.getAgreementContext(), request.getAgreementContextNote());
+    order.initialiseRequestedDate(request.getRequestedDeliveryDate());
 
     SalesOrder saved = orderRepository.save(order);
 
@@ -265,10 +287,16 @@ public class SalesOrderService {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
-    // 4a. Soft-delete lines not in request
+    // 4a. Soft-delete lines not in request; their delivery allocations go with them.
+    List<UUID> removedLineIds = new ArrayList<>();
     existingLines.stream()
         .filter(line -> !incomingLineIds.contains(line.getId()))
-        .forEach(SalesOrderLine::delete);
+        .forEach(
+            line -> {
+              line.delete();
+              removedLineIds.add(line.getId());
+            });
+    lineAllocations.linesRemoved(order.getId(), removedLineIds);
 
     // 4b. Update existing + create new lines
     List<SalesOrderLine> syncedLines = new ArrayList<>();
@@ -369,6 +397,8 @@ public class SalesOrderService {
   }
 
   private void updateLineFromRequest(SalesOrderLine line, UpdateSalesOrderLineRequest req) {
+    // ADR-0014 D8: the line's deliveries must still fit its quantity and unit.
+    lineAllocations.assertChange(line, req.getRequestedQty(), req.getUnit());
     line.setProductId(req.getProductId());
     line.setProductDesc(req.getProductDesc());
     line.setRequestedQty(req.getRequestedQty());

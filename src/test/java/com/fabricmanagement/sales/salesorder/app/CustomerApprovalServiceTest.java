@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +84,9 @@ class CustomerApprovalServiceTest {
   @Mock private OrderIntakeHooks intake;
   @Mock private OrderApprovalInvalidator invalidator;
   @Mock private OrderFlowEventRepository events;
+  @Mock private ApproverAuthorities approvers;
+
+  private static final UUID AUTHORITY = UUID.randomUUID();
 
   private final List<CustomerApproval> saved = new ArrayList<>();
   private CustomerApprovalService service;
@@ -109,7 +114,8 @@ class CustomerApprovalServiceTest {
             intake,
             invalidator,
             new OrderFlowRecorder(events, clock),
-            clock);
+            clock,
+            approvers);
     order =
         SalesOrder.builder()
             .tradingPartnerId(UUID.randomUUID())
@@ -126,6 +132,14 @@ class CustomerApprovalServiceTest {
         DeliveryTerms.of(DeliveryTerm.FCA, "Felixstowe", IncotermsVersion.INCOTERMS_2020));
     proposal = proposal(NOW.plus(Duration.ofDays(5)));
 
+    // The order's designated approver holds a valid authority (ADR-0014 D4).
+    when(approvers.resolve(any()))
+        .thenReturn(
+            new ApproverAuthorities.Resolution(
+                new ApproverAuthorities.Approver(AUTHORITY, "Jane Smith", "jane@example.co.uk"),
+                null));
+    // The request's authority stays in force unless a test says otherwise.
+    when(approvers.block(any(), any())).thenReturn(null);
     when(orders.findByTenantIdAndId(TENANT, order.getId())).thenReturn(Optional.of(order));
     when(orders.lockByTenantIdAndId(TENANT, order.getId())).thenReturn(Optional.of(order));
     when(accessPolicy.canRead(TENANT, SALES, order)).thenReturn(true);
@@ -417,19 +431,137 @@ class CustomerApprovalServiceTest {
   }
 
   @Test
-  void aResendReplacesTheLinkForTheSameVersion() {
+  void aResendReplacesTheLinkForTheSameRepresentativeAtTheAuthorisedAddress() {
     policyRequiresApproval(false);
     service.sendForApproval(order.getId(), null, SALES);
     String first = only().getTokenHash();
 
-    service.resend(
-        order.getId(), new CustomerApprovalDtos.Resend("John Smith", "john@example.co.uk"), SALES);
+    service.resend(order.getId(), SALES);
 
     assertThat(only().getTokenHash()).isNotEqualTo(first);
-    assertThat(only().getRecipientEmail()).isEqualTo("john@example.co.uk");
+    assertThat(only().getApprovalAuthorityId()).isEqualTo(AUTHORITY);
+    assertThat(only().getRecipientName()).isEqualTo("Jane Smith");
+    assertThat(only().getRecipientEmail()).isEqualTo("jane@example.co.uk");
     assertThat(only().getLinksIssued()).isEqualTo(2);
-    verify(mailer)
-        .sendApprovalRequest(eq(TENANT), eq("john@example.co.uk"), any(), any(), any(), any());
+    verify(mailer, times(2))
+        .sendApprovalRequest(eq(TENANT), eq("jane@example.co.uk"), any(), any(), any(), any());
+    // Each send holds the authority's lock while the link is issued.
+    verify(approvers, times(2)).holdValid(any(), any());
+  }
+
+  @Test
+  void anAddressChangedOnTheCustomersCardStopsTheResendUntilTheAuthorityIsGrantedAgain() {
+    policyRequiresApproval(false);
+    service.sendForApproval(order.getId(), null, SALES);
+    String first = only().getTokenHash();
+    // Someone edited Jane's contact point: it now reads another address.
+    when(approvers.block(any(), any())).thenReturn(ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+
+    assertThatThrownBy(() -> service.resend(order.getId(), SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ApproverAuthorities.APPROVER_EMAIL_CHANGED));
+    assertThat(only().getTokenHash()).isEqualTo(first);
+    assertThat(only().getRecipientEmail()).isEqualTo("jane@example.co.uk");
+    // Only the first request went out, and never to any other address.
+    verify(mailer).sendApprovalRequest(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aRevocationThatCameFirstStopsTheSendHeldUnderTheLock() {
+    policyRequiresApproval(false);
+    doThrow(ApproverAuthorities.refusal(ApproverAuthorities.AUTHORITY_INACTIVE))
+        .when(approvers)
+        .holdValid(any(), any());
+
+    assertThatThrownBy(() -> service.sendForApproval(order.getId(), null, SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
+    verify(mailer, never()).sendApprovalRequest(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void theRequestGoesToTheAuthorisedApproverNotToTheOrdersContact() {
+    policyRequiresApproval(false);
+    ReflectionTestUtils.setField(order, "contactEmail", "buyer@example.co.uk");
+
+    service.sendForApproval(order.getId(), null, SALES);
+
+    assertThat(only().getApprovalAuthorityId()).isEqualTo(AUTHORITY);
+    assertThat(only().getRecipientEmail()).isEqualTo("jane@example.co.uk");
+    verify(mailer, never())
+        .sendApprovalRequest(any(), eq("buyer@example.co.uk"), any(), any(), any(), any());
+  }
+
+  @Test
+  void withoutAnAuthorisedApproverNothingIsSent() {
+    policyRequiresApproval(false);
+    when(approvers.resolve(any()))
+        .thenReturn(ApproverAuthorities.Resolution.blocked(ApproverAuthorities.AUTHORITY_INACTIVE));
+
+    assertThatThrownBy(() -> service.sendForApproval(order.getId(), null, SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
+    assertThat(saved).isEmpty();
+    verify(mailer, never()).sendApprovalRequest(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void noNewLinkOnceTheRequestsAuthorityHasEnded() {
+    policyRequiresApproval(false);
+    service.sendForApproval(order.getId(), null, SALES);
+    String first = only().getTokenHash();
+    when(approvers.block(any(), any())).thenReturn(ApproverAuthorities.AUTHORITY_INACTIVE);
+
+    assertThatThrownBy(() -> service.resend(order.getId(), SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
+    assertThat(only().getTokenHash()).isEqualTo(first);
+  }
+
+  @Test
+  void anAuthorityThatEndedDuringTheInternalApprovalStopsTheSend() {
+    policyRequiresApproval(true);
+    UUID request = UUID.randomUUID();
+    when(approvalPort.pendingRequestId(TENANT, "SALES_ORDER", order.getId()))
+        .thenReturn(Optional.of(request));
+    service.sendForApproval(order.getId(), null, SALES);
+    when(approvals.findByTenantIdAndInternalApprovalRequestId(TENANT, request))
+        .thenReturn(Optional.of(only()));
+    when(approvers.block(any(), any())).thenReturn(ApproverAuthorities.AUTHORITY_INACTIVE);
+
+    service.onInternalApproval(request);
+
+    assertThat(only().getStatus()).isEqualTo(CustomerApprovalStatus.WITHDRAWN);
+    assertThat(order.getFlowStage()).isEqualTo(OrderFlowStage.PLANNED);
+    verify(mailer, never()).sendApprovalRequest(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void anAddressChangedDuringTheInternalApprovalStopsTheSend() {
+    policyRequiresApproval(true);
+    UUID request = UUID.randomUUID();
+    when(approvalPort.pendingRequestId(TENANT, "SALES_ORDER", order.getId()))
+        .thenReturn(Optional.of(request));
+    service.sendForApproval(order.getId(), null, SALES);
+    when(approvals.findByTenantIdAndInternalApprovalRequestId(TENANT, request))
+        .thenReturn(Optional.of(only()));
+    when(approvers.block(any(), any())).thenReturn(ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+
+    service.onInternalApproval(request);
+
+    assertThat(only().getStatus()).isEqualTo(CustomerApprovalStatus.WITHDRAWN);
+    assertThat(only().getClosedReason()).contains("e-mail address changed");
+    assertThat(order.getFlowStage()).isEqualTo(OrderFlowStage.PLANNED);
+    verify(mailer, never()).sendApprovalRequest(any(), any(), any(), any(), any(), any());
   }
 
   @Test

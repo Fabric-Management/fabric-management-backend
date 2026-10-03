@@ -57,6 +57,7 @@ class PublicOrderApprovalServiceTest {
   @Mock private TransactionTemplate transactions;
   @Mock private CustomerApprovalDecisionService decisions;
   @Mock private CustomerApprovalMailer mailer;
+  @Mock private ApproverAuthorities approvers;
 
   private PublicOrderApprovalService service;
   private CustomerApproval approval;
@@ -73,7 +74,9 @@ class PublicOrderApprovalServiceTest {
             transactions,
             decisions,
             mailer,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            approvers);
+    when(approvers.isValid(any(), any())).thenReturn(true);
     when(transactions.execute(any()))
         .thenAnswer(
             invocation -> {
@@ -114,6 +117,7 @@ class PublicOrderApprovalServiceTest {
     approval =
         CustomerApproval.request(
             version,
+            UUID.randomUUID(),
             "Jane Smith",
             "jane@example.co.uk",
             NOW.plus(Duration.ofDays(3)),
@@ -121,7 +125,7 @@ class PublicOrderApprovalServiceTest {
             UUID.randomUUID(),
             NOW.minusSeconds(60));
     ReflectionTestUtils.setField(approval, "id", UUID.randomUUID());
-    approval.issueLink(hash, null, null, UUID.randomUUID(), NOW.minusSeconds(60));
+    approval.issueLink(hash, UUID.randomUUID(), NOW.minusSeconds(60));
     when(approvals.findByTenantIdAndTokenHash(TENANT, hash)).thenReturn(Optional.of(approval));
     when(versions.findByTenantIdAndId(TENANT, version.getId())).thenReturn(Optional.of(version));
   }
@@ -187,6 +191,88 @@ class PublicOrderApprovalServiceTest {
             });
     assertThat(approval.getCodeAttempts()).isEqualTo(1);
     verify(approvals, org.mockito.Mockito.atLeast(2)).save(approval);
+  }
+
+  /** The representative's authority ended after the link went out (ADR-0014 D4). */
+  private void authorityEnded() {
+    authorityNoLongerInForce(ApproverAuthorities.AUTHORITY_INACTIVE);
+  }
+
+  /** The authority stopped being in force for {@code reason}, after the link went out. */
+  private void authorityNoLongerInForce(String reason) {
+    when(approvers.isValid(any(), any())).thenReturn(false);
+    org.mockito.Mockito.doThrow(ApproverAuthorities.refusal(reason))
+        .when(approvers)
+        .requireValid(any(), any());
+    org.mockito.Mockito.doThrow(ApproverAuthorities.refusal(reason))
+        .when(approvers)
+        .holdValid(any(), any());
+  }
+
+  @Test
+  void everyStepOfTheCustomerHoldsTheAuthority() {
+    String code = sendAndCaptureCode();
+    PublicOrderApprovalDtos.Verified verified = service.verify(TOKEN, code);
+    service.version(TOKEN, verified.session());
+
+    // Sending the code, checking it and showing the content each hold the authority's lock, as a
+    // decision does; none relies on a read that an ending could overtake.
+    verify(approvers, org.mockito.Mockito.times(3)).holdValid(any(), any());
+    verify(approvers, never()).requireValid(any(), any());
+  }
+
+  @Test
+  void aLinkWhoseApproverAddressChangedOnTheCardIsClosedAndSendsNoCode() {
+    authorityNoLongerInForce(ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+
+    assertThat(service.view(TOKEN).state()).isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertThatThrownBy(() -> service.sendCode(TOKEN))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ApproverAuthorities.APPROVER_EMAIL_CHANGED));
+    verify(mailer, never()).sendCode(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aLinkWhoseAuthorityEndedIsClosedAndSendsNoCode() {
+    authorityEnded();
+
+    assertThat(service.view(TOKEN).state()).isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertThat(service.view(TOKEN).nextCodeAllowedAt()).isNull();
+    assertThatThrownBy(() -> service.sendCode(TOKEN))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
+    verify(mailer, never()).sendCode(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aCodeReceivedBeforeTheAuthorityEndedOpensNothing() {
+    String code = sendAndCaptureCode();
+    authorityEnded();
+
+    assertThatThrownBy(() -> service.verify(TOKEN, code))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
+    assertThat(approval.getSessionHash()).isNull();
+  }
+
+  @Test
+  void aSessionStartedBeforeTheAuthorityEndedShowsNoContent() {
+    String code = sendAndCaptureCode();
+    PublicOrderApprovalDtos.Verified verified = service.verify(TOKEN, code);
+    authorityEnded();
+
+    assertThatThrownBy(() -> service.version(TOKEN, verified.session()))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("APPROVAL_AUTHORITY_INACTIVE"));
   }
 
   @Test

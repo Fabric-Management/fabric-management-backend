@@ -64,4 +64,28 @@ public enum OrderStatus {
   public boolean canEdit() {
     return this == DRAFT;
   }
+
+  /** Processing starts on a confirmed order. */
+  public boolean canStartProcessing() {
+    return this == CONFIRMED;
+  }
+
+  /** Only a shipped order is delivered. */
+  public boolean canDeliver() {
+    return this == SHIPPED;
+  }
+
+  /** Anything still open can be put on hold. */
+  public boolean canHold() {
+    return !isTerminal() && this != ON_HOLD;
+  }
+
+  public boolean canResume() {
+    return this == ON_HOLD;
+  }
+
+  /** A rejected order goes back to the draft. */
+  public boolean canRevise() {
+    return this == REJECTED;
+  }
 }
