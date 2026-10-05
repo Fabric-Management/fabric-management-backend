@@ -16,6 +16,7 @@ class CustomerApprovalTest {
   private static final Instant NOW = Instant.parse("2026-10-02T09:00:00Z");
   private static final UUID SALES = UUID.randomUUID();
   private static final String HASH = "a".repeat(64);
+  private static final UUID AUTHORITY = UUID.randomUUID();
 
   private static OrderVersion version() {
     OrderVersion version =
@@ -52,9 +53,16 @@ class CustomerApprovalTest {
   private static CustomerApproval sent(Instant proposalValidUntil, Integer hours) {
     CustomerApproval approval =
         CustomerApproval.request(
-            version(), "Jane Smith", "jane@example.co.uk", proposalValidUntil, hours, SALES, NOW);
+            version(),
+            AUTHORITY,
+            "Jane Smith",
+            "jane@example.co.uk",
+            proposalValidUntil,
+            hours,
+            SALES,
+            NOW);
     ReflectionTestUtils.setField(approval, "id", UUID.randomUUID());
-    approval.issueLink(HASH, null, null, SALES, NOW);
+    approval.issueLink(HASH, SALES, NOW);
     return approval;
   }
 
@@ -82,11 +90,29 @@ class CustomerApprovalTest {
   }
 
   @Test
+  void aRequestNamesTheAuthorityItIsSentUnder() {
+    assertThatThrownBy(
+            () ->
+                CustomerApproval.request(
+                    version(),
+                    null,
+                    "Jane",
+                    "jane@example.co.uk",
+                    NOW.plusSeconds(3600),
+                    null,
+                    SALES,
+                    NOW))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(sent(NOW.plus(Duration.ofDays(3)), null).getApprovalAuthorityId())
+        .isEqualTo(AUTHORITY);
+  }
+
+  @Test
   void anExpiredProposalIsNeverSent() {
     assertThatThrownBy(
             () ->
                 CustomerApproval.request(
-                    version(), "Jane", "jane@example.co.uk", NOW, null, SALES, NOW))
+                    version(), AUTHORITY, "Jane", "jane@example.co.uk", NOW, null, SALES, NOW))
         .isInstanceOfSatisfying(
             OrderDomainException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo("PROPOSAL_EXPIRED"));
@@ -97,7 +123,14 @@ class CustomerApprovalTest {
     assertThatThrownBy(
             () ->
                 CustomerApproval.request(
-                    version(), "Jane", "not-an-address", NOW.plusSeconds(3600), null, SALES, NOW))
+                    version(),
+                    AUTHORITY,
+                    "Jane",
+                    "not-an-address",
+                    NOW.plusSeconds(3600),
+                    null,
+                    SALES,
+                    NOW))
         .isInstanceOfSatisfying(
             OrderDomainException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo("CONTACT_EMAIL_REQUIRED"));
@@ -107,17 +140,24 @@ class CustomerApprovalTest {
   void aVersionWaitingForTheInternalApprovalIsNotSentBeforeIt() {
     CustomerApproval approval =
         CustomerApproval.request(
-            version(), "Jane", "jane@example.co.uk", NOW.plusSeconds(86_400), null, SALES, NOW);
+            version(),
+            AUTHORITY,
+            "Jane",
+            "jane@example.co.uk",
+            NOW.plusSeconds(86_400),
+            null,
+            SALES,
+            NOW);
     approval.awaitInternalApproval(UUID.randomUUID());
 
-    assertThatThrownBy(() -> approval.issueLink(HASH, null, null, SALES, NOW))
+    assertThatThrownBy(() -> approval.issueLink(HASH, SALES, NOW))
         .isInstanceOfSatisfying(
             OrderDomainException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo("AWAITING_INTERNAL_APPROVAL"));
 
     approval.internallyApproved(NOW);
-    approval.issueLink(HASH, null, null, SALES, NOW);
+    approval.issueLink(HASH, SALES, NOW);
     assertThat(approval.getStatus()).isEqualTo(CustomerApprovalStatus.SENT);
   }
 
@@ -179,10 +219,15 @@ class CustomerApprovalTest {
     approval.codeIssued("c".repeat(64), NOW);
     approval.verifyCode("c".repeat(64), "e".repeat(64), NOW);
 
-    approval.issueLink("9".repeat(64), "John Smith", "john@example.co.uk", SALES, NOW);
+    String address = approval.getRecipientEmail();
+
+    // The same representative, at the address their authority was granted for: nothing else.
+    approval.issueLink("9".repeat(64), SALES, NOW);
 
     assertThat(approval.getTokenHash()).isEqualTo("9".repeat(64));
-    assertThat(approval.getRecipientEmail()).isEqualTo("john@example.co.uk");
+    assertThat(approval.getRecipientName()).isEqualTo("Jane Smith");
+    assertThat(approval.getRecipientEmail()).isEqualTo(address);
+    assertThat(approval.getApprovalAuthorityId()).isEqualTo(AUTHORITY);
     assertThat(approval.getLinksIssued()).isEqualTo(2);
     assertThat(approval.hasSession("e".repeat(64), NOW)).isFalse();
   }

@@ -82,6 +82,7 @@ class CustomerApprovalDecisionServiceTest {
   @Mock private TransactionTemplate transactions;
   @Mock private EntityManager entityManager;
   @Mock private OrderFlowEventRepository events;
+  @Mock private ApproverAuthorities approvers;
 
   /** What each transaction loaded, newest last. */
   private final List<CustomerApproval> loadedApprovals = new ArrayList<>();
@@ -108,7 +109,8 @@ class CustomerApprovalDecisionServiceTest {
             work,
             transactions,
             entityManager,
-            clock);
+            clock,
+            approvers);
     when(transactions.execute(any()))
         .thenAnswer(
             invocation ->
@@ -192,6 +194,7 @@ class CustomerApprovalDecisionServiceTest {
     CustomerApproval approval =
         CustomerApproval.request(
             version(),
+            UUID.randomUUID(),
             "Jane Smith",
             "jane@example.co.uk",
             NOW.plus(Duration.ofDays(5)),
@@ -199,7 +202,7 @@ class CustomerApprovalDecisionServiceTest {
             UUID.randomUUID(),
             NOW.minusSeconds(3600));
     ReflectionTestUtils.setField(approval, "id", APPROVAL);
-    approval.issueLink("a".repeat(64), null, null, UUID.randomUUID(), NOW.minusSeconds(3600));
+    approval.issueLink("a".repeat(64), UUID.randomUUID(), NOW.minusSeconds(3600));
     return approval;
   }
 
@@ -329,6 +332,74 @@ class CustomerApprovalDecisionServiceTest {
         .isInstanceOfSatisfying(
             OrderDomainException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo("VERSION_STALE"));
+  }
+
+  @Test
+  void onceTheRepresentativesAuthorityIsNoLongerInForceNothingIsDecided() {
+    for (String reason :
+        new String[] {
+          ApproverAuthorities.AUTHORITY_INACTIVE, ApproverAuthorities.APPROVER_EMAIL_CHANGED
+        }) {
+      org.mockito.Mockito.reset(approvers);
+      doThrow(ApproverAuthorities.refusal(reason)).when(approvers).holdValid(any(), any());
+
+      // Even a check that accepts any session cannot decide past the authority.
+      assertThatThrownBy(() -> service.approve(APPROVAL, jane(), ANYONE))
+          .isInstanceOfSatisfying(
+              OrderDomainException.class,
+              exception -> assertThat(exception.getErrorCode()).isEqualTo(reason));
+      assertThatThrownBy(() -> service.requestChanges(APPROVAL, jane(), "Earlier please", ANYONE))
+          .isInstanceOfSatisfying(
+              OrderDomainException.class,
+              exception -> assertThat(exception.getErrorCode()).isEqualTo(reason));
+
+      assertThat(lastApproval().getStatus()).isEqualTo(CustomerApprovalStatus.SENT);
+      assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.AWAITING_CUSTOMER_APPROVAL);
+    }
+    verify(salesOrders, never()).confirmApprovedByCustomer(any());
+  }
+
+  @Test
+  void theAuthorityIsHeldLockedAfterTheOrderAndBeforeTheDecision() {
+    service.approve(APPROVAL, jane(), ANYONE);
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(orders, approvers, salesOrders);
+    order.verify(orders).lockByTenantIdAndId(TENANT, ORDER);
+    order.verify(approvers).holdValid(any(), eq(NOW));
+    order.verify(salesOrders).confirmApprovedByCustomer(any());
+    // The unlocked check is never what a decision relies on.
+    verify(approvers, never()).requireValid(any(), any());
+  }
+
+  @Test
+  void aDecisionFromACustomerAccountIsRefusedUntilPersonAndAuthorityAreMatched() {
+    CustomerApproval.Decider account =
+        new CustomerApproval.Decider(
+            CustomerApprovalChannel.CUSTOMER_ACCOUNT,
+            "Jane Smith",
+            "jane@example.co.uk",
+            UUID.randomUUID(),
+            null,
+            null);
+
+    assertThatThrownBy(() -> service.approve(APPROVAL, account, ANYONE))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(CustomerApprovalDecisionService.ACCOUNT_CHANNEL_NOT_AVAILABLE));
+    assertThatThrownBy(() -> service.requestChanges(APPROVAL, account, "Earlier please", ANYONE))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(CustomerApprovalDecisionService.ACCOUNT_CHANNEL_NOT_AVAILABLE));
+
+    // Refused before anything is read or locked.
+    assertThat(loadedApprovals).isEmpty();
+    verify(orders, never()).lockByTenantIdAndId(any(), any());
+    verify(commitments, never())
+        .recordCustomerApproval(any(), any(), any(), any(), anyInt(), any(), any());
   }
 
   @Test

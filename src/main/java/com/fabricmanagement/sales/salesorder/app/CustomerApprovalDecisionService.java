@@ -29,12 +29,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The customer's decision on a sent version, whichever door the representative came through (the
- * e-mailed link or their customer account). Approving re-checks, in one transaction, that the
- * approved terms can still be met, then confirms the order, holds its accepted pieces, records the
- * agreed date and marks the delivery term agreed. If the terms can no longer be met, the approval
- * is recorded but the order goes back to planning instead of being confirmed. A decision taken
- * twice gives the same result and creates nothing twice.
+ * The customer's decision on a sent version. Today the only door is the e-mailed link verified with
+ * the one-time code sent to the address the authority was granted for. A decision from a customer
+ * account is refused until the signed-in person is matched to the approval authority the request
+ * was sent under (ADR-0014 OD-13; customer portal, step 6). Approving re-checks, in one
+ * transaction, that the approved terms can still be met, then confirms the order, holds its
+ * accepted pieces, records the agreed date and marks the delivery term agreed. If the terms can no
+ * longer be met, the approval is recorded but the order goes back to planning instead of being
+ * confirmed. A decision taken twice gives the same result and creates nothing twice.
  *
  * <p>The caller has set the tenant; this service opens its own transactions.
  */
@@ -54,13 +56,18 @@ public class CustomerApprovalDecisionService {
   private final TransactionTemplate transactions;
   private final EntityManager entityManager;
   private final Clock clock;
+  private final ApproverAuthorities approvers;
+
+  /** A decision from a customer account, refused until person and authority are matched. */
+  public static final String ACCOUNT_CHANNEL_NOT_AVAILABLE = "ACCOUNT_CHANNEL_NOT_AVAILABLE";
 
   /** What the decision left: the request's state and its order. */
   public record Outcome(UUID approvalId, UUID orderId, CustomerApprovalStatus status) {}
 
   /**
-   * Checks that the decider may decide on this request (a verified link session, or the authority
-   * of an account); it throws when not.
+   * Checks that the decider may decide on this request (a verified link session); it throws when
+   * not. Before it, the representative's approval authority the request was sent under must still
+   * be in force, checked under that authority's row lock (ADR-0014 D4, OD-13).
    */
   @FunctionalInterface
   public interface Authority {
@@ -69,6 +76,7 @@ public class CustomerApprovalDecisionService {
 
   /** The customer approves the version. */
   public Outcome approve(UUID approvalId, CustomerApproval.Decider decider, Authority authority) {
+    requireLinkChannel(decider);
     try {
       return transactions.execute(status -> approveWithin(approvalId, decider, authority));
     } catch (NotFulfillable failure) {
@@ -81,6 +89,7 @@ public class CustomerApprovalDecisionService {
   /** The customer asks for changes with a note; the order goes back to sales. */
   public Outcome requestChanges(
       UUID approvalId, CustomerApproval.Decider decider, String note, Authority authority) {
+    requireLinkChannel(decider);
     return transactions.execute(
         status -> {
           Instant now = clock.instant();
@@ -96,6 +105,7 @@ public class CustomerApprovalDecisionService {
           SalesOrder order = decision.order();
           // A closed or expired request says so; only an open one asks for the session.
           approval.requireOpen(now);
+          approvers.holdValid(approval, now);
           authority.check(approval, now);
           requireAwaiting(order);
           approval.changesRequested(decider, note, now);
@@ -133,6 +143,7 @@ public class CustomerApprovalDecisionService {
     }
     SalesOrder order = decision.order();
     approval.requireOpen(now);
+    approvers.holdValid(approval, now);
     authority.check(approval, now);
     requireAwaiting(order);
     OrderVersion version = versionOf(approval);
@@ -183,6 +194,7 @@ public class CustomerApprovalDecisionService {
       return outcome(approval);
     }
     approval.requireOpen(now);
+    approvers.holdValid(approval, now);
     authority.check(approval, now);
     requireAwaiting(decision.order());
     return notFulfillable(approval, decision.order(), decider, detail, now);
@@ -229,6 +241,20 @@ public class CustomerApprovalDecisionService {
     // Another decision may have committed while this one waited for the lock.
     entityManager.refresh(approval);
     return new Decision(approval, order);
+  }
+
+  /**
+   * Only the e-mailed link decides for now. A customer account would let whoever is signed in for
+   * the customer decide under the request's authority, without proving to be its representative;
+   * that waits until the portal matches the person to the authority (ADR-0014 OD-13).
+   */
+  private static void requireLinkChannel(CustomerApproval.Decider decider) {
+    if (decider == null || decider.channel() != CustomerApprovalChannel.EMAIL_LINK) {
+      throw OrderDomainException.stage(
+          ACCOUNT_CHANNEL_NOT_AVAILABLE,
+          "Decisions from a customer account are not accepted yet; the representative decides"
+              + " through the e-mailed link");
+    }
   }
 
   private static void requireAwaiting(SalesOrder order) {

@@ -213,6 +213,11 @@ DomainException (abstract, common/infrastructure)
 
 ## 7. Database & Flyway
 
+- **Şema değişiklik dönemi (ADR-0014 D14, Fatih 2026-10-02)** → **İlk canlı tenant'a kadar** sıfırlanabilir
+  geliştirme veritabanlarında mevcut migration dosyaları yeniden düzenlenebilir (yeni delta açmak yerine ilgili
+  `V…` dosyası güncellenir; geliştirici DB'yi sıfırlayıp yeniden kurar; eski geliştirme verisi için backfill
+  yazılmaz). **Bitiş koşulu:** ilk canlı tenant'ın verisi oluştuğu an. O andan itibaren yalnız yeni delta migration
+  eklenir; mevcut `V…` dosyaları değiştirilmez. Dönemin bittiği tarih bu satıra yazılır.
 - **Migration naming** → Delta: `V{yyyyMMddHHmmss}__{aciklama}.sql`; Repeatable: `R__{sira}__{aciklama}.sql`
 - **Konsolide migration** → `db/migration/consolidated/` referans arşividir, Flyway tarafından çalıştırılmaz. Production'da çalışan migration'lar `db/migration/` kökündedir
 - **Rollback** → Kritik migration'lar için `db/rollback/V{version}_ROLLBACK__{aciklama}.sql`

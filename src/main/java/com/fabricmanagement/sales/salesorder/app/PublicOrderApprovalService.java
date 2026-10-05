@@ -45,6 +45,7 @@ public class PublicOrderApprovalService {
   private final CustomerApprovalDecisionService decisions;
   private final CustomerApprovalMailer mailer;
   private final Clock clock;
+  private final ApproverAuthorities approvers;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public PublicOrderApprovalDtos.LinkView view(String token) {
@@ -64,6 +65,9 @@ public class PublicOrderApprovalService {
                 status -> {
                   Instant now = clock.instant();
                   CustomerApproval approval = approvalOf(hash);
+                  // No code once the representative's authority is no longer in force; the
+                  // authority is held while the code goes out, like every other send.
+                  approvers.holdValid(approval, now);
                   String code = String.format("%06d", RANDOM.nextInt(1_000_000));
                   approval.codeIssued(codeHash(approval, code), now);
                   approvals.save(approval);
@@ -93,6 +97,10 @@ public class PublicOrderApprovalService {
                     status -> {
                       Instant now = clock.instant();
                       CustomerApproval approval = approvalOf(hash);
+                      // A code received earlier — even one still queued when the authority
+                      // ended — opens nothing. Checked under the authority's lock: a right code
+                      // answers with the content, so it never races an ending.
+                      approvers.holdValid(approval, now);
                       String session = CustomerApprovalService.randomHex();
                       boolean right =
                           approval.verifyCode(
@@ -131,6 +139,8 @@ public class PublicOrderApprovalService {
                   if (!approval.hasSession(OrderVersionSnapshotter.sha256(session), now)) {
                     throw sessionRequired();
                   }
+                  // The content is shown only under the authority's lock, never while it ends.
+                  approvers.holdValid(approval, now);
                   return versionView(approval, now);
                 }));
   }
@@ -225,25 +235,36 @@ public class PublicOrderApprovalService {
   private PublicOrderApprovalDtos.VersionView versionView(CustomerApproval approval, Instant now) {
     OrderVersion version = versionOf(approval);
     return new PublicOrderApprovalDtos.VersionView(
-        version.getVersionNo(), version.getContent(), linkView(approval, version, now));
+        version.getVersionNo(),
+        version.getContent(),
+        linkView(approval, version, now, approvers.isValid(approval, now)));
   }
 
   private PublicOrderApprovalDtos.LinkView linkView(CustomerApproval approval, Instant now) {
-    return linkView(approval, versionOf(approval), now);
+    return linkView(approval, versionOf(approval), now, approvers.isValid(approval, now));
   }
 
+  /**
+   * An open link whose representative's authority has ended is shown closed: it can no longer be
+   * used. A decision already taken is shown as taken.
+   */
   private static PublicOrderApprovalDtos.LinkView linkView(
-      CustomerApproval approval, OrderVersion version, Instant now) {
+      CustomerApproval approval, OrderVersion version, Instant now, boolean authorityValid) {
     OrderVersionContent content = version.getContent();
+    PublicOrderApprovalDtos.LinkState state = stateOf(approval, now);
+    boolean usable = approval.isOpenAt(now) && authorityValid;
+    if (state == PublicOrderApprovalDtos.LinkState.OPEN && !authorityValid) {
+      state = PublicOrderApprovalDtos.LinkState.CLOSED;
+    }
     return new PublicOrderApprovalDtos.LinkView(
-        stateOf(approval, now),
+        state,
         content.sellerName(),
         content.orderNumber(),
         content.customerName(),
         mask(approval.getRecipientEmail()),
         approval.getLinkExpiresAt(),
         approval.getCodeSentAt(),
-        approval.isOpenAt(now) ? approval.nextCodeAllowedAt() : null,
+        usable ? approval.nextCodeAllowedAt() : null,
         approval.getDecidedAt());
   }
 

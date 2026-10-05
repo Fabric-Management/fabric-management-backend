@@ -8,17 +8,23 @@ import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
+import org.slf4j.MDC;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -31,6 +37,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RequiredArgsConstructor
 @Slf4j
 public class GlobalExceptionHandler {
+
+  /** MDC key under which Micrometer Tracing publishes the current trace id (see logback-spring). */
+  static final String TRACE_ID_MDC_KEY = "traceId";
+
+  /** Seconds a client should wait before retrying after a temporary infrastructure failure. */
+  static final String SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS = "30";
 
   private final org.springframework.beans.factory.ObjectProvider<MeterRegistry>
       meterRegistryProvider;
@@ -296,15 +308,59 @@ public class GlobalExceptionHandler {
     return response.body(problemDetail);
   }
 
+  /**
+   * Infrastructure that is temporarily out of reach (no database connection, no transaction, query
+   * timeout) is reported as 503 so the client can say "try again shortly". A broken schema or a
+   * code defect (for example {@code BadSqlGrammarException}) is not temporary and stays a 500.
+   */
+  @ExceptionHandler({
+    DataAccessResourceFailureException.class,
+    CannotCreateTransactionException.class,
+    QueryTimeoutException.class
+  })
+  public ResponseEntity<ApiProblemDetail> handleServiceUnavailable(
+      Exception ex, HttpServletRequest req) {
+    String traceId = currentTraceId();
+    log.error("Service temporarily unavailable: {} [traceId={}]", req.getRequestURI(), traceId, ex);
+    ApiProblemDetail problemDetail =
+        buildProblemDetail(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Service Unavailable",
+            "SERVICE_TEMPORARILY_UNAVAILABLE",
+            "The service is temporarily unavailable. Please try again shortly.",
+            req.getRequestURI());
+    problemDetail.setTraceId(traceId);
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .header(HttpHeaders.RETRY_AFTER, SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS)
+        .body(problemDetail);
+  }
+
   @ExceptionHandler(Exception.class)
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public ApiProblemDetail handleGeneric(Exception ex, HttpServletRequest req) {
-    log.error("Unexpected error occurred: {}", req.getRequestURI(), ex);
-    return buildProblemDetail(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        "Internal Server Error",
-        "UNEXPECTED_ERROR",
-        "An unexpected error occurred. Please contact support.",
-        req.getRequestURI());
+    String traceId = currentTraceId();
+    log.error("Unexpected error occurred: {} [traceId={}]", req.getRequestURI(), traceId, ex);
+    ApiProblemDetail problemDetail =
+        buildProblemDetail(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Internal Server Error",
+            "UNEXPECTED_ERROR",
+            "An unexpected error occurred. Please contact support.",
+            req.getRequestURI());
+    problemDetail.setTraceId(traceId);
+    return problemDetail;
+  }
+
+  /**
+   * Returns the trace id the log lines of this request carry, so the value shown to the user finds
+   * the stack trace. Without an active trace a random id is returned; it is still written into the
+   * error log line by the caller, so the reference stays searchable.
+   */
+  static String currentTraceId() {
+    String traceId = MDC.get(TRACE_ID_MDC_KEY);
+    if (traceId != null && !traceId.isBlank()) {
+      return traceId;
+    }
+    return UUID.randomUUID().toString().replace("-", "");
   }
 }

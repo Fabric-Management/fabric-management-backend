@@ -2,17 +2,23 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.platform.organization.dto.EditOrganizationContactRequest;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
@@ -23,10 +29,15 @@ import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPart
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.Role;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.domain.ApprovalAuthorityBasis;
+import com.fabricmanagement.sales.salesorder.domain.CustomerApproval;
+import com.fabricmanagement.sales.salesorder.domain.CustomerApprovalChannel;
+import com.fabricmanagement.sales.salesorder.domain.CustomerApprovalStatus;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryProposal;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
@@ -36,6 +47,9 @@ import com.fabricmanagement.sales.salesorder.domain.OrderVersionContent;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.CustomerApprovalDtos;
+import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.ApprovalAuthorityView;
+import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.GrantApprovalAuthorityRequest;
+import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RevokeApprovalAuthorityRequest;
 import com.fabricmanagement.sales.salesorder.dto.PublicOrderApprovalDtos;
 import com.fabricmanagement.sales.salesorder.infra.repository.DeliveryProposalRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
@@ -47,6 +61,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +74,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -69,6 +91,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * customer opens the link with no tenant context, verifies the e-mailed code and approves. The
  * order is confirmed once, with the agreed date and term; a change request sends it back to sales;
  * a withdrawn link decides nothing.
+ *
+ * <p>The approval authority in force (ADR-0014 OD-13): a revoked or expired authority, or one whose
+ * contact point was edited to another address, decides nothing; a revocation and a decision that
+ * overlap are put one after the other by the authority's row lock.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -116,12 +142,23 @@ class CustomerApprovalFlowIT {
   @Autowired private TransactionTemplate transactions;
   @Autowired private JdbcTemplate jdbc;
 
+  @Autowired
+  private com.fabricmanagement.platform.organization.api.facade.OrganizationContactFacade
+      organizationContacts;
+
+  @Autowired private ApprovalAuthorityService authorityService;
+  @Autowired private CustomerApprovalDecisionService decisions;
+
   @MockitoBean private PermissionEvaluator permissionEvaluator;
   @MockitoBean private CustomerApprovalMailer mailer;
 
   private UUID tenantId;
   private UUID sales;
   private UUID orderId;
+  private UUID partnerId;
+  private UUID customerOrganizationId;
+  private UUID janesAddress;
+  private UUID authorityId;
 
   @BeforeEach
   void setUp() {
@@ -149,20 +186,43 @@ class CustomerApprovalFlowIT {
     TradingPartnerRegistry registry =
         TradingPartnerRegistry.create(null, "Northern Garments " + suffix, "GBR");
     registry.setUid("REG-" + UUID.randomUUID());
-    UUID partnerId =
-        partners
-            .saveAndFlush(
-                TradingPartner.create(
-                    registries.save(registry), PartnerType.CUSTOMER, "Northern Garments"))
-            .getId();
+    // The customer's organisation with Jane's e-mail address on its card.
+    Organization customerOrganization =
+        organizations.save(
+            Organization.create(
+                "Northern Garments " + suffix,
+                "TAXC-" + suffix,
+                OrganizationType.EXTERNAL_PARTNER));
+    TradingPartner customer =
+        TradingPartner.create(registries.save(registry), PartnerType.CUSTOMER, "Northern Garments");
+    customerOrganizationId = customerOrganization.getId();
+    customer.setOrganizationId(customerOrganizationId);
+    partnerId = partners.saveAndFlush(customer).getId();
+    janesAddress =
+        organizationContacts
+            .createAndAssignContact(
+                customerOrganization.getId(),
+                com.fabricmanagement.platform.communication.dto.CreateContactRequest.builder()
+                    .contactValue("jane@northern-garments.co.uk")
+                    .contactType(ContactType.EMAIL)
+                    .label("Jane Smith")
+                    .isPersonal(false)
+                    .build(),
+                true,
+                "Buying")
+            .getContactId();
+    // Jane may approve orders for the customer (ADR-0014 D4).
+    authorityId = grantJane();
     SalesOrder order =
         SalesOrder.builder()
             .tradingPartnerId(partnerId)
             .orderNumber("SO-" + suffix)
             .status(OrderStatus.DRAFT)
             .orderDate(LocalDate.now())
-            .contactName("Jane Smith")
-            .contactEmail("jane@northern-garments.co.uk")
+            // The order's day-to-day contact is not the approver: the request goes to Jane.
+            .contactName("Order desk")
+            .contactEmail("orders@northern-garments.co.uk")
+            .approverContactId(janesAddress)
             .build();
     order.applyDeliveryTerms(
         DeliveryTerms.of(DeliveryTerm.FCA, "Felixstowe", IncotermsVersion.INCOTERMS_2020));
@@ -313,6 +373,497 @@ class CustomerApprovalFlowIT {
             jdbc.queryForObject(
                 "SELECT status FROM sales_ord.sales_order WHERE id = ?", String.class, orderId))
         .isEqualTo("DRAFT");
+  }
+
+  @Test
+  void aRevokedAuthorityStopsTheLinkTheCodeAndTheSessionAlreadyGiven() {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    revokeJane();
+
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertRefused(() -> publicApprovals.approve(token, session, null, null));
+    assertRefused(
+        () -> publicApprovals.requestChanges(token, session, "Earlier please", null, null));
+    assertRefused(() -> publicApprovals.version(token, session));
+    assertRefused(() -> publicApprovals.sendCode(token));
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, flow_stage FROM sales_ord.sales_order WHERE id = ?", orderId))
+        .containsEntry("status", "DRAFT")
+        .containsEntry("flow_stage", "AWAITING_CUSTOMER_APPROVAL");
+  }
+
+  @Test
+  void aNewGrantToTheSamePersonDoesNotReviveTheEarlierLink() {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    revokeJane();
+    UUID renewed = grantJane();
+
+    assertThat(renewed).isNotEqualTo(authorityId);
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertRefused(() -> publicApprovals.approve(token, session, null, null));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT approval_authority_id FROM sales_ord.customer_approval"
+                    + " WHERE sales_order_id = ?",
+                UUID.class,
+                orderId))
+        .isEqualTo(authorityId);
+  }
+
+  @Test
+  void anAuthorityPastItsLastDayDecidesNothing() {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    jdbc.update(
+        "UPDATE sales_ord.customer_approval_authority SET valid_from = ?, valid_until = ?"
+            + " WHERE id = ?",
+        java.sql.Date.valueOf(LocalDate.now().minusDays(30)),
+        java.sql.Date.valueOf(LocalDate.now().minusDays(1)),
+        authorityId);
+
+    assertRefused(() -> publicApprovals.approve(token, session, null, null));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM sales_ord.customer_approval WHERE sales_order_id = ?",
+                String.class,
+                orderId))
+        .isEqualTo("SENT");
+  }
+
+  @Test
+  void anAddressEditedOnTheCardReachesNobodyUntilTheAuthorityIsGrantedAgainThere() {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+
+    editJanesAddress("jane.smith@elsewhere.example");
+
+    // Jane's authority was granted for her earlier mailbox: the edit ended it, in the same commit.
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT revoked_at IS NOT NULL AS ended, revocation_cause"
+                    + " FROM sales_ord.customer_approval_authority WHERE id = ?",
+                authorityId))
+        .containsEntry("ended", true)
+        .containsEntry("revocation_cause", "CONTACT_ADDRESS_CHANGED");
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertRefused(
+        () -> publicApprovals.sendCode(token), ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> publicApprovals.approve(token, session, null, null),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> asSales(() -> customerApprovals.resend(orderId, sales)),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    CustomerApprovalDtos.State state = asSales(() -> customerApprovals.state(orderId, sales));
+    assertThat(state.approverEmail()).isNull();
+    assertThat(state.actions())
+        .filteredOn(action -> action.action() == CustomerApprovalDtos.Action.RESEND_LINK)
+        .singleElement()
+        .satisfies(
+            action ->
+                assertThat(action.reason()).isEqualTo(ApproverAuthorities.APPROVER_EMAIL_CHANGED));
+    verify(mailer, never())
+        .sendApprovalRequest(any(), eq("jane.smith@elsewhere.example"), any(), any(), any(), any());
+    verify(mailer, never())
+        .sendCode(any(), eq("jane.smith@elsewhere.example"), any(), any(), any());
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, recipient_email FROM sales_ord.customer_approval"
+                    + " WHERE sales_order_id = ?",
+                orderId))
+        .containsEntry("status", "SENT")
+        .containsEntry("recipient_email", "jane@northern-garments.co.uk");
+
+    // A new grant needs the address confirmed as it reads now; the earlier one is refused.
+    assertRefused(
+        () -> grantJane("jane@northern-garments.co.uk"),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    // An authorised user confirms the new address is Jane's: the authority is granted again there.
+    UUID renewed = grantJane("jane.smith@elsewhere.example");
+    java.util.List<ApprovalAuthorityView> recorded =
+        asSales(() -> authorityService.list(partnerId));
+    assertThat(recorded)
+        .filteredOn(view -> view.id().equals(renewed))
+        .singleElement()
+        .satisfies(
+            view -> {
+              assertThat(view.authorisedEmail()).isEqualTo("jane.smith@elsewhere.example");
+              assertThat(view.contactAddressChanged()).isFalse();
+              assertThat(view.active()).isTrue();
+            });
+    assertThat(recorded)
+        .filteredOn(view -> view.id().equals(authorityId))
+        .singleElement()
+        .satisfies(
+            view -> {
+              assertThat(view.authorisedEmail()).isEqualTo("jane@northern-garments.co.uk");
+              assertThat(view.contactAddressChanged()).isTrue();
+              assertThat(view.revokedAt()).isNotNull();
+              assertThat(view.revocationCause())
+                  .isEqualTo(
+                      com.fabricmanagement.sales.salesorder.domain.ApprovalAuthorityEnd
+                          .CONTACT_ADDRESS_CHANGED);
+            });
+    // The earlier request stays bound to the earlier authority and stays closed.
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+  }
+
+  @Test
+  void anAddressChangedAndChangedBackKeepsTheEarlierAuthorityLinkCodeAndSessionClosed() {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    // Another code is on its way to Jane (queued) when her card changes.
+    jdbc.update(
+        "UPDATE sales_ord.customer_approval SET code_sent_at = code_sent_at - interval '1 hour'"
+            + " WHERE sales_order_id = ?",
+        orderId);
+    publicApprovals.sendCode(token);
+    ArgumentCaptor<String> codes = ArgumentCaptor.forClass(String.class);
+    verify(mailer, times(2))
+        .sendCode(eq(tenantId), eq("jane@northern-garments.co.uk"), any(), any(), codes.capture());
+    String queuedCode = codes.getValue();
+
+    // A → B → A
+    editJanesAddress("jane.smith@elsewhere.example");
+    editJanesAddress("jane@northern-garments.co.uk");
+
+    // The card reads Jane's authorised address again; her authority ended with the first change.
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT revoked_at IS NOT NULL AS ended, revocation_cause"
+                    + " FROM sales_ord.customer_approval_authority WHERE id = ?",
+                authorityId))
+        .containsEntry("ended", true)
+        .containsEntry("revocation_cause", "CONTACT_ADDRESS_CHANGED");
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    // The code that was on its way opens nothing; the session already given shows nothing.
+    assertRefused(
+        () -> publicApprovals.verify(token, queuedCode),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> publicApprovals.version(token, session), ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> publicApprovals.approve(token, session, null, null),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> publicApprovals.requestChanges(token, session, "Earlier please", null, null),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> publicApprovals.sendCode(token), ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertRefused(
+        () -> asSales(() -> customerApprovals.resend(orderId, sales)),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertThat(asSales(() -> customerApprovals.state(orderId, sales)).approverEmail()).isNull();
+
+    // Only a new grant brings an authority back, and it never reopens the earlier request.
+    UUID renewed = grantJane();
+    assertThat(renewed).isNotEqualTo(authorityId);
+    assertThat(publicApprovals.view(token).state())
+        .isEqualTo(PublicOrderApprovalDtos.LinkState.CLOSED);
+    assertRefused(
+        () -> publicApprovals.approve(token, session, null, null),
+        ApproverAuthorities.APPROVER_EMAIL_CHANGED);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, approval_authority_id FROM sales_ord.customer_approval"
+                    + " WHERE sales_order_id = ?",
+                orderId))
+        .containsEntry("status", "SENT")
+        .containsEntry("approval_authority_id", authorityId);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, flow_stage FROM sales_ord.sales_order WHERE id = ?", orderId))
+        .containsEntry("status", "DRAFT")
+        .containsEntry("flow_stage", "AWAITING_CUSTOMER_APPROVAL");
+  }
+
+  @Test
+  void aRevocationInProgressMakesTheDecisionWaitAndThenRefusesIt() throws Exception {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    CountDownLatch revocationHoldsTheLock = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      // The revocation locks Jane's authority and keeps its transaction open...
+      CompletableFuture<Object> revocation =
+          CompletableFuture.supplyAsync(
+              () ->
+                  attempt(
+                      () ->
+                          asSales(
+                              () ->
+                                  transactions.execute(
+                                      status -> {
+                                        Object view = revoke(authorityId);
+                                        revocationHoldsTheLock.countDown();
+                                        await(release);
+                                        return view;
+                                      }))),
+              pool);
+      assertThat(revocationHoldsTheLock.await(20, TimeUnit.SECONDS)).isTrue();
+      // ...while Jane approves: her decision waits for the authority instead of reading the state
+      // before the revocation.
+      CompletableFuture<Object> decision =
+          CompletableFuture.supplyAsync(
+              () -> attempt(() -> publicApprovals.approve(token, session, null, null)), pool);
+      awaitAWaitingTransaction();
+      assertThat(decision).isNotDone();
+
+      release.countDown();
+
+      assertThat(revocation.get(20, TimeUnit.SECONDS)).isInstanceOf(ApprovalAuthorityView.class);
+      assertThat(decision.get(20, TimeUnit.SECONDS))
+          .isInstanceOfSatisfying(
+              OrderDomainException.class,
+              exception ->
+                  assertThat(exception.getErrorCode())
+                      .isEqualTo(ApproverAuthorities.AUTHORITY_INACTIVE));
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM sales_ord.customer_approval WHERE sales_order_id = ?",
+                String.class,
+                orderId))
+        .isEqualTo("SENT");
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, flow_stage FROM sales_ord.sales_order WHERE id = ?", orderId))
+        .containsEntry("status", "DRAFT")
+        .containsEntry("flow_stage", "AWAITING_CUSTOMER_APPROVAL");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sales_ord.delivery_commitment WHERE sales_order_id = ?",
+                Integer.class,
+                orderId))
+        .isZero();
+  }
+
+  @Test
+  void aDecisionInProgressFinishesBeforeTheRevocation() throws Exception {
+    String token = send();
+    String session = publicApprovals.verify(token, code(token)).session();
+    UUID approval = approvalId();
+    String presented = OrderVersionSnapshotter.sha256(session);
+    CustomerApproval.Decider jane =
+        new CustomerApproval.Decider(
+            CustomerApprovalChannel.EMAIL_LINK,
+            "Jane Smith",
+            "jane@northern-garments.co.uk",
+            null,
+            null,
+            null);
+    CountDownLatch decisionHoldsTheLock = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      // Jane's approval checks her authority under its lock and keeps its transaction open...
+      CompletableFuture<Object> decision =
+          CompletableFuture.supplyAsync(
+              () ->
+                  attempt(
+                      () ->
+                          asCustomer(
+                              () ->
+                                  transactions.execute(
+                                      status -> {
+                                        Object outcome =
+                                            decisions.approve(
+                                                approval,
+                                                jane,
+                                                (value, now) -> {
+                                                  if (!value.hasSession(presented, now)) {
+                                                    throw new IllegalStateException("No session");
+                                                  }
+                                                });
+                                        decisionHoldsTheLock.countDown();
+                                        await(release);
+                                        return outcome;
+                                      }))),
+              pool);
+      assertThat(decisionHoldsTheLock.await(20, TimeUnit.SECONDS)).isTrue();
+      // ...so the revocation waits until her decision is recorded.
+      CompletableFuture<Object> revocation =
+          CompletableFuture.supplyAsync(() -> attempt(() -> revoke(authorityId)), pool);
+      awaitAWaitingTransaction();
+      assertThat(revocation).isNotDone();
+
+      release.countDown();
+
+      assertThat(decision.get(20, TimeUnit.SECONDS))
+          .isInstanceOfSatisfying(
+              CustomerApprovalDecisionService.Outcome.class,
+              outcome -> assertThat(outcome.status()).isEqualTo(CustomerApprovalStatus.APPROVED));
+      assertThat(revocation.get(20, TimeUnit.SECONDS))
+          .isInstanceOfSatisfying(
+              ApprovalAuthorityView.class, view -> assertThat(view.revokedAt()).isNotNull());
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+    // The decision came first and stands; the revocation applies from then on.
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, flow_stage FROM sales_ord.sales_order WHERE id = ?", orderId))
+        .containsEntry("status", "CONFIRMED")
+        .containsEntry("flow_stage", "CUSTOMER_APPROVED");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT revoked_at IS NOT NULL FROM sales_ord.customer_approval_authority"
+                    + " WHERE id = ?",
+                Boolean.class,
+                authorityId))
+        .isTrue();
+  }
+
+  /** An authorised user grants Jane the authority at the address her contact point reads now. */
+  private UUID grantJane() {
+    return grantJane("jane@northern-garments.co.uk");
+  }
+
+  /** An authorised user grants Jane the authority, confirming {@code address} as hers. */
+  private UUID grantJane(String address) {
+    return asSales(
+        () ->
+            authorityService
+                .grant(
+                    partnerId,
+                    new GrantApprovalAuthorityRequest(
+                        "Jane Smith",
+                        janesAddress,
+                        address,
+                        ApprovalAuthorityBasis.WRITTEN_MANDATE,
+                        "Mandate letter from the managing director",
+                        LocalDate.now().minusDays(1),
+                        null),
+                    sales)
+                .id());
+  }
+
+  private void revokeJane() {
+    revoke(authorityId);
+  }
+
+  private ApprovalAuthorityView revoke(UUID authority) {
+    return asSales(
+        () ->
+            authorityService.revoke(
+                partnerId,
+                authority,
+                new RevokeApprovalAuthorityRequest("Jane left the company"),
+                sales));
+  }
+
+  /** Someone edits Jane's contact point on the customer's card. */
+  private void editJanesAddress(String address) {
+    asSales(
+        () ->
+            organizationContacts.editOrganizationContact(
+                customerOrganizationId,
+                janesAddress,
+                EditOrganizationContactRequest.builder()
+                    .contactValue(address)
+                    .contactType(ContactType.EMAIL)
+                    .build()));
+  }
+
+  /** Runs {@code step} in the tenant as the seller. */
+  private <T> T asSales(java.util.function.Supplier<T> step) {
+    boolean outside = TenantContext.getCurrentTenantIdOrNull() == null;
+    Authentication previousAuthentication = SecurityContextHolder.getContext().getAuthentication();
+    if (outside) {
+      TenantContext.setCurrentTenantId(tenantId);
+      TenantContext.setCurrentUserId(sales);
+    }
+    AuthenticatedUserContext principal =
+        new AuthenticatedUserContext(sales, "WORKER", java.util.List.of(), null, tenantId);
+    UsernamePasswordAuthenticationToken authentication =
+        UsernamePasswordAuthenticationToken.authenticated(principal, "n/a", java.util.List.of());
+    authentication.setDetails(principal);
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+    try {
+      return step.get();
+    } finally {
+      SecurityContextHolder.getContext().setAuthentication(previousAuthentication);
+      if (outside) {
+        TenantContext.clear();
+      }
+    }
+  }
+
+  /** Runs {@code step} in the tenant as the system, the way the customer's link does. */
+  private Object asCustomer(java.util.function.Supplier<Object> step) {
+    TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(SystemUser.ID);
+    try {
+      return step.get();
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
+  /** A failure is returned rather than thrown, so another thread can inspect it. */
+  private static Object attempt(java.util.function.Supplier<Object> step) {
+    try {
+      return step.get();
+    } catch (RuntimeException failure) {
+      return failure;
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      if (!latch.await(20, TimeUnit.SECONDS)) {
+        throw new IllegalStateException("Timed out waiting for the other transaction");
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
+  }
+
+  /** Waits until some transaction waits for a row lock another transaction holds. */
+  private void awaitAWaitingTransaction() throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      Integer waiting =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted",
+              Integer.class);
+      if (waiting != null && waiting > 0) {
+        return;
+      }
+      Thread.sleep(50);
+    }
+    fail("No transaction waited for the approval authority's lock");
+  }
+
+  private UUID approvalId() {
+    return jdbc.queryForObject(
+        "SELECT id FROM sales_ord.customer_approval WHERE sales_order_id = ?", UUID.class, orderId);
+  }
+
+  private static void assertRefused(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+    assertRefused(call, ApproverAuthorities.AUTHORITY_INACTIVE);
+  }
+
+  private static void assertRefused(
+      org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String code) {
+    assertThatThrownBy(call)
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(code));
   }
 
   /** Sales sends the planned order; returns the link the customer received. */

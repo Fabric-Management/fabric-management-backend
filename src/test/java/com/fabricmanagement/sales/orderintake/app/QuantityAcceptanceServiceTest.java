@@ -65,7 +65,13 @@ class QuantityAcceptanceServiceTest {
   @Mock private QuantityAcceptanceRepository acceptances;
   @Mock private QuantityEvaluationService evaluation;
   @Mock private SalesOrderLineRepository lines;
-  @org.mockito.Spy private LineAdjustmentGuard adjustments = new LineAdjustmentGuard();
+
+  @org.mockito.Spy
+  private LineAdjustmentGuard adjustments =
+      new LineAdjustmentGuard(
+          org.mockito.Mockito.mock(
+              com.fabricmanagement.sales.salesorder.app.LineAllocationPolicy.class));
+
   @Mock private com.fabricmanagement.sales.salesorder.app.SalesOrderRevision revision;
   @Mock private LotCompatibilityRequestPort compatibilityRequests;
 

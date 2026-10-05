@@ -29,6 +29,13 @@ public class CreateSalesOrderRequest {
   @NotNull(message = "Partner ID is required")
   private UUID partnerId;
 
+  @Schema(
+      description =
+          "Client-generated key of this create request. Repeating the request with the same key"
+              + " (for example a retried autosave) returns the order it created instead of a"
+              + " second one.")
+  private UUID idempotencyKey;
+
   /** Customer's purchase order reference. */
   private String customerReference;
 

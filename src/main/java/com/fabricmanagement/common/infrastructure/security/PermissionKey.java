@@ -100,6 +100,12 @@ public enum PermissionKey {
   SALES_ASSIGN_OWNER("sales:assign-owner", EnforcedBy.ANNOTATION, ""),
   SALES_CANCEL("sales:cancel", EnforcedBy.ANNOTATION, ""),
   SALES_DELETE("sales:delete", EnforcedBy.ANNOTATION, ""),
+  SALES_GRANT_APPROVAL_AUTHORITY(
+      "sales:grant-approval-authority",
+      EnforcedBy.ANNOTATION,
+      Distribution.EXPLICIT_AUTHORISATION_ONLY,
+      "Grant or revoke a customer contact's authority to approve orders (ADR-0014 OD-3c)."
+          + " Explicit tenant authorisation only, for sales managers."),
   SALES_READ("sales:read", EnforcedBy.ANNOTATION, ""),
   SALES_SHIP("sales:ship", EnforcedBy.ANNOTATION, ""),
   SALES_WRITE("sales:write", EnforcedBy.ANNOTATION, ""),

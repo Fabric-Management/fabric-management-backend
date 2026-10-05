@@ -1592,6 +1592,46 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
     contact_email VARCHAR(254),
     contact_phone VARCHAR(30),
     contact_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
+    -- ADR-0014 D10: client key of the create request; repeating the create returns this order.
+    creation_key UUID,
+    -- Fingerprint of that create request: the same key with other content is a conflict.
+    creation_request_hash VARCHAR(64),
+    -- ADR-0014 D7: whether the customer asked for a date ("not requested" is a value) and the event
+    -- the customer meant; never converted by the delivery term. Default of every delivery.
+    requested_date_status VARCHAR(20)
+        CHECK (requested_date_status IN ('REQUESTED', 'NOT_REQUESTED')),
+    -- Where the customer said the requested event happens; apart from the term's named place.
+    requested_delivery_place VARCHAR(200),
+    requested_delivery_event VARCHAR(40)
+        CHECK (requested_delivery_event IN ('AVAILABLE_FOR_COLLECTION', 'HANDED_TO_CARRIER', 'ALONGSIDE_VESSEL', 'ON_BOARD_VESSEL',
+                                            'READY_FOR_UNLOADING_AT_DESTINATION', 'UNLOADED_AT_DESTINATION',
+                                            'RECEIVED_BY_CONSIGNEE', 'UNSPECIFIED')),
+    -- ADR-0014 D4: who is invoiced — the customer, another partner or an unregistered party. Another
+    -- legal entity records its relationship to the customer and the reason (finance accepts it).
+    bill_to_mode VARCHAR(20) CHECK (bill_to_mode IN ('CUSTOMER', 'PARTNER', 'SNAPSHOT')),
+    bill_to_partner_id UUID,
+    bill_to_name VARCHAR(200),
+    bill_to_contact_name VARCHAR(120),
+    bill_to_email VARCHAR(254),
+    bill_to_phone VARCHAR(30),
+    bill_to_address_line1 VARCHAR(200),
+    bill_to_address_line2 VARCHAR(200),
+    bill_to_city VARCHAR(100),
+    bill_to_region VARCHAR(100),
+    bill_to_postal_code VARCHAR(20),
+    bill_to_country_code VARCHAR(2),
+    bill_to_address_source_id UUID,
+    bill_to_relationship VARCHAR(30)
+        CHECK (bill_to_relationship IN ('GROUP_COMPANY', 'PARENT_COMPANY', 'AGENT',
+                                        'FINANCING_PARTY', 'OTHER')),
+    bill_to_reason VARCHAR(500),
+    -- ADR-0014 D9 (OD-8): all production quantities released together when the customer requires it.
+    release_together BOOLEAN NOT NULL DEFAULT FALSE,
+    -- ADR-0014 D4 (OD-3c): the customer contact who approves; must hold an approval authority
+    -- (sales_ord.customer_approval_authority), checked when designated and again at command time.
+    approver_contact_id UUID,
+    -- Deprecated by ADR-0014 D4/D8 (bill-to and per-delivery consignee/address/transport); kept
+    -- readable for the current order form until the new-order workspace replaces it (SOI v2 step 4).
     shipping_address VARCHAR(500),
     billing_address VARCHAR(500),
     shipping_method VARCHAR(50),
@@ -1620,9 +1660,43 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
         OR (delivery_term IS NOT NULL AND length(trim(delivery_place)) > 0
             AND incoterms_version IS NOT NULL AND delivery_term_status IS NOT NULL
             AND NOT (delivery_term = 'DAT' AND incoterms_version <> 'INCOTERMS_2010')
-            AND NOT (delivery_term = 'DPU' AND incoterms_version <> 'INCOTERMS_2020')))
+            AND NOT (delivery_term = 'DPU' AND incoterms_version <> 'INCOTERMS_2020'))),
+    CONSTRAINT fk_so_bill_to_partner FOREIGN KEY (bill_to_partner_id)
+        REFERENCES common_company.common_trading_partner(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_so_creation_key CHECK ((creation_key IS NULL) = (creation_request_hash IS NULL)),
+    CONSTRAINT ck_so_requested_date CHECK (
+        (requested_date_status IS NULL AND requested_delivery_date IS NULL
+            AND requested_delivery_event IS NULL AND requested_delivery_place IS NULL)
+        OR (requested_date_status = 'REQUESTED' AND requested_delivery_date IS NOT NULL
+            AND requested_delivery_event IS NOT NULL)
+        OR (requested_date_status = 'NOT_REQUESTED' AND requested_delivery_date IS NULL
+            AND requested_delivery_event IS NULL AND requested_delivery_place IS NULL)),
+    CONSTRAINT ck_so_bill_to CHECK (
+        (bill_to_mode IS NULL AND bill_to_partner_id IS NULL AND bill_to_name IS NULL
+            AND bill_to_address_line1 IS NULL AND bill_to_relationship IS NULL
+            AND bill_to_reason IS NULL)
+        OR (bill_to_mode = 'CUSTOMER' AND bill_to_partner_id IS NULL AND bill_to_name IS NULL
+            AND bill_to_relationship IS NULL AND bill_to_reason IS NULL)
+        OR (bill_to_mode = 'PARTNER' AND bill_to_partner_id IS NOT NULL
+            AND bill_to_partner_id <> trading_partner_id AND bill_to_name IS NULL
+            AND bill_to_relationship IS NOT NULL AND length(trim(bill_to_reason)) > 0)
+        OR (bill_to_mode = 'SNAPSHOT' AND bill_to_partner_id IS NULL
+            AND length(trim(bill_to_name)) > 0
+            AND bill_to_relationship IS NOT NULL AND length(trim(bill_to_reason)) > 0)),
+    CONSTRAINT ck_so_bill_to_party_details CHECK (
+        bill_to_name IS NOT NULL
+        OR (bill_to_contact_name IS NULL AND bill_to_email IS NULL AND bill_to_phone IS NULL)),
+    CONSTRAINT ck_so_bill_to_address CHECK (
+        (bill_to_address_line1 IS NULL AND bill_to_address_line2 IS NULL AND bill_to_city IS NULL
+            AND bill_to_region IS NULL AND bill_to_postal_code IS NULL
+            AND bill_to_country_code IS NULL AND bill_to_address_source_id IS NULL)
+        -- A draft keeps a partial address; completeness is asked by the gate that needs it.
+        OR (bill_to_mode IS NOT NULL
+            AND (bill_to_country_code IS NULL OR bill_to_country_code ~ '^[A-Z]{2}$')))
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_so_creation_key
+    ON sales_ord.sales_order (tenant_id, creation_key) WHERE creation_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_so_tenant ON sales_ord.sales_order(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_so_trading_partner ON sales_ord.sales_order(trading_partner_id);
 CREATE INDEX IF NOT EXISTS idx_so_status ON sales_ord.sales_order(status);

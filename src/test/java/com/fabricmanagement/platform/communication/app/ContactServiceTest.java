@@ -3,13 +3,16 @@ package com.fabricmanagement.platform.communication.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import com.fabricmanagement.platform.communication.domain.event.ContactPointChangedEvent;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +34,7 @@ class ContactServiceTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
 
   @Mock private ContactRepository contactRepository;
+  @Mock private DomainEventPublisher eventPublisher;
 
   @InjectMocks private ContactService service;
 
@@ -221,6 +225,55 @@ class ContactServiceTest {
 
       verify(contactRepository).save(contact);
       assertThat(contact.getIsActive()).isFalse();
+      ArgumentCaptor<ContactPointChangedEvent> event =
+          ArgumentCaptor.forClass(ContactPointChangedEvent.class);
+      verify(eventPublisher).publish(event.capture());
+      assertThat(event.getValue().getContactId()).isEqualTo(contactId);
+      assertThat(event.getValue().getChange()).isEqualTo(ContactPointChangedEvent.DELETED);
+    }
+  }
+
+  @Nested
+  @DisplayName("updateContactFields")
+  class UpdateContactFields {
+
+    private Contact jane(UUID contactId) {
+      Contact contact =
+          Contact.builder()
+              .contactValue("jane@example.com")
+              .contactType(ContactType.EMAIL)
+              .isVerified(false)
+              .build();
+      contact.setId(contactId);
+      contact.setTenantId(TENANT_ID);
+      when(contactRepository.findById(contactId)).thenReturn(Optional.of(contact));
+      when(contactRepository.save(any(Contact.class))).thenAnswer(inv -> inv.getArgument(0));
+      return contact;
+    }
+
+    @Test
+    void anotherAddressIsReportedInTheSameTransaction() {
+      UUID contactId = UUID.randomUUID();
+      jane(contactId);
+
+      service.updateContactFields(contactId, "jane.smith@elsewhere.example", null, null, null);
+
+      ArgumentCaptor<ContactPointChangedEvent> event =
+          ArgumentCaptor.forClass(ContactPointChangedEvent.class);
+      verify(eventPublisher).publish(event.capture());
+      assertThat(event.getValue().getTenantId()).isEqualTo(TENANT_ID);
+      assertThat(event.getValue().getContactId()).isEqualTo(contactId);
+      assertThat(event.getValue().getChange()).isEqualTo(ContactPointChangedEvent.ADDRESS_CHANGED);
+    }
+
+    @Test
+    void theSameMailboxInOtherLetterCaseOrALabelChangeIsNotReported() {
+      UUID contactId = UUID.randomUUID();
+      jane(contactId);
+
+      service.updateContactFields(contactId, "Jane@Example.com", null, "Buying", null);
+
+      verify(eventPublisher, never()).publish(any());
     }
   }
 }

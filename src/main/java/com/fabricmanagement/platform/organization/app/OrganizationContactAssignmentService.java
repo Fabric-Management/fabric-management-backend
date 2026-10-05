@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.domain.OrganizationContact;
 import com.fabricmanagement.platform.organization.domain.event.OrganizationContactAssignedEvent;
+import com.fabricmanagement.platform.organization.domain.event.OrganizationContactRemovedEvent;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationContactRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import java.util.List;
@@ -234,6 +235,9 @@ public class OrganizationContactAssignmentService
     }
 
     unassign(organizationId, contactId);
+    // In this transaction: whatever rested on the contact for this organization ends with it.
+    eventPublisher.publish(
+        new OrganizationContactRemovedEvent(tenantId, organizationId, contactId));
   }
 
   @Transactional

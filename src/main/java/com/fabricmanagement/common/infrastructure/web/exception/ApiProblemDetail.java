@@ -27,6 +27,12 @@ public class ApiProblemDetail extends ProblemDetail {
   @Schema(description = "Dynamic arguments for parameterized frontend messages")
   private Object[] args;
 
+  @Schema(
+      description =
+          "Reference of this failure that also appears in the server log. Present on server"
+              + " errors.")
+  private String traceId;
+
   protected ApiProblemDetail() {
     super();
   }

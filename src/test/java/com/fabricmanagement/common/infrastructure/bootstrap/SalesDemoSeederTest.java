@@ -109,7 +109,9 @@ class SalesDemoSeederTest {
                 enrolment,
                 mock(com.fabricmanagement.sales.salesorder.app.OrderIntakeHooks.class),
                 mock(com.fabricmanagement.sales.orderintake.app.CustomerRequestService.class),
-                mock(com.fabricmanagement.sales.salesorder.app.OrderApprovalInvalidator.class)));
+                mock(com.fabricmanagement.sales.salesorder.app.OrderApprovalInvalidator.class),
+                mock(com.fabricmanagement.sales.salesorder.app.LineAllocationPolicy.class),
+                mock(com.fabricmanagement.sales.salesorder.app.OrderCreationReplay.class)));
     // Isolate creation only; seedFor invokes the real demo confirmation.
     doAnswer(
             invocation -> {

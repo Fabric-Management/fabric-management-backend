@@ -36,4 +36,14 @@ class OrderStatusTest {
   void canCancel_whenShipped_returnsFalse() {
     assertThat(OrderStatus.SHIPPED.canCancel()).isFalse();
   }
+
+  @ParameterizedTest
+  @EnumSource(OrderStatus.class)
+  void lifecyclePredicates_describeTheEntityTransitions(OrderStatus status) {
+    assertThat(status.canStartProcessing()).isEqualTo(status == OrderStatus.CONFIRMED);
+    assertThat(status.canDeliver()).isEqualTo(status == OrderStatus.SHIPPED);
+    assertThat(status.canResume()).isEqualTo(status == OrderStatus.ON_HOLD);
+    assertThat(status.canRevise()).isEqualTo(status == OrderStatus.REJECTED);
+    assertThat(status.canHold()).isEqualTo(!status.isTerminal() && status != OrderStatus.ON_HOLD);
+  }
 }

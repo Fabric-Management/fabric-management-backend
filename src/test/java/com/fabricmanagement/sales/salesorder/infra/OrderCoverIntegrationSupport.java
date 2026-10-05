@@ -343,6 +343,25 @@ public abstract class OrderCoverIntegrationSupport extends AbstractIntegrationTe
     return awaitCover(orderId);
   }
 
+  /**
+   * Waits until the decision projection listener has handled every event published since {@code
+   * since}. Tests that change the projection directly must call this first, otherwise a late event
+   * can write the old values back.
+   */
+  protected void awaitDecisionProjectionSettled(java.time.Instant since) {
+    await()
+        .atMost(Duration.ofSeconds(20))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForObject(
+                            "select count(*) from public.event_publication where completion_date"
+                                + " is null and publication_date >= ? and listener_id like"
+                                + " '%DecisionProjectionListener%'",
+                            Integer.class, java.sql.Timestamp.from(since)))
+                    .isZero());
+  }
+
   protected Cover awaitCover(UUID orderId) {
     await()
         .atMost(Duration.ofSeconds(20))

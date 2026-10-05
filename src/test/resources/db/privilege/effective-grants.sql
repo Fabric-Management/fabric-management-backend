@@ -85,6 +85,7 @@ classified_relations AS (
                WHEN 'sales_ord.order_arrival_estimate' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_work_assignment' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.customer_approval' THEN 'MUTABLE_SYSTEM_PURGE'
+               WHEN 'sales_ord.customer_approval_authority' THEN 'CLOSE_ONCE_LEDGER'
                WHEN 'production.production_execution_batch_color_archive' THEN 'READ_ONLY_ARCHIVE'
                WHEN 'common_tenant.flyway_schema_history' THEN 'NO_RUNTIME_ACCESS'
                WHEN 'public.jobrunr_migrations' THEN 'APP_ONLY_MUTABLE'

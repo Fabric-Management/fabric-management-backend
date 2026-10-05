@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.api.controller;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.sales.salesorder.app.SalesOrderCapabilityService;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
@@ -45,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SalesOrderController {
 
   private final SalesOrderService orderService;
+  private final SalesOrderCapabilityService capabilityService;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CRUD
@@ -87,14 +89,20 @@ public class SalesOrderController {
 
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
-  @Operation(summary = "Get order by ID")
+  @Operation(
+      summary = "Get order by ID",
+      description =
+          "The order with its lines and the capabilities of the current user: what may be done"
+              + " with it now, and why not otherwise.")
   public ResponseEntity<ApiResponse<SalesOrderDto>> getOrder(
       @PathVariable UUID id, Authentication authentication) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            orderService
-                .findById(id, currentUserId(authentication))
-                .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + id))));
+    UUID currentUserId = currentUserId(authentication);
+    SalesOrderDto order =
+        orderService
+            .findById(id, currentUserId)
+            .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + id));
+    order.setCapabilities(capabilityService.resolve(id, currentUserId, authentication));
+    return ResponseEntity.ok(ApiResponse.success(order));
   }
 
   @GetMapping("/number/{orderNumber}")

@@ -108,6 +108,16 @@ public class SalesOrderDto {
   /** Embedded order lines — populated by SalesOrderService.findById (not findAll for perf). */
   @Builder.Default private List<SalesOrderLineResponse> lines = Collections.emptyList();
 
+  /**
+   * What the current user may do with this order. Present on the single-order query (GET
+   * /orders/{id}) only; null on list queries.
+   */
+  @Schema(
+      nullable = true,
+      description =
+          "What the current user may do with this order. Present on GET /sales/orders/{id} only.")
+  private List<SalesOrderCapabilityDto> capabilities;
+
   /** Create DTO from entity (no lines — used for list queries). */
   public static SalesOrderDto from(SalesOrder order, OrderCurrencyTotals totals) {
     return from(order, null, Collections.emptyList(), totals);

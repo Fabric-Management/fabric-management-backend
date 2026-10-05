@@ -207,11 +207,16 @@ class DecisionQueueSecurityIT extends OrderCoverIntegrationSupport {
 
   @Test
   void caseWithoutTaskIsExcludedFromEveryBucketAndSummaryCount() {
+    java.time.Instant since = java.time.Instant.now();
     Cover cover = governed(1);
+    // A late projection event would write task_id back over the change below.
+    awaitDecisionProjectionSettled(since);
     rebuild.rebuild(tenant, java.util.List.of(cover.caseId()));
-    jdbc.update(
-        "update flowboard.decision_subject_projection set task_id=null where case_id=?",
-        cover.caseId());
+    assertThat(
+            jdbc.update(
+                "update flowboard.decision_subject_projection set task_id=null where case_id=?",
+                cover.caseId()))
+        .isOne();
     for (DecisionQueueBucket bucket : DecisionQueueBucket.values()) {
       if (bucket != DecisionQueueBucket.UNASSIGNED) {
         assertThat(queue.list(tenant, actor.getId(), bucket, 0, 20).getContent()).isEmpty();

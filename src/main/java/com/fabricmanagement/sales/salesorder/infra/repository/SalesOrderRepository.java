@@ -43,6 +43,9 @@ public interface SalesOrderRepository
 
   Optional<SalesOrder> findByTenantIdAndUid(UUID tenantId, String uid);
 
+  /** The order a create request with this client key produced (ADR-0014 D10). */
+  Optional<SalesOrder> findByTenantIdAndCreationKey(UUID tenantId, UUID creationKey);
+
   Optional<SalesOrder> findByTenantIdAndOrderNumber(UUID tenantId, String orderNumber);
 
   // ═══════════════════════════════════════════════════════════════════════════
