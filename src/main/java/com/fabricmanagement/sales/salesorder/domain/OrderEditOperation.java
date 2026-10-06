@@ -89,11 +89,44 @@ public class OrderEditOperation extends BaseEntity {
 
   /**
    * What a conflict answered: its code, the conflicts as a later resolution is checked against
-   * them, and the exact problem body, so a repeat answers identically.
+   * them, the exact problem body, so a repeat answers identically, and the decisions of earlier
+   * rounds this save still sent that the conflict did not ask again (CEDIT-04 R1). A receipt
+   * recorded before decisions were carried reads as carrying none.
    */
-  public record ConflictRecord(String code, List<Item> items, JsonNode problem) {
+  public record ConflictRecord(
+      String code, List<Item> items, JsonNode problem, List<Carried> carried) {
     public ConflictRecord {
       items = items == null ? List.of() : List.copyOf(items);
+      carried = carried == null ? List.of() : List.copyOf(carried);
+    }
+  }
+
+  /**
+   * A decision of an earlier conflict round that this conflict did not ask again (CEDIT-04 R1): the
+   * save sent the decided instruction and resolved it, but another key conflicted, so nothing was
+   * written. A save against this conflict's base that sends exactly {@code instructionToken} for
+   * the slot again, without deciding it anew, keeps the decision: a USE_MINE applies {@code mine}
+   * as the first conflict showed it (the requested date with its event and place, a specification
+   * with its profile), not the instruction completed against the newer base, and the field history
+   * records {@code choice}. {@code mine} is null where the instruction alone determines the value.
+   */
+  public record Carried(
+      String key,
+      UUID lineId,
+      UUID clientLineId,
+      Choice choice,
+      String instructionToken,
+      RecordedMine mine) {
+
+    public static Carried of(Slot slot, Choice choice, String instructionToken, RecordedMine mine) {
+      Objects.requireNonNull(choice, "A carried decision names its choice");
+      Objects.requireNonNull(instructionToken, "A carried decision names its instruction");
+      return new Carried(
+          slot.key(), slot.lineId(), slot.clientLineId(), choice, instructionToken, mine);
+    }
+
+    public Slot slot() {
+      return new Slot(key, lineId, clientLineId);
     }
   }
 
@@ -221,6 +254,11 @@ public class OrderEditOperation extends BaseEntity {
   /** The recorded conflicts with what they showed, as a later resolution substitutes it. */
   public List<Item> conflictItems() {
     return conflict == null ? List.of() : conflict.items();
+  }
+
+  /** The earlier decisions this conflict carried without asking them again (CEDIT-04 R1). */
+  public List<Carried> carriedDecisions() {
+    return conflict == null ? List.of() : conflict.carried();
   }
 
   @Override

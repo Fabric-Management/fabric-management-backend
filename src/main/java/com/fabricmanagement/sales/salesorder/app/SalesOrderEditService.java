@@ -49,6 +49,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -230,10 +231,17 @@ public class SalesOrderEditService {
 
     // The receipt and the request's own instructions are matched before anything is resolved
     // against this base: a USE_MINE that sends the recorded instruction again takes the shown mine
-    // as it is (§5.7), so no resolution against the newer base can refuse or change it.
-    List<OrderEditOperation.Item> originConflicts = originConflicts(tenantId, base);
-    Mine requested =
-        applier.mine(parsed, base.getContent(), sameInstructionMines(originConflicts, parsed));
+    // as it is (§5.7), so no resolution against the newer base can refuse or change it. A decision
+    // an earlier round carried past a conflict on another key is kept the same way (CEDIT-04 R1).
+    Optional<OrderEditOperation> origin = originOperation(tenantId, base);
+    List<OrderEditOperation.Item> originConflicts =
+        origin.map(OrderEditOperation::conflictItems).orElse(List.of());
+    Decisions decisions =
+        decisions(
+            originConflicts,
+            origin.map(OrderEditOperation::carriedDecisions).orElse(List.of()),
+            parsed);
+    Mine requested = applier.mine(parsed, base.getContent(), decisions.sameInstruction());
     applier.assertNewClientLines(orderId, parsed);
     OrderEditMerge.resolutionMismatch(
             originConflicts.stream().map(OrderEditOperation.Item::toRecorded).toList(),
@@ -250,7 +258,7 @@ public class SalesOrderEditService {
                   slot.clientLineId());
             });
     // A USE_MINE proven by the key's equality instead also saves the mine as shown.
-    Mine mine = applier.withRecordedMines(requested, chosenMines(originConflicts, parsed));
+    Mine mine = applier.withRecordedMines(requested, decisions.chosen());
 
     boolean expired = base.isExpiredAt(now);
     OrderEditMerge.Result merged =
@@ -270,6 +278,7 @@ public class SalesOrderEditService {
           base,
           merged,
           mine,
+          decisions,
           guard,
           identity,
           expired,
@@ -325,6 +334,7 @@ public class SalesOrderEditService {
         new OrderFieldChange.Context(
             orderId, parsed.operationId(), receipt.getId(), actor, resultVersion, now),
         parsed,
+        decisions.choices(),
         merged,
         current,
         after,
@@ -436,20 +446,79 @@ public class SalesOrderEditService {
     return chosen;
   }
 
-  /** The conflicts a base was answered with, which a save against it must resolve. */
-  private List<OrderEditOperation.Item> originConflicts(UUID tenantId, OrderEditBase base) {
+  /**
+   * The decisions a save carries (CEDIT-04 R1): its own resolutions, and the earlier decisions its
+   * base's conflict carried that it sends again unchanged without deciding them anew; the shown
+   * mines it takes as recorded, by sending the recorded instruction again ({@code sameInstruction})
+   * or by the key's equality ({@code chosen}); and the instruction it sent per slot.
+   */
+  private record Decisions(
+      Map<Slot, Choice> choices,
+      Map<Slot, OrderEditOperation.RecordedMine> sameInstruction,
+      Map<Slot, OrderEditOperation.RecordedMine> chosen,
+      Map<Slot, String> sent) {
+
+    /**
+     * The decisions to carry past a conflict that asks only other slots again: each one this save
+     * applied with an instruction, outside the slots asked again, with the shown mine it applied.
+     * KEEP_CURRENT sends no instruction, so there is nothing to carry.
+     */
+    List<OrderEditOperation.Carried> carriedPast(Collection<Slot> asked) {
+      List<OrderEditOperation.Carried> carried = new ArrayList<>();
+      choices.forEach(
+          (slot, choice) -> {
+            String instruction = sent.get(slot);
+            if (choice == Choice.KEEP_CURRENT || instruction == null || asked.contains(slot)) {
+              return;
+            }
+            OrderEditOperation.RecordedMine mine =
+                choice != Choice.USE_MINE
+                    ? null
+                    : chosen.containsKey(slot) ? chosen.get(slot) : sameInstruction.get(slot);
+            carried.add(OrderEditOperation.Carried.of(slot, choice, instruction, mine));
+          });
+      return carried;
+    }
+  }
+
+  private static Decisions decisions(
+      List<OrderEditOperation.Item> conflicts,
+      List<OrderEditOperation.Carried> carried,
+      Parsed parsed) {
+    Map<Slot, String> sent = SalesOrderEditInstructions.instructionTokens(parsed);
+    Map<Slot, Choice> choices = new LinkedHashMap<>();
+    Map<Slot, OrderEditOperation.RecordedMine> sameInstruction = new LinkedHashMap<>();
+    for (OrderEditOperation.Carried decision : carried) {
+      Slot slot = decision.slot();
+      // Changed since, or decided again: the request's own instruction and resolution stand.
+      if (parsed.resolutions().containsKey(slot)
+          || !decision.instructionToken().equals(sent.get(slot))) {
+        continue;
+      }
+      choices.put(slot, decision.choice());
+      if (decision.choice() == Choice.USE_MINE && decision.mine() != null) {
+        sameInstruction.put(slot, decision.mine());
+      }
+    }
+    choices.putAll(parsed.resolutions());
+    sameInstruction.putAll(sameInstructionMines(conflicts, parsed));
+    return new Decisions(choices, sameInstruction, chosenMines(conflicts, parsed), sent);
+  }
+
+  /** The conflict a base was answered with, whose conflicts a save against it must resolve. */
+  private Optional<OrderEditOperation> originOperation(UUID tenantId, OrderEditBase base) {
     if (base.getOrigin() != OrderEditBase.Origin.CONFLICT
         && base.getOrigin() != OrderEditBase.Origin.EXPIRED) {
-      return List.of();
+      return Optional.empty();
     }
-    return operations
-        .lockByTenantIdAndOperationId(tenantId, base.getOriginOperationId())
-        .map(OrderEditOperation::conflictItems)
-        .orElseThrow(
-            () ->
-                OrderDomainException.internal(
-                    "EDIT_BASE_ORIGIN_MISSING",
-                    "The conflict that produced the edit base is no longer recorded"));
+    return Optional.of(
+        operations
+            .lockByTenantIdAndOperationId(tenantId, base.getOriginOperationId())
+            .orElseThrow(
+                () ->
+                    OrderDomainException.internal(
+                        "EDIT_BASE_ORIGIN_MISSING",
+                        "The conflict that produced the edit base is no longer recorded")));
   }
 
   /**
@@ -463,6 +532,7 @@ public class SalesOrderEditService {
       OrderEditBase base,
       OrderEditMerge.Result merged,
       Mine mine,
+      Decisions decisions,
       Map<Slot, String> guard,
       Identity identity,
       boolean expired,
@@ -529,9 +599,13 @@ public class SalesOrderEditService {
     } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
       throw new IllegalStateException("The conflict problem cannot be written as JSON", failure);
     }
+    // Nothing was written: what this save decided outside the conflicts asked again is kept for
+    // the save that resolves them (CEDIT-04 R1).
+    List<OrderEditOperation.Carried> carried =
+        decisions.carriedPast(merged.conflicts().stream().map(Conflict::slot).toList());
     operations.saveAndFlush(
         OrderEditOperation.conflict(
-            identity, conflictBase.getId(), new ConflictRecord(code, items, body)));
+            identity, conflictBase.getId(), new ConflictRecord(code, items, body, carried)));
     return new Conflicted(code, body);
   }
 
@@ -540,17 +614,18 @@ public class SalesOrderEditService {
    * changed key with the value before and after, whole lines added or removed with their
    * projection, and the resolution that decided the change with its scope. A changed line key that
    * was not decided on its own carries the decision of its whole line (a product change seen and
-   * accepted), so the history keeps it after the receipt is cleaned up.
+   * accepted), so the history keeps it after the receipt is cleaned up. A decision carried past a
+   * conflict on another key is recorded as the save's own (CEDIT-04 R1).
    */
   private void recordHistory(
       OrderFieldChange.Context context,
       Parsed parsed,
+      Map<Slot, Choice> resolutions,
       OrderEditMerge.Result merged,
       OrderEditSnapshot before,
       OrderEditSnapshot after,
       Applied applied) {
     List<OrderFieldChange> changes = new ArrayList<>();
-    Map<Slot, Choice> resolutions = parsed.resolutions();
 
     merged
         .headerChanges()

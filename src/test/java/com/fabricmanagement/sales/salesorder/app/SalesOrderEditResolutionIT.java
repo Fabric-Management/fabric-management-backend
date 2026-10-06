@@ -30,6 +30,9 @@ import org.springframework.beans.factory.annotation.Autowired;
  * value and the history's new value are the same; the conflict base stays the merge's base, so a
  * third change conflicts again with the same mine; a shown mine saved meanwhile is a no-change.
  *
+ * <p>CEDIT-04 R1: a decision whose save conflicted only on another key is carried by that conflict;
+ * resolving the other key with the same instruction keeps it, the shown mine included.
+ *
  * <p>R2: a line-level decision (LINE_PRODUCT_CHANGED) stays in the history of every field the save
  * changed on that line, with its scope, after the receipt is cleaned up; a repeat writes none.
  */
@@ -37,6 +40,7 @@ class SalesOrderEditResolutionIT extends SalesOrderEditItSupport {
 
   private static final String DATE = "requestedDeliveryDate";
   private static final String SPECIFICATION = "line.specification";
+  private static final String NOTES = "notes";
 
   @Autowired private OrderPartiesService parties;
   @Autowired private ProductCorrectionService productCorrections;
@@ -138,6 +142,108 @@ class SalesOrderEditResolutionIT extends SalesOrderEditItSupport {
     Map<String, Object> row = onlyHistoryOf(actorB, DATE);
     assertThat(row.get("resolution")).isEqualTo("NEW_VALUE");
     assertThat(read(row.get("new_value"))).isNotEqualTo(only(first, DATE).path("mine"));
+  }
+
+  // ── CEDIT-04 R1: a decision carried past a conflict on another key ──────────
+
+  @Test
+  @DisplayName(
+      "CEDIT-04 R1: USE_MINE of the requested date survives a second conflict on the notes; the"
+          + " saved date and its history are the shown date, event and place")
+  void useMineOfTheDateIsCarriedPastAConflictOnAnotherKey() {
+    JsonNode first = dateAndNotesConflict("2026-11-08");
+    JsonNode shown = only(first, DATE).path("mine");
+    assertShownMine(shown);
+    saved(actorC, body(UUID.randomUUID(), open(actorC).baseId(), NOTES, set("C")));
+    long version = orderVersion();
+
+    JsonNode second =
+        conflicted(
+            actorB,
+            withResolutions(
+                body(UUID.randomUUID(), baseOf(first), DATE, set("2026-11-15"), NOTES, set("B")),
+                List.of(resolution(DATE, null, "USE_MINE"), resolution(NOTES, null, "USE_MINE"))));
+    // Only the notes are asked again; atomically, the date is not written either.
+    assertThat(second.path("conflicts")).hasSize(1);
+    assertThat(only(second, NOTES).path("current").asText()).isEqualTo("C");
+    assertThat(orderVersion()).isEqualTo(version);
+    assertRequestedDate("2026-11-08", "RECEIVED_BY_CONSIGNEE", "York");
+    assertThat(historyOf(actorB)).isEmpty();
+
+    UUID resolution = UUID.randomUUID();
+    saved(
+        actorB,
+        withResolutions(
+            body(resolution, baseOf(second), DATE, set("2026-11-15"), NOTES, set("B")),
+            List.of(resolution(NOTES, null, "USE_MINE"))));
+
+    assertRequestedDate("2026-11-15", "HANDED_TO_CARRIER", "Leeds");
+    Map<String, Object> date = onlyHistoryOf(actorB, DATE);
+    assertThat(read(date.get("new_value"))).isEqualTo(shown);
+    assertThat(date.get("resolution")).isEqualTo("USE_MINE");
+    assertThat(date.get("resolution_scope")).isEqualTo("FIELD");
+    assertThat(date.get("operation_id")).isEqualTo(resolution);
+    assertThat(onlyHistoryOf(actorB, NOTES).get("resolution")).isEqualTo("USE_MINE");
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-04 R1: the carried date is kept when the newer base already has the same date with"
+          + " another event and place")
+  void carriedDateIsKeptWhenOnlyItsEventAndPlaceDiffer() {
+    // A already set 15 November, received in York: the date alone equals B's, the meaning not.
+    JsonNode first = dateAndNotesConflict("2026-11-15");
+    JsonNode shown = only(first, DATE).path("mine");
+    assertShownMine(shown);
+    assertThat(only(first, DATE).path("current").path("place").asText()).isEqualTo("York");
+    saved(actorC, body(UUID.randomUUID(), open(actorC).baseId(), NOTES, set("C")));
+
+    JsonNode second =
+        conflicted(
+            actorB,
+            withResolutions(
+                body(UUID.randomUUID(), baseOf(first), DATE, set("2026-11-15"), NOTES, set("B")),
+                List.of(resolution(DATE, null, "USE_MINE"), resolution(NOTES, null, "USE_MINE"))));
+    assertThat(second.path("conflicts")).hasSize(1);
+    assertThat(only(second, NOTES).path("key").asText()).isEqualTo(NOTES);
+    assertThat(second.path("currentBase").path("order").path("requestedDeliveryDate").asText())
+        .isEqualTo("2026-11-15");
+    assertRequestedDate("2026-11-15", "RECEIVED_BY_CONSIGNEE", "York");
+
+    saved(
+        actorB,
+        withResolutions(
+            body(UUID.randomUUID(), baseOf(second), DATE, set("2026-11-15"), NOTES, set("B")),
+            List.of(resolution(NOTES, null, "USE_MINE"))));
+
+    assertRequestedDate("2026-11-15", "HANDED_TO_CARRIER", "Leeds");
+    Map<String, Object> date = onlyHistoryOf(actorB, DATE);
+    assertThat(read(date.get("new_value"))).isEqualTo(shown);
+    assertThat(date.get("resolution")).isEqualTo("USE_MINE");
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-04 R1: a carried decision ends when the date is sent differently; the new date is"
+          + " completed from the newer base and undecided")
+  void changedInstructionDoesNotTakeTheCarriedDecision() {
+    JsonNode first = dateAndNotesConflict("2026-11-08");
+    saved(actorC, body(UUID.randomUUID(), open(actorC).baseId(), NOTES, set("C")));
+    JsonNode second =
+        conflicted(
+            actorB,
+            withResolutions(
+                body(UUID.randomUUID(), baseOf(first), DATE, set("2026-11-15"), NOTES, set("B")),
+                List.of(resolution(DATE, null, "USE_MINE"), resolution(NOTES, null, "USE_MINE"))));
+
+    saved(
+        actorB,
+        withResolutions(
+            body(UUID.randomUUID(), baseOf(second), DATE, set("2026-11-20"), NOTES, set("B")),
+            List.of(resolution(NOTES, null, "USE_MINE"))));
+
+    assertRequestedDate("2026-11-20", "RECEIVED_BY_CONSIGNEE", "York");
+    assertThat(onlyHistoryOf(actorB, DATE).get("resolution")).isNull();
   }
 
   // ── R1: the specification ─────────────────────────────────────────────────
@@ -452,6 +558,23 @@ class SalesOrderEditResolutionIT extends SalesOrderEditItSupport {
     UUID b0 = open(actorB).baseId();
     requestedDate(actorA, "2026-11-08", RequestedDeliveryEvent.RECEIVED_BY_CONSIGNEE, "York");
     return conflicted(actorB, body(UUID.randomUUID(), b0, DATE, set("2026-11-15")));
+  }
+
+  /**
+   * The requested date is 1 November, handed to the carrier in Leeds. B opens; A changes it to
+   * {@code otherDate}, received by the consignee in York, and the notes to "A"; B sends the date 15
+   * November and the notes "B" and conflicts on both.
+   */
+  private JsonNode dateAndNotesConflict(String otherDate) {
+    requestedDate(actorA, "2026-11-01", RequestedDeliveryEvent.HANDED_TO_CARRIER, "Leeds");
+    UUID b0 = open(actorB).baseId();
+    requestedDate(actorA, otherDate, RequestedDeliveryEvent.RECEIVED_BY_CONSIGNEE, "York");
+    saved(actorA, body(UUID.randomUUID(), open(actorA).baseId(), NOTES, set("A")));
+    JsonNode problem =
+        conflicted(actorB, body(UUID.randomUUID(), b0, DATE, set("2026-11-15"), NOTES, set("B")));
+    assertThat(problem.path("conflicts")).hasSize(2);
+    assertThat(only(problem, NOTES).path("current").asText()).isEqualTo("A");
+    return problem;
   }
 
   /**
