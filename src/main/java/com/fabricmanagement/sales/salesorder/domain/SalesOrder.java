@@ -670,21 +670,11 @@ public class SalesOrder extends BaseEntity {
    * date confirms.
    */
   void syncLegacyRequestedDate(LocalDate date) {
-    if (date == null) {
-      if (requestedDateStatus == RequestedDateStatus.REQUESTED) {
-        this.requestedDateStatus = null;
-        this.requestedDeliveryEvent = null;
-        this.requestedDeliveryPlace = null;
-      }
-      this.requestedDeliveryDate = null;
-      return;
-    }
-    if (requestedDateStatus != RequestedDateStatus.REQUESTED || requestedDeliveryEvent == null) {
-      this.requestedDateStatus = RequestedDateStatus.REQUESTED;
-      this.requestedDeliveryEvent = RequestedDeliveryEvent.UNSPECIFIED;
-      this.requestedDeliveryPlace = null;
-    }
-    this.requestedDeliveryDate = date;
+    RequestedDate next = getRequestedDate().withLegacyDate(date);
+    this.requestedDateStatus = next.status();
+    this.requestedDeliveryDate = next.date();
+    this.requestedDeliveryEvent = next.event();
+    this.requestedDeliveryPlace = next.place();
   }
 
   /** The requested date entered with a new order from the order form. */

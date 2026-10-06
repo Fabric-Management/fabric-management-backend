@@ -52,7 +52,9 @@ class RequirementProfileServiceTest {
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(UUID.randomUUID());
-    service = new RequirementProfileService(versions, yarnHistory, products);
+    service =
+        new RequirementProfileService(
+            versions, new RequirementProfileResolver(yarnHistory, products));
     org.mockito.Mockito.lenient()
         .when(products.findReferences(any()))
         .thenAnswer(
@@ -105,6 +107,79 @@ class RequirementProfileServiceTest {
 
     verify(versions, org.mockito.Mockito.times(1)).save(any());
     assertThat(line.getRequirementProfileVersion()).isEqualTo(1);
+  }
+
+  @Test
+  void aProfileResolvedElsewhereIsStoredAsTheLinesNextVersionWithItsFingerprint() {
+    RequirementProfileSnapshot first = service.apply(line, explicit("150"), Map.of());
+    // Resolved for the save against another state of the line (CEDIT-03: a conflict's mine).
+    RequirementProfileSnapshot resolved =
+        new RequirementProfileResolver(yarnHistory, products)
+            .resolve(
+                new RequirementProfileResolver.LineContext(null, null, null, null, null),
+                explicit("160"),
+                Map.of());
+
+    RequirementProfileSnapshot stored = service.applyResolved(line, resolved);
+
+    assertThat(stored.fingerprint()).isEqualTo(resolved.fingerprint());
+    assertThat(stored.facets()).isEqualTo(resolved.facets());
+    assertThat(stored.profileId()).isEqualTo(first.profileId());
+    assertThat(stored.profileVersion()).isEqualTo(2);
+    assertThat(line.getRequirementProfileFingerprint()).isEqualTo(resolved.fingerprint());
+    assertThat(line.getRequirementProfileVersion()).isEqualTo(2);
+    verify(versions, org.mockito.Mockito.times(2)).save(any());
+  }
+
+  @Test
+  void aResolvedProfileTheLineAlreadyCarriesStoresNothing() {
+    RequirementProfileSnapshot first = service.apply(line, explicit("150"), Map.of());
+
+    RequirementProfileSnapshot again =
+        service.applyResolved(line, first.withIdentity(UUID.randomUUID(), 9));
+
+    assertThat(again).isEqualTo(first);
+    assertThat(line.getRequirementProfileVersion()).isEqualTo(1);
+    verify(versions, org.mockito.Mockito.times(1)).save(any());
+  }
+
+  @Test
+  void aResolvedProfileOfAnotherProductIsRefused() {
+    line.setProductId(UUID.randomUUID());
+    RequirementProfileSnapshot resolved =
+        new RequirementProfileResolver(yarnHistory, products)
+            .resolve(
+                new RequirementProfileResolver.LineContext(null, null, null, null, null),
+                explicit("160"),
+                Map.of());
+    RequirementProfileBasis basis = resolved.basis();
+    RequirementProfileSnapshot otherProduct =
+        new RequirementProfileSnapshot(
+            resolved.profileId(),
+            resolved.profileVersion(),
+            new RequirementProfileBasis(
+                basis.kind(),
+                UUID.randomUUID(),
+                basis.specificationKind(),
+                basis.referenceId(),
+                basis.specificationVersion(),
+                basis.actorId(),
+                basis.decidedAt(),
+                basis.decisionReference()),
+            resolved.scopeVersion(),
+            resolved.resolutionRuleVersion(),
+            resolved.scope(),
+            resolved.facets(),
+            resolved.unmodelledConstraints(),
+            resolved.deviations(),
+            resolved.pinnedSource(),
+            resolved.complete(),
+            resolved.incompleteReasons(),
+            resolved.fingerprint());
+
+    assertThatThrownBy(() -> service.applyResolved(line, otherProduct))
+        .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class);
+    org.mockito.Mockito.verifyNoInteractions(versions);
   }
 
   @Test

@@ -2,6 +2,9 @@ package com.fabricmanagement.sales.salesorder.domain.requirement;
 
 import com.fabricmanagement.product.core.domain.registry.UnitCode;
 import com.fabricmanagement.product.core.domain.registry.policy.LinearDensityV1;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -14,6 +17,8 @@ import java.util.UUID;
  * {@code value} retains the kind-specific structured payload without forcing unrelated facets into
  * one flat table.
  */
+@JsonIgnoreProperties(ignoreUnknown = false)
+@Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
 public record RequirementFacet(
     Kind kind,
     String qualifier,
@@ -22,6 +27,10 @@ public record RequirementFacet(
     RequirementFacetValue nominalValue,
     RequirementFacetValue value,
     DecisionBasis decisionBasis) {
+  @JsonAnySetter
+  public void rejectUnknownProperty(String name, Object value) {
+    throw new IllegalArgumentException("Unknown RequirementFacet property: " + name);
+  }
 
   public enum Kind {
     CERTIFICATION,
@@ -55,7 +64,14 @@ public record RequirementFacet(
   }
 
   /** Traceable reason for an explicit facet value, including UNCONSTRAINED. */
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   public record DecisionBasis(Source source, String reference, UUID actorId, Instant decidedAt) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown DecisionBasis property: " + name);
+    }
+
     public enum Source {
       SPEC_VERSION,
       CUSTOMER_INSTRUCTION,

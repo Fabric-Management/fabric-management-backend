@@ -1,9 +1,14 @@
 package com.fabricmanagement.sales.salesorder.domain.requirement;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Immutable identity of the source from which an order-line requirement profile was resolved. */
+@JsonIgnoreProperties(ignoreUnknown = false)
+@Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
 public record RequirementProfileBasis(
     Kind kind,
     UUID productId,
@@ -13,6 +18,10 @@ public record RequirementProfileBasis(
     UUID actorId,
     Instant decidedAt,
     String decisionReference) {
+  @JsonAnySetter
+  public void rejectUnknownProperty(String name, Object value) {
+    throw new IllegalArgumentException("Unknown RequirementProfileBasis property: " + name);
+  }
 
   public enum Kind {
     SPEC_VERSION,

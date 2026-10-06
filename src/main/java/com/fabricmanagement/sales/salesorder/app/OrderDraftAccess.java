@@ -26,6 +26,7 @@ class OrderDraftAccess {
   private final SalesOrderRepository orders;
   private final SalesOrderAccessPolicy accessPolicy;
   private final TradingPartnerService partners;
+  private final SalesOrderRevision revision;
 
   SalesOrder readable(UUID orderId, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -36,21 +37,26 @@ class OrderDraftAccess {
         .orElseThrow(() -> new NotFoundException("Sales order not found: " + orderId));
   }
 
-  /** The order, locked for this transaction, when {@code expectedVersion} is still current. */
+  /**
+   * The order, locked for this transaction, when {@code expectedVersion} is still current. The
+   * entity read for the access check is reloaded under the lock (CEDIT-03 §5): a locked query does
+   * not refresh an entity already in the persistence context, and the version, status and flow
+   * stage the caller checks must be the committed ones.
+   */
   SalesOrder writable(UUID orderId, Long expectedVersion, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = readable(orderId, actor);
     if (!accessPolicy.canWrite(tenantId, actor, order)) {
       throw new AccessDeniedException("You do not have access to update this sales order.");
     }
-    SalesOrder locked =
-        orders
-            .lockByTenantIdAndId(tenantId, order.getId())
-            .orElseThrow(() -> new NotFoundException("Sales order not found: " + orderId));
-    if (expectedVersion == null || !expectedVersion.equals(locked.getVersion())) {
+    revision.lockFresh(order);
+    if (!Boolean.TRUE.equals(order.getIsActive())) {
+      throw new NotFoundException("Sales order not found: " + orderId);
+    }
+    if (expectedVersion == null || !expectedVersion.equals(order.getVersion())) {
       throw new ObjectOptimisticLockingFailureException(SalesOrder.class, orderId);
     }
-    return locked;
+    return order;
   }
 
   /** A registered partner named for a role must exist in this tenant. */

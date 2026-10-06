@@ -50,4 +50,24 @@ public record RequestedDate(
   public boolean isKnown() {
     return status != null;
   }
+
+  /**
+   * The order form that knows only a date (no status, event or place). A date makes the status
+   * "requested"; an event and place chosen earlier are kept, otherwise the customer's meaning is
+   * recorded as not stated ({@link RequestedDeliveryEvent#UNSPECIFIED}) rather than guessed.
+   * Clearing the date makes it unknown again, except an explicit "not requested", which an absent
+   * date confirms. One rule for the legacy update and the safe edit (CEDIT-03).
+   */
+  public RequestedDate withLegacyDate(LocalDate legacyDate) {
+    if (legacyDate == null) {
+      return status == RequestedDateStatus.REQUESTED
+          ? UNKNOWN
+          : new RequestedDate(status, null, event, place);
+    }
+    if (status != RequestedDateStatus.REQUESTED || event == null) {
+      return new RequestedDate(
+          RequestedDateStatus.REQUESTED, legacyDate, RequestedDeliveryEvent.UNSPECIFIED, null);
+    }
+    return new RequestedDate(RequestedDateStatus.REQUESTED, legacyDate, event, place);
+  }
 }

@@ -38,4 +38,11 @@ public interface SalesOrderLineRepository extends JpaRepository<SalesOrderLine, 
       "select l from SalesOrderLine l where l.tenantId=:tenantId and l.salesOrderId=:orderId and l.isActive=true order by l.id")
   List<SalesOrderLine> lockAllForOrder(
       @Param("tenantId") UUID tenantId, @Param("orderId") UUID orderId);
+
+  /**
+   * The line a safe-edit add created from this client id, active or removed (CEDIT-03): a client id
+   * adds at most one line to an order, ever.
+   */
+  Optional<SalesOrderLine> findByTenantIdAndSalesOrderIdAndClientLineId(
+      UUID tenantId, UUID salesOrderId, UUID clientLineId);
 }

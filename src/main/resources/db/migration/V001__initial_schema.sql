@@ -5787,6 +5787,165 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order_line_processed_shipments (
 CREATE INDEX IF NOT EXISTS idx_sol_processed_shipments_shipment_line_id ON sales_ord.sales_order_line_processed_shipments (shipment_line_id);
 
 
+-- ===================== CEDIT-03: safe collaborative edit (ADR-0014 D14, restructured) =====================
+-- Server-owned edit bases, save receipts and the append-only field history of the safe edit
+-- (docs/architecture/COLLABORATIVE-EDITING-SAVE-CONTRACT.md §3, §6, §7). Lines added by the safe
+-- edit keep the client's stable id; one client id adds at most one line to an order, ever.
+
+ALTER TABLE sales_ord.sales_order_line
+    ADD COLUMN IF NOT EXISTS client_line_id UUID;
+
+-- Tenant-qualified identities the composite foreign keys below reference. The names match the
+-- later migrations that declare the same identities, which then find them in place.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_order_evidence_tenant_id
+    ON sales_ord.sales_order (tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_order_line_tenant_id
+    ON sales_ord.sales_order_line (tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_order_line_tenant_order_id
+    ON sales_ord.sales_order_line (tenant_id, sales_order_id, id);
+-- Active and removed lines alike: a removed line's client id is never reused.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_order_line_client_line
+    ON sales_ord.sales_order_line (tenant_id, sales_order_id, client_line_id)
+    WHERE client_line_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS sales_ord.order_edit_operation (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    -- The client's id of one save; unique per tenant whatever the order (no soft-delete filter).
+    operation_id UUID NOT NULL,
+    sales_order_id UUID NOT NULL,
+    actor_id UUID NOT NULL,
+    base_id UUID NOT NULL,
+    request_fingerprint VARCHAR(64) NOT NULL CHECK (request_fingerprint ~ '^[0-9a-f]{64}$'),
+    outcome VARCHAR(20) NOT NULL CHECK (outcome IN ('APPLIED', 'NO_CHANGE', 'CONFLICT')),
+    result_version BIGINT CHECK (result_version IS NULL OR result_version >= 0),
+    -- Logical references: a cleaned-up base never removes or blocks a receipt.
+    result_base_id UUID NOT NULL,
+    line_ids JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(line_ids) = 'array'),
+    conflict JSONB CHECK (conflict IS NULL OR jsonb_typeof(conflict) = 'object'),
+    recorded_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT uq_order_edit_operation_tenant_operation UNIQUE (tenant_id, operation_id),
+    CONSTRAINT fk_order_edit_operation_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    CONSTRAINT ck_order_edit_operation_outcome CHECK (
+        (outcome = 'CONFLICT' AND conflict IS NOT NULL AND result_version IS NULL)
+        OR (outcome <> 'CONFLICT' AND conflict IS NULL AND result_version IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_order_edit_operation_cleanup
+    ON sales_ord.order_edit_operation (tenant_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_order_edit_operation_order
+    ON sales_ord.order_edit_operation (tenant_id, sales_order_id, recorded_at);
+
+CREATE TABLE IF NOT EXISTS sales_ord.order_edit_base (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    actor_id UUID NOT NULL,
+    order_version BIGINT NOT NULL CHECK (order_version >= 0),
+    content JSONB NOT NULL CHECK (jsonb_typeof(content) = 'object'),
+    origin VARCHAR(20) NOT NULL CHECK (origin IN ('OPENED', 'SAVED', 'CONFLICT', 'EXPIRED')),
+    -- Logical reference: the guard copies the parent's values, so cleaning the parent breaks nothing.
+    parent_base_id UUID,
+    origin_operation_id UUID,
+    guard JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(guard) = 'array'),
+    captured_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT fk_order_edit_base_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    -- A conflict's receipt stays while the base its resolution relies on stays. Deferred: the
+    -- base and its receipt are written in one transaction, in either order.
+    CONSTRAINT fk_order_edit_base_origin_operation FOREIGN KEY (tenant_id, origin_operation_id)
+        REFERENCES sales_ord.order_edit_operation (tenant_id, operation_id)
+        DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT ck_order_edit_base_origin CHECK (
+        (origin = 'OPENED' AND origin_operation_id IS NULL AND parent_base_id IS NULL)
+        OR (origin <> 'OPENED' AND origin_operation_id IS NOT NULL)),
+    CONSTRAINT ck_order_edit_base_expiry CHECK (expires_at > captured_at)
+);
+CREATE INDEX IF NOT EXISTS idx_order_edit_base_cleanup
+    ON sales_ord.order_edit_base (tenant_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_order_edit_base_origin_operation
+    ON sales_ord.order_edit_base (tenant_id, origin_operation_id)
+    WHERE origin_operation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_order_edit_base_parent
+    ON sales_ord.order_edit_base (tenant_id, parent_base_id)
+    WHERE parent_base_id IS NOT NULL;
+-- The order foreign key's side: a purged order finds its bases without a scan.
+CREATE INDEX IF NOT EXISTS idx_order_edit_base_order
+    ON sales_ord.order_edit_base (tenant_id, sales_order_id);
+
+CREATE TABLE IF NOT EXISTS sales_ord.order_field_change (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    sales_order_id UUID NOT NULL,
+    -- Kept here for good: the history outlives the receipt it was written with.
+    operation_id UUID NOT NULL,
+    -- Correlation with the receipt row only; no foreign key and no cascade.
+    operation_receipt_id UUID NOT NULL,
+    line_id UUID,
+    edit_key VARCHAR(40) NOT NULL,
+    change_kind VARCHAR(20) NOT NULL
+        CHECK (change_kind IN ('SET', 'CLEAR', 'LINE_ADDED', 'LINE_REMOVED')),
+    old_value JSONB,
+    new_value JSONB,
+    resolution VARCHAR(20) CHECK (resolution IN ('KEEP_CURRENT', 'USE_MINE', 'NEW_VALUE')),
+    -- What the resolution decided: this field, or the whole line the field belongs to (a product
+    -- change seen and accepted for every changed field of the line).
+    resolution_scope VARCHAR(10) CHECK (resolution_scope IN ('FIELD', 'LINE')),
+    actor_id UUID NOT NULL,
+    order_version BIGINT NOT NULL CHECK (order_version >= 0),
+    changed_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT ck_order_field_change_resolution CHECK (
+        (resolution IS NULL) = (resolution_scope IS NULL)),
+    CONSTRAINT fk_order_field_change_order FOREIGN KEY (tenant_id, sales_order_id)
+        REFERENCES sales_ord.sales_order (tenant_id, id),
+    -- A line's history belongs to that line of that order of that tenant.
+    CONSTRAINT fk_order_field_change_line FOREIGN KEY (tenant_id, sales_order_id, line_id)
+        REFERENCES sales_ord.sales_order_line (tenant_id, sales_order_id, id),
+    CONSTRAINT ck_order_field_change_line CHECK (
+        change_kind NOT IN ('LINE_ADDED', 'LINE_REMOVED') OR line_id IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_order_field_change_order
+    ON sales_ord.order_field_change (tenant_id, sales_order_id, changed_at);
+CREATE INDEX IF NOT EXISTS idx_order_field_change_operation
+    ON sales_ord.order_field_change (tenant_id, operation_id);
+-- A line's history, and the line foreign key's side.
+CREATE INDEX IF NOT EXISTS idx_order_field_change_line
+    ON sales_ord.order_field_change (tenant_id, sales_order_id, line_id, changed_at)
+    WHERE line_id IS NOT NULL;
+
+COMMENT ON TABLE sales_ord.order_edit_base IS
+    'CEDIT-03: immutable server edit bases; technical, cleaned after expiry + retention.';
+COMMENT ON TABLE sales_ord.order_edit_operation IS
+    'CEDIT-03: safe-edit save receipts for repeat detection; technical, cleaned after retention.';
+COMMENT ON TABLE sales_ord.order_field_change IS
+    'CEDIT-03: append-only field history of safe-edit saves; never cleaned by retention.';
+
+
 -- ===================== FROM: V20260329093500__add_sales_order_id_to_work_order.sql =====================
 -- Migration: Add sales_order_id and product_code to prod_work_order
 

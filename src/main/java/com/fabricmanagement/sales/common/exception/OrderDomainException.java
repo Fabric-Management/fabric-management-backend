@@ -49,6 +49,21 @@ public class OrderDomainException extends DomainException {
     return new OrderDomainException(message, code, 400);
   }
 
+  /** The request breaks the safe-edit contract (CEDIT-02 §4.2/§4.3): 422 with its own code. */
+  public static OrderDomainException invalid(String code, String message) {
+    return new OrderDomainException(message, code, 422);
+  }
+
+  /** The request conflicts with recorded state other than another user's edit (409). */
+  public static OrderDomainException conflict(String code, String message) {
+    return new OrderDomainException(message, code, 409);
+  }
+
+  /** The server broke its own invariant; the transaction is rolled back (500). */
+  public static OrderDomainException internal(String code, String message) {
+    return new OrderDomainException(message, code, 500);
+  }
+
   public OrderDomainException(String message, Throwable cause) {
     super(message, "ORDER_RULE_VIOLATION", 400, cause);
   }

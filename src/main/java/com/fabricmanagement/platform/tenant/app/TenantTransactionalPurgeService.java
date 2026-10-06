@@ -191,6 +191,11 @@ public class TenantTransactionalPurgeService {
           "procurement.purchase_order",
           "flowboard.decision_follow_suppression",
           "flowboard.decision_follow",
+          // CEDIT-03: field history and the technical edit records go before their order and
+          // lines; a base names its origin receipt (deferred FK), so bases go before receipts.
+          "sales_ord.order_field_change",
+          "sales_ord.order_edit_base",
+          "sales_ord.order_edit_operation",
           "sales_ord.quantity_acceptance",
           "sales_ord.quantity_proposal",
           "sales_ord.customer_tone_acceptance",

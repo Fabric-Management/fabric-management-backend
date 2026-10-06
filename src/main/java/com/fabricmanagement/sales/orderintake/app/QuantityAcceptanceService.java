@@ -66,12 +66,25 @@ public class QuantityAcceptanceService {
     }
 
     SalesOrder order = access.writableOrder(orderId, actor);
+    // The order row first (CEDIT-02 §5.5); decisions below are made on what is current after it.
+    revision.lockFresh(order);
+    access.requireActive(order);
+    // Another recording of the same key may have committed while this one waited for the lock.
+    Optional<QuantityAcceptance> recordedMeanwhile = repeated(tenantId, request.idempotencyKey());
+    if (recordedMeanwhile.isPresent()) {
+      if (!recordedMeanwhile.get().getSalesOrderLineId().equals(lineId)) {
+        throw OrderIntakeException.conflict(
+            "IDEMPOTENCY_KEY_REUSED", "The idempotency key belongs to another line");
+      }
+      return toDto(tenantId, recordedMeanwhile.get(), access.line(order, lineId));
+    }
     if (order.getStatus() != OrderStatus.DRAFT) {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_DRAFT", "Stock choices are recorded while the order is a draft");
     }
     order.assertCommercialContentEditable();
     SalesOrderLine line = access.line(order, lineId);
+    revision.lockFresh(line);
     QuantityProposal proposal =
         proposals
             .findByTenantIdAndIdAndSalesOrderLineId(tenantId, request.proposalId(), lineId)
@@ -189,12 +202,15 @@ public class QuantityAcceptanceService {
   public void withdraw(UUID orderId, UUID lineId, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = access.writableOrder(orderId, actor);
+    revision.lockFresh(order);
+    access.requireActive(order);
     if (order.getStatus() != OrderStatus.DRAFT) {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_DRAFT", "Stock choices change only while the order is a draft");
     }
     order.assertCommercialContentEditable();
-    access.line(order, lineId);
+    SalesOrderLine line = access.line(order, lineId);
+    revision.lockFresh(line);
     QuantityAcceptance active =
         acceptances
             .findFirstByTenantIdAndSalesOrderLineIdAndStatus(
@@ -203,7 +219,6 @@ public class QuantityAcceptanceService {
     active.withdraw(clock.instant());
     acceptances.save(active);
     compatibilityRequests.withdrawOpen(tenantId, lineId, actor);
-    SalesOrderLine line = access.line(order, lineId);
     if (line.getInitialRequestedQty() != null
         && line.getRequestedQty().compareTo(line.getInitialRequestedQty()) != 0) {
       // The acceptance had moved the line to the accepted quantity; the customer's request stands
@@ -238,6 +253,12 @@ public class QuantityAcceptanceService {
     if (!proposal.getId().equals(latest)) {
       throw OrderIntakeException.conflict(
           "PROPOSAL_STALE", "A newer proposal exists for this line; decide on the latest one");
+    }
+    // A product correction leaves the earlier proposal behind: it offered another product's
+    // pieces, whatever the stock of the corrected product holds now (CEDIT-03).
+    if (!proposal.getProductId().equals(line.getProductId())) {
+      throw OrderIntakeException.conflict(
+          "PROPOSAL_STALE", "The line's product changed after this proposal; evaluate again");
     }
     boolean sameRequest =
         proposal.getRequestedQty().compareTo(line.getRequestedQty()) == 0

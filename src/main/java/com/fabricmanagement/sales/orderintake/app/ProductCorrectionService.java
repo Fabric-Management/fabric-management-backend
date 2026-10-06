@@ -15,6 +15,7 @@ import com.fabricmanagement.sales.orderintake.infra.repository.LinePortionReadin
 import com.fabricmanagement.sales.orderintake.infra.repository.LineProductCorrectionRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
 import com.fabricmanagement.sales.salesorder.app.CatalogLineValidator;
+import com.fabricmanagement.sales.salesorder.app.SalesOrderRevision;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -23,6 +24,7 @@ import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepo
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -64,12 +66,18 @@ public class ProductCorrectionService {
   private final Clock clock;
   private final com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock
       fulfilmentLock;
+  private final SalesOrderRevision revision;
 
   @Transactional
   public List<FulfilmentDtos.CorrectionView> correct(
       UUID orderId, FulfilmentDtos.CorrectProduct input, UUID actor) {
     UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = access.writableOrder(orderId, actor);
+    // Lock order (CEDIT-02 §5.5): the order row, then the advisory line locks, then the line rows.
+    // Status and versions are judged on what is current after the locks.
+    revision.lockFresh(order);
+    access.requireActive(order);
+    long versionBefore = order.getVersion();
     if (!CORRECTABLE.contains(order.getStatus())) {
       throw OrderIntakeException.conflict(
           "ORDER_NOT_CORRECTABLE",
@@ -81,6 +89,7 @@ public class ProductCorrectionService {
     }
     fulfilmentLock.lockAll(
         tenantId, input.lines().stream().map(FulfilmentDtos.LineVersion::lineId).toList());
+    // The other line writers wait on the order row, so the lines read now are the committed ones.
     List<SalesOrderLine> all =
         lines.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
     Map<UUID, SalesOrderLine> group =
@@ -94,6 +103,11 @@ public class ProductCorrectionService {
           "PRODUCT_GROUP_MISMATCH",
           "Name every distribution of the product in this order; they are corrected together");
     }
+    // Row locks only on the corrected lines, whose advisory locks are held, in id order; each is
+    // reloaded so its version is judged as committed.
+    group.values().stream()
+        .sorted(Comparator.comparing(line -> line.getId().toString()))
+        .forEach(revision::lockFresh);
     for (FulfilmentDtos.LineVersion ref : input.lines()) {
       SalesOrderLine line = group.get(ref.lineId());
       if (!ref.expectedVersion().equals(line.getVersion())) {
@@ -158,6 +172,8 @@ public class ProductCorrectionService {
                 greigeCovers.save(cover);
               });
     }
+    // The order's content changed: its version moves exactly once.
+    revision.advanceOnce(order, versionBefore);
     return historyForOrder(tenantId, order.getId());
   }
 

@@ -80,6 +80,7 @@ public class QuantityEvaluationService {
         QuantityProposal.record(
             order.getId(),
             line.getId(),
+            line.getProductId(),
             line.getRequestedQty(),
             line.getUnit(),
             evaluation.result(),

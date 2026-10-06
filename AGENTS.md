@@ -175,6 +175,13 @@ public record CreateBatchRequest(
   endpoint'lerine KOPYALAMA.
 - **OpenAPI (SÖZLEŞME)** → Frontend'in tüm tip güvenliği bu belgelendirmeye bağlıdır! `@Tag`, `@Operation`, `@ApiResponse`, `@Schema(required = true)` gibi annotation'lar asla eksik bırakılamaz. Backend'deki bir drift, frontend'i otomatik patlatır.
 - **API versioning** → `/api/v1/`
+- **Safe-edit DTO istisnası (CEDIT-02 §4.2, CEDIT-03):** `sales/salesorder/dto` altındaki güvenli kayıt
+  istek tipleri (`SalesOrderEditRequest`, `SalesOrderHeaderEdits`, `SalesOrderLineFieldEdits`,
+  `SalesOrderLineEdit`, `SalesOrder*FieldEdit`/`*Edit`) record değil, setter'lı sınıftır: gönderilmeyen
+  alan, açık `null` (400) ve `CLEAR` ancak setter ile ayırt edilir. Yanıt adları sözleşmedeki
+  `SalesOrderEditBase`/`SalesOrderEditResult` gibi `Dto` son ekisizdir. Katı okuma, global mapper
+  değiştirilmeden her tipli seviyede reddeden `@JsonAnySetter` + `@Schema(additionalProperties = FALSE)`
+  ile yapılır. İstisna yalnız bu sözleşmenin tipleri içindir; başka DTO'lara kalıp olarak kopyalanmaz.
 
 ### 5.1 Exception Hiyerarşisi
 

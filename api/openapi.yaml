@@ -102,6 +102,8 @@ tags:
   name: WhatsApp Webhooks
 - description: User performance leaderboard
   name: FlowBoard — Performance
+- description: Edit bases and merged saves of draft orders
+  name: Sales Order Safe Edit
 - description: Immutable stock quality disposition decisions
   name: Quality Decisions
 - description: Commercial ownership for sales customers
@@ -51802,6 +51804,241 @@ paths:
         \ shifts"
       tags:
       - Delivery Commitments
+  /api/v1/sales/orders/{orderId}/edit-bases:
+    post:
+      description: Requires current write access and an editable draft. The base records
+        the order as read now; saves name it and are merged against it.
+      operationId: createSalesOrderEditBase
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseSalesOrderEditBase"
+          description: The base and the order as it was read for it
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Open the edit form: a server base for this user"
+      tags:
+      - Sales Order Safe Edit
+  /api/v1/sales/orders/{orderId}/edit-operations:
+    post:
+      description: Only the keys sent change. A retry with the same operation id and
+        content answers the recorded result again. Conflicts save nothing and answer
+        409 EDIT_CONFLICT or EDIT_BASE_EXPIRED with a new base to resolve against;
+        other 409 codes carry only the standard problem fields.
+      operationId: saveSalesOrderEdit
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesOrderEditRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseSalesOrderEditResult"
+          description: Saved (APPLIED) or nothing differed (NO_CHANGE)
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/SalesOrderEditConflictProblem"
+          description: "EDIT_CONFLICT or EDIT_BASE_EXPIRED with conflicts and currentBase;\
+            \ EDIT_BASE_UNKNOWN, OPERATION_ID_REUSED, LINE_ALREADY_ADDED or an order\
+            \ rule otherwise"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Save changed keys against a base
+      tags:
+      - Sales Order Safe Edit
+  /api/v1/sales/orders/{orderId}/edit-operations/{operationId}:
+    get:
+      description: "For diagnosis only. Not found is not proof that a save failed:\
+        \ repeat the same save to learn its result."
+      operationId: getSalesOrderEditOperation
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: operationId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseSalesOrderEditOperationView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: The recorded outcome of one of my saves
+      tags:
+      - Sales Order Safe Edit
   /api/v1/sales/orders/{orderId}/parties:
     get:
       operationId: getOrderParties
@@ -62436,6 +62673,60 @@ components:
           type: array
           items:
             type: string
+    ApiResponseSalesOrderEditBase:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SalesOrderEditBase"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseSalesOrderEditOperationView:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SalesOrderEditOperationView"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseSalesOrderEditResult:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SalesOrderEditResult"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseSalesProductDto:
       type: object
       properties:
@@ -64353,31 +64644,42 @@ components:
           type: string
           description: Warning details
     Categorical:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          values:
-            type: array
-            items:
-              type: string
-            uniqueItems: true
+      type: object
+      additionalProperties: false
+      properties:
+        valueType:
+          type: string
+          enum:
+          - CATEGORICAL
+        values:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      required:
+      - valueType
     CertificateRef:
       type: object
+      additionalProperties: false
       properties:
         certificateKind:
           type: string
         scheme:
           type: string
     Certification:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          certificates:
-            type: array
-            items:
-              $ref: "#/components/schemas/CertificateRef"
+      type: object
+      additionalProperties: false
+      properties:
+        certificates:
+          type: array
+          items:
+            $ref: "#/components/schemas/CertificateRef"
+        valueType:
+          type: string
+          enum:
+          - CERTIFICATION
+      required:
+      - valueType
     CertificationSummary:
       type: object
       properties:
@@ -64808,13 +65110,18 @@ components:
       - matchedIsPrimary
       - primaryExternalCode
     ColourIdentity:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          colorId:
-            type: string
-            format: uuid
+      type: object
+      additionalProperties: false
+      properties:
+        colorId:
+          type: string
+          format: uuid
+        valueType:
+          type: string
+          enum:
+          - COLOUR_IDENTITY
+      required:
+      - valueType
     CommitmentChangeOrigin:
       type: string
       enum:
@@ -65376,6 +65683,7 @@ components:
           description: OVERRUN | SAVING | ON_TARGET (±2%) | NO_DATA
     CountrySetReference:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -68691,6 +68999,7 @@ components:
       - holderDisplay
     DecisionBasis:
       type: object
+      additionalProperties: false
       properties:
         actorId:
           type: string
@@ -72200,6 +72509,7 @@ components:
           type: string
     NumericBounds:
       type: object
+      additionalProperties: false
       properties:
         boundType:
           type: string
@@ -74037,28 +74347,33 @@ components:
           type: string
           format: uuid
     Origin:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          allowedCountries:
-            type: array
-            items:
-              type: string
-            uniqueItems: true
-          countrySet:
-            $ref: "#/components/schemas/CountrySetReference"
-          mixtureRule:
+      type: object
+      additionalProperties: false
+      properties:
+        allowedCountries:
+          type: array
+          items:
             type: string
-            enum:
-            - SINGLE_ORIGIN
-            - ALL_ORIGINS_ALLOWED
-          originSubject:
-            type: string
-            enum:
-            - FIBRE_GROWN
-            - YARN_SPUN
-            - FABRIC_MADE
+          uniqueItems: true
+        countrySet:
+          $ref: "#/components/schemas/CountrySetReference"
+        mixtureRule:
+          type: string
+          enum:
+          - SINGLE_ORIGIN
+          - ALL_ORIGINS_ALLOWED
+        originSubject:
+          type: string
+          enum:
+          - FIBRE_GROWN
+          - YARN_SPUN
+          - FABRIC_MADE
+        valueType:
+          type: string
+          enum:
+          - ORIGIN
+      required:
+      - valueType
     OverrideStatusRequest:
       type: object
       properties:
@@ -78988,6 +79303,7 @@ components:
       - UNSPECIFIED
     RequirementDeviation:
       type: object
+      additionalProperties: false
       properties:
         actorId:
           type: string
@@ -79001,6 +79317,7 @@ components:
           type: string
     RequirementFacet:
       type: object
+      additionalProperties: false
       properties:
         comparison:
           type: string
@@ -79043,6 +79360,17 @@ components:
           $ref: "#/components/schemas/RequirementFacetValue"
     RequirementFacetValue:
       discriminator:
+        mapping:
+          CATEGORICAL: "#/components/schemas/Categorical"
+          CERTIFICATION: "#/components/schemas/Certification"
+          COLOUR_IDENTITY: "#/components/schemas/ColourIdentity"
+          ORIGIN: "#/components/schemas/Origin"
+          SHADE_APPROVAL: "#/components/schemas/ShadeApproval"
+          WEIGHT: "#/components/schemas/Weight"
+          WIDTH: "#/components/schemas/Width"
+          YARN_CONSTRUCTION: "#/components/schemas/YarnConstruction"
+          YARN_COUNT: "#/components/schemas/YarnCount"
+          YARN_TWIST: "#/components/schemas/YarnTwist"
         propertyName: valueType
       oneOf:
       - $ref: "#/components/schemas/Certification"
@@ -79055,13 +79383,9 @@ components:
       - $ref: "#/components/schemas/YarnTwist"
       - $ref: "#/components/schemas/YarnConstruction"
       - $ref: "#/components/schemas/Categorical"
-      properties:
-        valueType:
-          type: string
-      required:
-      - valueType
     RequirementProfileBasis:
       type: object
+      additionalProperties: false
       properties:
         actorId:
           type: string
@@ -79090,6 +79414,7 @@ components:
           format: int32
     RequirementProfileInput:
       type: object
+      additionalProperties: false
       properties:
         basis:
           $ref: "#/components/schemas/RequirementProfileBasis"
@@ -79745,6 +80070,31 @@ components:
       - HOLD
       - RESUME
       - REVISE
+    SalesOrderAgreementContextEdit:
+      type: object
+      additionalProperties: false
+      description: "Where the order was agreed, with its description, as one key."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderAgreementContextValue"
+          description: The whole context with SET
+      required:
+      - operation
+    SalesOrderAgreementContextValue:
+      type: object
+      additionalProperties: false
+      properties:
+        context:
+          $ref: "#/components/schemas/AgreementContext"
+        note:
+          type: string
+          description: Description of an OTHER context
+          maxLength: 500
+          minLength: 0
+      required:
+      - context
     SalesOrderCapability:
       type: object
       properties:
@@ -79762,6 +80112,41 @@ components:
       - action
       - allowed
       - reason
+    SalesOrderContactEdit:
+      type: object
+      additionalProperties: false
+      description: "The customer's contact person as one key: name, e-mail, phone\
+        \ and WhatsApp consent."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderContactValue"
+          description: The whole contact with SET; CLEAR empties all of it
+      required:
+      - operation
+    SalesOrderContactValue:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        whatsapp:
+          type: boolean
+          description: WhatsApp needs a phone number; true without one is refused
+      required:
+      - whatsapp
     SalesOrderCurrencyTotalDto:
       type: object
       description: "Order totals in one agreed currency, derived from the lines"
@@ -79789,6 +80174,58 @@ components:
       - netAmount
       - subtotal
       - taxAmount
+    SalesOrderDateFieldEdit:
+      type: object
+      additionalProperties: false
+      description: A date field instruction.
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          type: string
+          format: date
+          description: The new date with SET; never sent with CLEAR
+      required:
+      - operation
+    SalesOrderDeliveryTermsEdit:
+      type: object
+      additionalProperties: false
+      description: "The delivery term as one key: rule, named place, edition, standing\
+        \ and contract reference."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderDeliveryTermsValue"
+          description: The whole delivery term with SET; CLEAR removes the term
+      required:
+      - operation
+    SalesOrderDeliveryTermsValue:
+      type: object
+      additionalProperties: false
+      properties:
+        contractReference:
+          type: string
+          description: The contract that fixed the term
+          maxLength: 200
+          minLength: 0
+        incotermsVersion:
+          $ref: "#/components/schemas/IncotermsVersion"
+          description: Incoterms edition; the current edition when omitted
+        place:
+          type: string
+          description: Place named with the term (under C-terms the destination)
+          maxLength: 200
+          minLength: 0
+        status:
+          $ref: "#/components/schemas/DeliveryTermStatus"
+          description: Proposed when omitted; agreement by the customer comes only
+            from approval
+        term:
+          $ref: "#/components/schemas/DeliveryTerm"
+      required:
+      - place
+      - term
     SalesOrderDto:
       type: object
       properties:
@@ -79943,6 +80380,502 @@ components:
       required:
       - totals
       - unpricedLineCount
+    SalesOrderEditBase:
+      type: object
+      properties:
+        baseId:
+          type: string
+          format: uuid
+        capturedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        order:
+          $ref: "#/components/schemas/SalesOrderDto"
+          description: "The order with its lines and the caller's capabilities, as\
+            \ in the base"
+        orderId:
+          type: string
+          format: uuid
+        orderVersion:
+          type: integer
+          format: int64
+      required:
+      - baseId
+      - capturedAt
+      - expiresAt
+      - order
+      - orderId
+      - orderVersion
+    SalesOrderEditConflict:
+      type: object
+      properties:
+        base:
+          $ref: "#/components/schemas/JsonNode"
+          description: The value in the base the save was made against
+        choices:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrderEditResolutionChoice"
+        clientLineId:
+          type: string
+          format: uuid
+          description: The new line the conflict is about
+        current:
+          $ref: "#/components/schemas/JsonNode"
+          description: The value saved now
+        key:
+          type: string
+          description: "Edit key, for example paymentTerms or line.pricing; line for\
+            \ a whole line"
+        lineId:
+          type: string
+          format: uuid
+          description: The existing line the conflict is about
+        mine:
+          $ref: "#/components/schemas/JsonNode"
+          description: The value the save asked for
+        reason:
+          $ref: "#/components/schemas/SalesOrderEditConflictReason"
+      required:
+      - choices
+      - key
+      - reason
+    SalesOrderEditConflictProblem:
+      type: object
+      properties:
+        args:
+          type: array
+          description: Dynamic arguments for parameterized frontend messages
+          items: {}
+        baseId:
+          type: string
+          format: uuid
+          description: "The base the save was made against (EDIT_CONFLICT, EDIT_BASE_EXPIRED)"
+        code:
+          type: string
+          description: "Domain-specific error code (e.g., 'VALIDATION_ERROR', 'INSUFFICIENT_WEIGHT')"
+        conflicts:
+          type: array
+          description: "What was not saved (EDIT_CONFLICT, EDIT_BASE_EXPIRED)"
+          items:
+            $ref: "#/components/schemas/SalesOrderEditConflict"
+        currentBase:
+          $ref: "#/components/schemas/SalesOrderEditBase"
+          description: "The base to resolve against (EDIT_CONFLICT, EDIT_BASE_EXPIRED)"
+        detail:
+          type:
+          - string
+          - "null"
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Validation field errors, if applicable"
+        instance:
+          type:
+          - string
+          - "null"
+          format: uri
+        operationId:
+          type: string
+          format: uuid
+          description: "The save's operation id (EDIT_CONFLICT, EDIT_BASE_EXPIRED)"
+        properties:
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
+        status:
+          type: integer
+          format: int32
+        title:
+          type:
+          - string
+          - "null"
+        traceId:
+          type: string
+          description: Reference of this failure that also appears in the server log.
+            Present on server errors.
+        type:
+          type: string
+          format: uri
+      required:
+      - code
+    SalesOrderEditConflictReason:
+      type: string
+      enum:
+      - CHANGED_ON_SERVER
+      - LINE_REMOVED_ON_SERVER
+      - LINE_CHANGED_ON_SERVER
+      - LINE_PRODUCT_CHANGED
+      - UNCONFIRMED_REVERT
+      - REVIEW_REQUIRED
+    SalesOrderEditLineIdMapping:
+      type: object
+      properties:
+        clientLineId:
+          type: string
+          format: uuid
+        lineId:
+          type: string
+          format: uuid
+      required:
+      - clientLineId
+      - lineId
+    SalesOrderEditOperationView:
+      type: object
+      properties:
+        conflictBaseId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The base a conflict was answered with; null otherwise
+        lineIds:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrderEditLineIdMapping"
+        operationId:
+          type: string
+          format: uuid
+        outcome:
+          $ref: "#/components/schemas/SalesOrderEditOutcome"
+        recordedAt:
+          type: string
+          format: date-time
+        resultVersion:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The version the save left; null for a conflict
+      required:
+      - conflictBaseId
+      - lineIds
+      - operationId
+      - outcome
+      - recordedAt
+      - resultVersion
+    SalesOrderEditOutcome:
+      type: string
+      enum:
+      - APPLIED
+      - NO_CHANGE
+      - CONFLICT
+    SalesOrderEditRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        baseId:
+          type: string
+          format: uuid
+        header:
+          $ref: "#/components/schemas/SalesOrderHeaderEdits"
+          description: Header keys changed against the base
+        lines:
+          type: array
+          description: Line operations; a line not listed is not touched
+          items:
+            $ref: "#/components/schemas/SalesOrderLineEdit"
+          maxItems: 200
+        operationId:
+          type: string
+          format: uuid
+          description: Same id for a retry of the same save; a new id for changed
+            content
+        resolutions:
+          type: array
+          description: One decision per conflict of the base's origin; only on a conflict
+            or expired base
+          items:
+            $ref: "#/components/schemas/SalesOrderEditResolution"
+      required:
+      - baseId
+      - operationId
+    SalesOrderEditResolution:
+      type: object
+      additionalProperties: false
+      properties:
+        choice:
+          $ref: "#/components/schemas/SalesOrderEditResolutionChoice"
+        clientLineId:
+          type: string
+          format: uuid
+          description: "The conflict's new line, when it is about an added line"
+        key:
+          type: string
+          example: paymentTerms
+          maxLength: 40
+          minLength: 0
+        lineId:
+          type: string
+          format: uuid
+          description: "The conflict's line, when it is about an existing line"
+      required:
+      - choice
+      - key
+    SalesOrderEditResolutionChoice:
+      type: string
+      enum:
+      - KEEP_CURRENT
+      - USE_MINE
+      - NEW_VALUE
+    SalesOrderEditResult:
+      type: object
+      properties:
+        lineIds:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrderEditLineIdMapping"
+        nextBase:
+          $ref: "#/components/schemas/SalesOrderEditBase"
+        operationId:
+          type: string
+          format: uuid
+        outcome:
+          $ref: "#/components/schemas/SalesOrderEditOutcome"
+          description: APPLIED or NO_CHANGE
+        replayed:
+          type: boolean
+          description: True when this answer repeats an earlier save of the same operation
+        resultVersion:
+          type: integer
+          format: int64
+      required:
+      - lineIds
+      - nextBase
+      - operationId
+      - outcome
+      - replayed
+      - resultVersion
+    SalesOrderFieldEditOperation:
+      type: string
+      enum:
+      - SET
+      - CLEAR
+    SalesOrderFlagFieldEdit:
+      type: object
+      additionalProperties: false
+      description: "A yes/no field instruction; false is a value, not a clear."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          type: boolean
+          description: The new value with SET; never sent with CLEAR
+      required:
+      - operation
+    SalesOrderHeaderEdits:
+      type: object
+      additionalProperties: false
+      properties:
+        agreementContext:
+          $ref: "#/components/schemas/SalesOrderAgreementContextEdit"
+          description: "Where the order was agreed, with its description, as one key"
+        billingAddress:
+          allOf:
+          - $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          - type: object
+            properties:
+              value:
+                type: string
+                maxLength: 500
+          description: "Deprecated billing address, at most 500 characters"
+        contact:
+          $ref: "#/components/schemas/SalesOrderContactEdit"
+          description: "The customer's contact person, as one key"
+        customerReference:
+          allOf:
+          - $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          - type: object
+            properties:
+              value:
+                type: string
+                maxLength: 100
+          description: "Customer's purchase order reference, at most 100 characters"
+        deadline:
+          $ref: "#/components/schemas/SalesOrderDateFieldEdit"
+          description: Customer deadline for all lines
+        deliveryTerms:
+          $ref: "#/components/schemas/SalesOrderDeliveryTermsEdit"
+          description: "The delivery term with its place, edition and standing, as\
+            \ one key"
+        notes:
+          $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          description: Notes; spaces and line breaks are kept
+        orderDate:
+          $ref: "#/components/schemas/SalesOrderDateFieldEdit"
+          description: "Order date; required, CLEAR is refused"
+        paymentTerms:
+          allOf:
+          - $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          - type: object
+            properties:
+              value:
+                type: string
+                maxLength: 200
+          description: "Agreed payment terms, at most 200 characters"
+        requestedDeliveryDate:
+          $ref: "#/components/schemas/SalesOrderDateFieldEdit"
+          description: The date the customer asked for; an event chosen earlier is
+            kept
+        shippingAddress:
+          allOf:
+          - $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          - type: object
+            properties:
+              value:
+                type: string
+                maxLength: 500
+          description: "Deprecated shipping address, at most 500 characters"
+        shippingMethod:
+          allOf:
+          - $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          - type: object
+            properties:
+              value:
+                type: string
+                maxLength: 50
+          description: "Deprecated shipping method, at most 50 characters"
+    SalesOrderIdFieldEdit:
+      type: object
+      additionalProperties: false
+      description: A reference field instruction (for example the colour card).
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          type: string
+          format: uuid
+          description: The new reference with SET; never sent with CLEAR
+      required:
+      - operation
+    SalesOrderLineEdit:
+      type: object
+      additionalProperties: false
+      properties:
+        clientLineId:
+          type: string
+          format: uuid
+          description: The client's stable id of a new line (ADD only)
+        fields:
+          $ref: "#/components/schemas/SalesOrderLineFieldEdits"
+          description: "ADD: SET instructions, quantity required. UPDATE: at least\
+            \ one. REMOVE: none"
+        lineId:
+          type: string
+          format: uuid
+          description: "The existing line (UPDATE, REMOVE); never with ADD"
+        operation:
+          $ref: "#/components/schemas/SalesOrderLineEditOperation"
+        productId:
+          type: string
+          format: uuid
+          description: The product of a new line (ADD only); a line's product never
+            changes here
+      required:
+      - operation
+    SalesOrderLineEditOperation:
+      type: string
+      enum:
+      - ADD
+      - UPDATE
+      - REMOVE
+    SalesOrderLineFieldEdits:
+      type: object
+      additionalProperties: false
+      properties:
+        colorId:
+          $ref: "#/components/schemas/SalesOrderIdFieldEdit"
+          description: Colour card of the distribution
+        finishedWidth:
+          $ref: "#/components/schemas/SalesOrderLineWidthEdit"
+          description: "Finished width with its unit, as one key"
+        pricing:
+          $ref: "#/components/schemas/SalesOrderLinePricingEdit"
+          description: "Price in its currency with discount and tax, as one key"
+        productDesc:
+          $ref: "#/components/schemas/SalesOrderTextFieldEdit"
+          description: Optional line note; never a substitute for the product
+        quantity:
+          $ref: "#/components/schemas/SalesOrderLineQuantityEdit"
+          description: "Requested quantity in its unit; required on ADD, CLEAR is\
+            \ refused"
+        requestedDeliveryDate:
+          $ref: "#/components/schemas/SalesOrderDateFieldEdit"
+          description: Customer-requested delivery date of this distribution
+        singleLotRequired:
+          $ref: "#/components/schemas/SalesOrderFlagFieldEdit"
+          description: Whether the distribution must come from one dye lot; CLEAR
+            is refused
+        specification:
+          $ref: "#/components/schemas/SalesOrderLineSpecificationEdit"
+          description: "Module type, module specs and requirement profile, as one\
+            \ key; CLEAR is refused"
+        tolerance:
+          $ref: "#/components/schemas/SalesOrderLineToleranceEdit"
+          description: "Agreed quantity tolerance, as one key"
+    SalesOrderLinePricingEdit:
+      type: object
+      additionalProperties: false
+      description: "A line's agreed price in its currency with discount and tax, as\
+        \ one key."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderLinePricingValue"
+          description: The whole pricing with SET; CLEAR leaves the line unpriced
+      required:
+      - operation
+    SalesOrderLinePricingValue:
+      type: object
+      additionalProperties: false
+      properties:
+        currency:
+          type: string
+          description: Agreed sales currency of the line (ISO 4217)
+          example: GBP
+          pattern: "[A-Z]{3}"
+        discountAmount:
+          type: number
+          minimum: 0
+        taxAmount:
+          type: number
+          minimum: 0
+        unitPrice:
+          type: number
+          minimum: 0
+    SalesOrderLineQuantityEdit:
+      type: object
+      additionalProperties: false
+      description: "A line's requested quantity in its unit, as one key; it cannot\
+        \ be cleared."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderLineQuantityValue"
+          description: The quantity and unit with SET
+      required:
+      - operation
+    SalesOrderLineQuantityValue:
+      type: object
+      additionalProperties: false
+      properties:
+        requestedQty:
+          type: number
+          minimum: 0.001
+        unit:
+          type: string
+          maxLength: 20
+          minLength: 0
+      required:
+      - requestedQty
+      - unit
     SalesOrderLineRequest:
       type: object
       properties:
@@ -80114,6 +81047,102 @@ components:
           format: int64
           description: Line version; commands that change the line send it back (SOI
             R19)
+    SalesOrderLineSpecificationEdit:
+      type: object
+      additionalProperties: false
+      description: "A line's module type, module specs and requirement profile as\
+        \ one key; it cannot be cleared."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderLineSpecificationValue"
+          description: The whole specification with SET
+      required:
+      - operation
+    SalesOrderLineSpecificationValue:
+      type: object
+      additionalProperties: false
+      properties:
+        moduleSpecs:
+          type: object
+          additionalProperties: true
+          description: "Free module specs, compared and saved as one whole value"
+        moduleType:
+          type: string
+          description: Production module of the line
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - DYE_FINISHING
+        requirementProfile:
+          $ref: "#/components/schemas/RequirementProfileInput"
+          description: "Typed requirement profile input, resolved against the base's\
+            \ profile; omitted keeps the base profile"
+    SalesOrderLineToleranceEdit:
+      type: object
+      additionalProperties: false
+      description: A line's agreed quantity tolerance as one key.
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderLineToleranceValue"
+          description: Both limits with SET; CLEAR removes the tolerance
+      required:
+      - operation
+    SalesOrderLineToleranceValue:
+      type: object
+      additionalProperties: false
+      properties:
+        downPct:
+          type: number
+          maximum: 100
+          minimum: 0
+        upPct:
+          type: number
+          maximum: 100
+          minimum: 0
+    SalesOrderLineWidthEdit:
+      type: object
+      additionalProperties: false
+      description: "A line's finished width with its unit, as one key."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/SalesOrderLineWidthValue"
+          description: Width and unit with SET; CLEAR removes the width
+      required:
+      - operation
+    SalesOrderLineWidthValue:
+      type: object
+      additionalProperties: false
+      properties:
+        unit:
+          type: string
+          enum:
+          - CM
+          - IN
+          pattern: CM|IN|cm|in
+        value:
+          type: number
+          description: One of the product's defined finished widths
+          minimum: 0.01
+    SalesOrderTextFieldEdit:
+      type: object
+      additionalProperties: false
+      description: "A text field instruction; SET never takes a blank text, CLEAR\
+        \ is the only way to empty a field."
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          type: string
+          description: The new text with SET; never sent with CLEAR
+      required:
+      - operation
     SalesProductDto:
       type: object
       properties:
@@ -80393,18 +81422,23 @@ components:
       required:
       - expectedVersion
     ShadeApproval:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          approvalKind:
-            type: string
-            enum:
-            - LAB_DIP
-            - BULK_LOT
-            - EITHER
-          required:
-            type: boolean
+      type: object
+      additionalProperties: false
+      properties:
+        approvalKind:
+          type: string
+          enum:
+          - LAB_DIP
+          - BULK_LOT
+          - EITHER
+        required:
+          type: boolean
+        valueType:
+          type: string
+          enum:
+          - SHADE_APPROVAL
+      required:
+      - valueType
     ShipmentDto:
       type: object
       properties:
@@ -80619,6 +81653,7 @@ components:
             example: 22.5
     SpinningSystem:
       type: object
+      additionalProperties: false
       properties:
         code:
           type: string
@@ -80928,6 +81963,7 @@ components:
       - targetLocationId
     SubValueInteger:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -80940,6 +81976,7 @@ components:
           format: int32
     SubValueNumericBounds:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -80951,6 +81988,7 @@ components:
           $ref: "#/components/schemas/NumericBounds"
     SubValueSetString:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -80965,6 +82003,7 @@ components:
           uniqueItems: true
     SubValueSpinningSystem:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -80976,6 +82015,7 @@ components:
           $ref: "#/components/schemas/SpinningSystem"
     SubValueString:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -82083,6 +83123,7 @@ components:
       - newLocationId
     TwistStage:
       type: object
+      additionalProperties: false
       properties:
         direction:
           $ref: "#/components/schemas/SubValueString"
@@ -82095,6 +83136,7 @@ components:
           $ref: "#/components/schemas/SubValueNumericBounds"
     UnmodelledSpecConstraint:
       type: object
+      additionalProperties: false
       properties:
         field:
           type: string
@@ -84138,12 +85180,17 @@ components:
             description: Weft yarn information
             example: Ne 30/1 Cotton
     Weight:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          bounds:
-            $ref: "#/components/schemas/NumericBounds"
+      type: object
+      additionalProperties: false
+      properties:
+        bounds:
+          $ref: "#/components/schemas/NumericBounds"
+        valueType:
+          type: string
+          enum:
+          - WEIGHT
+      required:
+      - valueType
     WhatsAppCapabilityDto:
       type: object
       properties:
@@ -84163,22 +85210,27 @@ components:
         object:
           type: string
     Width:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          bounds:
-            $ref: "#/components/schemas/NumericBounds"
-          form:
-            type: string
-            enum:
-            - OPEN
-            - TUBULAR
-          materialState:
-            type: string
-            enum:
-            - FINISHED
-            - GREIGE
+      type: object
+      additionalProperties: false
+      properties:
+        bounds:
+          $ref: "#/components/schemas/NumericBounds"
+        form:
+          type: string
+          enum:
+          - OPEN
+          - TUBULAR
+        materialState:
+          type: string
+          enum:
+          - FINISHED
+          - GREIGE
+        valueType:
+          type: string
+          enum:
+          - WIDTH
+      required:
+      - valueType
     WorkOrderConsumptionResponse:
       type: object
       properties:
@@ -85126,35 +86178,45 @@ components:
         uid:
           type: string
     YarnConstruction:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          features:
-            $ref: "#/components/schemas/SubValueSetString"
-          foldCount:
-            $ref: "#/components/schemas/SubValueInteger"
-          spinningSystem:
-            $ref: "#/components/schemas/SubValueSpinningSystem"
-          structureType:
-            $ref: "#/components/schemas/SubValueString"
+      type: object
+      additionalProperties: false
+      properties:
+        features:
+          $ref: "#/components/schemas/SubValueSetString"
+        foldCount:
+          $ref: "#/components/schemas/SubValueInteger"
+        spinningSystem:
+          $ref: "#/components/schemas/SubValueSpinningSystem"
+        structureType:
+          $ref: "#/components/schemas/SubValueString"
+        valueType:
+          type: string
+          enum:
+          - YARN_CONSTRUCTION
+      required:
+      - valueType
     YarnCount:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          context:
-            type: string
-          countBasis:
-            type: string
-          originalSystem:
-            type: string
-          originalValue:
-            type: number
-          resultantTex:
-            type: number
-          resultantTexRule:
-            $ref: "#/components/schemas/NumericBounds"
+      type: object
+      additionalProperties: false
+      properties:
+        context:
+          type: string
+        countBasis:
+          type: string
+        originalSystem:
+          type: string
+        originalValue:
+          type: number
+        resultantTex:
+          type: number
+        resultantTexRule:
+          $ref: "#/components/schemas/NumericBounds"
+        valueType:
+          type: string
+          enum:
+          - YARN_COUNT
+      required:
+      - valueType
     YarnDuplicateCandidateDto:
       type: object
       description: Advisory same-canonical-key article candidate
@@ -85517,14 +86579,19 @@ components:
       - sourceKind
       - sourceRecordId
     YarnTwist:
-      allOf:
-      - $ref: "#/components/schemas/RequirementFacetValue"
-      - type: object
-        properties:
-          stages:
-            type: array
-            items:
-              $ref: "#/components/schemas/TwistStage"
+      type: object
+      additionalProperties: false
+      properties:
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/TwistStage"
+        valueType:
+          type: string
+          enum:
+          - YARN_TWIST
+      required:
+      - valueType
     YarnUnlinkedOpenDocumentsDto:
       type: object
       description: Advisory counts of open yarn documents without a product link

@@ -45,6 +45,16 @@ public class OrderIntakeAccess {
     return order;
   }
 
+  /**
+   * After the order row was locked and reloaded: an order deactivated meanwhile is reported like a
+   * missing one.
+   */
+  public void requireActive(SalesOrder order) {
+    if (!Boolean.TRUE.equals(order.getIsActive())) {
+      throw new NotFoundException("Sales order not found: " + order.getId());
+    }
+  }
+
   public boolean canWrite(SalesOrder order, UUID actor) {
     return accessPolicy.canWrite(TenantContext.requireTenantId(), actor, order);
   }

@@ -72,7 +72,12 @@ public class ModuleSpecsValidator {
         currentRequirementProfile);
   }
 
-  private void validate(
+  /**
+   * Validates a line's module type and specs against the requested typed profile and the line's
+   * current one (null for a new line). The legacy line requests and the safe edit (CEDIT-03) share
+   * this rule.
+   */
+  public void validate(
       ModuleType type,
       Map<String, Object> specs,
       RequirementProfileInput requirementProfile,
