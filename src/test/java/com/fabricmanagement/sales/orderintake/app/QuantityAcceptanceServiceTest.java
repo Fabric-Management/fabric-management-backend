@@ -197,6 +197,29 @@ class QuantityAcceptanceServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "CEDIT-03 S17.5: a proposal evaluated for the line's earlier product is stale, even when the"
+          + " same pieces are offered now")
+  void proposalOfTheEarlierProductIsStale() {
+    QuantityOption above =
+        option(QuantityOption.OptionKind.ABOVE, "514", List.of(lotA), List.of(pieceA));
+    QuantityProposal proposal = latest(above);
+    stock(List.of(lot(lotA, pieceA, PieceState.ELIGIBLE)), List.of());
+    // A product correction committed after the proposal.
+    line.setProductId(UUID.randomUUID());
+
+    assertThatThrownBy(
+            () ->
+                service.record(
+                    order.getId(), line.getId(), request(proposal, above, null, null), ACTOR))
+        .isInstanceOf(OrderIntakeException.class)
+        .extracting(error -> ((OrderIntakeException) error).getErrorCode())
+        .isEqualTo("ORDER_INTAKE_PROPOSAL_STALE");
+    verify(acceptances, never()).save(any());
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("500");
+  }
+
+  @Test
   @DisplayName("A newer proposal for the line makes the older one stale")
   void olderProposalIsStale() {
     QuantityOption above =
@@ -415,6 +438,83 @@ class QuantityAcceptanceServiceTest {
   }
 
   @Test
+  @DisplayName("CEDIT-03 §5: the order row is locked and reloaded before the line is read")
+  void locksTheOrderBeforeTheLine() {
+    QuantityOption below =
+        option(QuantityOption.OptionKind.BELOW, "212", List.of(lotA), List.of(pieceA));
+    QuantityProposal proposal = latest(below);
+    stock(List.of(lot(lotA, pieceA, PieceState.ELIGIBLE)), List.of());
+
+    service.record(
+        order.getId(),
+        line.getId(),
+        request(proposal, below, RemainingNeed.REMAINS_OPEN, null),
+        ACTOR);
+
+    org.mockito.InOrder locks = org.mockito.Mockito.inOrder(access, revision);
+    locks.verify(access).writableOrder(order.getId(), ACTOR);
+    locks.verify(revision).lockFresh(order);
+    locks.verify(access).line(order, line.getId());
+    locks.verify(revision).lockFresh(line);
+    locks.verify(revision).linesChanged(order);
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-03 §5: a recording of the same key committed while this one waited is answered from it")
+  void repeatCommittedWhileWaitingForTheLock() {
+    QuantityOption above =
+        option(QuantityOption.OptionKind.ABOVE, "514", List.of(lotA), List.of(pieceA));
+    QuantityAcceptance first =
+        QuantityAcceptance.record(
+            order.getId(),
+            line.getId(),
+            UUID.randomUUID(),
+            above,
+            QuantityOption.Compatibility.SINGLE_LOT,
+            new BigDecimal("514"),
+            "M",
+            QuantityAcceptanceBasis.CUSTOMER_ACCEPTED,
+            false,
+            null,
+            null,
+            new QuantityAcceptance.CustomerEvidence(
+                "Morgan", AcceptanceChannel.PHONE, NOW, null, null, true),
+            ACTOR,
+            NOW,
+            "key-2");
+    first.setId(UUID.randomUUID());
+    first.coverTerms("0".repeat(64));
+    // Not there before the lock; committed by the other recording by the time the lock is held.
+    when(acceptances.findByTenantIdAndIdempotencyKey(TENANT, "key-2"))
+        .thenReturn(Optional.empty(), Optional.of(first));
+
+    QuantityAcceptanceDto dto =
+        service.record(
+            order.getId(),
+            line.getId(),
+            new OrderIntakeRequests.RecordQuantityAcceptance(
+                UUID.randomUUID(),
+                above.optionKey(),
+                false,
+                null,
+                "Morgan",
+                AcceptanceChannel.PHONE,
+                NOW,
+                null,
+                null,
+                true,
+                "key-2"),
+            ACTOR);
+
+    assertThat(dto.id()).isEqualTo(first.getId());
+    verify(revision).lockFresh(order);
+    verify(acceptances, never()).save(any());
+    verify(lines, never()).save(any());
+    verify(revision, never()).linesChanged(any());
+  }
+
+  @Test
   void aRemeasuredPieceCannotBeAcceptedAtItsOldMetres() {
     QuantityOption below =
         option(QuantityOption.OptionKind.BELOW, "212", List.of(lotA), List.of(pieceA));
@@ -485,6 +585,7 @@ class QuantityAcceptanceServiceTest {
         QuantityProposal.record(
             order.getId(),
             line.getId(),
+            line.getProductId(),
             new BigDecimal("500"),
             "M",
             result,

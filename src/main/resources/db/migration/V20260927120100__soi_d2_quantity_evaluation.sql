@@ -115,6 +115,9 @@ CREATE TABLE IF NOT EXISTS sales_ord.quantity_proposal (
     version BIGINT NOT NULL DEFAULT 0,
     sales_order_id UUID NOT NULL,
     sales_order_line_id UUID NOT NULL,
+    -- The line's product when it was evaluated: stock of one product is no proposal for another
+    -- (CEDIT-03: a product correction leaves the earlier proposal behind).
+    product_id UUID NOT NULL,
     requested_qty NUMERIC(15, 3) NOT NULL CHECK (requested_qty > 0),
     unit VARCHAR(20) NOT NULL,
     evaluation_status VARCHAR(30) NOT NULL CHECK (evaluation_status IN

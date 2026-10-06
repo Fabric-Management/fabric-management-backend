@@ -1,5 +1,8 @@
 package com.fabricmanagement.sales.salesorder.domain.requirement;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -10,6 +13,8 @@ import java.util.stream.Collectors;
 /**
  * Caller-visible profile input. Identity, version, completeness and fingerprint are server-owned.
  */
+@JsonIgnoreProperties(ignoreUnknown = false)
+@Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
 public record RequirementProfileInput(
     RequirementProfileBasis basis,
     String scopeVersion,
@@ -18,6 +23,10 @@ public record RequirementProfileInput(
     List<RequirementFacet> facets,
     List<UnmodelledSpecConstraint> unmodelledConstraints,
     List<RequirementDeviation> deviations) {
+  @JsonAnySetter
+  public void rejectUnknownProperty(String name, Object value) {
+    throw new IllegalArgumentException("Unknown RequirementProfileInput property: " + name);
+  }
 
   public RequirementProfileInput {
     if (basis == null

@@ -37,6 +37,30 @@ public record RequirementProfileSnapshot(
     return pinnedSource == null ? null : pinnedSource.deepCopy();
   }
 
+  /**
+   * The same resolved content under another identity and version. The fingerprint is kept: it is
+   * computed from the content alone, never from the identity or version.
+   */
+  public RequirementProfileSnapshot withIdentity(UUID identity, int version) {
+    if (identity == null || version < 1) {
+      throw new IllegalArgumentException("Profile identity and positive version are required");
+    }
+    return new RequirementProfileSnapshot(
+        identity,
+        version,
+        basis,
+        scopeVersion,
+        resolutionRuleVersion,
+        scope,
+        facets,
+        unmodelledConstraints,
+        deviations,
+        pinnedSource,
+        complete,
+        incompleteReasons,
+        fingerprint);
+  }
+
   /** Rebuild input from the persisted basis, resolved values and recorded deviations. */
   public RequirementProfileInput reproductionInput() {
     return new RequirementProfileInput(

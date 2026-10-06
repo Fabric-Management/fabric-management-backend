@@ -34,6 +34,10 @@ public class QuantityProposal extends BaseEntity {
   @Column(name = "sales_order_line_id", nullable = false, updatable = false)
   private UUID salesOrderLineId;
 
+  /** The line's product when it was evaluated; a proposal holds for that product only. */
+  @Column(name = "product_id", nullable = false, updatable = false)
+  private UUID productId;
+
   @Column(name = "requested_qty", nullable = false, updatable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
 
@@ -60,6 +64,7 @@ public class QuantityProposal extends BaseEntity {
   public static QuantityProposal record(
       UUID salesOrderId,
       UUID salesOrderLineId,
+      UUID productId,
       BigDecimal requestedQty,
       String unit,
       QuantityEvaluationResult result,
@@ -69,6 +74,8 @@ public class QuantityProposal extends BaseEntity {
     QuantityProposal proposal = new QuantityProposal();
     proposal.salesOrderId = salesOrderId;
     proposal.salesOrderLineId = salesOrderLineId;
+    proposal.productId =
+        java.util.Objects.requireNonNull(productId, "Evaluated product is required");
     proposal.requestedQty = requestedQty;
     proposal.unit = unit;
     proposal.result = result;

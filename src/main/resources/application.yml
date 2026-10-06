@@ -277,6 +277,18 @@ retention:
     deadTokenDays: ${QUOTE_RETENTION_DEAD_TOKEN_DAYS:365}
     cron: ${QUOTE_RETENTION_CRON:0 30 3 * * ?}
 
+# Sales order safe edit (CEDIT-03 §6): technical bases and save receipts, not business records.
+# Expiry is checked on every save; the cleanup only removes rows. Field history never expires.
+sales:
+  edit:
+    base-ttl: ${SALES_EDIT_BASE_TTL:PT8H}
+    expired-base-retention: ${SALES_EDIT_EXPIRED_BASE_RETENTION:P7D}
+    operation-retention: ${SALES_EDIT_OPERATION_RETENTION:P30D}
+    max-line-operations: ${SALES_EDIT_MAX_LINE_OPERATIONS:200}
+    cleanup-enabled: ${SALES_EDIT_CLEANUP_ENABLED:true}
+    cleanup-cron: ${SALES_EDIT_CLEANUP_CRON:0 45 3 * * *}
+    cleanup-batch-size: ${SALES_EDIT_CLEANUP_BATCH_SIZE:500}
+
 # Feature Flags
 feature:
   trading-partner:

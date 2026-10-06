@@ -352,6 +352,24 @@ class TenantTransactionalPurgeServiceTest {
   }
 
   @Test
+  void shouldDeleteSafeEditRowsBeforeTheirOrderAndLines() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    // CEDIT-03: a base names its origin receipt; history, bases and receipts name the order and
+    // line rows.
+    assertThat(tables.indexOf("sales_ord.order_edit_base"))
+        .isNotNegative()
+        .isLessThan(tables.indexOf("sales_ord.order_edit_operation"));
+    assertThat(tables.indexOf("sales_ord.order_field_change"))
+        .isNotNegative()
+        .isLessThan(tables.indexOf("sales_ord.sales_order_line"));
+    assertThat(tables.indexOf("sales_ord.order_edit_operation"))
+        .isLessThan(tables.indexOf("sales_ord.sales_order"));
+    assertThat(tables.indexOf("sales_ord.order_edit_base"))
+        .isLessThan(tables.indexOf("sales_ord.sales_order"));
+  }
+
+  @Test
   void shouldDeleteOrderCoverLedgerInForeignKeySafeOrder() {
     List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
 

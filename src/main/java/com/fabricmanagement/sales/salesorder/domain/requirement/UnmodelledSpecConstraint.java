@@ -1,10 +1,15 @@
 package com.fabricmanagement.sales.salesorder.domain.requirement;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * A pinned specification constraint that must never disappear merely because no comparator exists.
  */
+@JsonIgnoreProperties(ignoreUnknown = false)
+@Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
 public record UnmodelledSpecConstraint(
     String field,
     Status status,
@@ -12,6 +17,10 @@ public record UnmodelledSpecConstraint(
     String unitOrVocabulary,
     String meaning,
     String reason) {
+  @JsonAnySetter
+  public void rejectUnknownProperty(String name, Object value) {
+    throw new IllegalArgumentException("Unknown UnmodelledSpecConstraint property: " + name);
+  }
 
   public enum Status {
     RESOLVED_UNSUPPORTED,

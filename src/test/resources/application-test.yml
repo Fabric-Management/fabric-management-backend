@@ -48,6 +48,11 @@ retention:
   quote:
     enabled: false
 
+# Safe-edit cleanup runs only where a test calls it (SalesOrderEditRetentionIT).
+sales:
+  edit:
+    cleanup-enabled: false
+
 # OpenApiExportIT requires springdoc enabled to fetch /api-docs.yaml.
 # Default profile disables it for security (CVE mitigations for swagger-ui/DOMPurify).
 springdoc:

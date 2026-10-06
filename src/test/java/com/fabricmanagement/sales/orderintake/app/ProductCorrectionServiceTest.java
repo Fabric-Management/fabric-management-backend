@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,6 +20,7 @@ import com.fabricmanagement.sales.orderintake.infra.repository.LinePortionReadin
 import com.fabricmanagement.sales.orderintake.infra.repository.LineProductCorrectionRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
 import com.fabricmanagement.sales.salesorder.app.CatalogLineValidator;
+import com.fabricmanagement.sales.salesorder.app.SalesOrderRevision;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -66,6 +69,7 @@ class ProductCorrectionServiceTest {
 
   @Mock private ConfirmationGate gate;
   @Mock private LotCompatibilityRequestPort compatibilityRequests;
+  @Mock private SalesOrderRevision revision;
 
   private ProductCorrectionService service;
   private SalesOrder order;
@@ -90,7 +94,8 @@ class ProductCorrectionServiceTest {
             gate,
             compatibilityRequests,
             Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC),
-            fulfilmentLock);
+            fulfilmentLock,
+            revision);
     order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-5").build();
     order.setId(UUID.randomUUID());
     navy160 = line(OLD, 2L);
@@ -123,6 +128,52 @@ class ProductCorrectionServiceTest {
     verify(corrections, org.mockito.Mockito.times(2)).save(any(LineProductCorrection.class));
     verify(validator).validate(eq(TENANT), eq(order.getTradingPartnerId()), any());
     verify(gate).release(any(), eq(ACTOR), eq(ProductCorrectionService.RELEASE_REASON));
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-03 §5: order row, advisory locks, then only the corrected line rows; the version"
+          + " moves once")
+  void locksInOrderAndMovesTheVersionOnce() {
+    List<SalesOrderLine> inIdOrder =
+        java.util.stream.Stream.of(navy160, navy155)
+            .sorted(java.util.Comparator.comparing(line -> line.getId().toString()))
+            .toList();
+    SalesOrderLine first = inIdOrder.get(0);
+    SalesOrderLine second = inIdOrder.get(1);
+
+    service.correct(order.getId(), request(List.of(ref(navy160, 2L), ref(navy155, 5L))), ACTOR);
+
+    InOrder locks = inOrder(revision, fulfilmentLock);
+    locks.verify(revision).lockFresh(order);
+    locks.verify(fulfilmentLock).lockAll(eq(TENANT), any());
+    locks.verify(revision).lockFresh(first);
+    locks.verify(revision).lockFresh(second);
+    locks.verify(revision).advanceOnce(order, 0L);
+    verify(revision, never()).lockFresh(other);
+    verify(revision, never()).lockFreshLines(any());
+    verify(revision, never()).linesChanged(any());
+  }
+
+  @Test
+  @DisplayName("CEDIT-03 §5: the status is judged after the order row is locked and reloaded")
+  void statusIsJudgedAfterTheLock() {
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              order.setStatus(com.fabricmanagement.sales.salesorder.domain.OrderStatus.CANCELLED);
+              return null;
+            })
+        .when(revision)
+        .lockFresh(order);
+
+    assertThatThrownBy(
+            () ->
+                service.correct(
+                    order.getId(), request(List.of(ref(navy160, 2L), ref(navy155, 5L))), ACTOR))
+        .isInstanceOf(OrderIntakeException.class)
+        .extracting(error -> ((OrderIntakeException) error).getErrorCode())
+        .isEqualTo("ORDER_INTAKE_ORDER_NOT_CORRECTABLE");
+    verify(fulfilmentLock, never()).lockAll(any(), any());
   }
 
   @Test

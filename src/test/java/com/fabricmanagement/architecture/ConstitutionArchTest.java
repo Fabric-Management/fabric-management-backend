@@ -1099,6 +1099,8 @@ class ConstitutionArchTest {
       //   - PublicOrderApprovalService   : Public order approval link→tenant lookup, same pattern
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
+      //   - SalesOrderEditRetentionJob   : CEDIT-03 scheduled cleanup of expired edit bases and old
+      // save receipts across tenants; explicit tenant_id filter, never the order or its history
       //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
       // reconciliation
       //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
@@ -1144,6 +1146,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("QuoteRetentionPurgeJob")
               .and()
               .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
+              .and()
+              .doNotHaveSimpleName("SalesOrderEditRetentionJob")
               .and()
               .doNotHaveSimpleName("OwnershipAssignmentReconciliationMonitor")
               .and()

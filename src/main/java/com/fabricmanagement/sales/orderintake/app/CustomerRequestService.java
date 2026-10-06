@@ -208,7 +208,12 @@ public class CustomerRequestService {
   @Transactional
   public CustomerRequestDtos.RequestDto resolve(
       UUID orderId, UUID requestId, CustomerRequestDtos.ResolveRequest input, UUID actor) {
-    SalesOrder order = draft(access.writableOrder(orderId, actor));
+    SalesOrder writable = access.writableOrder(orderId, actor);
+    // Lock order (CEDIT-02 §5.5): the order row first, and the draft judged on its current state,
+    // before the new line is checked against the other lines and written.
+    orderRevision.lockFresh(writable);
+    access.requireActive(writable);
+    SalesOrder order = draft(writable);
     CustomerProductRequest request = attached(order, requestId);
     if (!request.hasQuantity()) {
       throw OrderIntakeException.rule(

@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(147)
+        .hasSize(150)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(147);
+    assertThat(expected).hasSize(150);
   }
 
   @Test
@@ -247,6 +247,17 @@ class SalesEndpointAuthorizationArchTest {
         "setOrderApprover",
         "grantApprovalAuthority",
         "revokeApprovalAuthority");
+    add(
+        result,
+        "SalesOrderEditController",
+        Category.MUTATION,
+        "createSalesOrderEditBase",
+        "saveSalesOrderEdit");
+    add(
+        result,
+        "SalesOrderEditController",
+        Category.TRANSACTIONAL_READ,
+        "getSalesOrderEditOperation");
     add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
     add(
         result,

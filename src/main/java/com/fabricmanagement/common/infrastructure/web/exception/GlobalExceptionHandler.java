@@ -79,6 +79,10 @@ public class GlobalExceptionHandler {
     if (ex.getDetails() != null && !ex.getDetails().isEmpty()) {
       ex.getDetails().forEach(pd::setProperty);
     }
+    // The typed errors field, as bean validation writes it; never also a property of that name.
+    if (!ex.getFieldErrors().isEmpty()) {
+      pd.setErrors(new java.util.LinkedHashMap<>(ex.getFieldErrors()));
+    }
     return ResponseEntity.status(status).body(pd);
   }
 

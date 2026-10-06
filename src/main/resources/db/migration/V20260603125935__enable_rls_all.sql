@@ -1469,6 +1469,33 @@ CREATE POLICY rls_tenant_isolation ON sales.sample_request
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
+-- Table: sales_ord.order_edit_base
+ALTER TABLE sales_ord.order_edit_base ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_ord.order_edit_base FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON sales_ord.order_edit_base;
+CREATE POLICY rls_tenant_isolation ON sales_ord.order_edit_base
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+-- Table: sales_ord.order_edit_operation
+ALTER TABLE sales_ord.order_edit_operation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_ord.order_edit_operation FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON sales_ord.order_edit_operation;
+CREATE POLICY rls_tenant_isolation ON sales_ord.order_edit_operation
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+-- Table: sales_ord.order_field_change
+ALTER TABLE sales_ord.order_field_change ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_ord.order_field_change FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON sales_ord.order_field_change;
+CREATE POLICY rls_tenant_isolation ON sales_ord.order_field_change
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- Table: sales_ord.sales_order
 ALTER TABLE sales_ord.sales_order ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_ord.sales_order FORCE ROW LEVEL SECURITY;

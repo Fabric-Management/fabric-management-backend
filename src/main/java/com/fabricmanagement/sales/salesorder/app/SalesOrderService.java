@@ -376,21 +376,38 @@ public class SalesOrderService {
 
   private void validateRequirementProfileContextChange(
       SalesOrderLine existing, UpdateSalesOrderLineRequest requested) {
+    assertProfileContextChange(
+        existing,
+        requested.getProductId(),
+        requested.getModuleType(),
+        requested.getRequirementProfile());
+  }
+
+  /**
+   * A profiled line whose product or module type changes needs a new profile from a new basis; the
+   * legacy update and the safe edit (CEDIT-03) apply the same rule.
+   */
+  static void assertProfileContextChange(
+      SalesOrderLine existing,
+      java.util.UUID requestedProductId,
+      ModuleType requestedModuleType,
+      com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput
+          requestedProfile) {
     var current = existing.getRequirementProfileSnapshot();
     if (current == null) {
       return;
     }
     boolean contextChanged =
-        !Objects.equals(existing.getProductId(), requested.getProductId())
-            || existing.getModuleType() != requested.getModuleType();
+        !Objects.equals(existing.getProductId(), requestedProductId)
+            || existing.getModuleType() != requestedModuleType;
     if (!contextChanged) {
       return;
     }
-    if (requested.getRequirementProfile() == null) {
+    if (requestedProfile == null) {
       throw new OrderDomainException(
           "Changing a profiled line's product or module type requires a new requirement profile basis");
     }
-    if (current.basis().equals(requested.getRequirementProfile().basis())) {
+    if (current.basis().equals(requestedProfile.basis())) {
       throw new OrderDomainException(
           "Changing a profiled line's product or module type requires full re-resolution from a new basis");
     }
@@ -417,7 +434,7 @@ public class SalesOrderService {
     line.setSingleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()));
   }
 
-  private static String normaliseWidthUnit(String unit) {
+  static String normaliseWidthUnit(String unit) {
     return unit == null || unit.isBlank() ? null : unit.trim().toUpperCase(java.util.Locale.ROOT);
   }
 
@@ -641,7 +658,7 @@ public class SalesOrderService {
    * moduleType varsa null döner. Null line moduleType değerleri deriveOrderUnit ile tutarlı şekilde
    * yok sayılır.
    */
-  private ModuleType deriveOrderModuleType(List<SalesOrderLine> lines) {
+  static ModuleType deriveOrderModuleType(List<SalesOrderLine> lines) {
     if (lines.isEmpty()) {
       return null;
     }
@@ -975,7 +992,7 @@ public class SalesOrderService {
     return Boolean.TRUE.equals(requested) && blankToNull(phone) != null;
   }
 
-  private static String blankToNull(String value) {
+  static String blankToNull(String value) {
     return value == null || value.isBlank() ? null : value.trim();
   }
 
@@ -1036,6 +1053,11 @@ public class SalesOrderService {
   }
 
   private SalesOrderLineResponse mapLineToResponse(SalesOrderLine line) {
+    return lineResponse(line);
+  }
+
+  /** A line as the order detail shows it; the safe edit's bases use the same mapping. */
+  static SalesOrderLineResponse lineResponse(SalesOrderLine line) {
     return SalesOrderLineResponse.builder()
         .id(line.getId())
         .uid(line.getUid())

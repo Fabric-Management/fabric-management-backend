@@ -65,6 +65,15 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;
 
+  /**
+   * The client's stable identity of a line added through the safe edit (CEDIT-03). Unique within
+   * the order across active and removed lines, so a repeated or re-sent add never creates a second
+   * line. Null for lines created by other paths.
+   */
+  @Column(name = "client_line_id", updatable = false)
+  @Setter(AccessLevel.NONE)
+  private UUID clientLineId;
+
   // ── Distribution (SOI K04/K05) ───────────────────────────────────────────
 
   /** Colour card of this distribution; must be an active tenant colour card when present. */

@@ -1,5 +1,7 @@
 package com.fabricmanagement.sales.salesorder.domain.requirement;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -55,7 +57,17 @@ public sealed interface RequirementFacetValue
         RequirementFacetValue.YarnConstruction,
         RequirementFacetValue.Categorical {
 
+  // The discriminated subtypes keep the runtime any-setter but publish no
+  // additionalProperties:false:
+  // their schemas are allOf the parent, where valueType lives, so the flag would reject every
+  // valid value. Unknown properties are still refused when the request is read.
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record Certification(List<CertificateRef> certificates) implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown Certification property: " + name);
+    }
+
     public Certification {
       certificates =
           certificates == null
@@ -74,7 +86,14 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record CertificateRef(String scheme, String certificateKind) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown CertificateRef property: " + name);
+    }
+
     public CertificateRef {
       if (scheme == null
           || scheme.isBlank()
@@ -87,12 +106,18 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record Origin(
       OriginSubject originSubject,
       Set<String> allowedCountries,
       CountrySetReference countrySet,
       MixtureRule mixtureRule)
       implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown Origin property: " + name);
+    }
+
     private static final Pattern COUNTRY = Pattern.compile("^[A-Z]{2}$");
 
     public Origin {
@@ -135,7 +160,14 @@ public sealed interface RequirementFacetValue
     ALL_ORIGINS_ALLOWED
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record CountrySetReference(String name, int version) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown CountrySetReference property: " + name);
+    }
+
     public CountrySetReference {
       if (name == null || name.isBlank() || version < 1) {
         throw new IllegalArgumentException("Country-set name and positive version are required");
@@ -143,14 +175,26 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record ColourIdentity(UUID colorId) implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown ColourIdentity property: " + name);
+    }
+
     public ColourIdentity {
       if (colorId == null) throw new IllegalArgumentException("Colour-card identity is required");
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record ShadeApproval(boolean required, ApprovalKind approvalKind)
       implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown ShadeApproval property: " + name);
+    }
+
     public ShadeApproval {
       if (required && approvalKind == null) {
         throw new IllegalArgumentException("Required shade approval needs an approval kind");
@@ -164,8 +208,14 @@ public sealed interface RequirementFacetValue
     EITHER
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record Width(NumericBounds bounds, WidthForm form, MaterialState materialState)
       implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown Width property: " + name);
+    }
+
     public Width {
       if (bounds == null || form == null || materialState == null) {
         throw new IllegalArgumentException("Width bounds, form and material state are required");
@@ -186,7 +236,13 @@ public sealed interface RequirementFacetValue
     GREIGE
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record Weight(NumericBounds bounds) implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown Weight property: " + name);
+    }
+
     public Weight {
       if (bounds == null || !"g/m²".equals(bounds.unit())) {
         throw new IllegalArgumentException("Fabric areal mass must be expressed in g/m²");
@@ -194,6 +250,8 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record NumericBounds(
       BoundType boundType,
       BigDecimal exact,
@@ -202,6 +260,11 @@ public sealed interface RequirementFacetValue
       boolean minimumInclusive,
       boolean maximumInclusive,
       String unit) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown NumericBounds property: " + name);
+    }
+
     public NumericBounds {
       if (boundType == null || unit == null || unit.isBlank()) {
         throw new IllegalArgumentException("Numeric bound type and unit are required");
@@ -228,6 +291,7 @@ public sealed interface RequirementFacetValue
     RANGE
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record YarnCount(
       String originalSystem,
       BigDecimal originalValue,
@@ -236,6 +300,11 @@ public sealed interface RequirementFacetValue
       BigDecimal resultantTex,
       NumericBounds resultantTexRule)
       implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown YarnCount property: " + name);
+    }
+
     public YarnCount(
         String originalSystem,
         BigDecimal originalValue,
@@ -246,7 +315,13 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record YarnTwist(List<TwistStage> stages) implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown YarnTwist property: " + name);
+    }
+
     public YarnTwist {
       stages =
           stages == null
@@ -258,11 +333,18 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record TwistStage(
       String stage,
       SubValue<String> direction,
       SubValue<NumericBounds> turnsPerMetre,
       Integer sequence) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown TwistStage property: " + name);
+    }
+
     public TwistStage {
       if (stage == null
           || stage.isBlank()
@@ -276,7 +358,14 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record SubValue<T>(RequirementFacet.State state, T value) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown SubValue property: " + name);
+    }
+
     public SubValue {
       if (state == null) throw new IllegalArgumentException("Sub-value state is required");
       if (state == RequirementFacet.State.BOUNDED && value == null) {
@@ -288,12 +377,18 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record YarnConstruction(
       SubValue<String> structureType,
       SubValue<Integer> foldCount,
       SubValue<SpinningSystem> spinningSystem,
       SubValue<Set<String>> features)
       implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown YarnConstruction property: " + name);
+    }
+
     public YarnConstruction {
       if (structureType == null
           || foldCount == null
@@ -311,7 +406,14 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record SpinningSystem(UUID id, String code, String family) {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown SpinningSystem property: " + name);
+    }
+
     public SpinningSystem {
       if (id == null || code == null || code.isBlank() || family == null || family.isBlank()) {
         throw new IllegalArgumentException(
@@ -320,7 +422,13 @@ public sealed interface RequirementFacetValue
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = false)
   record Categorical(Set<String> values) implements RequirementFacetValue {
+    @JsonAnySetter
+    public void rejectUnknownProperty(String name, Object value) {
+      throw new IllegalArgumentException("Unknown Categorical property: " + name);
+    }
+
     public Categorical {
       values =
           values == null
