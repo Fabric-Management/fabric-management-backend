@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(150)
+        .hasSize(151)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(150);
+    assertThat(expected).hasSize(151);
   }
 
   @Test
@@ -322,6 +322,7 @@ class SalesEndpointAuthorizationArchTest {
     // SOI order intake (D1-D8).
     add(result, "OrderIntakeProductController", Category.REFERENCE_READ, "search");
     add(result, "OrderIntakeAvailabilityController", Category.REFERENCE_READ, "get");
+    add(result, "OrderIntakeStockPreviewController", Category.REFERENCE_READ, "preview");
     add(
         result,
         "OrderIntakeController",

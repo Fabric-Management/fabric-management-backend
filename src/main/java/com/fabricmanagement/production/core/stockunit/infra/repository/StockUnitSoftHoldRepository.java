@@ -44,6 +44,43 @@ public interface StockUnitSoftHoldRepository extends JpaRepository<StockUnitSoft
             Collectors.toMap(SoftHoldCountRow::getStockUnitId, SoftHoldCountRow::getHoldCount));
   }
 
+  /**
+   * Active piece holds on the stock units of the given lots, with the lot each piece belongs to
+   * (STOCK-PREVIEW-1 A2). One query; tenant-scoped on both the hold and the piece.
+   */
+  @Query(
+      """
+      SELECT h.stockUnitId AS stockUnitId, s.batchId AS batchId, h.quoteLineId AS quoteLineId
+      FROM StockUnitSoftHold h, StockUnit s
+      WHERE h.tenantId = :tenantId
+        AND s.tenantId = :tenantId
+        AND s.id = h.stockUnitId
+        AND s.batchId IN :batchIds
+        AND s.isActive = true
+        AND h.status = :status
+        AND h.isActive = true
+      ORDER BY s.batchId, h.stockUnitId, h.quoteLineId
+      """)
+  List<HeldPieceRow> findActiveRowsByBatchIds(
+      @Param("tenantId") UUID tenantId,
+      @Param("batchIds") Collection<UUID> batchIds,
+      @Param("status") StockUnitSoftHoldStatus status);
+
+  default List<HeldPieceRow> findActiveByBatchIds(UUID tenantId, Collection<UUID> batchIds) {
+    if (batchIds == null || batchIds.isEmpty()) {
+      return List.of();
+    }
+    return findActiveRowsByBatchIds(tenantId, batchIds, StockUnitSoftHoldStatus.ACTIVE);
+  }
+
+  interface HeldPieceRow {
+    UUID getStockUnitId();
+
+    UUID getBatchId();
+
+    UUID getQuoteLineId();
+  }
+
   interface SoftHoldCountRow {
     UUID getStockUnitId();
 
