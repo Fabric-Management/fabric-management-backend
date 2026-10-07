@@ -49962,6 +49962,82 @@ paths:
       summary: Open ship-readiness questions for held stock
       tags:
       - Fulfilment Planning
+  /api/v1/sales/order-intake/stock-preview:
+    post:
+      description: "Evaluates the line exactly as a saved line with the same inputs\
+        \ would be evaluated and reports, beside the options, what other quotes hold\
+        \ on each lot and whether each option is covered by free stock. Guidance for\
+        \ the salesperson only: nothing is reserved or recorded, and the options are\
+        \ not changed by quote holds. A free quantity that cannot be determined is\
+        \ null with its reasons."
+      operationId: previewOrderIntakeStock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderIntakeStockPreviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderIntakeStockPreview"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Current stock for an order line that is not saved yet
+      tags:
+      - Order Intake
   /api/v1/sales/orders:
     get:
       operationId: getAllOrders
@@ -61130,6 +61206,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/OrderIntakeReadiness"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseOrderIntakeStockPreview:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/OrderIntakeStockPreview"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -73712,6 +73806,380 @@ components:
       - conditional
       - salesOrderLineId
       - stockChoice
+    OrderIntakeStockPreview:
+      type: object
+      properties:
+        canonicalUnit:
+          type: string
+          description: "Canonical stock unit (M for fabric, KG for yarn and fibre);\
+            \ \"?\" when the product's measure is unknown"
+        evaluation:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewEvaluation"
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewLot"
+        optionChecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewOptionCheck"
+        totals:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewTotals"
+        unconvertibleIntentCount:
+          type: integer
+          format: int32
+          description: Quote intents whose quantity could not be stated in the canonical
+            unit
+        unit:
+          type: string
+          description: The line's unit
+      required:
+      - canonicalUnit
+      - evaluation
+      - lots
+      - optionChecks
+      - totals
+      - unconvertibleIntentCount
+      - unit
+    OrderIntakeStockPreviewEvaluation:
+      type: object
+      properties:
+        agedByProductionDate:
+          type: boolean
+        canonicalUnit:
+          type: string
+        eligiblePieces:
+          type: integer
+          format: int32
+        excludedPieces:
+          type: integer
+          format: int32
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuantityProposalOption"
+        optionsOutsideAgreedTolerance:
+          type: integer
+          format: int32
+        requestedQuantity:
+          type: number
+        status:
+          $ref: "#/components/schemas/QuantityEvaluationStatus"
+        unit:
+          type: string
+        unknownPieces:
+          type: integer
+          format: int32
+        unknownReasons:
+          type: array
+          description: "Why the evaluation or some pieces are unknown, e.g. UNIT_NOT_CONVERTIBLE,\
+            \ MEASURE_UNKNOWN, QUANTITY_BELOW_RESOLUTION"
+          items:
+            type: string
+      required:
+      - agedByProductionDate
+      - canonicalUnit
+      - eligiblePieces
+      - excludedPieces
+      - options
+      - optionsOutsideAgreedTolerance
+      - requestedQuantity
+      - status
+      - unit
+      - unknownPieces
+      - unknownReasons
+    OrderIntakeStockPreviewFreeIncompleteReason:
+      type: string
+      enum:
+      - UNCONVERTIBLE_INTENT
+      - UNVERIFIED_HOLD
+    OrderIntakeStockPreviewHeldPiece:
+      type: object
+      properties:
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date
+        holdStatus:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewHoldStatus"
+        marketerName:
+          type:
+          - string
+          - "null"
+        pieceNo:
+          type: string
+        quoteNumber:
+          type:
+          - string
+          - "null"
+        stockUnitId:
+          type: string
+          format: uuid
+      required:
+      - expiresAt
+      - holdStatus
+      - marketerName
+      - pieceNo
+      - quoteNumber
+      - stockUnitId
+    OrderIntakeStockPreviewHoldStatus:
+      type: string
+      enum:
+      - VERIFIED
+      - UNVERIFIED
+    OrderIntakeStockPreviewIntent:
+      type: object
+      properties:
+        canonicalQuantity:
+          type:
+          - number
+          - "null"
+          description: Null when the quantity cannot be converted to the canonical
+            unit
+        expiresAt:
+          type: string
+          format: date
+        marketerName:
+          type:
+          - string
+          - "null"
+        quantity:
+          type: number
+        quoteNumber:
+          type:
+          - string
+          - "null"
+        unit:
+          type: string
+      required:
+      - canonicalQuantity
+      - expiresAt
+      - marketerName
+      - quantity
+      - quoteNumber
+      - unit
+    OrderIntakeStockPreviewLot:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        eligible:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          description: Pieces with a recorded quantity and confirmed saleability
+        eligiblePieces:
+          type: integer
+          format: int32
+        free:
+          anyOf:
+          - $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          - type: "null"
+          description: "Eligible minus intent-held, never below zero; null when freeComplete\
+            \ is false"
+        freeComplete:
+          type: boolean
+        freeIncompleteReasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewFreeIncompleteReason"
+        heldByQuotes:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          description: Sum of the convertible quote intents on the lot
+        heldPieces:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewHeldPiece"
+        intents:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewIntent"
+        lotNo:
+          type: string
+        unknown:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          description: "Measured pieces awaiting suitability evidence (quality, width,\
+            \ verification); never ready stock. Unmeasured records are counted in\
+            \ unmeasuredPieces, not here"
+        unknownPieces:
+          type: integer
+          format: int32
+        unmeasuredPieces:
+          type: integer
+          format: int32
+          description: "Records with no exact measure: a record to complete, never\
+            \ offerable stock; counted, never summed"
+        unverifiedHold:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          description: "Eligible pieces with an unverified hold record; reported apart,\
+            \ never treated as a proven commitment"
+        unverifiedHoldPieces:
+          type: integer
+          format: int32
+      required:
+      - batchId
+      - eligible
+      - eligiblePieces
+      - free
+      - freeComplete
+      - freeIncompleteReasons
+      - heldByQuotes
+      - heldPieces
+      - intents
+      - lotNo
+      - unknown
+      - unknownPieces
+      - unmeasuredPieces
+      - unverifiedHold
+      - unverifiedHoldPieces
+    OrderIntakeStockPreviewOptionCheck:
+      type: object
+      properties:
+        coveredByFreeStock:
+          type: boolean
+          description: True only when no lot part exceeds or may exceed free stock
+            and no part uses a held or unverified-hold piece
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewOptionLotCheck"
+        optionKey:
+          type: string
+      required:
+      - coveredByFreeStock
+      - lots
+      - optionKey
+    OrderIntakeStockPreviewOptionLotCheck:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        exceedsFree:
+          type:
+          - boolean
+          - "null"
+          description: The part takes more than the lot's free quantity; null when
+            that free quantity cannot be determined
+        heldPieceIds:
+          type: array
+          description: Pieces of the part held by another quote (verified)
+          items:
+            type: string
+            format: uuid
+        unverifiedHoldPieceIds:
+          type: array
+          description: Pieces of the part with a hold record that cannot be verified
+          items:
+            type: string
+            format: uuid
+      required:
+      - batchId
+      - exceedsFree
+      - heldPieceIds
+      - unverifiedHoldPieceIds
+    OrderIntakeStockPreviewQuantity:
+      type: object
+      properties:
+        canonical:
+          type: number
+        inLineUnit:
+          type:
+          - number
+          - "null"
+          description: Null when the line's unit cannot be converted from the canonical
+            one
+      required:
+      - canonical
+      - inLineUnit
+    OrderIntakeStockPreviewRequest:
+      type: object
+      properties:
+        colorId:
+          type: string
+          format: uuid
+          description: Colour card; omit for colourless stock
+        customerId:
+          type: string
+          format: uuid
+          description: "Customer, so its confirmed lot compatibility is honoured"
+        finishedWidth:
+          type: number
+          description: Finished width; must be one of the product's defined widths
+          minimum: 0.01
+        finishedWidthUnit:
+          type: string
+          description: Unit of the finished width
+          enum:
+          - CM
+          - IN
+          pattern: CM|IN|cm|in
+        productId:
+          type: string
+          format: uuid
+        requestedQty:
+          type: number
+          minimum: 0.001
+        singleLotRequired:
+          type: boolean
+          description: The customer requires this line from a single dye lot
+        toleranceDownPct:
+          type: number
+          description: Quantity tolerance below the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
+        toleranceUpPct:
+          type: number
+          description: Quantity tolerance above the requested quantity agreed for
+            this line (%)
+          maximum: 100
+          minimum: 0
+        unit:
+          type: string
+      required:
+      - productId
+      - requestedQty
+      - singleLotRequired
+      - unit
+    OrderIntakeStockPreviewTotals:
+      type: object
+      properties:
+        free:
+          anyOf:
+          - $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          - type: "null"
+          description: "Null when any lot's free quantity, or the measure, is unknown"
+        freeComplete:
+          type: boolean
+        freeIncompleteReasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewFreeIncompleteReason"
+        heldByQuotes:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+        notCoveredByReadyStock:
+          anyOf:
+          - $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          - type: "null"
+          description: "Requested minus ready free stock, never below zero; null when\
+            \ free is null or the line's unit cannot be converted. Stock awaiting\
+            \ suitability, unmeasured records and work in progress never reduce it.\
+            \ It is a quantity comparison, not physical absence, required production\
+            \ or overall order coverage"
+        unknown:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+          description: Measured stock awaiting suitability evidence; never ready stock
+        unverifiedHold:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+      required:
+      - free
+      - freeComplete
+      - freeIncompleteReasons
+      - heldByQuotes
+      - notCoveredByReadyStock
+      - unknown
+      - unverifiedHold
     OrderLineAllocationInput:
       type: object
       properties:

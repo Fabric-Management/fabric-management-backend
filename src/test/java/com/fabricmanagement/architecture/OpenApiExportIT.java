@@ -96,7 +96,16 @@ public class OpenApiExportIT {
               "resolvedCandidate",
               "YarnReconciliationResolvedCandidateDto"),
           // FIBER-CATALOG-1: a blend has no ISO code of its own.
-          new NullableReference("FiberDto", "isoCode", "FiberIsoCodeDto"));
+          new NullableReference("FiberDto", "isoCode", "FiberIsoCodeDto"),
+          // STOCK-PREVIEW-1: a free quantity that cannot be determined is null, never a number.
+          new NullableReference(
+              "OrderIntakeStockPreviewLot", "free", "OrderIntakeStockPreviewQuantity"),
+          new NullableReference(
+              "OrderIntakeStockPreviewTotals", "free", "OrderIntakeStockPreviewQuantity"),
+          new NullableReference(
+              "OrderIntakeStockPreviewTotals",
+              "notCoveredByReadyStock",
+              "OrderIntakeStockPreviewQuantity"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =
@@ -150,6 +159,7 @@ public class OpenApiExportIT {
     assertValidationContracts(generatedDocument);
     assertPermissionCatalogueContract(generatedDocument);
     assertNavPreferencesImportContract(generatedDocument);
+    assertOrderIntakeStockPreviewContract(generatedDocument);
     assertNoNullTypedReferences(generatedDocument);
     assertNullableReferenceContract(generatedDocument);
 
@@ -206,6 +216,46 @@ public class OpenApiExportIT {
     assertThat(required).isInstanceOf(List.class);
     assertThat(((List<?>) required).stream().map(Object::toString).toList())
         .containsExactlyInAnyOrder("imported", "preferences");
+  }
+
+  /** STOCK-PREVIEW-1: the stock preview is published with its request bounds and response. */
+  private void assertOrderIntakeStockPreviewContract(Map<String, Object> document) {
+    Map<String, Object> operation =
+        mapAt(document, "paths", "/api/v1/sales/order-intake/stock-preview", "post");
+    assertThat(operation).containsEntry("operationId", "previewOrderIntakeStock");
+    assertThat(mapAt(operation, "requestBody", "content", "application/json", "schema"))
+        .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewRequest");
+    assertThat(mapAt(operation, "responses", "200", "content", "*/*", "schema"))
+        .containsEntry("$ref", "#/components/schemas/ApiResponseOrderIntakeStockPreview");
+    assertThat(schemaProperty(document, "ApiResponseOrderIntakeStockPreview", "data"))
+        .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreview");
+
+    assertThat(requiredOf(document, "OrderIntakeStockPreviewRequest"))
+        .containsExactlyInAnyOrder("productId", "requestedQty", "unit", "singleLotRequired");
+    assertPercentageBounds(document, "OrderIntakeStockPreviewRequest", "toleranceUpPct");
+    assertPercentageBounds(document, "OrderIntakeStockPreviewRequest", "toleranceDownPct");
+
+    assertThat(requiredOf(document, "OrderIntakeStockPreview"))
+        .containsExactlyInAnyOrder(
+            "unit",
+            "canonicalUnit",
+            "evaluation",
+            "lots",
+            "optionChecks",
+            "totals",
+            "unconvertibleIntentCount");
+    assertThat(requiredOf(document, "OrderIntakeStockPreviewOptionLotCheck"))
+        .contains("exceedsFree", "heldPieceIds", "unverifiedHoldPieceIds");
+    assertThat(schemaProperty(document, "OrderIntakeStockPreviewHeldPiece", "holdStatus"))
+        .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");
+    assertThat(mapAt(document, "components", "schemas", "OrderIntakeStockPreviewHoldStatus"))
+        .containsEntry("enum", List.of("VERIFIED", "UNVERIFIED"));
+  }
+
+  private List<String> requiredOf(Map<String, Object> document, String schemaName) {
+    Object required = mapAt(document, "components", "schemas", schemaName).get("required");
+    assertThat(required).as("%s required", schemaName).isInstanceOf(List.class);
+    return ((List<?>) required).stream().map(Object::toString).toList();
   }
 
   private void assertPermissionCatalogueContract(Map<String, Object> document) {

@@ -36,6 +36,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class QuantityEvaluationService {
 
+  private static final String UNKNOWN_CANONICAL_UNIT = "?";
+
+  private static final ProposalStockQueryService.ProposalStock NO_STOCK =
+      new ProposalStockQueryService.ProposalStock(List.of(), List.of());
+
   private final OrderIntakeAccess access;
   private final ProductSalesDefinitionQueryService productDefinitions;
   private final ProposalStockQueryService stockQuery;
@@ -152,59 +157,94 @@ public class QuantityEvaluationService {
 
   private QuantityEvaluator.Evaluation evaluation(SalesOrder order, SalesOrderLine line) {
     UUID tenantId = TenantContext.requireTenantId();
+    return run(new EvaluationRequest(
+            line.getId(),
+            line.getProductId(),
+            line.getColorId(),
+            line.getFinishedWidth(),
+            line.getFinishedWidthUnit(),
+            order.getTradingPartnerId(),
+            line.getRequestedQty(),
+            line.getUnit(),
+            line.isSingleLotRequired(),
+            line.getToleranceUpPct(),
+            line.getToleranceDownPct(),
+            toneGroups(tenantId, order, line)))
+        .evaluation();
+  }
+
+  /**
+   * The one evaluation path (STOCK-PREVIEW-1 A1): a saved line and an unsaved preview are evaluated
+   * by the same evaluator, from the same stock read and with the same unit conversion. Stock is
+   * read once, as soon as the product's measure is known, and returned with the result so a caller
+   * can describe exactly the lots the options were computed from. Persists nothing.
+   *
+   * <p>Public, not package-visible, because callers reach it through this bean's class-based
+   * transaction proxy.
+   */
+  public EvaluationRun run(EvaluationRequest request) {
+    UUID tenantId = TenantContext.requireTenantId();
     ProductSalesDefinitionDto product =
         productDefinitions
-            .find(tenantId, line.getProductId())
-            .orElseThrow(() -> OrderIntakeException.productNotAvailable(line.getProductId()));
+            .find(tenantId, request.productId())
+            .orElseThrow(() -> OrderIntakeException.productNotAvailable(request.productId()));
     Optional<PrimaryMeasure> measure = stockQuery.measureFor(product.productType());
     if (measure.isEmpty()) {
-      return unknown(line, "?", "MEASURE_UNKNOWN");
+      return new EvaluationRun(
+          unknown(request, UNKNOWN_CANONICAL_UNIT, "MEASURE_UNKNOWN"),
+          null,
+          UNKNOWN_CANONICAL_UNIT,
+          NO_STOCK);
     }
-    String canonicalUnit = stockQuery.canonicalUnit(measure.get());
-    Optional<BigDecimal> canonicalTarget =
-        stockQuery.toCanonical(line.getRequestedQty(), line.getUnit(), measure.get());
-    if (canonicalTarget.isEmpty()) {
-      return unknown(line, canonicalUnit, "UNIT_NOT_CONVERTIBLE");
-    }
+    PrimaryMeasure dimension = measure.get();
+    String canonicalUnit = stockQuery.canonicalUnit(dimension);
     ProposalStockQueryService.ProposalStock stock =
         stockQuery.find(
             new ProposalStockQueryService.ProposalStockQuery(
                 tenantId,
-                line.getProductId(),
-                line.getColorId(),
-                line.getFinishedWidth(),
-                line.getFinishedWidthUnit(),
-                order.getTradingPartnerId()));
-    List<Set<UUID>> toneGroups = toneGroups(tenantId, order, line);
-    PrimaryMeasure dimension = measure.get();
+                request.productId(),
+                request.colorId(),
+                request.finishedWidth(),
+                request.finishedWidthUnit(),
+                request.customerId()));
+    Optional<BigDecimal> canonicalTarget =
+        stockQuery.toCanonical(request.requestedQty(), request.unit(), dimension);
+    if (canonicalTarget.isEmpty()) {
+      // The lots stay readable in the canonical unit; the options cannot be stated in the line
+      // unit.
+      return new EvaluationRun(
+          unknown(request, canonicalUnit, "UNIT_NOT_CONVERTIBLE"), dimension, canonicalUnit, stock);
+    }
     Function<BigDecimal, BigDecimal> toLineUnit =
         canonical ->
             stockQuery
-                .fromCanonical(canonical, line.getUnit(), dimension)
+                .fromCanonical(canonical, request.unit(), dimension)
                 .map(value -> value.setScale(3, RoundingMode.HALF_UP))
                 .orElse(canonical);
-    return QuantityEvaluator.evaluate(
-        new QuantityEvaluator.Input(
-            line.getRequestedQty(),
-            line.getUnit(),
-            canonicalUnit,
-            canonicalTarget.get(),
-            toLineUnit,
-            stock.lots(),
-            stock.confirmedCompatibleGroups(),
-            toneGroups,
-            line.isSingleLotRequired(),
-            line.getToleranceUpPct(),
-            line.getToleranceDownPct()));
+    QuantityEvaluator.Evaluation evaluation =
+        QuantityEvaluator.evaluate(
+            new QuantityEvaluator.Input(
+                request.requestedQty(),
+                request.unit(),
+                canonicalUnit,
+                canonicalTarget.get(),
+                toLineUnit,
+                stock.lots(),
+                stock.confirmedCompatibleGroups(),
+                request.toneGroups(),
+                request.singleLotRequired(),
+                request.toleranceUpPct(),
+                request.toleranceDownPct()));
+    return new EvaluationRun(evaluation, dimension, canonicalUnit, stock);
   }
 
   private QuantityEvaluator.Evaluation unknown(
-      SalesOrderLine line, String canonicalUnit, String reason) {
+      EvaluationRequest request, String canonicalUnit, String reason) {
     QuantityEvaluationResult result =
         new QuantityEvaluationResult(
             QuantityEvaluationResult.EvaluationStatus.UNKNOWN,
-            line.getRequestedQty(),
-            line.getUnit(),
+            request.requestedQty(),
+            request.unit(),
             canonicalUnit,
             List.of(),
             0,
@@ -213,8 +253,42 @@ public class QuantityEvaluationService {
             List.of(reason),
             false,
             0);
+    // Seeded with the saved line's id exactly as before; a preview has none and never exposes it.
     return new QuantityEvaluator.Evaluation(
         result,
-        QuantityEvaluator.sha256(line.getId() + "|" + reason + "|" + line.getRequestedQty()));
+        QuantityEvaluator.sha256(request.lineId() + "|" + reason + "|" + request.requestedQty()));
   }
+
+  /**
+   * What one evaluation needs. {@code lineId} is the saved line (it seeds the fingerprint of an
+   * unknown result) and is null for a preview. Tolerances are on the percent scale the line stores.
+   */
+  public record EvaluationRequest(
+      UUID lineId,
+      UUID productId,
+      UUID colorId,
+      BigDecimal finishedWidth,
+      String finishedWidthUnit,
+      UUID customerId,
+      BigDecimal requestedQty,
+      String unit,
+      boolean singleLotRequired,
+      BigDecimal toleranceUpPct,
+      BigDecimal toleranceDownPct,
+      List<Set<UUID>> toneGroups) {
+
+    public EvaluationRequest {
+      toneGroups = toneGroups == null ? List.of() : List.copyOf(toneGroups);
+    }
+  }
+
+  /**
+   * An evaluation with the stock read it was computed from. {@code measure} is null and the stock
+   * is empty when the product's measure is unknown; the canonical unit is then {@code "?"}.
+   */
+  public record EvaluationRun(
+      QuantityEvaluator.Evaluation evaluation,
+      PrimaryMeasure measure,
+      String canonicalUnit,
+      ProposalStockQueryService.ProposalStock stock) {}
 }
