@@ -41,7 +41,6 @@ class OrderIntakeReadinessServiceTest {
   @Mock private QuantityAcceptanceRepository acceptances;
   @Mock private ConfirmationGate gate;
   @Mock private PieceAllocationPort allocation;
-  @Mock private DeliveryPreferenceService deliveryPreference;
   @Mock private IntakePermissions permissions;
 
   private final UUID tenantId = UUID.randomUUID();
@@ -73,7 +72,6 @@ class OrderIntakeReadinessServiceTest {
             acceptances,
             gate,
             allocation,
-            deliveryPreference,
             permissions,
             Clock.fixed(Instant.parse("2026-10-01T12:00:00Z"), ZoneOffset.UTC));
   }
@@ -95,7 +93,6 @@ class OrderIntakeReadinessServiceTest {
         .containsEntry(OrderIntakeAction.ADD_CUSTOM_REQUEST, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.RECORD_CUSTOMER_DECISION, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, "ORDER_WITH_PLANNING")
-        .containsEntry(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.CORRECT_PRODUCT, "ORDER_WITH_PLANNING")
         .containsEntry(OrderIntakeAction.EVALUATE_QUANTITY, "")
         .containsEntry(OrderIntakeAction.UPLOAD_ATTACHMENT, "")

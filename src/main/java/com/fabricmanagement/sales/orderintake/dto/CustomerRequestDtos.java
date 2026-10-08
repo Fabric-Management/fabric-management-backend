@@ -6,7 +6,6 @@ import com.fabricmanagement.sales.orderintake.domain.CustomerRequestEvaluationOu
 import com.fabricmanagement.sales.orderintake.domain.CustomerRequestRevisionStatus;
 import com.fabricmanagement.sales.orderintake.domain.CustomerRequestStatus;
 import com.fabricmanagement.sales.orderintake.domain.IntakeAttachmentKind;
-import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -74,13 +73,6 @@ public final class CustomerRequestDtos {
       @DecimalMin("0") BigDecimal unitPrice,
       @Size(min = 3, max = 3) String currency,
       LocalDate requestedDeliveryDate) {}
-
-  @Schema(name = "RecordPartialDeliveryPreference")
-  public record RecordDeliveryPreference(
-      @NotNull PartialDeliveryPreference preference,
-      @Size(max = 200) String customerContact,
-      AcceptanceChannel channel,
-      @PastOrPresent Instant decidedAt) {}
 
   @Schema(name = "IntakeAttachment")
   public record AttachmentDto(
@@ -184,15 +176,4 @@ public final class CustomerRequestDtos {
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<AttachmentDto> attachments,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID recordedBy,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant recordedAt) {}
-
-  @Schema(name = "PartialDeliveryPreferenceView")
-  public record DeliveryPreferenceDto(
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderId,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PartialDeliveryPreference preference,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String customerContact,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
-          AcceptanceChannel channel,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Instant decidedAt,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) UUID recordedBy,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Instant recordedAt) {}
 }

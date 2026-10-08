@@ -12,6 +12,7 @@ import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_PRI
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_PRODUCT_DESC;
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_QUANTITY;
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_REQUESTED_DELIVERY_DATE;
+import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_SHIPMENT_PREFERENCE;
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_SINGLE_LOT_REQUIRED;
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_SPECIFICATION;
 import static com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_TOLERANCE;
@@ -1089,6 +1090,50 @@ class OrderEditMergeTest {
     }
 
     @Test
+    @DisplayName(
+        "LINE-PREFERENCES-1: shipmentPreference AS_READY on the default is NO_CHANGE;"
+            + " WHEN_COMPLETE applies")
+    void shipmentPreferenceDefaultIsAValue() {
+      OrderEditSnapshot b0 = start();
+
+      assertNoChange(
+          merge(
+              b0,
+              b0,
+              lines(update(L1, mine(LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.AS_READY)))));
+      Result set =
+          merge(
+              b0,
+              b0,
+              lines(
+                  update(
+                      L1, mine(LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.WHEN_COMPLETE))));
+      assertThat(set.conflicts()).isEmpty();
+      assertThat(set.lineChanges().get(L1))
+          .containsExactly(entry(LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.WHEN_COMPLETE));
+    }
+
+    @Test
+    @DisplayName(
+        "LINE-PREFERENCES-1: a stale form never reverts a shipment preference changed on the"
+            + " server")
+    void staleShipmentPreferenceKeepsTheServerChange() {
+      OrderEditSnapshot b0 = start();
+      OrderEditSnapshot current =
+          withLine(b0, L1, LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.WHEN_COMPLETE);
+
+      // The form still holds the base value: that is no instruction, so the server's change stays.
+      Result result =
+          merge(
+              b0,
+              current,
+              lines(update(L1, mine(LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.AS_READY))));
+
+      assertThat(result.lineChanges().getOrDefault(L1, Map.of())).isEmpty();
+      assertThat(result.conflicts()).isEmpty();
+    }
+
+    @Test
     @DisplayName("S12.3: tolerance 0/0 on a line without tolerance applies; zero is not a clear")
     void zeroToleranceIsAValue() {
       OrderEditSnapshot b0 = start();
@@ -1539,6 +1584,7 @@ class OrderEditMergeTest {
         WidthValue.NONE,
         null,
         false,
+        LineShipmentPreference.AS_READY,
         quantity,
         pricing,
         tolerance,
@@ -1643,6 +1689,7 @@ class OrderEditMergeTest {
         (WidthValue) values.get(LINE_FINISHED_WIDTH),
         (LocalDate) values.get(LINE_REQUESTED_DELIVERY_DATE),
         (Boolean) values.get(LINE_SINGLE_LOT_REQUIRED),
+        (LineShipmentPreference) values.get(LINE_SHIPMENT_PREFERENCE),
         (QuantityValue) values.get(LINE_QUANTITY),
         (PricingValue) values.get(LINE_PRICING),
         (ToleranceValue) values.get(LINE_TOLERANCE),

@@ -6,9 +6,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.product.color.api.query.ColorQueryService;
 import com.fabricmanagement.sales.orderintake.domain.CustomerProductRequest;
-import com.fabricmanagement.sales.orderintake.domain.OrderDeliveryPreference;
 import com.fabricmanagement.sales.orderintake.infra.repository.CustomerProductRequestRepository;
-import com.fabricmanagement.sales.orderintake.infra.repository.OrderDeliveryPreferenceRepository;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryProposal;
 import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotal;
 import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotals;
@@ -30,8 +28,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Freezes what the customer is shown of an order: its header, lines with readable product and
- * colour, totals per agreed currency, open custom requests and planning's proposal. Internal notes
- * and who did what inside the company are left out.
+ * colour and its dye-lot and shipment preferences, totals per agreed currency, open custom requests
+ * and planning's proposal. Internal notes and who did what inside the company are left out.
  */
 @Component
 public class OrderVersionSnapshotter {
@@ -40,7 +38,6 @@ public class OrderVersionSnapshotter {
   private final TradingPartnerService partners;
   private final ColorQueryService colours;
   private final CustomerProductRequestRepository requests;
-  private final OrderDeliveryPreferenceRepository preferences;
   private final TenantQueryPort tenants;
   private final ObjectMapper canonical;
 
@@ -49,14 +46,12 @@ public class OrderVersionSnapshotter {
       TradingPartnerService partners,
       ColorQueryService colours,
       CustomerProductRequestRepository requests,
-      OrderDeliveryPreferenceRepository preferences,
       TenantQueryPort tenants,
       ObjectMapper objectMapper) {
     this.lines = lines;
     this.partners = partners;
     this.colours = colours;
     this.requests = requests;
-    this.preferences = preferences;
     this.tenants = tenants;
     this.canonical =
         objectMapper
@@ -95,11 +90,6 @@ public class OrderVersionSnapshotter {
                 order.getDeliveryContractReference()),
             new OrderVersionContent.Contact(
                 order.getContactName(), order.getContactEmail(), order.getContactPhone()),
-            preferences
-                .findByTenantIdAndSalesOrderId(tenantId, order.getId())
-                .map(OrderDeliveryPreference::getPreference)
-                .map(Enum::name)
-                .orElse(null),
             active.stream().map(this::line).toList(),
             totals.totals().stream().map(OrderVersionSnapshotter::total).toList(),
             totals.unpricedLineCount(),
@@ -159,7 +149,9 @@ public class OrderVersionSnapshotter {
         line.getCurrency(),
         line.getDiscountAmountValue(),
         line.getTaxAmountValue(),
-        line.getRequestedDeliveryDate());
+        line.getRequestedDeliveryDate(),
+        line.isSingleLotRequired(),
+        line.getShipmentPreference());
   }
 
   private static OrderVersionContent.Total total(OrderCurrencyTotal total) {

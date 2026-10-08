@@ -16,13 +16,13 @@ import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.CoverPortionKind;
 import com.fabricmanagement.sales.orderintake.domain.LineGreigeCover;
 import com.fabricmanagement.sales.orderintake.domain.LinePortionReadiness;
-import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.infra.repository.CustomerProductRequestRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.LineGreigeCoverRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.LinePortionReadinessRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.OrderArrivalEstimateRepository;
 import com.fabricmanagement.sales.salesorder.app.WorkFixture;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
@@ -70,7 +70,6 @@ class CoverPlanningServiceTest {
   @Mock private LinePortionReadinessRepository readiness;
   @Mock private OrderArrivalEstimateRepository arrivals;
   @Mock private ProductionHistoryQueryService history;
-  @Mock private DeliveryPreferenceService deliveryPreference;
   @Mock private CustomerProductRequestRepository customRequests;
 
   private WorkFixture work;
@@ -104,7 +103,6 @@ class CoverPlanningServiceTest {
             arrivals,
             stockPortion,
             history,
-            deliveryPreference,
             customRequests,
             work.service,
             Clock.fixed(NOW, ZoneOffset.UTC));
@@ -141,8 +139,6 @@ class CoverPlanningServiceTest {
         .thenReturn(Optional.empty());
     when(readiness.findByTenantIdAndSalesOrderLineIdInAndStatusIn(any(), any(), any()))
         .thenReturn(List.of());
-    when(deliveryPreference.preferenceOf(order.getId()))
-        .thenReturn(PartialDeliveryPreference.UNKNOWN);
     when(arrivals.findFirstByTenantIdAndSalesOrderIdAndSupersededAtIsNull(TENANT, order.getId()))
         .thenReturn(Optional.empty());
   }
@@ -166,7 +162,20 @@ class CoverPlanningServiceTest {
     assertThat(view.readyOn()).isNull();
     assertThat(view.history().sampleSize()).isZero();
     assertThat(outlook.arrival()).as("A07-b: no source, no arrival").isNull();
-    assertThat(outlook.readyPartsMayShipFirst()).as("A10: UNKNOWN is not permission").isFalse();
+    assertThat(view.shipmentPreference())
+        .as("LINE-PREFERENCES-1: a line without a choice ships as ready")
+        .isEqualTo(LineShipmentPreference.AS_READY);
+  }
+
+  @Test
+  @DisplayName("LINE-PREFERENCES-1: planning sees each line's own shipment preference")
+  void outlookCarriesTheLineShipmentPreference() {
+    line.setShipmentPreference(LineShipmentPreference.WHEN_COMPLETE);
+
+    FulfilmentDtos.DeliveryOutlook outlook = service.outlook(order.getId(), ACTOR);
+
+    assertThat(outlook.lines().getFirst().shipmentPreference())
+        .isEqualTo(LineShipmentPreference.WHEN_COMPLETE);
   }
 
   @Test

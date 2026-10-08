@@ -215,6 +215,7 @@ public class SalesOrderEditBases {
         new WidthValue(line.getFinishedWidth(), line.getFinishedWidthUnit()),
         line.getRequestedDeliveryDate(),
         line.isSingleLotRequired(),
+        line.getShipmentPreference(),
         new QuantityValue(line.getRequestedQty(), line.getUnit()),
         new PricingValue(
             line.getCurrency(),

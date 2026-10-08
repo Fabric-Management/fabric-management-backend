@@ -367,6 +367,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- JSON Schema 2020-12 validation of published OpenAPI schemas against real payloads (CEDIT-05 R3) -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.7</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Testcontainers -->
         <dependency>
             <groupId>org.testcontainers</groupId>

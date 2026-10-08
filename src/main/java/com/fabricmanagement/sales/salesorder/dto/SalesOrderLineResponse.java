@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
@@ -28,6 +29,12 @@ public class SalesOrderLineResponse {
   BigDecimal initialRequestedQty;
 
   boolean singleLotRequired;
+
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      description = "How the distribution may ship once ready (LINE-PREFERENCES-1)")
+  LineShipmentPreference shipmentPreference;
+
   BigDecimal requestedQty;
   BigDecimal shippedQty;
   String unit;

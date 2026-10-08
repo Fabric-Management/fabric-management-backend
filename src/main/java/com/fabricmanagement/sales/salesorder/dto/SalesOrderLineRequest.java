@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.CatalogLineInput;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,6 +48,11 @@ public class SalesOrderLineRequest implements CatalogLineInput {
 
   @Schema(description = "The customer requires this distribution from a single dye lot")
   private Boolean singleLotRequired;
+
+  @Schema(
+      description =
+          "How the distribution may ship once ready; omitted means AS_READY (LINE-PREFERENCES-1)")
+  private LineShipmentPreference shipmentPreference;
 
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be greater than zero")

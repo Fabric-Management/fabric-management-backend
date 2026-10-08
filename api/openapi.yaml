@@ -183,6 +183,8 @@ tags:
   name: FlowBoard — Otomasyon
 - description: Board management and kanban view
   name: FlowBoard — Board
+- description: Change signals of an open sales order
+  name: Sales Order Live Events
 - description: Fiber Quality Standard operations
   name: Fiber Quality Standard
 - description: Company Type operations
@@ -45599,153 +45601,6 @@ paths:
       summary: Ask planning or the warehouse to confirm when a portion will be ready
       tags:
       - Order Intake
-  /api/v1/sales-orders/{orderId}/intake/partial-delivery:
-    get:
-      operationId: getPartialDeliveryPreference
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponsePartialDeliveryPreferenceView"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: The customer's partial-delivery answer; UNKNOWN when none was recorded
-      tags:
-      - Order Intake
-    put:
-      operationId: recordPartialDeliveryPreference
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RecordPartialDeliveryPreference"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponsePartialDeliveryPreferenceView"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Record whether the customer allows partial delivery
-      tags:
-      - Order Intake
   /api/v1/sales-orders/{orderId}/intake/product-corrections:
     get:
       operationId: listLineProductCorrections
@@ -52115,6 +51970,165 @@ paths:
       summary: The recorded outcome of one of my saves
       tags:
       - Sales Order Safe Edit
+  /api/v1/sales/orders/{orderId}/live-events:
+    get:
+      description: "Server-Sent Events. Authentication is the normal access token\
+        \ (cookie or Authorization header); nothing in the query string is read. Requires\
+        \ current read access to this order, checked again on every poll; write access\
+        \ or a draft is not required. The first frame is always `ready`; `invalidated`\
+        \ means the committed revision changed and the client reads the order again;\
+        \ `closed` ends the stream with a reason. Changes may coalesce and nothing\
+        \ is replayed: on every reconnect the client starts from `ready` and reads\
+        \ the current order. Lines starting with `:` are keepalive comments. Refusals\
+        \ before the stream opens use the normal problem response."
+      operationId: subscribeSalesOrderLiveEvents
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Ignored. Frames have no ids and are never replayed; every connection
+          starts with `ready` and the client reads the current state.
+        in: header
+        name: Last-Event-ID
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              examples:
+                closed:
+                  description: closed
+                  summary: The server ends the stream
+                  value: |+
+                    event:closed
+                    data:{"success":true,"data":{"connectionId":"5f720a32-85d2-4af9-a762-c91f7423eaf2","reason":"RECONNECT_REQUIRED"},"timestamp":"2026-10-07T09:01:00Z"}
+
+                invalidated:
+                  description: invalidated
+                  summary: "The order changed: read it again"
+                  value: |+
+                    event:invalidated
+                    data:{"success":true,"data":{"connectionId":"5f720a32-85d2-4af9-a762-c91f7423eaf2","resourceId":"30dfd4f0-e5d6-49cb-a539-75347f083441","revision":"13"},"timestamp":"2026-10-07T09:00:04Z"}
+
+                keepalive:
+                  description: keepalive
+                  summary: "Keepalive comment, not data"
+                  value: |+
+                    : keepalive
+
+                ready:
+                  description: ready
+                  summary: First frame of every connection
+                  value: |+
+                    event:ready
+                    data:{"success":true,"data":{"connectionId":"5f720a32-85d2-4af9-a762-c91f7423eaf2","resourceId":"30dfd4f0-e5d6-49cb-a539-75347f083441","revision":"12"},"timestamp":"2026-10-07T09:00:00Z"}
+
+              schema:
+                anyOf:
+                - $ref: "#/components/schemas/ApiResponseLiveReadyDto"
+                - $ref: "#/components/schemas/ApiResponseLiveInvalidatedDto"
+                - $ref: "#/components/schemas/ApiResponseLiveClosedDto"
+                description: "The JSON on the `data:` line of one frame. The SSE `event:`\
+                  \ line names the frame and its schema (see x-fabric-live-frames):\
+                  \ `ready`: ApiResponseLiveReadyDto, `invalidated`: ApiResponseLiveInvalidatedDto,\
+                  \ `closed`: ApiResponseLiveClosedDto. Lines starting with `:` are\
+                  \ keepalive comments, not data. No `id:` line is sent."
+                x-fabric-live-frames:
+                  closed: "#/components/schemas/ApiResponseLiveClosedDto"
+                  invalidated: "#/components/schemas/ApiResponseLiveInvalidatedDto"
+                  ready: "#/components/schemas/ApiResponseLiveReadyDto"
+          description: The event stream; `ready` is its first frame
+          headers:
+            Cache-Control:
+              description: Always no-store
+              schema:
+                type: string
+                example: no-store
+              style: simple
+            X-Accel-Buffering:
+              description: Asks reverse proxies not to buffer the stream
+              schema:
+                type: string
+                example: "no"
+              style: simple
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: "Missing, invalid, pre-auth or expired access token, or a token\
+            \ without tenant"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: "No sales read permission, or a partner account"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: No such active order within the caller's tenant and read scope
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too many live connections on this server; retry after the given
+            seconds
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+              style: simple
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Live events are switched off (LIVE_STREAM_DISABLED) or temporarily
+            unavailable; editing works without them
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+              style: simple
+      summary: Subscribe to change signals of a sales order
+      tags:
+      - Sales Order Live Events
+      x-fabric-live-stream:
+        frames: "ready,invalidated,closed"
   /api/v1/sales/orders/{orderId}/parties:
     get:
       operationId: getOrderParties
@@ -60738,6 +60752,78 @@ components:
           type: array
           items:
             type: string
+    ApiResponseLiveClosedDto:
+      type: object
+      description: "Standard ApiResponse envelope of the `closed` frame, on the frame's\
+        \ `data:` line."
+      properties:
+        data:
+          $ref: "#/components/schemas/LiveClosedDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+      - data
+      - success
+      - timestamp
+    ApiResponseLiveInvalidatedDto:
+      type: object
+      description: "Standard ApiResponse envelope of the `invalidated` frame, on the\
+        \ frame's `data:` line."
+      properties:
+        data:
+          $ref: "#/components/schemas/LiveInvalidatedDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+      - data
+      - success
+      - timestamp
+    ApiResponseLiveReadyDto:
+      type: object
+      description: "Standard ApiResponse envelope of the `ready` frame, on the frame's\
+        \ `data:` line."
+      properties:
+        data:
+          $ref: "#/components/schemas/LiveReadyDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+      - data
+      - success
+      - timestamp
     ApiResponseLoginResponse:
       type: object
       properties:
@@ -62052,24 +62138,6 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseYarnReconciliationItemDto"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    ApiResponsePartialDeliveryPreferenceView:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/PartialDeliveryPreferenceView"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -71942,6 +72010,10 @@ components:
         salesOrderLineId:
           type: string
           format: uuid
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: "The line's shipment preference as recorded; shown to planning,\
+            \ not a shipment gate (LINE-PREFERENCES-1)"
         unit:
           type: string
       required:
@@ -71951,6 +72023,7 @@ components:
       - portions
       - readyOn
       - salesOrderLineId
+      - shipmentPreference
       - unit
     LineHold:
       type: object
@@ -72038,6 +72111,14 @@ components:
       - oldProductId
       - reason
       - salesOrderLineId
+    LineShipmentPreference:
+      type: string
+      description: "AS_READY: ready quantity may leave in parts (default). WHEN_COMPLETE:\
+        \ the distribution leaves when all of it is ready; a split distribution is\
+        \ judged per delivery share."
+      enum:
+      - AS_READY
+      - WHEN_COMPLETE
     LineVersionRef:
       type: object
       properties:
@@ -72104,6 +72185,85 @@ components:
           type: string
         unit:
           type: string
+    LiveCloseReason:
+      type: string
+      description: Why the server closes the stream. After any reason the client may
+        open a new request; the new connection starts with ready and the current state
+        is read again.
+      enum:
+      - AUTH_EXPIRED
+      - ACCESS_REVOKED
+      - RECONNECT_REQUIRED
+      - TEMPORARILY_UNAVAILABLE
+      - SLOW_CONSUMER
+      - FEATURE_DISABLED
+    LiveClosedDto:
+      type: object
+      description: "Data of the `closed` control frame. The server closes the stream\
+        \ right after it; a stream may also end without it (network loss, a client\
+        \ that stopped reading)."
+      properties:
+        connectionId:
+          type: string
+          format: uuid
+          description: Id of the connection being closed.
+        reason:
+          $ref: "#/components/schemas/LiveCloseReason"
+          description: Why the stream closes.
+      required:
+      - connectionId
+      - reason
+    LiveInvalidatedDto:
+      type: object
+      description: "Data of the `invalidated` frame: the committed revision differs\
+        \ from the last one sent on this connection. Several changes may arrive as\
+        \ one frame; the client reads the current state and does not count frames.\
+        \ It does not say who changed what."
+      properties:
+        connectionId:
+          type: string
+          format: uuid
+          description: "Id of this connection, as in its ready frame."
+        resourceId:
+          type: string
+          format: uuid
+          description: "The subscribed resource; for a sales order, its id."
+        revision:
+          type: string
+          description: Opaque committed revision now; compare for equality only. A
+            sales order sends its version as a decimal string.
+          example: "13"
+          minLength: 1
+      required:
+      - connectionId
+      - resourceId
+      - revision
+    LiveReadyDto:
+      type: object
+      description: "Data of the `ready` frame, always the first frame of a connection.\
+        \ The client reads the current state of the resource; nothing missed before\
+        \ this connection is replayed."
+      properties:
+        connectionId:
+          type: string
+          format: uuid
+          description: Server-generated id of this connection; every connection has
+            a new one.
+        resourceId:
+          type: string
+          format: uuid
+          description: "The subscribed resource; for a sales order, its id."
+        revision:
+          type: string
+          description: Opaque revision of the resource when it was read; compare for
+            equality only. A sales order sends its version as a decimal string; 0
+            is valid.
+          example: "12"
+          minLength: 1
+      required:
+      - connectionId
+      - resourceId
+      - revision
     LoginRequest:
       type: object
       properties:
@@ -73416,8 +73576,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LineCoverOutlook"
-        partialDelivery:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
         pendingCustomRequestIds:
           type: array
           description: "Unfinished custom requests of this order, attached or taken\
@@ -73425,18 +73583,13 @@ components:
           items:
             type: string
             format: uuid
-        readyPartsMayShipFirst:
-          type: boolean
-          description: Ready lines may ship before the rest (A10)
         salesOrderId:
           type: string
           format: uuid
       required:
       - arrival
       - lines
-      - partialDelivery
       - pendingCustomRequestIds
-      - readyPartsMayShipFirst
       - salesOrderId
     OrderDeliveryView:
       type: object
@@ -73555,7 +73708,6 @@ components:
       - ADD_CUSTOM_REQUEST
       - RECORD_CUSTOMER_DECISION
       - RESOLVE_CUSTOM_REQUEST
-      - RECORD_PARTIAL_DELIVERY
       - UPLOAD_ATTACHMENT
       - REQUEST_READINESS_CONFIRMATION
       - CORRECT_PRODUCT
@@ -73736,8 +73888,6 @@ components:
             $ref: "#/components/schemas/OrderIntakeReadinessBlock"
         orderStatus:
           type: string
-        partialDelivery:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
         salesOrderId:
           type: string
           format: uuid
@@ -73747,7 +73897,6 @@ components:
       - lines
       - orderBlocks
       - orderStatus
-      - partialDelivery
       - salesOrderId
     OrderIntakeReadinessBlock:
       type: object
@@ -74302,8 +74451,6 @@ components:
           format: date
         orderNumber:
           type: string
-        partialDelivery:
-          type: string
         paymentTerms:
           type: string
         proposal:
@@ -74354,6 +74501,11 @@ components:
         requestedDeliveryDate:
           type: string
           format: date
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+        singleLotRequired:
+          type: boolean
+          description: The distribution must come from one dye lot
         tax:
           type: number
         toleranceDownPct:
@@ -74364,6 +74516,9 @@ components:
           type: string
         unitPrice:
           type: number
+      required:
+      - shipmentPreference
+      - singleLotRequired
     OrderVersionProposal:
       type: object
       properties:
@@ -75889,51 +76044,6 @@ components:
       required:
       - acceptedQuantity
       - reason
-    PartialDeliveryPreference:
-      type: string
-      enum:
-      - UNKNOWN
-      - ALLOWED
-      - TOGETHER
-    PartialDeliveryPreferenceView:
-      type: object
-      properties:
-        channel:
-          anyOf:
-          - $ref: "#/components/schemas/IntakeAcceptanceChannel"
-          - type: "null"
-        customerContact:
-          type:
-          - string
-          - "null"
-        decidedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        preference:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
-        recordedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        recordedBy:
-          type:
-          - string
-          - "null"
-          format: uuid
-        salesOrderId:
-          type: string
-          format: uuid
-      required:
-      - channel
-      - customerContact
-      - decidedAt
-      - preference
-      - recordedAt
-      - recordedBy
-      - salesOrderId
     PartnerContactDto:
       type: object
       properties:
@@ -79408,22 +79518,6 @@ components:
       required:
       - unit
       - value
-    RecordPartialDeliveryPreference:
-      type: object
-      properties:
-        channel:
-          $ref: "#/components/schemas/IntakeAcceptanceChannel"
-        customerContact:
-          type: string
-          maxLength: 200
-          minLength: 0
-        decidedAt:
-          type: string
-          format: date-time
-        preference:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
-      required:
-      - preference
     RecordPaymentRequest:
       type: object
       properties:
@@ -81275,6 +81369,10 @@ components:
         requestedDeliveryDate:
           $ref: "#/components/schemas/SalesOrderDateFieldEdit"
           description: Customer-requested delivery date of this distribution
+        shipmentPreference:
+          $ref: "#/components/schemas/SalesOrderLineShipmentPreferenceEdit"
+          description: "How the distribution may ship once ready; omitted on ADD means\
+            \ AS_READY, CLEAR is refused"
         singleLotRequired:
           $ref: "#/components/schemas/SalesOrderFlagFieldEdit"
           description: Whether the distribution must come from one dye lot; CLEAR
@@ -81397,6 +81495,10 @@ components:
         requirementProfile:
           $ref: "#/components/schemas/RequirementProfileInput"
           description: "Typed, traceable order-line requirement profile input"
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready; omitted means AS_READY
+            (LINE-PREFERENCES-1)
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot
@@ -81485,6 +81587,9 @@ components:
         salesOrderId:
           type: string
           format: uuid
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready (LINE-PREFERENCES-1)
         shippedQty:
           type: number
         singleLotRequired:
@@ -81515,6 +81620,20 @@ components:
           format: int64
           description: Line version; commands that change the line send it back (SOI
             R19)
+      required:
+      - shipmentPreference
+    SalesOrderLineShipmentPreferenceEdit:
+      type: object
+      additionalProperties: false
+      description: The line's shipment preference; CLEAR is refused.
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: The new value with SET; never sent with CLEAR
+      required:
+      - operation
     SalesOrderLineSpecificationEdit:
       type: object
       additionalProperties: false
@@ -84454,6 +84573,10 @@ components:
           $ref: "#/components/schemas/RequirementProfileInput"
           description: Typed requirement profile update; omitted value preserves current
             profile
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready; omitted means AS_READY
+            (LINE-PREFERENCES-1)
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot

@@ -2,7 +2,6 @@ package com.fabricmanagement.sales.orderintake.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.sales.orderintake.app.CustomerRequestService;
-import com.fabricmanagement.sales.orderintake.app.DeliveryPreferenceService;
 import com.fabricmanagement.sales.orderintake.app.IntakeAttachmentService;
 import com.fabricmanagement.sales.orderintake.domain.IntakeAttachmentKind;
 import com.fabricmanagement.sales.orderintake.dto.CustomerRequestDtos;
@@ -27,9 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Custom customer requests on an order, the customer's answers to their revisions, files received
- * from the customer and the partial-delivery preference (SOI D7). Nothing is sent to the customer
- * from here; replies that arrived elsewhere are recorded.
+ * Custom customer requests on an order, the customer's answers to their revisions and files
+ * received from the customer (SOI D7). Nothing is sent to the customer from here; replies that
+ * arrived elsewhere are recorded. How a line may ship is the line's own shipment preference
+ * (LINE-PREFERENCES-1).
  */
 @RestController
 @RequestMapping("/api/v1/sales-orders/{orderId}/intake")
@@ -39,7 +39,6 @@ public class CustomerRequestController {
 
   private final CustomerRequestService requests;
   private final IntakeAttachmentService attachments;
-  private final DeliveryPreferenceService deliveryPreference;
 
   @PostMapping(value = "/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
@@ -190,30 +189,5 @@ public class CustomerRequestController {
     return ResponseEntity.ok(
         ApiResponse.success(
             requests.resolve(orderId, requestId, request, OrderIntakeActor.current())));
-  }
-
-  @GetMapping("/partial-delivery")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
-  @Operation(
-      operationId = "getPartialDeliveryPreference",
-      summary = "The customer's partial-delivery answer; UNKNOWN when none was recorded")
-  public ResponseEntity<ApiResponse<CustomerRequestDtos.DeliveryPreferenceDto>>
-      getPartialDeliveryPreference(@PathVariable UUID orderId) {
-    return ResponseEntity.ok(
-        ApiResponse.success(deliveryPreference.get(orderId, OrderIntakeActor.current())));
-  }
-
-  @PutMapping("/partial-delivery")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
-  @Operation(
-      operationId = "recordPartialDeliveryPreference",
-      summary = "Record whether the customer allows partial delivery")
-  public ResponseEntity<ApiResponse<CustomerRequestDtos.DeliveryPreferenceDto>>
-      recordPartialDeliveryPreference(
-          @PathVariable UUID orderId,
-          @Valid @RequestBody CustomerRequestDtos.RecordDeliveryPreference request) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            deliveryPreference.record(orderId, request, OrderIntakeActor.current())));
   }
 }

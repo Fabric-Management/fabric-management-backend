@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.web.AppRoutes;
 import com.fabricmanagement.platform.communication.api.facade.CustomerEmailFacade;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.OrderVersionContent;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -152,6 +153,14 @@ public class CustomerApprovalMailer {
               .append(escape(detail))
               .append("</span>");
         }
+        html.append("<br><span style=\"color: #6b7280;\">")
+            .append(escape(preferences(line)))
+            .append("</span>");
+        if (line.shipmentPreference() == LineShipmentPreference.WHEN_COMPLETE) {
+          html.append("<br><span style=\"color: #6b7280; font-size: 12px;\">")
+              .append(escape(SPLIT_SHARE_NOTE))
+              .append("</span>");
+        }
         html.append("</td><td style=\"padding: 6px 4px; vertical-align: top;\">")
             .append(escape(amount(line.quantity()) + " " + nullToEmpty(line.unit())))
             .append(tolerance(line))
@@ -191,6 +200,20 @@ public class CustomerApprovalMailer {
         .append("</td><td style=\"padding: 4px 0;\">")
         .append(escape(value))
         .append("</td></tr>");
+  }
+
+  /** What "when all is ready" means for a line split into delivery shares (LINE-PREFERENCES-1). */
+  static final String SPLIT_SHARE_NOTE =
+      "If this line is split into delivery shares, each share is judged separately.";
+
+  /** The line's dye-lot and shipment terms, worded as on the approval page (LINE-PREFERENCES-1). */
+  static String preferences(OrderVersionContent.Line line) {
+    String lot = line.singleLotRequired() ? "Single dye lot" : "Multiple dye lots allowed";
+    String shipment =
+        line.shipmentPreference() == LineShipmentPreference.WHEN_COMPLETE
+            ? "Ships when all is ready"
+            : "Ships as ready";
+    return lot + " · " + shipment;
   }
 
   private static String tolerance(OrderVersionContent.Line line) {

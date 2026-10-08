@@ -9,6 +9,7 @@ import com.fabricmanagement.sales.salesorder.app.SalesOrderEditInstructions.Pars
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
 import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditKey;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditMerge;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditMerge.Add;
@@ -456,6 +457,7 @@ public class SalesOrderEditApplier {
       case LINE_COLOR -> clear ? null : (UUID) value;
       case LINE_REQUESTED_DELIVERY_DATE -> clear ? null : (LocalDate) value;
       case LINE_SINGLE_LOT_REQUIRED -> Boolean.TRUE.equals(value);
+      case LINE_SHIPMENT_PREFERENCE -> (LineShipmentPreference) value;
       case LINE_FINISHED_WIDTH -> {
         if (clear) {
           yield WidthValue.NONE;
@@ -642,6 +644,8 @@ public class SalesOrderEditApplier {
             }
             case LINE_REQUESTED_DELIVERY_DATE -> line.setRequestedDeliveryDate((LocalDate) value);
             case LINE_SINGLE_LOT_REQUIRED -> line.setSingleLotRequired((Boolean) value);
+            case LINE_SHIPMENT_PREFERENCE ->
+                line.setShipmentPreference((LineShipmentPreference) value);
             default -> throw new IllegalArgumentException(key + " is not a line key");
           }
         });
@@ -758,6 +762,10 @@ public class SalesOrderEditApplier {
                   (LocalDate) fields.get(OrderEditKey.LINE_REQUESTED_DELIVERY_DATE))
               .singleLotRequired(
                   Boolean.TRUE.equals(fields.get(OrderEditKey.LINE_SINGLE_LOT_REQUIRED)))
+              .shipmentPreference(
+                  (LineShipmentPreference)
+                      fields.getOrDefault(
+                          OrderEditKey.LINE_SHIPMENT_PREFERENCE, LineShipmentPreference.AS_READY))
               .build();
       line.recordTolerance(tolerance.upPct(), tolerance.downPct(), actor, now);
       moduleSpecsValidator.validate(

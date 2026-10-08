@@ -147,6 +147,23 @@ application:
     playground-expiration: ${JWT_PLAYGROUND_EXPIRATION:1209600000} # 14 days
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 
+  # Live change channel (CEDIT-05 §5): SSE streams that re-read the committed order revision
+  # from PostgreSQL. Technical defaults, not an SLA; limits are per backend instance. Off unless a
+  # profile or REALTIME_ENABLED switches it on (development profiles do, explicitly).
+  realtime:
+    enabled: ${REALTIME_ENABLED:false}
+    poll-interval: ${REALTIME_POLL_INTERVAL:2s}
+    heartbeat-interval: ${REALTIME_HEARTBEAT_INTERVAL:15s}
+    max-connection-lifetime: ${REALTIME_MAX_CONNECTION_LIFETIME:60s}
+    max-connections-per-instance: ${REALTIME_MAX_CONNECTIONS_PER_INSTANCE:128}
+    max-connections-per-tenant-per-instance: ${REALTIME_MAX_CONNECTIONS_PER_TENANT:64}
+    max-connections-per-user-per-tenant-per-instance: ${REALTIME_MAX_CONNECTIONS_PER_USER:8}
+    worker-count: ${REALTIME_WORKER_COUNT:4}
+    worker-queue-capacity: ${REALTIME_WORKER_QUEUE_CAPACITY:128}
+    send-timeout: ${REALTIME_SEND_TIMEOUT:5s}
+    read-timeout: ${REALTIME_READ_TIMEOUT:3s}
+    retry-after: ${REALTIME_RETRY_AFTER:5s}
+
   trial:
     base-days: ${TRIAL_BASE_DAYS:90}
     dormancy-window-days: ${TRIAL_DORMANCY_WINDOW_DAYS:90}

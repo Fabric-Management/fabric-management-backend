@@ -1,5 +1,6 @@
--- SOI-D7: custom customer requests (K14–K16, R16–R18, N01), files received from the customer
--- (IK-12) and the partial-delivery preference (A10).
+-- SOI-D7: custom customer requests (K14–K16, R16–R18, N01) and files received from the customer
+-- (IK-12). The order-level partial-delivery preference (A10) was replaced by the line's
+-- shipment_preference (LINE-PREFERENCES-1).
 SET LOCAL lock_timeout = '5s';
 
 CREATE TABLE IF NOT EXISTS sales_ord.customer_product_request (
@@ -156,30 +157,6 @@ CREATE INDEX IF NOT EXISTS idx_intake_attachment_order
 CREATE INDEX IF NOT EXISTS idx_intake_attachment_request
     ON sales_ord.intake_attachment (tenant_id, request_id);
 
-CREATE TABLE IF NOT EXISTS sales_ord.order_delivery_preference (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL,
-    uid VARCHAR(100) UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL,
-    created_by UUID,
-    updated_at TIMESTAMPTZ NOT NULL,
-    updated_by UUID,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    deleted_at TIMESTAMPTZ,
-    version BIGINT NOT NULL DEFAULT 0,
-    sales_order_id UUID NOT NULL,
-    preference VARCHAR(20) NOT NULL CHECK (preference IN ('UNKNOWN', 'ALLOWED', 'TOGETHER')),
-    customer_contact VARCHAR(200),
-    channel VARCHAR(20) CHECK (channel IN ('PHONE', 'EMAIL', 'MESSAGE', 'IN_PERSON')),
-    decided_at TIMESTAMPTZ,
-    recorded_by UUID NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_order_delivery_preference UNIQUE (tenant_id, sales_order_id),
-    CONSTRAINT chk_order_delivery_preference_source CHECK (
-        preference = 'UNKNOWN'
-        OR (customer_contact IS NOT NULL AND channel IS NOT NULL AND decided_at IS NOT NULL))
-);
-
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -188,8 +165,7 @@ BEGIN
         'sales_ord.customer_request_evaluation',
         'sales_ord.customer_request_revision',
         'sales_ord.customer_request_decision',
-        'sales_ord.intake_attachment',
-        'sales_ord.order_delivery_preference'] LOOP
+        'sales_ord.intake_attachment'] LOOP
         EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', t);
         EXECUTE format('ALTER TABLE %s FORCE ROW LEVEL SECURITY', t);
         EXECUTE format($p$CREATE POLICY rls_tenant_isolation ON %s FOR ALL
@@ -203,16 +179,14 @@ BEGIN
         REVOKE UPDATE, DELETE ON sales_ord.customer_request_evaluation,
             sales_ord.customer_request_decision FROM fabric_app;
         GRANT SELECT, INSERT, UPDATE ON sales_ord.customer_product_request,
-            sales_ord.customer_request_revision, sales_ord.intake_attachment,
-            sales_ord.order_delivery_preference TO fabric_app;
+            sales_ord.customer_request_revision, sales_ord.intake_attachment TO fabric_app;
         REVOKE DELETE ON sales_ord.customer_product_request, sales_ord.customer_request_revision,
-            sales_ord.intake_attachment, sales_ord.order_delivery_preference FROM fabric_app;
+            sales_ord.intake_attachment FROM fabric_app;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
         GRANT SELECT, INSERT, UPDATE, DELETE ON sales_ord.customer_product_request,
             sales_ord.customer_request_evaluation, sales_ord.customer_request_revision,
-            sales_ord.customer_request_decision, sales_ord.intake_attachment,
-            sales_ord.order_delivery_preference TO fabric_system;
+            sales_ord.customer_request_decision, sales_ord.intake_attachment TO fabric_system;
     END IF;
 END $$;
 
@@ -222,5 +196,3 @@ COMMENT ON TABLE sales_ord.customer_request_decision IS
     'Customer answer to a revision recorded by an authorised salesperson (SOI A11).';
 COMMENT ON TABLE sales_ord.intake_attachment IS
     'File received from or about the customer; bytea until an object store exists (SOI IK-12).';
-COMMENT ON TABLE sales_ord.order_delivery_preference IS
-    'Customer answer on partial delivery; no row means UNKNOWN, never assumed allowed (SOI A10).';

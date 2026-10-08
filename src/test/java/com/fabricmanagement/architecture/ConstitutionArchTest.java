@@ -698,6 +698,41 @@ class ConstitutionArchTest {
     }
 
     @Test
+    @DisplayName("Rule 11.2b: the live channel engine depends on no domain module and no auth code")
+    void platformRealtimeShouldStayDomainAgnostic() {
+      // CEDIT-05: platform/realtime owns the stream lifecycle only. Each consuming module
+      // implements LiveRevisionSource and brings its own authorised entry point; the engine
+      // receives a verified LiveActor and never imports sales (or any domain) or platform/auth.
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.platform.realtime..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAnyPackage(
+                  "com.fabricmanagement.sales..",
+                  "com.fabricmanagement.production..",
+                  "com.fabricmanagement.procurement..",
+                  "com.fabricmanagement.flowboard..",
+                  "com.fabricmanagement.human..",
+                  "com.fabricmanagement.inventory..",
+                  "com.fabricmanagement.costing..",
+                  "com.fabricmanagement.finance..",
+                  "com.fabricmanagement.logistics..",
+                  "com.fabricmanagement.notification..",
+                  "com.fabricmanagement.offline..",
+                  "com.fabricmanagement.analytics..",
+                  "com.fabricmanagement.approval..",
+                  "com.fabricmanagement.product..",
+                  "com.fabricmanagement.platform.auth..")
+              .as(
+                  "Rule 11.2b: platform/realtime must not depend on domain modules or platform/auth"
+                      + " (consumers implement its port)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
     @DisplayName("Rule 11.3: platform/user must not depend on human except event listeners")
     void platformUserShouldNotImportHumanDirectly() {
       ArchRule rule =

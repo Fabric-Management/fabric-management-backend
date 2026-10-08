@@ -63,7 +63,6 @@ final class TablePrivilegeClassification {
     entries.put("sales_ord.customer_product_request", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.customer_request_revision", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.intake_attachment", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
-    entries.put("sales_ord.order_delivery_preference", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.line_greige_cover", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.line_portion_readiness", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_arrival_estimate", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);

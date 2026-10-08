@@ -1,7 +1,6 @@
 package com.fabricmanagement.sales.orderintake.dto;
 
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
-import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
 import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceBasis;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -18,7 +17,6 @@ import java.util.UUID;
 public record OrderIntakeReadinessDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderId,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String orderStatus,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PartialDeliveryPreference partialDelivery,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Block> orderBlocks,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Line> lines,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Capability> capabilities,

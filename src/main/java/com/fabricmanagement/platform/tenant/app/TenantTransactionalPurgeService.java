@@ -204,7 +204,6 @@ public class TenantTransactionalPurgeService {
           "sales_ord.customer_request_evaluation",
           "sales_ord.intake_attachment",
           "sales_ord.customer_product_request",
-          "sales_ord.order_delivery_preference",
           "sales_ord.line_greige_cover",
           "sales_ord.line_portion_readiness",
           "sales_ord.order_arrival_estimate",

@@ -8,6 +8,7 @@ import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderEditInstructions;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderEditInstructions.FieldInstruction;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderEditInstructions.Parsed;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditKey;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditMerge.Choice;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditMerge.Slot;
@@ -550,6 +551,31 @@ class SalesOrderEditRequestTest {
           parsed.lines().getFirst().fields().get(OrderEditKey.LINE_SINGLE_LOT_REQUIRED);
       assertThat(instruction.clear()).isFalse();
       assertThat(instruction.value()).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName(
+        "LINE-PREFERENCES-1: shipmentPreference CLEAR is refused; SET carries the enum value")
+    void shipmentPreferenceCannotBeCleared() throws Exception {
+      DomainException failure =
+          assertUnprocessable(
+              body(
+                  "'lines':[{'operation':'UPDATE','lineId':'$l1','fields':{"
+                      + "'shipmentPreference':{'operation':'CLEAR'}}}]"),
+              "REQUIRED_FIELD_CANNOT_BE_CLEARED");
+      assertThat(failure.getDetails())
+          .containsEntry("key", "line.shipmentPreference")
+          .containsEntry("lineId", L1);
+
+      Parsed parsed =
+          parse(
+              body(
+                  "'lines':[{'operation':'UPDATE','lineId':'$l1','fields':{"
+                      + "'shipmentPreference':{'operation':'SET','value':'WHEN_COMPLETE'}}}]"));
+      FieldInstruction instruction =
+          parsed.lines().getFirst().fields().get(OrderEditKey.LINE_SHIPMENT_PREFERENCE);
+      assertThat(instruction.clear()).isFalse();
+      assertThat(instruction.value()).isEqualTo(LineShipmentPreference.WHEN_COMPLETE);
     }
 
     @Test

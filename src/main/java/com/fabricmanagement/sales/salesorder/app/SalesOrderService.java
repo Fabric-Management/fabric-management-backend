@@ -10,6 +10,7 @@ import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.orderintake.app.CustomerRequestService;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
@@ -432,6 +433,12 @@ public class SalesOrderService {
     line.setFinishedWidthUnit(normaliseWidthUnit(req.getFinishedWidthUnit()));
     line.setRequestedDeliveryDate(req.getRequestedDeliveryDate());
     line.setSingleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()));
+    line.setShipmentPreference(req.getShipmentPreference());
+  }
+
+  /** A line's shipment preference as requested; omitted means "as ready" (LINE-PREFERENCES-1). */
+  static LineShipmentPreference shipmentPreferenceOrDefault(LineShipmentPreference requested) {
+    return requested == null ? LineShipmentPreference.AS_READY : requested;
   }
 
   static String normaliseWidthUnit(String unit) {
@@ -465,6 +472,7 @@ public class SalesOrderService {
             .finishedWidthUnit(normaliseWidthUnit(request.getFinishedWidthUnit()))
             .requestedDeliveryDate(request.getRequestedDeliveryDate())
             .singleLotRequired(Boolean.TRUE.equals(request.getSingleLotRequired()))
+            .shipmentPreference(shipmentPreferenceOrDefault(request.getShipmentPreference()))
             .build();
     recordTolerance(line, request.getToleranceUpPct(), request.getToleranceDownPct());
     return line;
@@ -1046,6 +1054,7 @@ public class SalesOrderService {
             .finishedWidthUnit(normaliseWidthUnit(req.getFinishedWidthUnit()))
             .requestedDeliveryDate(req.getRequestedDeliveryDate())
             .singleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()))
+            .shipmentPreference(shipmentPreferenceOrDefault(req.getShipmentPreference()))
             .lineStatus(SalesOrderLineStatus.PENDING)
             .build();
     recordTolerance(line, req.getToleranceUpPct(), req.getToleranceDownPct());
@@ -1070,6 +1079,7 @@ public class SalesOrderService {
         .requestedDeliveryDate(line.getRequestedDeliveryDate())
         .initialRequestedQty(line.getInitialRequestedQty())
         .singleLotRequired(line.isSingleLotRequired())
+        .shipmentPreference(line.getShipmentPreference())
         .requestedQty(line.getRequestedQty())
         .shippedQty(line.getShippedQty())
         .unit(line.getUnit())

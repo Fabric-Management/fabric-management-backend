@@ -88,6 +88,7 @@ public record OrderEditSnapshot(int schema, long orderVersion, Header header, Li
       WidthValue finishedWidth,
       LocalDate requestedDeliveryDate,
       boolean singleLotRequired,
+      LineShipmentPreference shipmentPreference,
       QuantityValue quantity,
       PricingValue pricing,
       ToleranceValue tolerance,
@@ -95,6 +96,8 @@ public record OrderEditSnapshot(int schema, long orderVersion, Header header, Li
       String allocationDigest) {
 
     public Line {
+      shipmentPreference =
+          shipmentPreference == null ? LineShipmentPreference.AS_READY : shipmentPreference;
       finishedWidth = finishedWidth == null ? WidthValue.NONE : finishedWidth;
       pricing = pricing == null ? PricingValue.NONE : pricing;
       tolerance = tolerance == null ? ToleranceValue.NONE : tolerance;
@@ -109,6 +112,7 @@ public record OrderEditSnapshot(int schema, long orderVersion, Header header, Li
         case LINE_FINISHED_WIDTH -> finishedWidth;
         case LINE_REQUESTED_DELIVERY_DATE -> requestedDeliveryDate;
         case LINE_SINGLE_LOT_REQUIRED -> singleLotRequired;
+        case LINE_SHIPMENT_PREFERENCE -> shipmentPreference;
         case LINE_QUANTITY -> quantity;
         case LINE_PRICING -> pricing;
         case LINE_TOLERANCE -> tolerance;

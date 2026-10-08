@@ -48,7 +48,7 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 
 | Modül | Sorumluluk |
 |-------|------------|
-| `platform` | Auth, User, Organization, Tenant, Communication, TradingPartner, Subscription, Policy, Audit, AI |
+| `platform` | Auth, User, Organization, Tenant, Communication, TradingPartner, Subscription, Policy, Audit, AI, Realtime (canlı değişiklik kanalı motoru) |
 | `product` | Product core, Fiber, Color, QualityGrade, Recipe (ürünün NE olduğu) |
 | `production` | Execution (Batch, WorkOrder, GoodsReceipt, Inventory, Lineage), Quality ve üretim süreçleri (NASIL) |
 | `sales` | SalesOrder, Quote, Catalog, Pricing, Sample |
@@ -182,6 +182,25 @@ public record CreateBatchRequest(
   `SalesOrderEditBase`/`SalesOrderEditResult` gibi `Dto` son ekisizdir. Katı okuma, global mapper
   değiştirilmeden her tipli seviyede reddeden `@JsonAnySetter` + `@Schema(additionalProperties = FALSE)`
   ile yapılır. İstisna yalnız bu sözleşmenin tipleri içindir; başka DTO'lara kalıp olarak kopyalanmaz.
+- **Canlı stream istisnası (CEDIT-05):** `platform/realtime` üzerinden açılan Server-Sent Events
+  endpoint'leri (ilki `GET /api/v1/sales/orders/{orderId}/live-events`) başarıda JSON gövde değil
+  `text/event-stream` döner. Controller metodu `void`'dir ve `HttpServletRequest`/`HttpServletResponse`
+  alır; stream'i `SseLiveChannel` servlet async + non-blocking I/O (`WriteListener`, `isReady`) ile yazar.
+  `SseEmitter` kullanılmaz ve hiçbir thread istemciye yazarken bloklanmaz. Stream yanıtı `Connection: close`
+  taşır (gövde bağlantıyla biter, sonda yazılacak chunk kalmaz); normal bitiş yalnız container'da gönderilmemiş
+  bayt yokken `complete()` eder. Açık ya da kapanmakta olan her transport, `sendTimeout`'tan uzun durursa abort
+  edilir: Tomcat'te bekleyen bayt varsa bağlantı `TomcatConnectionAbort` ile (`CLOSE_NOW`) flush'sız kapanır,
+  connector thread'i istemciyi beklemez. Kapasite slotu container transportun bittiğini bildirince bırakılır.
+  Global Tomcat timeout ayarı değiştirilmez. Her `data:`
+  satırı `ApiResponse<…Dto>` zarfını mevcut serializer ile taşır (`ready`, `invalidated`, `closed`),
+  keepalive SSE yorumudur (`: keepalive`), `id:` satırı ve replay yoktur. Her okuma taze yetki ve taze tenant
+  erişimi (`CurrentTenantAccessPort`, RLS self-row) ile yapılır. Stream açılmadan önceki her red normal
+  problem yoludur (`LiveStreamRejectedException` → `application/problem+json`, 429/503'te `Retry-After`);
+  stream açıldıktan sonra JSON hata yazılamaz, yalnız `closed` kontrol frame'i ve kapanış vardır. OpenAPI'de
+  200 yanıtı yalnız `text/event-stream` içerir: operasyon `x-fabric-live-stream` uzantısıyla işaretlenir,
+  `LiveStreamOpenApiCustomizer` frame zarflarını (`ApiResponseLiveReadyDto` …) yayınlar, stream şeması bu
+  zarfların `anyOf`'udur ve `x-fabric-live-frames` uzantısı SSE `event` adını zarf şemasına eşler. İstisna
+  yalnız bu stream'ler içindir; normal controller/DTO ve envelope kuralları gevşemez.
 
 ### 5.1 Exception Hiyerarşisi
 
@@ -357,6 +376,9 @@ com.fabricmanagement/
 │   ├── auth/                       # JWT, MFA, Onboarding
 │   ├── communication/              # Address, Email, WhatsApp, Notification
 │   ├── organization/               # Organization, Department, Certification
+│   ├── realtime/                   # Canlı değişiklik kanalı (SSE): bağlantı kaydı, kapasite, periyodik
+│   │                               # revision okuma; domain'e ait okuma portu (LiveRevisionSource) tüketici
+│   │                               # modülde uygulanır; realtime hiçbir domain modülünü import etmez
 │   ├── subscription/               # Subscription, Quota, FeatureCatalog
 │   ├── tenant/                     # Tenant, TenantSettings
 │   ├── tradingpartner/             # TradingPartner, PartnerUser

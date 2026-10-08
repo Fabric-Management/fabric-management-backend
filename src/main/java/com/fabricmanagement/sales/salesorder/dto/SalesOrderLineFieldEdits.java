@@ -23,6 +23,7 @@ public class SalesOrderLineFieldEdits {
   private SalesOrderLineWidthEdit finishedWidth;
   private SalesOrderDateFieldEdit requestedDeliveryDate;
   private SalesOrderFlagFieldEdit singleLotRequired;
+  private SalesOrderLineShipmentPreferenceEdit shipmentPreference;
   private SalesOrderLineQuantityEdit quantity;
   private SalesOrderLinePricingEdit pricing;
   private SalesOrderLineToleranceEdit tolerance;
@@ -79,6 +80,19 @@ public class SalesOrderLineFieldEdits {
   }
 
   @Valid
+  @Schema(
+      description =
+          "How the distribution may ship once ready; omitted on ADD means AS_READY, CLEAR is"
+              + " refused")
+  public SalesOrderLineShipmentPreferenceEdit getShipmentPreference() {
+    return shipmentPreference;
+  }
+
+  public void setShipmentPreference(SalesOrderLineShipmentPreferenceEdit shipmentPreference) {
+    this.shipmentPreference = present("shipmentPreference", shipmentPreference);
+  }
+
+  @Valid
   @Schema(description = "Requested quantity in its unit; required on ADD, CLEAR is refused")
   public SalesOrderLineQuantityEdit getQuantity() {
     return quantity;
@@ -128,6 +142,7 @@ public class SalesOrderLineFieldEdits {
     put(instructions, "line.finishedWidth", finishedWidth);
     put(instructions, "line.requestedDeliveryDate", requestedDeliveryDate);
     put(instructions, "line.singleLotRequired", singleLotRequired);
+    put(instructions, "line.shipmentPreference", shipmentPreference);
     put(instructions, "line.quantity", quantity);
     put(instructions, "line.pricing", pricing);
     put(instructions, "line.tolerance", tolerance);
