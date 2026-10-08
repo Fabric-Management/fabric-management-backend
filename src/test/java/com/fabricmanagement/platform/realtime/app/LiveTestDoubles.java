@@ -40,6 +40,12 @@ final class LiveTestDoubles {
     return new LiveReadResult.Visible(new LiveRevision(revision), new LiveRevision(presence));
   }
 
+  /** A visible resource with presence and field leases (CEDIT-07). */
+  static LiveReadResult visible(String revision, String presence, String lease) {
+    return new LiveReadResult.Visible(
+        new LiveRevision(revision), new LiveRevision(presence), new LiveRevision(lease));
+  }
+
   static LiveReadResult visible(String revision) {
     return new LiveReadResult.Visible(new LiveRevision(revision));
   }

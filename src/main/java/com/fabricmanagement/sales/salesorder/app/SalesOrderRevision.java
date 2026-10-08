@@ -46,6 +46,15 @@ public class SalesOrderRevision {
     entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
   }
 
+  /**
+   * Share-locks the order row for this transaction and reloads the entity from it (CEDIT-07): a
+   * lease is granted on the committed editability and edit epoch, and no writer of the order can
+   * commit between that decision and the grant. Taken first, like the exclusive lock of writers.
+   */
+  public void lockShared(SalesOrder order) {
+    entityManager.refresh(order, LockModeType.PESSIMISTIC_READ);
+  }
+
   /** Locks one line row and reloads it; call it after the order row is locked. */
   public void lockFresh(SalesOrderLine line) {
     entityManager.refresh(line, LockModeType.PESSIMISTIC_WRITE);

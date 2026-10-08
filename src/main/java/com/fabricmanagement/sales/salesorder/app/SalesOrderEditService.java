@@ -2,6 +2,10 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Missing;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Verification;
+import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy.PermissionFreshness;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderEditApplier.Applied;
@@ -33,6 +37,8 @@ import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditBase;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditConflict;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditConflictProblem;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditConflictReason;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseKey;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLineIdMapping;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOperationView;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
@@ -55,6 +61,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
@@ -73,12 +80,24 @@ import org.springframework.transaction.support.TransactionTemplate;
  * not an exception inside it: its base and receipt commit, and only then is the 409 raised. A
  * domain or validation failure rolls the whole save back, receipt included. Saves are started
  * outside any transaction: the one retry after a lost receipt race needs a fresh transaction.
+ *
+ * <p>Field leases (CEDIT-07 §3.3): a new save proves, inside its transaction and after the order
+ * row is locked, that its edit session holds every key it writes; the server computes the keys from
+ * what the save sends, a key list from the client grants nothing. A missing lease answers 409
+ * {@code EDIT_LEASE_REQUIRED} and records nothing. An applied or unchanged save releases the leases
+ * it used in the same transaction; a conflict or a validation failure releases none. A repeat of a
+ * recorded save answers from its receipt before any lease is looked at, and neither checks nor
+ * releases a lease. The lease proof (edit session id and tokens) is not part of the request
+ * fingerprint: re-acquiring a key and sending the same save again with the same operation id is the
+ * same save.
  */
 @Service
 public class SalesOrderEditService {
 
   private static final String EDIT_CONFLICT = "EDIT_CONFLICT";
   private static final String EDIT_BASE_EXPIRED = "EDIT_BASE_EXPIRED";
+  static final String EDIT_LEASE_REQUIRED = "EDIT_LEASE_REQUIRED";
+  static final String EDIT_LEASE_TOKEN_UNEXPECTED = "EDIT_LEASE_TOKEN_UNEXPECTED";
 
   private final SalesOrderEditBases bases;
   private final SalesOrderEditApplier applier;
@@ -89,6 +108,9 @@ public class SalesOrderEditService {
   private final OrderFieldChangeRepository fieldChanges;
   private final RequirementProfileVersionRepository profileVersions;
   private final SalesOrderEditProperties properties;
+  private final SalesOrderEditAccess editAccess;
+  private final LiveEditLeaseService leases;
+  private final SalesOrderEditLeaseService leaseViews;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final TransactionTemplate readCommitted;
@@ -104,6 +126,9 @@ public class SalesOrderEditService {
       OrderFieldChangeRepository fieldChanges,
       RequirementProfileVersionRepository profileVersions,
       SalesOrderEditProperties properties,
+      SalesOrderEditAccess editAccess,
+      LiveEditLeaseService leases,
+      SalesOrderEditLeaseService leaseViews,
       ObjectMapper objectMapper,
       Clock clock,
       PlatformTransactionManager transactionManager) {
@@ -116,6 +141,9 @@ public class SalesOrderEditService {
     this.fieldChanges = fieldChanges;
     this.profileVersions = profileVersions;
     this.properties = properties;
+    this.editAccess = editAccess;
+    this.leases = leases;
+    this.leaseViews = leaseViews;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.readCommitted = new TransactionTemplate(transactionManager);
@@ -152,10 +180,12 @@ public class SalesOrderEditService {
     }
     Parsed parsed =
         SalesOrderEditInstructions.parse(orderId, request, properties.getMaxLineOperations());
+    LeaseProof proof = LeaseProof.of(request);
     Answer answer;
     try {
       answer =
-          readCommitted.execute(status -> saveOnce(orderId, parsed, actor, authentication, path));
+          readCommitted.execute(
+              status -> saveOnce(orderId, parsed, proof, actor, authentication, path));
     } catch (DataIntegrityViolationException failure) {
       if (!isOperationRace(failure)) {
         throw failure;
@@ -163,7 +193,8 @@ public class SalesOrderEditService {
       // Another save recorded this operation id first and its transaction has ended: this one is
       // rolled back as a whole. Judged again in a new transaction it replays, or is refused.
       answer =
-          readCommitted.execute(status -> saveOnce(orderId, parsed, actor, authentication, path));
+          readCommitted.execute(
+              status -> saveOnce(orderId, parsed, proof, actor, authentication, path));
     }
     return switch (answer) {
       case Saved saved -> saved.result();
@@ -199,10 +230,17 @@ public class SalesOrderEditService {
   // ── the save transaction ─────────────────────────────────────────────────
 
   private Answer saveOnce(
-      UUID orderId, Parsed parsed, UUID actor, Authentication authentication, String path) {
+      UUID orderId,
+      Parsed parsed,
+      LeaseProof proof,
+      UUID actor,
+      Authentication authentication,
+      String path) {
     UUID tenantId = TenantContext.requireTenantId();
     Instant now = clock.instant();
 
+    // A suspended tenant or a deactivated user saves nothing with an older access token (CEDIT-07).
+    editAccess.requireActiveCaller(orderId, actor);
     SalesOrder order = bases.readable(tenantId, orderId, actor);
     if (!accessPolicy.canWrite(tenantId, actor, order, PermissionFreshness.FRESH)) {
       throw new AccessDeniedException("You do not have access to update this sales order.");
@@ -225,7 +263,9 @@ public class SalesOrderEditService {
 
     OrderEditBase base = usableBase(tenantId, parsed.baseId(), orderId, actor);
     SalesOrderEditBases.assertEditable(order);
-    // Future lease validation belongs here (CEDIT-03 §4.2); none in this ticket.
+    // Leases after the order row and before the line rows (CEDIT-07 §3.3): the session row and the
+    // lease rows stay locked until this save ends, so no key changes hands before it commits.
+    Verification held = verifyLeases(order, parsed, proof, actor);
     List<SalesOrderLine> lockedLines = revision.lockFreshLines(order);
     OrderEditSnapshot current = bases.project(order, lockedLines);
 
@@ -301,6 +341,7 @@ public class SalesOrderEditService {
               now);
       operations.saveAndFlush(
           OrderEditOperation.noChange(identity, order.getVersion(), next.getId()));
+      leases.releaseHeld(held.held());
       return new Saved(
           new SalesOrderEditResult(
               parsed.operationId(),
@@ -339,6 +380,7 @@ public class SalesOrderEditService {
         current,
         after,
         applied);
+    leases.releaseHeld(held.held());
     return new Saved(
         new SalesOrderEditResult(
             parsed.operationId(),
@@ -401,6 +443,73 @@ public class SalesOrderEditService {
             lineIds(receipt.getLineIds()),
             SalesOrderEditBases.toDto(
                 next, bases.view(order, lockedLines, actor, authentication))));
+  }
+
+  /** The edit session and lease tokens a save carries as proof; neither is part of its identity. */
+  private record LeaseProof(UUID sessionId, Set<UUID> tokens) {
+
+    static LeaseProof of(SalesOrderEditRequest request) {
+      List<UUID> tokens = request.getLeaseTokens() == null ? List.of() : request.getLeaseTokens();
+      if (!tokens.isEmpty() && request.getEditSessionId() == null) {
+        throw SalesOrderEditInstructions.invalidAt(
+            "editSessionId",
+            "Lease tokens come with the edit session that holds them",
+            null,
+            null,
+            null);
+      }
+      return new LeaseProof(request.getEditSessionId(), Set.copyOf(tokens));
+    }
+  }
+
+  /**
+   * Checks that the save holds every key it writes (CEDIT-07 §3.3). Enforced: each key needs this
+   * tab's lease and its token. Off: no proof is needed, but a key somebody still holds is refused,
+   * so lowering the mode never frees a held key. A token that proves none of the keys is a client
+   * error (422); a missing lease is 409 with the keys to acquire again. Nothing is recorded.
+   */
+  private Verification verifyLeases(SalesOrder order, Parsed parsed, LeaseProof proof, UUID actor) {
+    LiveLeaseMode mode = leases.mode(SalesOrderLiveRevisionSource.RESOURCE_TYPE);
+    Verification verification =
+        leases.verify(
+            SalesOrderLiveRevisionSource.resource(order.getId()),
+            order.getEditEpoch(),
+            mode,
+            proof.sessionId(),
+            proof.tokens(),
+            actor,
+            SalesOrderLeaseKeys.required(parsed));
+    if (!verification.missing().isEmpty()) {
+      List<SalesOrderEditLeaseDtos.Requirement> requirements =
+          verification.missing().stream()
+              .map(missing -> requirement(missing, proof, actor))
+              .toList();
+      throw OrderDomainException.conflict(
+              EDIT_LEASE_REQUIRED,
+              "Some of the fields you changed are not held by this form; take them again and save")
+          .withDetail("leases", requirements);
+    }
+    if (!verification.unexpectedTokens().isEmpty()) {
+      throw OrderDomainException.invalid(
+              EDIT_LEASE_TOKEN_UNEXPECTED,
+              "Send only the lease tokens of the fields this save changes")
+          .withDetail("leaseTokens", List.copyOf(verification.unexpectedTokens()));
+    }
+    return verification;
+  }
+
+  private SalesOrderEditLeaseDtos.Requirement requirement(
+      Missing missing, LeaseProof proof, UUID actor) {
+    SalesOrderEditLeaseKey key = SalesOrderLeaseKeys.toWire(missing.key());
+    boolean another =
+        missing.holder() != null && !missing.holder().getSessionId().equals(proof.sessionId());
+    return new SalesOrderEditLeaseDtos.Requirement(
+        key.key(),
+        key.lineId(),
+        another
+            ? SalesOrderEditLeaseDtos.RequirementReason.HELD_BY_ANOTHER
+            : SalesOrderEditLeaseDtos.RequirementReason.NOT_HELD,
+        another ? leaseViews.holders(List.of(missing.holder()), actor).getFirst() : null);
   }
 
   /** The base a save names, on its own order and by its own actor; anything else is unknown. */

@@ -34,6 +34,7 @@ public class LiveEditSessionService {
 
   private final LiveEditSessionRepository sessions;
   private final LiveEditSessionProperties properties;
+  private final LiveEditLeaseService leases;
   private final Clock clock;
 
   /** Opens a new session of {@code userId} on the resource; every call is a new session. */
@@ -62,11 +63,20 @@ public class LiveEditSessionService {
     return expiresAt;
   }
 
-  /** Closes the user's own session; closing twice, or someone else's session, changes nothing. */
+  /**
+   * Closes the user's own session; closing twice, or someone else's session, changes nothing. The
+   * session's field leases end in the same transaction (CEDIT-07): the session row is updated
+   * first, then its lease rows, the order every lease writer uses.
+   */
   @Transactional
   public void close(LiveResource resource, UUID sessionId, UUID userId) {
     UUID tenantId = TenantContext.requireTenantId();
-    sessions.close(tenantId, sessionId, resource.type(), resource.id(), userId, clock.instant());
+    int closed =
+        sessions.close(
+            tenantId, sessionId, resource.type(), resource.id(), userId, clock.instant());
+    if (closed == 1) {
+      leases.releaseSession(resource, sessionId, userId);
+    }
   }
 
   /** Sessions live now on the resource, oldest first. */

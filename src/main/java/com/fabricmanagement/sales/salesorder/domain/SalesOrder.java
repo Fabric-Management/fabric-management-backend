@@ -125,6 +125,16 @@ public class SalesOrder extends BaseEntity {
   @Builder.Default
   private int planningEvaluation = 0;
 
+  /**
+   * Moves each time the order stops being editable (CEDIT-07): it leaves the draft, is cancelled,
+   * held, confirmed or deleted. Field leases are granted in one value of it and are void in any
+   * other, so no lease survives such a change, even when the order later returns to the draft.
+   */
+  @Column(name = "edit_epoch", nullable = false)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private long editEpoch = 0L;
+
   /** When the order was last handed to planning. */
   @Column(name = "planning_submitted_at")
   @Setter(AccessLevel.NONE)
@@ -405,7 +415,30 @@ public class SalesOrder extends BaseEntity {
               + status
               + ". Use cancel() for non-draft orders.");
     }
+    boolean wasEditable = isContentEditable();
     super.delete();
+    endEditingIfLeft(wasEditable);
+  }
+
+  /**
+   * Whether sales may change the order's content now (CEDIT-07): an active order, in a status that
+   * allows editing, at the draft flow stage, with no commercial content lock. The safe edit checks
+   * the same three conditions one by one to name the reason.
+   */
+  public boolean isContentEditable() {
+    OrderFlowStage stage = flowStage == null ? OrderFlowStage.DRAFT : flowStage;
+    return Boolean.TRUE.equals(getIsActive())
+        && status != null
+        && status.canEdit()
+        && stage == OrderFlowStage.DRAFT
+        && commercialContentLock() == null;
+  }
+
+  /** Moves the edit epoch when a change made an editable order uneditable. */
+  private void endEditingIfLeft(boolean wasEditable) {
+    if (wasEditable && !isContentEditable()) {
+      editEpoch++;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -629,7 +662,9 @@ public class SalesOrder extends BaseEntity {
       throw new OrderDomainException(
           "Order " + orderNumber + " cannot move from " + current + " to " + next, 409);
     }
+    boolean wasEditable = isContentEditable();
     this.flowStage = next;
+    endEditingIfLeft(wasEditable);
     return current;
   }
 
@@ -814,7 +849,9 @@ public class SalesOrder extends BaseEntity {
       throw new OrderDomainException(
           String.format("Order can only be confirmed from DRAFT status. Current: %s", status), 409);
     }
+    boolean wasEditable = isContentEditable();
     this.status = OrderStatus.CONFIRMED;
+    endEditingIfLeft(wasEditable);
   }
 
   /** Start processing (CONFIRMED → IN_PRODUCTION). */
@@ -873,7 +910,9 @@ public class SalesOrder extends BaseEntity {
               orderNumber, status),
           409);
     }
+    boolean wasEditable = isContentEditable();
     this.status = OrderStatus.CANCELLED;
+    endEditingIfLeft(wasEditable);
   }
 
   /** Put order on hold. */
@@ -885,8 +924,10 @@ public class SalesOrder extends BaseEntity {
               orderNumber, status),
           409);
     }
+    boolean wasEditable = isContentEditable();
     this.statusBeforeHold = this.status;
     this.status = OrderStatus.ON_HOLD;
+    endEditingIfLeft(wasEditable);
   }
 
   /** Resume an order from hold. */

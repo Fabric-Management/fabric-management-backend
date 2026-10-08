@@ -129,6 +129,9 @@ class SalesOrderLiveOpenApiIT extends SalesOrderLiveItSupport {
       // CEDIT-06: optional, never mixed with revision.
       assertThat(typeOf(map(properties, "presenceRevision"))).isEqualTo("string");
       assertThat(map(properties, "presenceRevision")).containsEntry("minLength", 1);
+      // CEDIT-07: optional lease marker, never mixed with the other two.
+      assertThat(typeOf(map(properties, "leaseRevision"))).isEqualTo("string");
+      assertThat(map(properties, "leaseRevision")).containsEntry("minLength", 1);
     }
     Map<String, Object> closed = schema("LiveClosedDto");
     assertThat(list(closed.get("required"))).containsExactlyInAnyOrder("connectionId", "reason");
@@ -239,8 +242,12 @@ class SalesOrderLiveOpenApiIT extends SalesOrderLiveItSupport {
     assertThat(readyBody.path("data").path("presenceRevision").asText()).isEqualTo("0");
     ObjectNode emptyPresence = readyBody.deepCopy();
     ((ObjectNode) emptyPresence.get("data")).put("presenceRevision", "");
+    // CEDIT-07: and the lease marker; nobody holds a lease yet.
+    assertThat(readyBody.path("data").path("leaseRevision").asText()).isEqualTo("0");
+    ObjectNode emptyLease = readyBody.deepCopy();
+    ((ObjectNode) emptyLease.get("data")).put("leaseRevision", "");
     for (JsonNode broken :
-        List.of(missingRevision, emptyRevision, numericId, noData, emptyPresence)) {
+        List.of(missingRevision, emptyRevision, numericId, noData, emptyPresence, emptyLease)) {
       assertThat(validateRef(readyRef, broken)).as(broken.toString()).isNotEmpty();
       assertThat(validateStream(broken)).as(broken.toString()).isNotEmpty();
     }

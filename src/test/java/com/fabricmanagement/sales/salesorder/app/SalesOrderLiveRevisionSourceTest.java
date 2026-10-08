@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
 import com.fabricmanagement.platform.realtime.app.LiveEditSessionService;
 import com.fabricmanagement.platform.realtime.domain.LiveActor;
 import com.fabricmanagement.platform.realtime.domain.LiveReadResult;
@@ -46,6 +47,7 @@ class SalesOrderLiveRevisionSourceTest {
   @Mock private SalesAccessScopeResolver resolver;
   @Mock private UserQueryService users;
   @Mock private LiveEditSessionService editSessions;
+  @Mock private LiveEditLeaseService editLeases;
 
   private SalesOrderLiveRevisionSource source;
 
@@ -53,7 +55,7 @@ class SalesOrderLiveRevisionSourceTest {
   void setUp() {
     source =
         new SalesOrderLiveRevisionSource(
-            orders, new SalesOrderAccessPolicy(resolver), users, editSessions);
+            orders, new SalesOrderAccessPolicy(resolver), users, editSessions, editLeases);
     TenantContext.setCurrentTenantId(tenant);
   }
 
@@ -98,7 +100,7 @@ class SalesOrderLiveRevisionSourceTest {
     when(users.isActive(tenant, user)).thenReturn(false);
 
     assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.FORBIDDEN);
-    verifyNoInteractions(orders, resolver, editSessions);
+    verifyNoInteractions(orders, resolver, editSessions, editLeases);
   }
 
   @Test
@@ -107,7 +109,7 @@ class SalesOrderLiveRevisionSourceTest {
     activeUserWith(AccessScope.denied());
 
     assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.FORBIDDEN);
-    verifyNoInteractions(orders, editSessions);
+    verifyNoInteractions(orders, editSessions, editLeases);
   }
 
   @Test
@@ -157,7 +159,7 @@ class SalesOrderLiveRevisionSourceTest {
     TenantContext.setCurrentTenantId(UUID.randomUUID());
 
     assertThatThrownBy(() -> source.read(actor, orderId)).isInstanceOf(IllegalStateException.class);
-    verifyNoInteractions(orders, resolver, users, editSessions);
+    verifyNoInteractions(orders, resolver, users, editSessions, editLeases);
   }
 
   @Test
@@ -181,7 +183,26 @@ class SalesOrderLiveRevisionSourceTest {
         .thenReturn(Optional.of(view(tenant, true, creator, 4L)));
 
     assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.NOT_FOUND);
-    verifyNoInteractions(editSessions);
+    verifyNoInteractions(editSessions, editLeases);
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-07 L18: a visible order carries its lease marker for its current edit epoch, apart"
+          + " from the version and presence")
+  void visibleOrderCarriesLeases() {
+    activeUserWith(new AccessScope(DataScope.ORGANIZATION, Set.of()));
+    when(orders.findLiveRevisionViewByTenantIdAndId(tenant, orderId))
+        .thenReturn(Optional.of(view(tenant, true, creator, 4L, 3L)));
+    LiveResource resource = new LiveResource("sales-order", orderId);
+    when(editSessions.presenceRevision(resource)).thenReturn(new LiveRevision("pabc"));
+    when(editLeases.leaseRevision(resource, 3L)).thenReturn(new LiveRevision("ldef"));
+
+    assertThat(source.read(actor, orderId))
+        .isEqualTo(
+            new LiveReadResult.Visible(
+                new LiveRevision("4"), new LiveRevision("pabc"), new LiveRevision("ldef")));
+    verify(editLeases).leaseRevision(resource, 3L);
   }
 
   private void activeUserWith(AccessScope scope) {
@@ -191,6 +212,11 @@ class SalesOrderLiveRevisionSourceTest {
 
   private static LiveRevisionView view(
       UUID tenantId, boolean active, UUID createdBy, long version) {
+    return view(tenantId, active, createdBy, version, 0L);
+  }
+
+  private static LiveRevisionView view(
+      UUID tenantId, boolean active, UUID createdBy, long version, long editEpoch) {
     UUID id = UUID.randomUUID();
     return new LiveRevisionView() {
       @Override
@@ -216,6 +242,11 @@ class SalesOrderLiveRevisionSourceTest {
       @Override
       public Long getVersion() {
         return version;
+      }
+
+      @Override
+      public Long getEditEpoch() {
+        return editEpoch;
       }
     };
   }

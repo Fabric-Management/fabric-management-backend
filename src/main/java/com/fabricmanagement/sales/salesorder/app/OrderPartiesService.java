@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderPartiesService {
 
   private final OrderDraftAccess access;
+  private final SalesOrderLeaseGuard leaseGuard;
   private final ApprovalAuthorityRepository authorities;
   private final Clock clock;
 
@@ -59,6 +60,11 @@ public class OrderPartiesService {
   public OrderPartiesView setRequestedDate(
       UUID orderId, SetRequestedDateRequest request, UUID actor) {
     SalesOrder order = access.writable(orderId, request.expectedVersion(), actor);
+    // CEDIT-07: the same composite the safe edit leases as requestedDeliveryDate.
+    leaseGuard.assertHeaderFree(
+        order,
+        com.fabricmanagement.sales.salesorder.domain.OrderEditKey.REQUESTED_DELIVERY_DATE,
+        actor);
     order.applyRequestedDate(
         request.requestedDate() == null
             ? RequestedDate.UNKNOWN

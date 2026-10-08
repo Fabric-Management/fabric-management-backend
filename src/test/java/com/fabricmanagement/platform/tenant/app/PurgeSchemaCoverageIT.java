@@ -255,6 +255,10 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
     tables.put(
         "production.quality_grade",
         "Product reference data is deleted by dedicated product-reference cleanup.");
+    tables.put(
+        "common_infrastructure.live_edit_lease_mode",
+        "CEDIT-07 tenant setting: whether field leases are enforced. Retained across demo reset"
+            + " like other tenant configuration; never business data.");
 
     return Map.copyOf(tables);
   }

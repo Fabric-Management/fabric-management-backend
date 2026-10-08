@@ -67,6 +67,7 @@ public class ProductCorrectionService {
   private final com.fabricmanagement.common.infrastructure.persistence.SalesOrderLineFulfilmentLock
       fulfilmentLock;
   private final SalesOrderRevision revision;
+  private final com.fabricmanagement.sales.salesorder.app.SalesOrderLeaseGuard leaseGuard;
 
   @Transactional
   public List<FulfilmentDtos.CorrectionView> correct(
@@ -87,6 +88,10 @@ public class ProductCorrectionService {
     if (Objects.equals(input.fromProductId(), input.toProductId())) {
       throw OrderIntakeException.rule("SAME_PRODUCT", "Choose a different product");
     }
+    // CEDIT-07: a product change touches the whole line; refused while any key of it is leased.
+    // After the order row and before the advisory line locks, the order every writer uses.
+    leaseGuard.assertLinesFree(
+        order, input.lines().stream().map(FulfilmentDtos.LineVersion::lineId).toList(), actor);
     fulfilmentLock.lockAll(
         tenantId, input.lines().stream().map(FulfilmentDtos.LineVersion::lineId).toList());
     // The other line writers wait on the order row, so the lines read now are the committed ones.

@@ -73,6 +73,7 @@ class QuantityAcceptanceServiceTest {
               com.fabricmanagement.sales.salesorder.app.LineAllocationPolicy.class));
 
   @Mock private com.fabricmanagement.sales.salesorder.app.SalesOrderRevision revision;
+  @Mock private com.fabricmanagement.sales.salesorder.app.SalesOrderLeaseGuard leaseGuard;
   @Mock private LotCompatibilityRequestPort compatibilityRequests;
 
   private final java.util.Map<UUID, BigDecimal> measuredPieces = new java.util.HashMap<>();
@@ -96,6 +97,7 @@ class QuantityAcceptanceServiceTest {
             lines,
             adjustments,
             revision,
+            leaseGuard,
             compatibilityRequests,
             Clock.fixed(NOW, ZoneOffset.UTC));
     order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-1").build();
@@ -161,6 +163,43 @@ class QuantityAcceptanceServiceTest {
                     order.getId(), line.getId(), request(proposal, above, null, null), ACTOR))
         .isInstanceOf(com.fabricmanagement.sales.common.exception.OrderDomainException.class);
     assertThat(line.getRequestedQty()).isNotEqualByComparingTo("514");
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-07 L15: a leased quantity refuses the acceptance after the order lock, before the"
+          + " line is read; nothing changes")
+  void aLeasedQuantityRefusesTheAcceptance() {
+    QuantityOption above =
+        option(QuantityOption.OptionKind.ABOVE, "514", List.of(lotA), List.of(pieceA));
+    QuantityProposal proposal = latest(above);
+    stock(List.of(lot(lotA, pieceA, PieceState.ELIGIBLE)), List.of());
+    com.fabricmanagement.sales.common.exception.OrderDomainException held =
+        com.fabricmanagement.sales.common.exception.OrderDomainException.conflict(
+            "EDIT_LEASE_HELD", "Someone is editing the quantity");
+    org.mockito.Mockito.doThrow(held)
+        .when(leaseGuard)
+        .assertLineFieldFree(
+            order,
+            line.getId(),
+            com.fabricmanagement.sales.salesorder.domain.OrderEditKey.LINE_QUANTITY,
+            ACTOR);
+
+    assertThatThrownBy(
+            () ->
+                service.record(
+                    order.getId(), line.getId(), request(proposal, above, null, null), ACTOR))
+        .isSameAs(held);
+    org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(revision, leaseGuard, access);
+    sequence.verify(revision).lockFresh(order);
+    sequence.verify(leaseGuard).assertLineFieldFree(any(), any(), any(), any());
+    verify(access, never()).line(any(), any());
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("500");
+    verify(acceptances, never()).save(any());
+
+    // Withdrawing may move the quantity back to the request: refused the same way.
+    assertThatThrownBy(() -> service.withdraw(order.getId(), line.getId(), ACTOR)).isSameAs(held);
+    verify(acceptances, never()).save(any());
   }
 
   @Test

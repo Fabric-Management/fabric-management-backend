@@ -1556,6 +1556,10 @@ CREATE TABLE IF NOT EXISTS sales_ord.sales_order (
     planning_round INTEGER NOT NULL DEFAULT 0 CHECK (planning_round >= 0),
     planning_evaluation INTEGER NOT NULL DEFAULT 0 CHECK (planning_evaluation >= 0),
     planning_submitted_at TIMESTAMPTZ,
+    -- CEDIT-07: moves each time the order stops being editable (it leaves the draft, is cancelled,
+    -- held or deleted). Field leases granted in an earlier value are void, so a lease never
+    -- survives a status or flow change, even if the order comes back to the draft.
+    edit_epoch BIGINT NOT NULL DEFAULT 0 CHECK (edit_epoch >= 0),
     order_date DATE NOT NULL,
     -- The delivery date the customer asked for, kept as told; it never takes the meaning of the
     -- delivery term's event.
@@ -5984,6 +5988,72 @@ CREATE INDEX IF NOT EXISTS idx_live_edit_session_ended
 
 COMMENT ON TABLE common_infrastructure.live_edit_session IS
     'CEDIT-06: open edit forms (presence only); technical, deleted after retention.';
+
+-- ===================== CEDIT-07: field leases (ADR-0014 D14, restructured) =====================
+-- The right of one edit session to change one key of one record for a limited time
+-- (docs/architecture/COLLABORATIVE-EDITING-FIELD-LEASES.md). Domain-agnostic like the sessions: the
+-- consuming module maps its key catalogue to (lease_scope, lease_part); lease_part '*' is the whole
+-- scope. One row per key; each holding of it is a period with its own server token. Ending a period
+-- (release, expiry, a newer resource_generation) never deletes the row; the retention job does.
+CREATE TABLE IF NOT EXISTS common_infrastructure.live_edit_lease (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    resource_type VARCHAR(40) NOT NULL CHECK (resource_type ~ '^[a-z][a-z0-9-]*$'),
+    resource_id UUID NOT NULL,
+    lease_scope VARCHAR(80) NOT NULL CHECK (lease_scope ~ '^[a-z][a-z0-9:-]*$'),
+    lease_part VARCHAR(60) NOT NULL CHECK (lease_part ~ '^(\*|[a-z][A-Za-z0-9.]*)$'),
+    resource_generation BIGINT NOT NULL CHECK (resource_generation >= 0),
+    session_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    token UUID NOT NULL,
+    acquired_at TIMESTAMPTZ NOT NULL,
+    renewed_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    released_at TIMESTAMPTZ,
+    CONSTRAINT uq_live_edit_lease_key
+        UNIQUE (tenant_id, resource_type, resource_id, lease_scope, lease_part),
+    CONSTRAINT uq_live_edit_lease_token UNIQUE (tenant_id, token),
+    -- The renewal time of one period never moves backwards and the expiry never passes the edit
+    -- session's; when no expiry after the recorded renewal exists (a clock behind by about a
+    -- lifetime) the entity ends the period instead (CEDIT-07 R3), so these hold across instances;
+    -- a new period writes all three from one clock.
+    CONSTRAINT ck_live_edit_lease_period CHECK (expires_at > renewed_at AND renewed_at >= acquired_at)
+);
+-- What a session holds (bounds, close).
+CREATE INDEX IF NOT EXISTS idx_live_edit_lease_session
+    ON common_infrastructure.live_edit_lease (tenant_id, session_id)
+    WHERE released_at IS NULL;
+-- Held leases of one record (list, revision, writers' checks).
+CREATE INDEX IF NOT EXISTS idx_live_edit_lease_held
+    ON common_infrastructure.live_edit_lease (tenant_id, resource_type, resource_id, expires_at)
+    WHERE released_at IS NULL;
+-- Retention: rows in end order.
+CREATE INDEX IF NOT EXISTS idx_live_edit_lease_ended
+    ON common_infrastructure.live_edit_lease (tenant_id, expires_at);
+
+COMMENT ON TABLE common_infrastructure.live_edit_lease IS
+    'CEDIT-07: field leases (who may change which key now); technical, deleted after retention.';
+
+-- Enforcement of field leases per tenant and resource type. No row = OFF (the default). A row is
+-- written by an operator (or a test) to switch enforcement on; the application never deletes it.
+CREATE TABLE IF NOT EXISTS common_infrastructure.live_edit_lease_mode (
+    tenant_id UUID NOT NULL,
+    resource_type VARCHAR(40) NOT NULL CHECK (resource_type ~ '^[a-z][a-z0-9-]*$'),
+    enforced_at TIMESTAMPTZ NOT NULL,
+    enforced_by VARCHAR(200) NOT NULL,
+    PRIMARY KEY (tenant_id, resource_type)
+);
+
+COMMENT ON TABLE common_infrastructure.live_edit_lease_mode IS
+    'CEDIT-07: field-lease enforcement switch per tenant and resource type; monotonic.';
 
 
 -- ===================== FROM: V20260329093500__add_sales_order_id_to_work_order.sql =====================

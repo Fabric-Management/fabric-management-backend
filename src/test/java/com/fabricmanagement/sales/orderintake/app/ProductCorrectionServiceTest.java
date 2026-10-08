@@ -70,6 +70,7 @@ class ProductCorrectionServiceTest {
   @Mock private ConfirmationGate gate;
   @Mock private LotCompatibilityRequestPort compatibilityRequests;
   @Mock private SalesOrderRevision revision;
+  @Mock private com.fabricmanagement.sales.salesorder.app.SalesOrderLeaseGuard leaseGuard;
 
   private ProductCorrectionService service;
   private SalesOrder order;
@@ -95,7 +96,8 @@ class ProductCorrectionServiceTest {
             compatibilityRequests,
             Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC),
             fulfilmentLock,
-            revision);
+            revision,
+            leaseGuard);
     order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-5").build();
     order.setId(UUID.randomUUID());
     navy160 = line(OLD, 2L);
@@ -153,6 +155,40 @@ class ProductCorrectionServiceTest {
     verify(revision, never()).lockFresh(other);
     verify(revision, never()).lockFreshLines(any());
     verify(revision, never()).linesChanged(any());
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-07 L15: the lease check comes after the order row and before the advisory locks;"
+          + " a held line refuses the correction with nothing changed")
+  void aLeasedLineRefusesTheCorrection() {
+    service.correct(order.getId(), request(List.of(ref(navy160, 2L), ref(navy155, 5L))), ACTOR);
+    InOrder locks = inOrder(revision, leaseGuard, fulfilmentLock);
+    locks.verify(revision).lockFresh(order);
+    locks
+        .verify(leaseGuard)
+        .assertLinesFree(
+            eq(order),
+            org.mockito.ArgumentMatchers.argThat(
+                ids ->
+                    ids.containsAll(List.of(navy160.getId(), navy155.getId())) && ids.size() == 2),
+            eq(ACTOR));
+    locks.verify(fulfilmentLock).lockAll(eq(TENANT), any());
+
+    UUID before = navy160.getProductId();
+    com.fabricmanagement.sales.common.exception.OrderDomainException held =
+        com.fabricmanagement.sales.common.exception.OrderDomainException.conflict(
+            "EDIT_LEASE_HELD", "Someone is editing this line");
+    org.mockito.Mockito.reset(fulfilmentLock, corrections);
+    org.mockito.Mockito.doThrow(held).when(leaseGuard).assertLinesFree(any(), any(), any());
+    assertThatThrownBy(
+            () ->
+                service.correct(
+                    order.getId(), request(List.of(ref(navy160, 2L), ref(navy155, 5L))), ACTOR))
+        .isSameAs(held);
+    assertThat(navy160.getProductId()).isEqualTo(before);
+    verify(fulfilmentLock, never()).lockAll(any(), any());
+    verify(corrections, never()).save(any(LineProductCorrection.class));
   }
 
   @Test

@@ -47,6 +47,9 @@ public interface SalesOrderRepository
     UUID getCreatedBy();
 
     Long getVersion();
+
+    /** The order's edit epoch: field leases of another epoch are void (CEDIT-07). */
+    Long getEditEpoch();
   }
 
   /** Orders at the given flow stages, oldest first: the planning queue. */

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +27,8 @@ public class SalesOrderEditRequest {
   private SalesOrderHeaderEdits header;
   private List<SalesOrderLineEdit> lines;
   private List<SalesOrderEditResolution> resolutions;
+  private UUID editSessionId;
+  private List<UUID> leaseTokens;
 
   @NotNull(message = "Every save carries its operation id")
   @Schema(
@@ -86,6 +89,45 @@ public class SalesOrderEditRequest {
 
   public void setResolutions(List<SalesOrderEditResolution> resolutions) {
     this.resolutions = presentList("resolutions", resolutions);
+  }
+
+  @Schema(
+      format = "uuid",
+      description =
+          "The edit session (browser tab) whose field leases this save uses (CEDIT-07). Needed"
+              + " when leases are enforced and the save changes any key; not part of the save's"
+              + " identity: a retry may carry a newer session or tokens under the same operation id.")
+  public UUID getEditSessionId() {
+    return editSessionId;
+  }
+
+  public void setEditSessionId(UUID editSessionId) {
+    if (editSessionId == null) {
+      throw new IllegalArgumentException("editSessionId must not be null; omit it instead");
+    }
+    this.editSessionId = editSessionId;
+  }
+
+  @Size(max = SalesOrderEditLeaseDtos.MAX_TOKENS)
+  @ArraySchema(
+      schema = @Schema(format = "uuid"),
+      uniqueItems = true,
+      maxItems = SalesOrderEditLeaseDtos.MAX_TOKENS,
+      arraySchema =
+          @Schema(
+              description =
+                  "One lease token per key this save writes, held by editSessionId; no other"
+                      + " token (CEDIT-07). The server computes which keys need a lease."))
+  public List<UUID> getLeaseTokens() {
+    return leaseTokens;
+  }
+
+  public void setLeaseTokens(List<UUID> leaseTokens) {
+    List<UUID> tokens = presentList("leaseTokens", leaseTokens);
+    if (new java.util.HashSet<>(tokens).size() != tokens.size()) {
+      throw new IllegalArgumentException("leaseTokens must be distinct");
+    }
+    this.leaseTokens = tokens;
   }
 
   private static <T> List<T> presentList(String name, List<T> values) {

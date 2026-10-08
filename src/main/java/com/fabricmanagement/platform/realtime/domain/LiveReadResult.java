@@ -9,10 +9,13 @@ public sealed interface LiveReadResult permits LiveReadResult.Visible, LiveReadR
 
   /**
    * The actor may read the resource; this is its committed revision. {@code presence} is a separate
-   * marker of who edits the resource now (CEDIT-06), or null for a resource without presence. The
-   * two are never combined: each tells the client what to read again.
+   * marker of who edits the resource now (CEDIT-06), or null for a resource without presence;
+   * {@code lease} a separate marker of which field leases are held now (CEDIT-07), or null for a
+   * resource without field leases. The three are never combined: each tells the client what to read
+   * again.
    */
-  record Visible(LiveRevision revision, LiveRevision presence) implements LiveReadResult {
+  record Visible(LiveRevision revision, LiveRevision presence, LiveRevision lease)
+      implements LiveReadResult {
 
     public Visible {
       if (revision == null) {
@@ -20,9 +23,14 @@ public sealed interface LiveReadResult permits LiveReadResult.Visible, LiveReadR
       }
     }
 
+    /** A resource without field leases. */
+    public Visible(LiveRevision revision, LiveRevision presence) {
+      this(revision, presence, null);
+    }
+
     /** A resource without presence. */
     public Visible(LiveRevision revision) {
-      this(revision, null);
+      this(revision, null, null);
     }
   }
 

@@ -29,6 +29,8 @@ import org.springframework.stereotype.Component;
  *       false}; the parent is the {@code oneOf} of the subtypes with the discriminator mapping.
  *       Springdoc otherwise writes each subtype as {@code allOf} the parent, where {@code
  *       valueType} lives, which cannot be closed without refusing every valid value.
+ *   <li>the lease key catalogue (CEDIT-07) as a closed string enum of the wire names, taken from
+ *       the same Java catalogue the server reads with, so the document never drifts from it.
  * </ul>
  *
  * The typed 409 problem schema comes from the save endpoint's response annotation.
@@ -39,6 +41,7 @@ public class SalesOrderEditOpenApiCustomizer implements OpenApiCustomizer {
   static final String REQUEST_SCHEMA = "SalesOrderEditRequest";
   static final String HEADER_SCHEMA = "SalesOrderHeaderEdits";
   static final String FACET_VALUE_SCHEMA = "RequirementFacetValue";
+  static final String LEASE_FIELD_SCHEMA = "SalesOrderEditLeaseField";
   static final String DISCRIMINATOR = "valueType";
   private static final String REF = "#/components/schemas/";
 
@@ -58,6 +61,23 @@ public class SalesOrderEditOpenApiCustomizer implements OpenApiCustomizer {
     limitLineOperations(schemas.get(REQUEST_SCHEMA));
     limitHeaderTexts(schemas.get(HEADER_SCHEMA));
     closeFacetValueTypes(schemas);
+    leaseFieldValues(schemas.get(LEASE_FIELD_SCHEMA));
+  }
+
+  /** The lease keys are exactly the catalogue's wire names. */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static void leaseFieldValues(Schema leaseField) {
+    if (leaseField == null) {
+      return;
+    }
+    leaseField.setTypes(new LinkedHashSet<>(List.of("string")));
+    leaseField.setType("string");
+    leaseField.setEnum(
+        new ArrayList<>(
+            java.util.Arrays.stream(
+                    com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseField.values())
+                .map(com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseField::wireName)
+                .toList()));
   }
 
   private void limitLineOperations(Schema<?> request) {

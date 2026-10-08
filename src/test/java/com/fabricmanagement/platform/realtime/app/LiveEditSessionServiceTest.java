@@ -33,6 +33,7 @@ class LiveEditSessionServiceTest {
   private final UUID user = UUID.randomUUID();
   private final LiveResource order = new LiveResource("sales-order", UUID.randomUUID());
   private final LiveEditSessionRepository repository = mock(LiveEditSessionRepository.class);
+  private final LiveEditLeaseService leases = mock(LiveEditLeaseService.class);
   private LiveEditSessionProperties properties;
   private LiveEditSessionService service;
 
@@ -40,7 +41,9 @@ class LiveEditSessionServiceTest {
   void setUp() {
     properties = new LiveEditSessionProperties();
     properties.afterPropertiesSet();
-    service = new LiveEditSessionService(repository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+    service =
+        new LiveEditSessionService(
+            repository, properties, leases, Clock.fixed(NOW, ZoneOffset.UTC));
     TenantContext.setCurrentTenantId(tenant);
   }
 
@@ -89,6 +92,21 @@ class LiveEditSessionServiceTest {
     UUID id = UUID.randomUUID();
     service.close(order, id, user);
     verify(repository).close(tenant, id, "sales-order", order.id(), user, NOW);
+    // Nothing was closed (already closed, or not the user's): no lease is touched.
+    org.mockito.Mockito.verifyNoInteractions(leases);
+  }
+
+  @Test
+  @DisplayName("CEDIT-07 L12: closing my session ends its leases, after the session row")
+  void closingEndsTheSessionsLeases() {
+    UUID id = UUID.randomUUID();
+    when(repository.close(tenant, id, "sales-order", order.id(), user, NOW)).thenReturn(1);
+
+    service.close(order, id, user);
+
+    org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(repository, leases);
+    sequence.verify(repository).close(tenant, id, "sales-order", order.id(), user, NOW);
+    sequence.verify(leases).releaseSession(order, id, user);
   }
 
   @Test

@@ -66,6 +66,7 @@ class SalesOrderServiceUpdateTest {
 
   @Mock private LineAllocationPolicy lineAllocations;
   @Mock private OrderCreationReplay creationReplay;
+  @Mock private SalesOrderLeaseGuard leaseGuard;
 
   @InjectMocks private SalesOrderService salesOrderService;
 
