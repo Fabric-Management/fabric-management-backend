@@ -79,9 +79,24 @@ public final class SalesOrderLeaseKeys {
    * conflict is sent again and needs its key the same way. A resolution alone needs no lease.
    */
   static Set<LiveLeaseKey> required(Parsed parsed) {
+    return required(parsed, Set.of());
+  }
+
+  /**
+   * The keys a save writes, except those of {@code gone}: lines of the save's server base that are
+   * no longer active lines of the order (CEDIT-07-F1). Nobody can hold such a line any more, and
+   * the merge answers its instructions without writing it (an UPDATE conflicts with the removal, a
+   * REMOVE changes nothing), so asking for its lease would only keep the save from that answer. The
+   * caller decides which lines are gone from the server base and the locked order; an id the base
+   * does not know is never in it, and every other key is required as before.
+   */
+  static Set<LiveLeaseKey> required(Parsed parsed, Set<UUID> gone) {
     Set<LiveLeaseKey> keys = new TreeSet<>();
     parsed.header().keySet().forEach(key -> keys.add(of(key, null)));
     for (LineOperation line : parsed.lines()) {
+      if (line.lineId() != null && gone.contains(line.lineId())) {
+        continue;
+      }
       switch (line.operation()) {
         case UPDATE -> line.fields().keySet().forEach(key -> keys.add(of(key, line.lineId())));
         case REMOVE -> keys.add(wholeLine(line.lineId()));

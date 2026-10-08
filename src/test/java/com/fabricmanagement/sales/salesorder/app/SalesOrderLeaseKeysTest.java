@@ -127,6 +127,47 @@ class SalesOrderLeaseKeysTest {
   }
 
   @Test
+  @DisplayName(
+      "CEDIT-07-F1: lines gone since the base need no lease, for UPDATE and REMOVE alike; the header"
+          + " and active lines still do")
+  void goneLinesNeedNoLease() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("operationId", UUID.randomUUID());
+    body.put("baseId", UUID.randomUUID());
+    body.put("header", Map.of("notes", set("x")));
+    UUID l3 = UUID.randomUUID();
+    body.put(
+        "lines",
+        List.of(
+            Map.of(
+                "operation",
+                "UPDATE",
+                "lineId",
+                l1,
+                "fields",
+                Map.of(
+                    "pricing", set(Map.of("currency", "GBP", "unitPrice", new BigDecimal("4"))))),
+            Map.of("operation", "REMOVE", "lineId", l2),
+            Map.of(
+                "operation",
+                "UPDATE",
+                "lineId",
+                l3,
+                "fields",
+                Map.of(
+                    "quantity", set(Map.of("requestedQty", new BigDecimal("10"), "unit", "M"))))));
+    SalesOrderEditInstructions.Parsed parsed = parse(body);
+
+    assertThat(SalesOrderLeaseKeys.required(parsed, Set.of(l1, l2)))
+        .containsExactlyInAnyOrder(
+            new LiveLeaseKey("header", "notes"), new LiveLeaseKey("line:" + l3, "line.quantity"));
+    // Without gone lines, the same request needs every key.
+    assertThat(SalesOrderLeaseKeys.required(parsed, Set.of()))
+        .isEqualTo(SalesOrderLeaseKeys.required(parsed))
+        .contains(new LiveLeaseKey("line:" + l1, "line.pricing"), LiveLeaseKey.whole("line:" + l2));
+  }
+
+  @Test
   @DisplayName("L11: the lease proof is not part of the save's identity")
   void proofIsNotInTheFingerprint() throws Exception {
     Map<String, Object> body = new LinkedHashMap<>();

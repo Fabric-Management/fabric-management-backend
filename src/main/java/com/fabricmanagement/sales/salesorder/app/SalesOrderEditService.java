@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -265,7 +266,7 @@ public class SalesOrderEditService {
     SalesOrderEditBases.assertEditable(order);
     // Leases after the order row and before the line rows (CEDIT-07 §3.3): the session row and the
     // lease rows stay locked until this save ends, so no key changes hands before it commits.
-    Verification held = verifyLeases(order, parsed, proof, actor);
+    Verification held = verifyLeases(order, base, parsed, proof, actor);
     List<SalesOrderLine> lockedLines = revision.lockFreshLines(order);
     OrderEditSnapshot current = bases.project(order, lockedLines);
 
@@ -463,12 +464,37 @@ public class SalesOrderEditService {
   }
 
   /**
+   * The lines this save names that its server base knows and the order no longer has as active
+   * lines (CEDIT-07-F1). Read under the order row lock, which a writer removing a line takes first,
+   * and without locking the line rows: their locks still come after the leases. An id the base does
+   * not know (made up, another order's or added since) is never gone: it keeps its lease
+   * requirement and the base's own checks.
+   */
+  private Set<UUID> goneSinceBase(SalesOrder order, OrderEditBase base, Parsed parsed) {
+    List<UUID> named =
+        parsed.lines().stream()
+            .map(LineOperation::lineId)
+            .filter(lineId -> lineId != null && base.getContent().line(lineId).isPresent())
+            .toList();
+    if (named.isEmpty()) {
+      return Set.of();
+    }
+    Set<UUID> active = revision.activeLineIds(order);
+    return named.stream().filter(lineId -> !active.contains(lineId)).collect(Collectors.toSet());
+  }
+
+  /**
    * Checks that the save holds every key it writes (CEDIT-07 §3.3). Enforced: each key needs this
    * tab's lease and its token. Off: no proof is needed, but a key somebody still holds is refused,
    * so lowering the mode never frees a held key. A token that proves none of the keys is a client
    * error (422); a missing lease is 409 with the keys to acquire again. Nothing is recorded.
+   *
+   * <p>A line of the save's base that is no longer an active line of the order needs no lease
+   * (CEDIT-07-F1): nobody can acquire it, and the merge answers it (an UPDATE conflicts with the
+   * removal, a REMOVE is no change). A token sent for it proves no key and stays unexpected.
    */
-  private Verification verifyLeases(SalesOrder order, Parsed parsed, LeaseProof proof, UUID actor) {
+  private Verification verifyLeases(
+      SalesOrder order, OrderEditBase base, Parsed parsed, LeaseProof proof, UUID actor) {
     LiveLeaseMode mode = leases.mode(SalesOrderLiveRevisionSource.RESOURCE_TYPE);
     Verification verification =
         leases.verify(
@@ -478,7 +504,7 @@ public class SalesOrderEditService {
             proof.sessionId(),
             proof.tokens(),
             actor,
-            SalesOrderLeaseKeys.required(parsed));
+            SalesOrderLeaseKeys.required(parsed, goneSinceBase(order, base, parsed)));
     if (!verification.missing().isEmpty()) {
       List<SalesOrderEditLeaseDtos.Requirement> requirements =
           verification.missing().stream()

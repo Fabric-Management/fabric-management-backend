@@ -14,6 +14,7 @@ import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
 import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
+import com.fabricmanagement.sales.salesorder.domain.RequestedDateStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos;
@@ -789,7 +790,10 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
     assertThat(failureCode(command.get(30, TimeUnit.SECONDS))).isEqualTo("EDIT_LEASE_HELD");
     release(actorA, tabA, token);
 
-    // Command first: the acquire waits and is then granted on the committed order.
+    // Command first: the acquire waits and is then granted on the committed order. The writer
+    // records "not requested": the order's date is still unknown, so clearing it would write
+    // nothing
+    // and leave the version where it was.
     long before = orderVersion();
     CountDownLatch written = new CountDownLatch(1);
     CountDownLatch finish = new CountDownLatch(1);
@@ -805,7 +809,9 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
                                   parties.setRequestedDate(
                                       orderId,
                                       new OrderPartyDtos.SetRequestedDateRequest(
-                                          orderVersion(), null),
+                                          orderVersion(),
+                                          new OrderPartyDtos.RequestedDateInput(
+                                              RequestedDateStatus.NOT_REQUESTED, null, null, null)),
                                       actorB.id());
                               written.countDown();
                               await(finish);
@@ -1140,6 +1146,363 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
     assertThat(orderText("notes")).isEqualTo("A");
   }
 
+  // ── CEDIT-07-F1: a line removed since the base ────────────────────────────
+
+  @Test
+  @DisplayName(
+      "DL01: A's lease ended and B removed the line; A's stale UPDATE reaches the merge and"
+          + " conflicts, nothing is written and the line stays removed")
+  void staleUpdateOfARemovedLineConflicts() {
+    enforce();
+    UUID tabA = openSession(actorA);
+    UUID baseA = open(actorA).baseId();
+    granted(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, l1));
+    // A was away: the lease (and the session) ended.
+    clock.advance(Duration.ofSeconds(100));
+    removeL1ByB();
+    long version = orderVersion();
+    int history = historyRows();
+
+    JsonNode problem = conflicted(actorA, staleL1Update(UUID.randomUUID(), baseA));
+
+    assertThat(problem.path("code").asText()).isEqualTo("EDIT_CONFLICT");
+    JsonNode conflict = problem.path("conflicts").get(0);
+    assertThat(conflict.path("lineId").asText()).isEqualTo(l1.toString());
+    assertThat(conflict.path("reason").asText()).isEqualTo("LINE_REMOVED_ON_SERVER");
+    assertThat(conflict.path("choices"))
+        .extracting(JsonNode::asText)
+        .containsExactly("KEEP_CURRENT");
+    assertThat(receipts("CONFLICT")).isEqualTo(1);
+    assertThat(l1Active()).isFalse();
+    assertThat(orderVersion()).isEqualTo(version);
+    assertThat(historyRows()).isEqualTo(history);
+  }
+
+  @Test
+  @DisplayName(
+      "DL02: a stale REMOVE of a line already removed is a no change without any lease; the retry"
+          + " answers the same receipt")
+  void staleRemoveOfARemovedLineIsNoChange() {
+    enforce();
+    UUID baseA = open(actorA).baseId();
+    removeL1ByB();
+    long version = orderVersion();
+    int history = historyRows();
+    Map<String, Object> stale = withLines(body(UUID.randomUUID(), baseA), List.of(remove(l1)));
+
+    SalesOrderEditResult first = saved(actorA, stale);
+    SalesOrderEditResult again = saved(actorA, stale);
+
+    assertThat(first.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
+    assertThat(again.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
+    assertThat(again.replayed()).isTrue();
+    // A replay derives a fresh base from the current order (CEDIT-03 §4.3): the same receipt
+    // answers, at the same version, but the base id is new each time.
+    assertThat(again.resultVersion()).isEqualTo(first.resultVersion());
+    assertThat(again.nextBase().orderVersion()).isEqualTo(first.nextBase().orderVersion());
+    assertThat(receipts("NO_CHANGE")).isEqualTo(1);
+    assertThat(orderVersion()).isEqualTo(version);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(l1Active()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "DL03: beside a removed line, an active key still needs its lease; with it the save conflicts"
+          + " on the removed line and writes none of its other changes")
+  void removedLineBesideAnActiveKey() {
+    enforce();
+    UUID tabA = openSession(actorA);
+    UUID baseA = open(actorA).baseId();
+    removeL1ByB();
+    long version = orderVersion();
+    int history = historyRows();
+    int receiptsBefore = receipts();
+    Map<String, Object> mixed =
+        withLines(
+            body(UUID.randomUUID(), baseA, "notes", set("A")),
+            List.of(update(l1, "pricing", set(pricing("GBP", "4.10")))));
+
+    Object unproven = save(actorA, mixed);
+
+    assertThat(requirements(unproven))
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.key()).isEqualTo(SalesOrderEditLeaseField.NOTES);
+              assertThat(r.lineId()).isNull();
+              assertThat(r.reason()).isEqualTo(RequirementReason.NOT_HELD);
+            });
+    assertThat(receipts()).isEqualTo(receiptsBefore);
+
+    UUID notesToken = token(granted(actorA, tabA, notes()));
+    JsonNode problem = conflicted(actorA, proof(mixed, tabA, notesToken));
+
+    assertThat(problem.path("conflicts"))
+        .anySatisfy(
+            c -> {
+              assertThat(c.path("lineId").asText()).isEqualTo(l1.toString());
+              assertThat(c.path("reason").asText()).isEqualTo("LINE_REMOVED_ON_SERVER");
+            });
+    assertThat(orderText("notes")).isNull();
+    assertThat(orderVersion()).isEqualTo(version);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(receipts("CONFLICT")).isEqualTo(1);
+    // A conflict keeps the lease it proved.
+    assertThat(leases(actorC))
+        .singleElement()
+        .satisfies(h -> assertThat(h.key()).isEqualTo(SalesOrderEditLeaseField.NOTES));
+  }
+
+  @Test
+  @DisplayName(
+      "DL04: a stale REMOVE of a removed line beside a proven change applies only the real change"
+          + " and releases the lease it used")
+  void removedLineBesideAProvenChange() {
+    enforce();
+    UUID tabA = openSession(actorA);
+    UUID baseA = open(actorA).baseId();
+    removeL1ByB();
+    UUID notesToken = token(granted(actorA, tabA, notes()));
+    UUID operationId = UUID.randomUUID();
+
+    SalesOrderEditResult result =
+        saved(
+            actorA,
+            proof(
+                withLines(body(operationId, baseA, "notes", set("A")), List.of(remove(l1))),
+                tabA,
+                notesToken));
+
+    assertThat(result.outcome()).isEqualTo(SalesOrderEditOutcome.APPLIED);
+    assertThat(orderText("notes")).isEqualTo("A");
+    assertThat(
+            history().stream()
+                .filter(row -> operationId.equals(row.get("operation_id")))
+                .map(row -> row.get("edit_key")))
+        .containsExactly("notes");
+    assertThat(leases(actorC)).isEmpty();
+    assertThat(l1Active()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "DL05: an active line still needs its lease for UPDATE and REMOVE; the gone-line exception"
+          + " is no bypass")
+  void activeLinesStillNeedLeases() {
+    enforce();
+    UUID baseA = open(actorA).baseId();
+    int receiptsBefore = receipts();
+
+    Object update = save(actorA, staleL1Update(UUID.randomUUID(), baseA));
+    assertThat(requirements(update))
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.key()).isEqualTo(SalesOrderEditLeaseField.LINE_PRICING);
+              assertThat(r.lineId()).isEqualTo(l1);
+              assertThat(r.reason()).isEqualTo(RequirementReason.NOT_HELD);
+            });
+
+    UUID tabB = openSession(actorB);
+    granted(actorB, tabB, line(SalesOrderEditLeaseField.LINE, l1));
+    Object removal = save(actorA, withLines(body(UUID.randomUUID(), baseA), List.of(remove(l1))));
+    assertThat(requirements(removal))
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.key()).isEqualTo(SalesOrderEditLeaseField.LINE);
+              assertThat(r.lineId()).isEqualTo(l1);
+              assertThat(r.reason()).isEqualTo(RequirementReason.HELD_BY_ANOTHER);
+              assertThat(r.holder().userId()).isEqualTo(actorB.id());
+            });
+    assertThat(l1Active()).isTrue();
+    assertThat(receipts()).isEqualTo(receiptsBefore);
+  }
+
+  @Test
+  @DisplayName(
+      "DL06: an id the base does not know is never a removed line: a made-up id still needs a"
+          + " lease, a line added since the base is refused by the base check, nothing is written")
+  void unknownLinesKeepTheirChecks() {
+    enforce();
+    UUID tabA = openSession(actorA);
+    UUID baseA = open(actorA).baseId();
+    UUID madeUp = UUID.randomUUID();
+
+    Object fabricated =
+        save(
+            actorA,
+            withLines(
+                body(UUID.randomUUID(), baseA),
+                List.of(update(madeUp, "pricing", set(pricing("GBP", "4.10"))))));
+    assertThat(requirements(fabricated))
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.lineId()).isEqualTo(madeUp);
+              assertThat(r.reason()).isEqualTo(RequirementReason.NOT_HELD);
+              assertThat(r.holder()).isNull();
+            });
+    assertThat(
+            failureCode(acquire(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, madeUp))))
+        .isEqualTo("EDIT_LEASE_KEY_INVALID");
+
+    // B adds a line after A's base: it is active and leasable, but A's base does not know it. A
+    // product of its own, so the line is not L1's distribution again.
+    UUID p3 = UUID.randomUUID();
+    SalesOrderEditResult added =
+        saved(
+            actorB,
+            withLines(
+                body(UUID.randomUUID(), open(actorB).baseId()),
+                List.of(add(UUID.randomUUID(), p3, "quantity", set(quantity("200", "M"))))));
+    UUID l3 = added.lineIds().getFirst().lineId();
+    UUID token = token(granted(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, l3)));
+    int receiptsBefore = receipts();
+    long version = orderVersion();
+
+    Object notInBase =
+        save(
+            actorA,
+            proof(
+                withLines(
+                    body(UUID.randomUUID(), baseA),
+                    List.of(update(l3, "pricing", set(pricing("GBP", "4.10"))))),
+                tabA,
+                token));
+
+    assertThat(failureCode(notInBase)).isEqualTo("LINE_NOT_IN_BASE");
+    assertThat(receipts()).isEqualTo(receiptsBefore);
+    assertThat(orderVersion()).isEqualTo(version);
+  }
+
+  @Test
+  @DisplayName(
+      "DL07: the removed line's old token is unexpected and records nothing; the same operation"
+          + " without it reaches the conflict")
+  void oldTokenOfARemovedLine() {
+    enforce();
+    UUID tabA = openSession(actorA);
+    UUID baseA = open(actorA).baseId();
+    UUID old = token(granted(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, l1)));
+    release(actorA, tabA, old);
+    removeL1ByB();
+    int receiptsBefore = receipts();
+    Map<String, Object> stale = staleL1Update(UUID.randomUUID(), baseA);
+
+    Object withOld = save(actorA, proof(stale, tabA, old));
+
+    assertThat(failureCode(withOld)).isEqualTo("EDIT_LEASE_TOKEN_UNEXPECTED");
+    assertThat(receipts()).isEqualTo(receiptsBefore);
+
+    JsonNode problem = conflicted(actorA, stale);
+    assertThat(problem.path("conflicts").get(0).path("reason").asText())
+        .isEqualTo("LINE_REMOVED_ON_SERVER");
+    assertThat(receipts("CONFLICT")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName(
+      "DL08: a removal that commits while the stale save waits for the order row is seen: the"
+          + " active lines are read after that lock")
+  void removalWhileTheSaveWaits() throws Exception {
+    enforce();
+    UUID baseA = open(actorA).baseId();
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch unlock = new CountDownLatch(1);
+    Future<Object> remover = pool.submit(() -> removeLineHoldingOrder(l1, locked, unlock));
+    await(locked);
+    Future<Object> stale = pool.submit(() -> save(actorA, staleL1Update(UUID.randomUUID(), baseA)));
+    awaitLockWaiters(1);
+
+    unlock.countDown();
+    remover.get(30, TimeUnit.SECONDS);
+    Object answer = stale.get(30, TimeUnit.SECONDS);
+
+    assertThat(answer).isInstanceOf(SalesOrderEditConflictException.class);
+    assertThat(
+            ((SalesOrderEditConflictException) answer)
+                .body()
+                .path("conflicts")
+                .get(0)
+                .path("reason")
+                .asText())
+        .isEqualTo("LINE_REMOVED_ON_SERVER");
+    assertThat(l1Active()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "DL08: a stale save that takes the order row before the removal decides on the line as it is"
+          + " then: still active, so it needs its lease; the removal follows")
+  void staleSaveBeforeTheRemoval() throws Exception {
+    enforce();
+    UUID baseA = open(actorA).baseId();
+    UUID tabB = openSession(actorB);
+    UUID whole = token(granted(actorB, tabB, line(SalesOrderEditLeaseField.LINE, l1)));
+    Map<String, Object> removal =
+        proof(
+            withLines(body(UUID.randomUUID(), open(actorB).baseId()), List.of(remove(l1))),
+            tabB,
+            whole);
+    UUID operationId = UUID.randomUUID();
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch unlock = new CountDownLatch(1);
+    Future<Object> holder = pool.submit(() -> holdOrderRow(locked, unlock));
+    await(locked);
+    Future<Object> stale = pool.submit(() -> save(actorA, staleL1Update(operationId, baseA)));
+    awaitLockWaiters(1);
+    Future<Object> removing = pool.submit(() -> save(actorB, removal));
+    awaitLockWaiters(2);
+
+    unlock.countDown();
+    holder.get(30, TimeUnit.SECONDS);
+
+    assertThat(requirements(stale.get(30, TimeUnit.SECONDS)))
+        .singleElement()
+        .satisfies(r -> assertThat(r.reason()).isEqualTo(RequirementReason.HELD_BY_ANOTHER));
+    assertThat(((SalesOrderEditResult) removing.get(30, TimeUnit.SECONDS)).outcome())
+        .isEqualTo(SalesOrderEditOutcome.APPLIED);
+    // The same operation afterwards sees the removal.
+    assertThat(
+            conflicted(actorA, staleL1Update(operationId, baseA))
+                .path("conflicts")
+                .get(0)
+                .path("reason")
+                .asText())
+        .isEqualTo("LINE_REMOVED_ON_SERVER");
+  }
+
+  @Test
+  @DisplayName(
+      "DL09: off, the merge answers as before; a replayed conflict needs no lease and releases"
+          + " nobody's; enforced, a stale REMOVE needs no proof")
+  void replayAndOffModeAroundARemovedLine() {
+    UUID baseA = open(actorA).baseId();
+    UUID baseC = open(actorC).baseId();
+    saved(actorB, withLines(body(UUID.randomUUID(), open(actorB).baseId()), List.of(remove(l1))));
+    Map<String, Object> stale = staleL1Update(UUID.randomUUID(), baseA);
+
+    JsonNode first = conflicted(actorA, stale);
+    assertThat(first.path("conflicts").get(0).path("reason").asText())
+        .isEqualTo("LINE_REMOVED_ON_SERVER");
+
+    enforce();
+    UUID tabB = openSession(actorB);
+    granted(actorB, tabB, notes());
+    JsonNode again = conflicted(actorA, stale);
+
+    assertThat(again.path("conflicts")).isEqualTo(first.path("conflicts"));
+    assertThat(receipts("CONFLICT")).isEqualTo(1);
+    assertThat(leases(actorC))
+        .singleElement()
+        .satisfies(h -> assertThat(h.userId()).isEqualTo(actorB.id()));
+    assertThat(
+            saved(actorC, withLines(body(UUID.randomUUID(), baseC), List.of(remove(l1)))).outcome())
+        .isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
+  }
+
   // ── L18–L19: signal and bounds ────────────────────────────────────────────
 
   @Test
@@ -1413,6 +1776,63 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
                     List.of(new FulfilmentDtos.LineVersion(l1, version)),
                     "Wrong article chosen"),
                 actor.id()));
+  }
+
+  /** B removes L1 with its whole-line lease; a base opened before still has the line. */
+  private void removeL1ByB() {
+    UUID tabB = openSession(actorB);
+    UUID whole = token(granted(actorB, tabB, line(SalesOrderEditLeaseField.LINE, l1)));
+    saved(
+        actorB,
+        proof(
+            withLines(body(UUID.randomUUID(), open(actorB).baseId()), List.of(remove(l1))),
+            tabB,
+            whole));
+    assertThat(l1Active()).isFalse();
+  }
+
+  /** A's pending pricing change of L1, against its own older base, without any proof. */
+  private Map<String, Object> staleL1Update(UUID operationId, UUID baseId) {
+    return withLines(
+        body(operationId, baseId), List.of(update(l1, "pricing", set(pricing("GBP", "4.10")))));
+  }
+
+  private boolean l1Active() {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT is_active FROM sales_ord.sales_order_line WHERE id = ?", Boolean.class, l1));
+  }
+
+  /**
+   * A line writer of another connection: takes the order row, then removes the line and moves the
+   * order version, committing on {@code unlock}.
+   */
+  private Object removeLineHoldingOrder(UUID lineId, CountDownLatch locked, CountDownLatch unlock)
+      throws Exception {
+    try (Connection owner = ownerConnection()) {
+      owner.setAutoCommit(false);
+      try (var lock =
+          owner.prepareStatement("SELECT id FROM sales_ord.sales_order WHERE id = ? FOR UPDATE")) {
+        lock.setObject(1, orderId);
+        lock.executeQuery().close();
+      }
+      locked.countDown();
+      await(unlock);
+      try (var removal =
+          owner.prepareStatement(
+              "UPDATE sales_ord.sales_order_line SET is_active = false WHERE id = ?")) {
+        removal.setObject(1, lineId);
+        removal.executeUpdate();
+      }
+      try (var version =
+          owner.prepareStatement(
+              "UPDATE sales_ord.sales_order SET version = version + 1 WHERE id = ?")) {
+        version.setObject(1, orderId);
+        version.executeUpdate();
+      }
+      owner.commit();
+      return Boolean.TRUE;
+    }
   }
 
   /** Holds the order row like a writer in the middle of its transaction. */
