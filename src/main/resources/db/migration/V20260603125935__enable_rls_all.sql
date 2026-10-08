@@ -1496,6 +1496,15 @@ CREATE POLICY rls_tenant_isolation ON sales_ord.order_field_change
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
+-- Table: common_infrastructure.live_edit_session (CEDIT-06)
+ALTER TABLE common_infrastructure.live_edit_session ENABLE ROW LEVEL SECURITY;
+ALTER TABLE common_infrastructure.live_edit_session FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON common_infrastructure.live_edit_session;
+CREATE POLICY rls_tenant_isolation ON common_infrastructure.live_edit_session
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- Table: sales_ord.sales_order
 ALTER TABLE sales_ord.sales_order ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_ord.sales_order FORCE ROW LEVEL SECURITY;

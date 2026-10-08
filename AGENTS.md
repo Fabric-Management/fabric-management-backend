@@ -378,7 +378,10 @@ com.fabricmanagement/
 │   ├── organization/               # Organization, Department, Certification
 │   ├── realtime/                   # Canlı değişiklik kanalı (SSE): bağlantı kaydı, kapasite, periyodik
 │   │                               # revision okuma; domain'e ait okuma portu (LiveRevisionSource) tüketici
-│   │                               # modülde uygulanır; realtime hiçbir domain modülünü import etmez
+│   │                               # modülde uygulanır; realtime hiçbir domain modülünü import etmez.
+│   │                               # CEDIT-06: düzenleme oturumu (presence) kaydı da burada
+│   │                               # (common_infrastructure.live_edit_session); erişimi tüketici modül
+│   │                               # her çağrıda kontrol eder, oturum kilit veya yazma yetkisi değildir
 │   ├── subscription/               # Subscription, Quota, FeatureCatalog
 │   ├── tenant/                     # Tenant, TenantSettings
 │   ├── tradingpartner/             # TradingPartner, PartnerUser

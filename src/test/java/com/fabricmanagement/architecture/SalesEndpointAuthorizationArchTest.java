@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(150)
+        .hasSize(154)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(150);
+    assertThat(expected).hasSize(154);
   }
 
   @Test
@@ -66,6 +66,22 @@ class SalesEndpointAuthorizationArchTest {
     // access is checked fresh by the stream itself on opening and on every poll.
     assertThat(preAuthorize("SalesOrderLiveController", "subscribeSalesOrderLiveEvents"))
         .isEqualTo("@auth.can(authentication, 'sales', 'read')");
+  }
+
+  @Test
+  void editSessionsNeedWriteToOpenAndRenewButOnlyReadToListAndClose() throws Exception {
+    // CEDIT-06 §3: a session says "editing", so opening and renewing need write; seeing who
+    // edits and closing one's own session need read. Object access is checked fresh as well.
+    String write = "@auth.can(authentication, 'sales', 'write')";
+    String read = "@auth.can(authentication, 'sales', 'read')";
+    assertThat(preAuthorize("SalesOrderEditSessionController", "openSalesOrderEditSession"))
+        .isEqualTo(write);
+    assertThat(preAuthorize("SalesOrderEditSessionController", "renewSalesOrderEditSession"))
+        .isEqualTo(write);
+    assertThat(preAuthorize("SalesOrderEditSessionController", "closeSalesOrderEditSession"))
+        .isEqualTo(read);
+    assertThat(preAuthorize("SalesOrderEditSessionController", "listSalesOrderEditors"))
+        .isEqualTo(read);
   }
 
   @Test
@@ -271,6 +287,18 @@ class SalesEndpointAuthorizationArchTest {
         "SalesOrderLiveController",
         Category.TRANSACTIONAL_READ,
         "subscribeSalesOrderLiveEvents");
+    add(
+        result,
+        "SalesOrderEditSessionController",
+        Category.MUTATION,
+        "openSalesOrderEditSession",
+        "renewSalesOrderEditSession",
+        "closeSalesOrderEditSession");
+    add(
+        result,
+        "SalesOrderEditSessionController",
+        Category.TRANSACTIONAL_READ,
+        "listSalesOrderEditors");
     add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
     add(
         result,

@@ -247,6 +247,46 @@ class LiveStreamServiceTest {
   }
 
   @Test
+  @DisplayName("P01 (CEDIT-06): presence travels beside the revision in ready and invalidated")
+  void presenceTravelsBesideTheRevision() {
+    FakeChannel channel = new FakeChannel();
+    open(
+        service,
+        tenantA,
+        userA,
+        new FakeSource(visible("1", "0"), visible("1", "pa"), visible("2", "pa")),
+        channel);
+
+    advanceAndRun(Duration.ofSeconds(2));
+    advanceAndRun(Duration.ofSeconds(2));
+
+    assertThat(channel.labels()).containsExactly("ready:1", "invalidated:1", "invalidated:2");
+    assertThat(((LiveFrame.Ready) channel.frames.get(0)).data().presenceRevision()).isEqualTo("0");
+    assertThat(((LiveFrame.Invalidated) channel.frames.get(1)).data().presenceRevision())
+        .isEqualTo("pa");
+    assertThat(((LiveFrame.Invalidated) channel.frames.get(2)).data().presenceRevision())
+        .isEqualTo("pa");
+  }
+
+  @Test
+  @DisplayName(
+      "P02 (CEDIT-06): unchanged presence and revision send nothing; a source without"
+          + " presence sends none")
+  void unchangedPresenceSendsNothing() {
+    FakeChannel withPresence = new FakeChannel();
+    open(service, tenantA, userA, new FakeSource(visible("1", "pa")), withPresence);
+    FakeChannel without = new FakeChannel();
+    open(service, tenantA, userB, new FakeSource(visible("1")), without);
+
+    advanceAndRun(Duration.ofSeconds(2));
+    advanceAndRun(Duration.ofSeconds(2));
+
+    assertThat(withPresence.labels()).containsExactly("ready:1");
+    assertThat(without.labels()).containsExactly("ready:1");
+    assertThat(((LiveFrame.Ready) without.frames.getFirst()).data().presenceRevision()).isNull();
+  }
+
+  @Test
   @DisplayName("L05/L06: an unchanged revision sends nothing until the heartbeat is due")
   void unchangedRevisionOnlyHeartbeats() {
     FakeChannel channel = new FakeChannel();

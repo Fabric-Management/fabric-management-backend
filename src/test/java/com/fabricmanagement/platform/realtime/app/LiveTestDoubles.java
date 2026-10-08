@@ -35,6 +35,11 @@ final class LiveTestDoubles {
 
   private LiveTestDoubles() {}
 
+  /** A visible resource with presence (CEDIT-06). */
+  static LiveReadResult visible(String revision, String presence) {
+    return new LiveReadResult.Visible(new LiveRevision(revision), new LiveRevision(presence));
+  }
+
   static LiveReadResult visible(String revision) {
     return new LiveReadResult.Visible(new LiveRevision(revision));
   }

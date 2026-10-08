@@ -250,6 +250,8 @@ public class TenantTransactionalPurgeService {
           "human.human_employee_number_sequence",
           "common_user.profile_update_request",
           "common_infrastructure.incomplete_follow_up_flag",
+          // CEDIT-06: presence rows; no foreign keys either way.
+          "common_infrastructure.live_edit_session",
           "common_infrastructure.document_sequence");
 
   static List<String> tenantScopedDeleteTables() {

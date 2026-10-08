@@ -5946,6 +5946,46 @@ COMMENT ON TABLE sales_ord.order_field_change IS
     'CEDIT-03: append-only field history of safe-edit saves; never cleaned by retention.';
 
 
+-- ===================== CEDIT-06: edit sessions (ADR-0014 D14, restructured) =====================
+-- Who holds a resource's edit form open (docs/sales/tickets/collaborative-editing/CEDIT-06-live-presence.md
+-- §2). Domain-agnostic: resource_type names the consuming module's resource, so there is no foreign
+-- key. Presence only: no save, lock or capability reads it. Renewal and closing are conditional
+-- updates; ended rows are deleted by the retention job.
+CREATE SCHEMA IF NOT EXISTS common_infrastructure;
+
+CREATE TABLE IF NOT EXISTS common_infrastructure.live_edit_session (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL,
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    version BIGINT NOT NULL DEFAULT 0,
+    resource_type VARCHAR(40) NOT NULL CHECK (resource_type ~ '^[a-z][a-z0-9-]*$'),
+    resource_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    opened_at TIMESTAMPTZ NOT NULL,
+    last_seen_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    closed_at TIMESTAMPTZ,
+    -- Only what one statement writes together; instances' clocks may differ slightly.
+    CONSTRAINT ck_live_edit_session_expiry CHECK (expires_at > last_seen_at)
+);
+-- Presence reads: the open sessions of one resource.
+CREATE INDEX IF NOT EXISTS idx_live_edit_session_resource
+    ON common_infrastructure.live_edit_session (tenant_id, resource_type, resource_id, expires_at)
+    WHERE closed_at IS NULL;
+-- Retention: ended sessions in end order.
+CREATE INDEX IF NOT EXISTS idx_live_edit_session_ended
+    ON common_infrastructure.live_edit_session ((COALESCE(closed_at, expires_at)));
+
+COMMENT ON TABLE common_infrastructure.live_edit_session IS
+    'CEDIT-06: open edit forms (presence only); technical, deleted after retention.';
+
+
 -- ===================== FROM: V20260329093500__add_sales_order_id_to_work_order.sql =====================
 -- Migration: Add sales_order_id and product_code to prod_work_order
 

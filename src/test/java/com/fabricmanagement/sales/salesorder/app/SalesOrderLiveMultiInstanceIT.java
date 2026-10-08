@@ -43,8 +43,8 @@ import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * CEDIT-05 L13, L14, L15, the real-permission half of L10 and the tenant-access regressions of
- * review R2, across two backend instances.
+ * CEDIT-05 L13, L14, L15, the real-permission half of L10, the tenant-access regressions of review
+ * R2 and CEDIT-06's edit-session presence (review R4), across two backend instances.
  *
  * <p>Instance A is the test's own context (port {@link #port}). Instance B is a second, independent
  * application context started here, with its own HTTP port, registry, scheduler and worker (one
@@ -325,6 +325,90 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
     }
   }
 
+  @Test
+  @DisplayName(
+      "CEDIT-06 (CE-18): edit sessions on either instance change the presence of B's stream; B"
+          + " lists them through RLS with real permission rows and hides others' session ids")
+  void presenceAcrossInstances() throws Exception {
+    grantSales(tenantId, "write", DataScope.GLOBAL);
+    LiveSse onB = subscribe(portB, orderId, bearer(token(actorB)));
+    LiveSse.Frame first = ready(onB);
+    String version = first.revision();
+    assertThat(presence(first)).isEqualTo("0");
+
+    // Opened on A, seen on B.
+    JsonNode opened = sessions(port, "POST", "", actorA, 201);
+    String onA = opened.path("data").path("editSessionId").asText();
+    LiveSse.Frame seen = onB.nextEvent(WAIT);
+    assertThat(seen.event()).isEqualTo("invalidated");
+    assertThat(seen.revision()).isEqualTo(version);
+    String present = presence(seen);
+    assertThat(present).isNotEqualTo("0");
+
+    // B lists it with its real permission evaluator; another person's session id stays hidden.
+    JsonNode editors = sessions(portB, "GET", "", actorB, 200).path("data").path("editors");
+    assertThat(editors).hasSize(1);
+    assertThat(editors.get(0).path("userId").asText()).isEqualTo(actorA.id().toString());
+    assertThat(editors.get(0).path("mine").asBoolean()).isFalse();
+    assertThat(editors.get(0).path("editSessionId").isNull()).isTrue();
+
+    // Renewed on B: nobody's presence changed. Closed on B: gone.
+    sessions(portB, "PUT", "/" + onA, actorA, 200);
+    expectQuiet(onB);
+    sessions(portB, "DELETE", "/" + onA, actorA, 204);
+    assertThat(presence(onB.nextEvent(WAIT))).isEqualTo("0");
+
+    // Opened on B, then expired without any write: B notices.
+    String onBSession =
+        sessions(portB, "POST", "", actorA, 201).path("data").path("editSessionId").asText();
+    assertThat(presence(onB.nextEvent(WAIT))).isNotEqualTo("0");
+    try (Connection owner = ownerConnection();
+        PreparedStatement expire =
+            owner.prepareStatement(
+                "UPDATE common_infrastructure.live_edit_session SET last_seen_at = now() -"
+                    + " interval '10 minutes', expires_at = now() - interval '5 minutes'"
+                    + " WHERE id = ?")) {
+      expire.setObject(1, UUID.fromString(onBSession));
+      assertThat(expire.executeUpdate()).isEqualTo(1);
+    }
+    assertThat(presence(onB.nextEvent(WAIT))).isEqualTo("0");
+
+    // A reconnect to B starts from the current presence.
+    onB.close();
+    String reopened =
+        sessions(port, "POST", "", actorA, 201).path("data").path("editSessionId").asText();
+    assertThat(presence(ready(subscribe(portB, orderId, bearer(token(actorB)))))).isNotEqualTo("0");
+
+    // Another tenant reaches neither the list nor the rows, even on the application role.
+    OtherTenant other = otherTenantWithOrder();
+    grantSales(other.tenantId(), "read", DataScope.GLOBAL);
+    sessions(portB, "GET", "", other.actor(), 404);
+    LiveTenantScope scope = instanceB.getBean(LiveTenantScope.class);
+    JdbcTemplate appJdbc = new JdbcTemplate(instanceB.getBean("dataSource", DataSource.class));
+    String count =
+        "SELECT count(*) FROM common_infrastructure.live_edit_session WHERE id = ?::uuid";
+    ExecutorService thread = Executors.newSingleThreadExecutor();
+    try {
+      LiveActor own = new LiveActor(tenantId, actorB.id(), Instant.now().plusSeconds(600));
+      LiveActor foreign =
+          new LiveActor(other.tenantId(), other.actor().id(), Instant.now().plusSeconds(600));
+      assertThat(
+              onThread(
+                  thread,
+                  () -> scope.read(own, () -> appJdbc.queryForObject(count, Long.class, reopened))))
+          .isEqualTo(1L);
+      assertThat(
+              onThread(
+                  thread,
+                  () ->
+                      scope.read(
+                          foreign, () -> appJdbc.queryForObject(count, Long.class, reopened))))
+          .isZero();
+    } finally {
+      thread.shutdownNow();
+    }
+  }
+
   // ── helpers ──────────────────────────────────────────────────────────────
 
   /** Keeps classes compiled from the test sources out of instance B's component scan. */
@@ -378,18 +462,51 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
 
   /** A real permission row: the tenant's WORKER role may read sales with this scope. */
   private void grantSalesRead(UUID tenant, DataScope scope) {
+    grantSales(tenant, "read", scope);
+  }
+
+  /** A real permission row: the tenant's WORKER role may do this sales action with this scope. */
+  private void grantSales(UUID tenant, String action, DataScope scope) {
     TenantContext.setCurrentTenantId(tenant);
     try {
       permissionTemplates.saveAndFlush(
           PermissionTemplate.builder()
               .roleCode("WORKER")
               .resource("sales")
-              .action("read")
+              .action(action)
               .dataScope(scope)
               .build());
     } finally {
       TenantContext.clear();
     }
+  }
+
+  private static String presence(LiveSse.Frame frame) {
+    return frame.body().path("presenceRevision").asText();
+  }
+
+  /** One edit-session call through the HTTP API of the given instance; checks the status. */
+  private JsonNode sessions(int serverPort, String method, String suffix, Actor actor, int status)
+      throws Exception {
+    URI uri =
+        URI.create(
+            "http://localhost:"
+                + serverPort
+                + "/api/v1/sales/orders/"
+                + orderId
+                + "/edit-sessions"
+                + suffix);
+    HttpResponse<String> response =
+        HTTP.send(
+            HttpRequest.newBuilder(uri)
+                .header("Authorization", "Bearer " + token(actor))
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .timeout(Duration.ofSeconds(15))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).as(response.body()).isEqualTo(status);
+    String body = response.body();
+    return body == null || body.isBlank() ? objectMapper.nullNode() : objectMapper.readTree(body);
   }
 
   /** Opens an edit base and saves the notes through the HTTP API of the given instance. */

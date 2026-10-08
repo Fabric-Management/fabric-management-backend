@@ -263,6 +263,20 @@ class SseLiveChannelTest {
   }
 
   @Test
+  @DisplayName("P03 (CEDIT-06): the presence marker is written when present and omitted otherwise")
+  void presenceMarkerIsWrittenOnlyWhenPresent() throws IOException {
+    channel.send(
+        new LiveFrame.Invalidated(
+            new LiveInvalidatedDto(UUID.randomUUID(), UUID.randomUUID(), "5", "pabc")));
+    String first = out.text();
+    assertThat(first).contains("\"presenceRevision\":\"pabc\"");
+
+    channel.send(invalidated("6"));
+    String second = out.text().substring(first.length());
+    assertThat(second).contains("\"revision\":\"6\"").doesNotContain("presenceRevision");
+  }
+
+  @Test
   @DisplayName("R1: a container error ends the transport once and completes the request")
   void containerErrorEndsOnce() throws IOException {
     IOException reset = new IOException("Connection reset");

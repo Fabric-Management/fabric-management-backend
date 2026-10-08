@@ -9,8 +9,10 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.realtime.app.LiveEditSessionService;
 import com.fabricmanagement.platform.realtime.domain.LiveActor;
 import com.fabricmanagement.platform.realtime.domain.LiveReadResult;
+import com.fabricmanagement.platform.realtime.domain.LiveResource;
 import com.fabricmanagement.platform.realtime.domain.LiveRevision;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.domain.DataScope;
@@ -43,12 +45,15 @@ class SalesOrderLiveRevisionSourceTest {
   @Mock private SalesOrderRepository orders;
   @Mock private SalesAccessScopeResolver resolver;
   @Mock private UserQueryService users;
+  @Mock private LiveEditSessionService editSessions;
 
   private SalesOrderLiveRevisionSource source;
 
   @BeforeEach
   void setUp() {
-    source = new SalesOrderLiveRevisionSource(orders, new SalesOrderAccessPolicy(resolver), users);
+    source =
+        new SalesOrderLiveRevisionSource(
+            orders, new SalesOrderAccessPolicy(resolver), users, editSessions);
     TenantContext.setCurrentTenantId(tenant);
   }
 
@@ -93,7 +98,7 @@ class SalesOrderLiveRevisionSourceTest {
     when(users.isActive(tenant, user)).thenReturn(false);
 
     assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.FORBIDDEN);
-    verifyNoInteractions(orders, resolver);
+    verifyNoInteractions(orders, resolver, editSessions);
   }
 
   @Test
@@ -102,7 +107,7 @@ class SalesOrderLiveRevisionSourceTest {
     activeUserWith(AccessScope.denied());
 
     assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.FORBIDDEN);
-    verifyNoInteractions(orders);
+    verifyNoInteractions(orders, editSessions);
   }
 
   @Test
@@ -152,7 +157,31 @@ class SalesOrderLiveRevisionSourceTest {
     TenantContext.setCurrentTenantId(UUID.randomUUID());
 
     assertThatThrownBy(() -> source.read(actor, orderId)).isInstanceOf(IllegalStateException.class);
-    verifyNoInteractions(orders, resolver, users);
+    verifyNoInteractions(orders, resolver, users, editSessions);
+  }
+
+  @Test
+  @DisplayName("P01: a visible order carries its presence marker beside the version, never in it")
+  void visibleOrderCarriesPresence() {
+    activeUserWith(new AccessScope(DataScope.ORGANIZATION, Set.of()));
+    when(orders.findLiveRevisionViewByTenantIdAndId(tenant, orderId))
+        .thenReturn(Optional.of(view(tenant, true, creator, 4L)));
+    when(editSessions.presenceRevision(new LiveResource("sales-order", orderId)))
+        .thenReturn(new LiveRevision("pabc"));
+
+    assertThat(source.read(actor, orderId))
+        .isEqualTo(new LiveReadResult.Visible(new LiveRevision("4"), new LiveRevision("pabc")));
+  }
+
+  @Test
+  @DisplayName("P02: presence is read only after access was decided; a hidden order reveals none")
+  void hiddenOrderReadsNoPresence() {
+    activeUserWith(new AccessScope(DataScope.OWN, Set.of(user)));
+    when(orders.findLiveRevisionViewByTenantIdAndId(tenant, orderId))
+        .thenReturn(Optional.of(view(tenant, true, creator, 4L)));
+
+    assertThat(source.read(actor, orderId)).isEqualTo(LiveReadResult.Hidden.NOT_FOUND);
+    verifyNoInteractions(editSessions);
   }
 
   private void activeUserWith(AccessScope scope) {
