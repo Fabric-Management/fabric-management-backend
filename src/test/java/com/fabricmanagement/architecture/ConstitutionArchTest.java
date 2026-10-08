@@ -1136,6 +1136,8 @@ class ConstitutionArchTest {
       //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
       //   - SalesOrderEditRetentionJob   : CEDIT-03 scheduled cleanup of expired edit bases and old
       // save receipts across tenants; explicit tenant_id filter, never the order or its history
+      //   - LiveEditSessionRetentionJob  : CEDIT-06 scheduled cleanup of ended edit sessions
+      // (presence rows) across tenants; explicit tenant_id filter, never a business record
       //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
       // reconciliation
       //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
@@ -1183,6 +1185,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
               .and()
               .doNotHaveSimpleName("SalesOrderEditRetentionJob")
+              .and()
+              .doNotHaveSimpleName("LiveEditSessionRetentionJob")
               .and()
               .doNotHaveSimpleName("OwnershipAssignmentReconciliationMonitor")
               .and()
