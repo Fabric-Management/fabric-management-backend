@@ -24,7 +24,7 @@ class SalesOrderLiveAccessIT extends SalesOrderLiveItSupport {
   @DisplayName("L02: no token, a bad signature, an expired or pre-auth token, or no tenant: 401")
   void unauthenticatedRequestsAreRefused() {
     assertRefused(Map.of(), 401);
-    assertRefused(bearer(token(actorB) + "x"), 401);
+    assertRefused(bearer(withBrokenSignature(token(actorB))), 401);
     assertRefused(
         bearer(token(actorB, Instant.now().minus(Duration.ofMinutes(1)), claims -> {})), 401);
     assertRefused(
@@ -211,6 +211,19 @@ class SalesOrderLiveAccessIT extends SalesOrderLiveItSupport {
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Changes one character in the middle of the signature, so the decoded signature bytes really
+   * differ. Appending a character is not enough: when the signature length is a multiple of three
+   * bytes (HS384 here), a lone trailing base64url character carries no full byte and is dropped by
+   * the decoder, which leaves the original, valid signature.
+   */
+  private static String withBrokenSignature(String token) {
+    int signatureStart = token.lastIndexOf('.') + 1;
+    int target = signatureStart + (token.length() - signatureStart) / 2;
+    char replacement = token.charAt(target) == 'A' ? 'B' : 'A';
+    return token.substring(0, target) + replacement + token.substring(target + 1);
+  }
 
   private LiveSse assertRefused(Map<String, String> headers, int status) {
     return assertRefused(port, orderId, headers, status);
