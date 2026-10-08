@@ -79,7 +79,6 @@ classified_relations AS (
                WHEN 'sales_ord.customer_product_request' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.customer_request_revision' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.intake_attachment' THEN 'MUTABLE_SYSTEM_PURGE'
-               WHEN 'sales_ord.order_delivery_preference' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.line_greige_cover' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.line_portion_readiness' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_arrival_estimate' THEN 'MUTABLE_SYSTEM_PURGE'

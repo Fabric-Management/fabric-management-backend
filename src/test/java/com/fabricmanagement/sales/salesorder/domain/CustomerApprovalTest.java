@@ -37,7 +37,6 @@ class CustomerApprovalTest {
                 null,
                 null,
                 null,
-                null,
                 List.of(),
                 List.of(),
                 0,

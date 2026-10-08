@@ -62,6 +62,7 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
           "SalesOrderDateFieldEdit",
           "SalesOrderIdFieldEdit",
           "SalesOrderFlagFieldEdit",
+          "SalesOrderLineShipmentPreferenceEdit",
           "SalesOrderDeliveryTermsEdit",
           "SalesOrderDeliveryTermsValue",
           "SalesOrderAgreementContextEdit",
@@ -417,6 +418,7 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
     lineFields.put("finishedWidth", "SalesOrderLineWidthEdit");
     lineFields.put("requestedDeliveryDate", "SalesOrderDateFieldEdit");
     lineFields.put("singleLotRequired", "SalesOrderFlagFieldEdit");
+    lineFields.put("shipmentPreference", "SalesOrderLineShipmentPreferenceEdit");
     lineFields.put("quantity", "SalesOrderLineQuantityEdit");
     lineFields.put("pricing", "SalesOrderLinePricingEdit");
     lineFields.put("tolerance", "SalesOrderLineToleranceEdit");
@@ -526,6 +528,7 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
     edits.put("SalesOrderDateFieldEdit", null);
     edits.put("SalesOrderIdFieldEdit", null);
     edits.put("SalesOrderFlagFieldEdit", null);
+    edits.put("SalesOrderLineShipmentPreferenceEdit", "LineShipmentPreference");
     edits.put("SalesOrderDeliveryTermsEdit", "SalesOrderDeliveryTermsValue");
     edits.put("SalesOrderAgreementContextEdit", "SalesOrderAgreementContextValue");
     edits.put("SalesOrderContactEdit", "SalesOrderContactValue");

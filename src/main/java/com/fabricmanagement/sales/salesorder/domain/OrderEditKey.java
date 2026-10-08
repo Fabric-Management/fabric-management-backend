@@ -27,6 +27,7 @@ public enum OrderEditKey {
   LINE_FINISHED_WIDTH("line.finishedWidth", true, false),
   LINE_REQUESTED_DELIVERY_DATE("line.requestedDeliveryDate", true, false),
   LINE_SINGLE_LOT_REQUIRED("line.singleLotRequired", true, true),
+  LINE_SHIPMENT_PREFERENCE("line.shipmentPreference", true, true),
   LINE_QUANTITY("line.quantity", true, true),
   LINE_PRICING("line.pricing", true, false),
   LINE_TOLERANCE("line.tolerance", true, false),

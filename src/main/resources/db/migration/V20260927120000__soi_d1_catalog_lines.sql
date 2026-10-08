@@ -12,7 +12,8 @@ ALTER TABLE sales_ord.sales_order_line
     ADD COLUMN IF NOT EXISTS finished_width_unit VARCHAR(10),
     ADD COLUMN IF NOT EXISTS requested_delivery_date DATE,
     ADD COLUMN IF NOT EXISTS initial_requested_qty NUMERIC(15, 3),
-    ADD COLUMN IF NOT EXISTS single_lot_required BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN IF NOT EXISTS single_lot_required BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS shipment_preference VARCHAR(20) NOT NULL DEFAULT 'AS_READY';
 
 UPDATE sales_ord.sales_order_line
     SET initial_requested_qty = requested_qty
@@ -26,7 +27,9 @@ ALTER TABLE sales_ord.sales_order_line
         OR (finished_width IS NOT NULL AND finished_width > 0
             AND finished_width_unit IN ('CM', 'IN'))
     ),
-    ADD CONSTRAINT chk_sales_line_initial_qty CHECK (initial_requested_qty > 0);
+    ADD CONSTRAINT chk_sales_line_initial_qty CHECK (initial_requested_qty > 0),
+    ADD CONSTRAINT chk_sales_line_shipment_preference CHECK (
+        shipment_preference IN ('AS_READY', 'WHEN_COMPLETE'));
 
 -- One active distribution per product + colour + finished width + unit + delivery date (SOI TK-2).
 CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_line_distribution
@@ -45,6 +48,8 @@ COMMENT ON COLUMN sales_ord.sales_order_line.product_desc IS
     'Optional line note. Never a substitute for product_id (SOI K02).';
 COMMENT ON COLUMN sales_ord.sales_order_line.initial_requested_qty IS
     'Quantity first requested by the customer; immutable (SOI K08).';
+COMMENT ON COLUMN sales_ord.sales_order_line.shipment_preference IS
+    'How the distribution may ship once ready: AS_READY (default) or WHEN_COMPLETE (LINE-PREFERENCES-1).';
 
 -- Customer-specific catalogue visibility (SOI K17 / IK-06).
 ALTER TABLE sales.sales_product

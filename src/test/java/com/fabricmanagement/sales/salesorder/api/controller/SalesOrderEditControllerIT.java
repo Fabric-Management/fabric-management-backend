@@ -272,6 +272,34 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
   }
 
   @Test
+  @DisplayName("LINE-PREFERENCES-1: a shipment preference is saved on its own line only")
+  void shipmentPreferenceIsSavedPerLine() throws Exception {
+    UUID base = open(actorB).baseId();
+
+    JsonNode result =
+        data(
+            saveRequest(
+                    actorB,
+                    json(
+                        withLines(
+                            body(UUID.randomUUID(), base),
+                            List.of(update(l1, "shipmentPreference", set("WHEN_COMPLETE"))))))
+                .andExpect(status().isOk()));
+
+    assertThat(result.path("outcome").asText()).isEqualTo("APPLIED");
+    Map<String, String> byLine = new java.util.HashMap<>();
+    result
+        .path("nextBase")
+        .path("order")
+        .path("lines")
+        .forEach(
+            line -> byLine.put(line.path("id").asText(), line.path("shipmentPreference").asText()));
+    assertThat(byLine)
+        .containsEntry(l1.toString(), "WHEN_COMPLETE")
+        .containsEntry(l2.toString(), "AS_READY");
+  }
+
+  @Test
   @DisplayName("S2.10, S6.6–S6.8, S12.2: refused line instructions name the line")
   void refusedLineInstructions() throws Exception {
     UUID base = open(actorB).baseId();
@@ -290,6 +318,14 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
                 withLines(
                     body(UUID.randomUUID(), base),
                     List.of(update(l1, "singleLotRequired", clear())))))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("REQUIRED_FIELD_CANNOT_BE_CLEARED"));
+    saveRequest(
+            actorB,
+            json(
+                withLines(
+                    body(UUID.randomUUID(), base),
+                    List.of(update(l1, "shipmentPreference", clear())))))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("REQUIRED_FIELD_CANNOT_BE_CLEARED"));
     saveRequest(

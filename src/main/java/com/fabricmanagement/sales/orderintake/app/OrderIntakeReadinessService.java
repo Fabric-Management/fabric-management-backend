@@ -34,7 +34,6 @@ public class OrderIntakeReadinessService {
   private final QuantityAcceptanceRepository acceptances;
   private final ConfirmationGate gate;
   private final PieceAllocationPort allocation;
-  private final DeliveryPreferenceService deliveryPreference;
   private final IntakePermissions permissions;
   private final Clock clock;
 
@@ -96,7 +95,6 @@ public class OrderIntakeReadinessService {
     return new OrderIntakeReadinessDto(
         order.getId(),
         order.getStatus().name(),
-        deliveryPreference.preferenceOf(order.getId()),
         orderBlocks,
         lineViews,
         capabilities,
@@ -119,7 +117,6 @@ public class OrderIntakeReadinessService {
     result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, contentLock, canWrite));
     result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, contentLock, canWrite));
     result.add(draftWrite(OrderIntakeAction.RESOLVE_CUSTOM_REQUEST, draft, contentLock, canWrite));
-    result.add(anyWrite(OrderIntakeAction.RECORD_PARTIAL_DELIVERY, contentLock, canWrite));
     result.add(anyWrite(OrderIntakeAction.UPLOAD_ATTACHMENT, null, canWrite));
     result.add(anyWrite(OrderIntakeAction.REQUEST_READINESS_CONFIRMATION, null, canWrite));
     result.add(anyWrite(OrderIntakeAction.CORRECT_PRODUCT, contentLock, canWrite));

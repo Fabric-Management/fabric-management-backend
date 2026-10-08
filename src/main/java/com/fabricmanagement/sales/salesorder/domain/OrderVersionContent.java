@@ -23,7 +23,6 @@ public record OrderVersionContent(
     String paymentTerms,
     Terms delivery,
     Contact contact,
-    String partialDelivery,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Line> lines,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Total> totals,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unpricedLineCount,
@@ -50,7 +49,10 @@ public record OrderVersionContent(
   @Schema(name = "OrderVersionContact")
   public record Contact(String name, String email, String phone) {}
 
-  /** One product line with its colour, width, quantity, tolerance and price. */
+  /**
+   * One product line with its colour, width, quantity, tolerance, price and the two line
+   * preferences the customer approves with the version (LINE-PREFERENCES-1).
+   */
   @Schema(name = "OrderVersionLine")
   public record Line(
       UUID lineId,
@@ -66,7 +68,13 @@ public record OrderVersionContent(
       String currency,
       BigDecimal discount,
       BigDecimal tax,
-      LocalDate requestedDeliveryDate) {}
+      LocalDate requestedDeliveryDate,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "The distribution must come from one dye lot")
+          boolean singleLotRequired,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          LineShipmentPreference shipmentPreference) {}
 
   /** What the order amounts to in one agreed currency. */
   @Schema(name = "OrderVersionTotal")

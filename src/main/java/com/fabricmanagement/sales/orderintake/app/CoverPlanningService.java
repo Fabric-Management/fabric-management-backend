@@ -10,7 +10,6 @@ import com.fabricmanagement.sales.orderintake.domain.CustomerRequestStatus;
 import com.fabricmanagement.sales.orderintake.domain.LineGreigeCover;
 import com.fabricmanagement.sales.orderintake.domain.LinePortionReadiness;
 import com.fabricmanagement.sales.orderintake.domain.OrderArrivalEstimate;
-import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.infra.repository.CustomerProductRequestRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.LineGreigeCoverRepository;
@@ -66,7 +65,6 @@ public class CoverPlanningService {
   private final OrderArrivalEstimateRepository arrivals;
   private final LineStockPortionPort stockPortion;
   private final ProductionHistoryQueryService history;
-  private final DeliveryPreferenceService deliveryPreference;
   private final CustomerProductRequestRepository customRequests;
   private final OrderWorkService work;
   private final Clock clock;
@@ -347,7 +345,6 @@ public class CoverPlanningService {
         lines.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId())) {
       lineViews.add(lineOutlook(tenantId, line));
     }
-    PartialDeliveryPreference preference = deliveryPreference.preferenceOf(order.getId());
     Set<CustomerRequestStatus> finished =
         EnumSet.of(CustomerRequestStatus.RESOLVED, CustomerRequestStatus.CLOSED);
     List<UUID> pending =
@@ -371,8 +368,6 @@ public class CoverPlanningService {
             .findFirstByTenantIdAndSalesOrderIdAndSupersededAtIsNull(tenantId, order.getId())
             .map(CoverPlanningService::arrivalView)
             .orElse(null),
-        preference,
-        preference == PartialDeliveryPreference.ALLOWED,
         pending);
   }
 
@@ -464,6 +459,7 @@ public class CoverPlanningService {
         line.getId(),
         open(line),
         line.getUnit(),
+        line.getShipmentPreference(),
         portions,
         allConfirmed && !portions.isEmpty() ? latest : null,
         exceedsOpen(quantities) ? "COVER_EXCEEDS_OPEN" : null,

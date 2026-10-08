@@ -96,6 +96,15 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Builder.Default
   private boolean singleLotRequired = false;
 
+  /**
+   * How the distribution may be shipped once goods are ready (LINE-PREFERENCES-1): "as ready"
+   * unless the customer wants it to leave complete. Not a shipment gate by itself.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "shipment_preference", nullable = false, length = 20)
+  @Builder.Default
+  private LineShipmentPreference shipmentPreference = LineShipmentPreference.AS_READY;
+
   // ── Quantities & Pricing ─────────────────────────────────────────────────
 
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
@@ -233,6 +242,11 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Column(name = "tolerance_recorded_at")
   @Setter(AccessLevel.NONE)
   private java.time.Instant toleranceRecordedAt;
+
+  /** Sets the shipment preference; an absent value is the default "as ready", never unknown. */
+  public void setShipmentPreference(LineShipmentPreference preference) {
+    this.shipmentPreference = preference == null ? LineShipmentPreference.AS_READY : preference;
+  }
 
   /**
    * Records the quantity tolerance agreed for this distribution, or clears it when both limits are
@@ -492,6 +506,10 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @PreUpdate
   private void validateEntity() {
     captureInitialRequestIfAbsent();
+    if (shipmentPreference == null) {
+      // A builder given an explicit null still saves the decided default (LINE-PREFERENCES-1).
+      shipmentPreference = LineShipmentPreference.AS_READY;
+    }
     if (!isValid()) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
           "A sales-order line must name a product");

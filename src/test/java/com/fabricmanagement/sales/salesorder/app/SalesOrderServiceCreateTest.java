@@ -16,6 +16,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -422,6 +423,7 @@ class SalesOrderServiceCreateTest {
     line.setFinishedWidthUnit("cm");
     line.setRequestedDeliveryDate(LocalDate.of(2026, 11, 12));
     line.setSingleLotRequired(true);
+    line.setShipmentPreference(LineShipmentPreference.WHEN_COMPLETE);
     request.setLines(List.of(line));
     stubSuccessfulCreate();
     when(lineRepository.saveAll(ArgumentMatchers.<List<SalesOrderLine>>any()))
@@ -438,6 +440,40 @@ class SalesOrderServiceCreateTest {
     assertThat(saved.getFinishedWidthUnit()).isEqualTo("CM");
     assertThat(saved.getRequestedDeliveryDate()).isEqualTo(LocalDate.of(2026, 11, 12));
     assertThat(saved.isSingleLotRequired()).isTrue();
+    assertThat(saved.getShipmentPreference()).isEqualTo(LineShipmentPreference.WHEN_COMPLETE);
+  }
+
+  @Test
+  void createOrder_linePreferencesDefaultToMultipleLotsAndAsReadyInTheSameSave() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of(lineRequest(new BigDecimal("500"), new BigDecimal("4.20"), "TRY")));
+    stubSuccessfulCreate();
+    when(lineRepository.saveAll(ArgumentMatchers.<List<SalesOrderLine>>any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    salesOrderService.createOrder(request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<SalesOrderLine>> lines = ArgumentCaptor.forClass(List.class);
+    verify(lineRepository).saveAll(lines.capture());
+    SalesOrderLine saved = lines.getValue().getFirst();
+    // LINE-PREFERENCES-1: no "unanswered" state; the defaults are saved with the line itself.
+    assertThat(saved.isSingleLotRequired()).isFalse();
+    assertThat(saved.getShipmentPreference()).isEqualTo(LineShipmentPreference.AS_READY);
+  }
+
+  @Test
+  void lineResponse_carriesTheShipmentPreference() {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .productId(UUID.randomUUID())
+            .requestedQty(new BigDecimal("300"))
+            .unit("M")
+            .shipmentPreference(LineShipmentPreference.WHEN_COMPLETE)
+            .build();
+
+    assertThat(SalesOrderService.lineResponse(line).getShipmentPreference())
+        .isEqualTo(LineShipmentPreference.WHEN_COMPLETE);
   }
 
   @Test

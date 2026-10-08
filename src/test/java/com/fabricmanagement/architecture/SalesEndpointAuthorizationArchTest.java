@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(152)
+        .hasSize(150)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(152);
+    assertThat(expected).hasSize(150);
   }
 
   @Test
@@ -359,8 +359,7 @@ class SalesEndpointAuthorizationArchTest {
         "listIntakeAttachments",
         "downloadIntakeAttachment",
         "listCustomerProductRequests",
-        "listUnattachedCustomerProductRequests",
-        "getPartialDeliveryPreference");
+        "listUnattachedCustomerProductRequests");
     add(
         result,
         "CustomerRequestController",
@@ -377,8 +376,7 @@ class SalesEndpointAuthorizationArchTest {
         "closeCustomerProductRequest",
         "markCustomerRequestRevisionSent",
         "recordCustomerRequestDecision",
-        "resolveCustomerProductRequest",
-        "recordPartialDeliveryPreference");
+        "resolveCustomerProductRequest");
     add(
         result,
         "CustomerRequestEvaluationController",

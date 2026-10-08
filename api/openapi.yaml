@@ -45601,153 +45601,6 @@ paths:
       summary: Ask planning or the warehouse to confirm when a portion will be ready
       tags:
       - Order Intake
-  /api/v1/sales-orders/{orderId}/intake/partial-delivery:
-    get:
-      operationId: getPartialDeliveryPreference
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponsePartialDeliveryPreferenceView"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: The customer's partial-delivery answer; UNKNOWN when none was recorded
-      tags:
-      - Order Intake
-    put:
-      operationId: recordPartialDeliveryPreference
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RecordPartialDeliveryPreference"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponsePartialDeliveryPreferenceView"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Record whether the customer allows partial delivery
-      tags:
-      - Order Intake
   /api/v1/sales-orders/{orderId}/intake/product-corrections:
     get:
       operationId: listLineProductCorrections
@@ -62298,24 +62151,6 @@ components:
           type: array
           items:
             type: string
-    ApiResponsePartialDeliveryPreferenceView:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/PartialDeliveryPreferenceView"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
     ApiResponsePartnerContactDto:
       type: object
       properties:
@@ -72175,6 +72010,10 @@ components:
         salesOrderLineId:
           type: string
           format: uuid
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: "The line's shipment preference as recorded; shown to planning,\
+            \ not a shipment gate (LINE-PREFERENCES-1)"
         unit:
           type: string
       required:
@@ -72184,6 +72023,7 @@ components:
       - portions
       - readyOn
       - salesOrderLineId
+      - shipmentPreference
       - unit
     LineHold:
       type: object
@@ -72271,6 +72111,14 @@ components:
       - oldProductId
       - reason
       - salesOrderLineId
+    LineShipmentPreference:
+      type: string
+      description: "AS_READY: ready quantity may leave in parts (default). WHEN_COMPLETE:\
+        \ the distribution leaves when all of it is ready; a split distribution is\
+        \ judged per delivery share."
+      enum:
+      - AS_READY
+      - WHEN_COMPLETE
     LineVersionRef:
       type: object
       properties:
@@ -73728,8 +73576,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LineCoverOutlook"
-        partialDelivery:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
         pendingCustomRequestIds:
           type: array
           description: "Unfinished custom requests of this order, attached or taken\
@@ -73737,18 +73583,13 @@ components:
           items:
             type: string
             format: uuid
-        readyPartsMayShipFirst:
-          type: boolean
-          description: Ready lines may ship before the rest (A10)
         salesOrderId:
           type: string
           format: uuid
       required:
       - arrival
       - lines
-      - partialDelivery
       - pendingCustomRequestIds
-      - readyPartsMayShipFirst
       - salesOrderId
     OrderDeliveryView:
       type: object
@@ -73867,7 +73708,6 @@ components:
       - ADD_CUSTOM_REQUEST
       - RECORD_CUSTOMER_DECISION
       - RESOLVE_CUSTOM_REQUEST
-      - RECORD_PARTIAL_DELIVERY
       - UPLOAD_ATTACHMENT
       - REQUEST_READINESS_CONFIRMATION
       - CORRECT_PRODUCT
@@ -74048,8 +73888,6 @@ components:
             $ref: "#/components/schemas/OrderIntakeReadinessBlock"
         orderStatus:
           type: string
-        partialDelivery:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
         salesOrderId:
           type: string
           format: uuid
@@ -74059,7 +73897,6 @@ components:
       - lines
       - orderBlocks
       - orderStatus
-      - partialDelivery
       - salesOrderId
     OrderIntakeReadinessBlock:
       type: object
@@ -74614,8 +74451,6 @@ components:
           format: date
         orderNumber:
           type: string
-        partialDelivery:
-          type: string
         paymentTerms:
           type: string
         proposal:
@@ -74666,6 +74501,11 @@ components:
         requestedDeliveryDate:
           type: string
           format: date
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+        singleLotRequired:
+          type: boolean
+          description: The distribution must come from one dye lot
         tax:
           type: number
         toleranceDownPct:
@@ -74676,6 +74516,9 @@ components:
           type: string
         unitPrice:
           type: number
+      required:
+      - shipmentPreference
+      - singleLotRequired
     OrderVersionProposal:
       type: object
       properties:
@@ -76201,51 +76044,6 @@ components:
       required:
       - acceptedQuantity
       - reason
-    PartialDeliveryPreference:
-      type: string
-      enum:
-      - UNKNOWN
-      - ALLOWED
-      - TOGETHER
-    PartialDeliveryPreferenceView:
-      type: object
-      properties:
-        channel:
-          anyOf:
-          - $ref: "#/components/schemas/IntakeAcceptanceChannel"
-          - type: "null"
-        customerContact:
-          type:
-          - string
-          - "null"
-        decidedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        preference:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
-        recordedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        recordedBy:
-          type:
-          - string
-          - "null"
-          format: uuid
-        salesOrderId:
-          type: string
-          format: uuid
-      required:
-      - channel
-      - customerContact
-      - decidedAt
-      - preference
-      - recordedAt
-      - recordedBy
-      - salesOrderId
     PartnerContactDto:
       type: object
       properties:
@@ -79720,22 +79518,6 @@ components:
       required:
       - unit
       - value
-    RecordPartialDeliveryPreference:
-      type: object
-      properties:
-        channel:
-          $ref: "#/components/schemas/IntakeAcceptanceChannel"
-        customerContact:
-          type: string
-          maxLength: 200
-          minLength: 0
-        decidedAt:
-          type: string
-          format: date-time
-        preference:
-          $ref: "#/components/schemas/PartialDeliveryPreference"
-      required:
-      - preference
     RecordPaymentRequest:
       type: object
       properties:
@@ -81587,6 +81369,10 @@ components:
         requestedDeliveryDate:
           $ref: "#/components/schemas/SalesOrderDateFieldEdit"
           description: Customer-requested delivery date of this distribution
+        shipmentPreference:
+          $ref: "#/components/schemas/SalesOrderLineShipmentPreferenceEdit"
+          description: "How the distribution may ship once ready; omitted on ADD means\
+            \ AS_READY, CLEAR is refused"
         singleLotRequired:
           $ref: "#/components/schemas/SalesOrderFlagFieldEdit"
           description: Whether the distribution must come from one dye lot; CLEAR
@@ -81709,6 +81495,10 @@ components:
         requirementProfile:
           $ref: "#/components/schemas/RequirementProfileInput"
           description: "Typed, traceable order-line requirement profile input"
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready; omitted means AS_READY
+            (LINE-PREFERENCES-1)
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot
@@ -81797,6 +81587,9 @@ components:
         salesOrderId:
           type: string
           format: uuid
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready (LINE-PREFERENCES-1)
         shippedQty:
           type: number
         singleLotRequired:
@@ -81827,6 +81620,20 @@ components:
           format: int64
           description: Line version; commands that change the line send it back (SOI
             R19)
+      required:
+      - shipmentPreference
+    SalesOrderLineShipmentPreferenceEdit:
+      type: object
+      additionalProperties: false
+      description: The line's shipment preference; CLEAR is refused.
+      properties:
+        operation:
+          $ref: "#/components/schemas/SalesOrderFieldEditOperation"
+        value:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: The new value with SET; never sent with CLEAR
+      required:
+      - operation
     SalesOrderLineSpecificationEdit:
       type: object
       additionalProperties: false
@@ -84766,6 +84573,10 @@ components:
           $ref: "#/components/schemas/RequirementProfileInput"
           description: Typed requirement profile update; omitted value preserves current
             profile
+        shipmentPreference:
+          $ref: "#/components/schemas/LineShipmentPreference"
+          description: How the distribution may ship once ready; omitted means AS_READY
+            (LINE-PREFERENCES-1)
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot

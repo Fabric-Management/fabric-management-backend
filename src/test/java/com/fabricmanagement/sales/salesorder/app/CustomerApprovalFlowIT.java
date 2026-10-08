@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -42,6 +43,7 @@ import com.fabricmanagement.sales.salesorder.domain.DeliveryProposal;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
 import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderVersionContent;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -325,6 +327,59 @@ class CustomerApprovalFlowIT {
                 Integer.class,
                 token))
         .isZero();
+  }
+
+  @Test
+  void theSentVersionFreezesEachLinesPreferencesWhenTheOrderChangesLater() {
+    // LINE-PREFERENCES-1: a second line with the non-default choices, beside the default one.
+    TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(sales);
+    UUID twill;
+    try {
+      twill =
+          lines
+              .saveAndFlush(
+                  SalesOrderLine.builder()
+                      .salesOrderId(orderId)
+                      .productId(UUID.randomUUID())
+                      .productDesc("Twill 240 cm")
+                      .requestedQty(new BigDecimal("800"))
+                      .unit("MT")
+                      .unitPrice(Money.of(new BigDecimal("5.10"), "GBP"))
+                      .singleLotRequired(true)
+                      .shipmentPreference(LineShipmentPreference.WHEN_COMPLETE)
+                      .build())
+              .getId();
+    } finally {
+      TenantContext.clear();
+    }
+    String token = send();
+
+    // After sending, both lines' preferences change on the order itself.
+    jdbc.update(
+        "UPDATE sales_ord.sales_order_line SET single_lot_required = (id <> ?),"
+            + " shipment_preference = CASE WHEN id = ? THEN 'AS_READY' ELSE 'WHEN_COMPLETE' END"
+            + " WHERE sales_order_id = ?",
+        twill,
+        twill,
+        orderId);
+
+    OrderVersionContent content = publicApprovals.verify(token, code(token)).version().content();
+    assertThat(content.lines())
+        .extracting(
+            OrderVersionContent.Line::product,
+            OrderVersionContent.Line::singleLotRequired,
+            OrderVersionContent.Line::shipmentPreference)
+        .containsExactlyInAnyOrder(
+            tuple("Cotton poplin 140 cm", false, LineShipmentPreference.AS_READY),
+            tuple("Twill 240 cm", true, LineShipmentPreference.WHEN_COMPLETE));
+    // The order itself did change: the version is a frozen copy, not a view of it.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT shipment_preference FROM sales_ord.sales_order_line WHERE id = ?",
+                String.class,
+                twill))
+        .isEqualTo("AS_READY");
   }
 
   @Test

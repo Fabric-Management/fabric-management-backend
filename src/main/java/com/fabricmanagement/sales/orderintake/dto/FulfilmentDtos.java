@@ -3,7 +3,7 @@ package com.fabricmanagement.sales.orderintake.dto;
 import com.fabricmanagement.sales.orderintake.domain.CoverPortionKind;
 import com.fabricmanagement.sales.orderintake.domain.LinePortionReadiness;
 import com.fabricmanagement.sales.orderintake.domain.OrderArrivalEstimate;
-import com.fabricmanagement.sales.orderintake.domain.PartialDeliveryPreference;
+import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
 import com.fabricmanagement.sales.salesorder.dto.OrderWorkDtos;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
@@ -76,6 +76,12 @@ public final class FulfilmentDtos {
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID salesOrderLineId,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal openQuantity,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String unit,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description =
+                  "The line's shipment preference as recorded; shown to planning, not a shipment"
+                      + " gate (LINE-PREFERENCES-1)")
+          LineShipmentPreference shipmentPreference,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<PortionOutlook> portions,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
@@ -108,12 +114,6 @@ public final class FulfilmentDtos {
               nullable = true,
               description = "Null: arrival unknown; never derived from readiness")
           ArrivalView arrival,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-          PartialDeliveryPreference partialDelivery,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              description = "Ready lines may ship before the rest (A10)")
-          boolean readyPartsMayShipFirst,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description = "Unfinished custom requests of this order, attached or taken off")
