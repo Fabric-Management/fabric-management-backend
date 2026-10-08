@@ -28,6 +28,19 @@ public class SalesOrderAccessPolicy {
     return canAccess(tenantId, userId, order, "write", freshness);
   }
 
+  /**
+   * The user's sales read reach, resolved once with the given freshness (CEDIT-05 §4.3): whether
+   * the user may read sales orders at all, and which orders by tenant and creator. Where only an
+   * order's tenant and creator are read (a projection), it decides like {@link #canRead} without a
+   * second permission lookup; the OWN/DEPARTMENT rules are the resolver's, unchanged.
+   */
+  public ReadReach readReach(UUID tenantId, UUID userId, PermissionFreshness freshness) {
+    if (tenantId == null || userId == null) {
+      return new ReadReach(tenantId, AccessScope.denied());
+    }
+    return new ReadReach(tenantId, resolveAccessScope(tenantId, userId, "read", freshness));
+  }
+
   public Specification<SalesOrder> readRestriction(UUID tenantId, UUID userId) {
     return restriction(tenantId, userId, "read", PermissionFreshness.CACHED);
   }
@@ -87,5 +100,20 @@ public class SalesOrderAccessPolicy {
   public enum PermissionFreshness {
     CACHED,
     FRESH
+  }
+
+  /** A user's resolved sales read scope in one tenant. */
+  public record ReadReach(UUID tenantId, AccessScope scope) {
+
+    /** Whether the user may read sales orders at all. */
+    public boolean any() {
+      return scope.scope() != null;
+    }
+
+    /** Whether an order of this tenant, created by this principal, is within the reach. */
+    public boolean permits(UUID orderTenantId, UUID orderCreatedBy) {
+      Set<UUID> principals = orderCreatedBy == null ? Set.of() : Set.of(orderCreatedBy);
+      return scope.permits(orderTenantId, tenantId, principals);
+    }
   }
 }

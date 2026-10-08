@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(151)
+        .hasSize(152)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(151);
+    assertThat(expected).hasSize(152);
   }
 
   @Test
@@ -58,6 +58,14 @@ class SalesEndpointAuthorizationArchTest {
         .isEqualTo("@auth.can(authentication, 'sales', 'assign-owner')");
     assertThat(preAuthorize("CustomerAccountTeamController", "listCandidates"))
         .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+  }
+
+  @Test
+  void theSalesOrderLiveStreamNeedsSalesReadOnly() throws Exception {
+    // CEDIT-05 §3.1: a read-only user may subscribe; write access is not required. Object
+    // access is checked fresh by the stream itself on opening and on every poll.
+    assertThat(preAuthorize("SalesOrderLiveController", "subscribeSalesOrderLiveEvents"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -258,6 +266,11 @@ class SalesEndpointAuthorizationArchTest {
         "SalesOrderEditController",
         Category.TRANSACTIONAL_READ,
         "getSalesOrderEditOperation");
+    add(
+        result,
+        "SalesOrderLiveController",
+        Category.TRANSACTIONAL_READ,
+        "subscribeSalesOrderLiveEvents");
     add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
     add(
         result,

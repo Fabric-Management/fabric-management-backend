@@ -67,6 +67,10 @@ application:
     username: ${POSTGRES_SYSTEM_USER:fabric_system}
     password: ${POSTGRES_SYSTEM_PASSWORD}
 
+  # Live change channel (CEDIT-05): on for development, explicitly; off by default elsewhere.
+  realtime:
+    enabled: ${REALTIME_ENABLED:true}
+
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 

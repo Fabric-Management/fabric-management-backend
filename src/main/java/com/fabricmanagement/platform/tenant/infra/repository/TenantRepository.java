@@ -54,6 +54,19 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
   Optional<Tenant> findBySlug(String slug);
 
   /**
+   * The access fields of one tenant (CEDIT-05 R2). With the application role, RLS shows only the
+   * tenant bound to the session, so this answers for the current tenant and is empty otherwise.
+   */
+  Optional<TenantAccessView> findAccessViewById(UUID id);
+
+  /** Projection of {@link #findAccessViewById}. */
+  interface TenantAccessView {
+    Boolean getIsActive();
+
+    TenantStatus getStatus();
+  }
+
+  /**
    * Find active tenant by ID.
    *
    * @param id Tenant UUID

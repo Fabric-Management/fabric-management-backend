@@ -15,7 +15,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
-import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.AsyncHandlerInterceptor;
 
 /**
  * JWT Context Interceptor - Global interceptor for JWT-based tenant context management.
@@ -53,7 +53,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class JwtContextInterceptor implements HandlerInterceptor {
+public class JwtContextInterceptor implements AsyncHandlerInterceptor {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
   private static final String[] OPTIONAL_TENANT_PATHS = {"/api/v1/common/company-types/**"};
@@ -169,6 +169,20 @@ public class JwtContextInterceptor implements HandlerInterceptor {
     // Always clear context, even if exception occurred
     TenantContext.clear();
     log.trace("TenantContext cleared for path: {}", request.getRequestURI());
+  }
+
+  /**
+   * An async response (a live event stream) has started: this request thread goes back to the
+   * container now, and {@link #afterCompletion} runs only on the later async dispatch. The tenant
+   * context is cleared here so the pooled thread does not carry it into its next request.
+   */
+  @Override
+  public void afterConcurrentHandlingStarted(
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull Object handler) {
+    TenantContext.clear();
+    log.trace("TenantContext cleared after async start for path: {}", request.getRequestURI());
   }
 
   private boolean isOptionalTenantRequest(HttpServletRequest request) {

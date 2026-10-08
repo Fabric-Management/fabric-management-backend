@@ -400,6 +400,20 @@ public class JwtService {
     }
   }
 
+  /**
+   * The expiry of a signed, unexpired token exactly as its {@code exp} claim states it; empty when
+   * the token is invalid, expired or has no expiry. Nothing is rounded up, so a caller using it as
+   * a deadline never outlives the token.
+   */
+  public Optional<Instant> verifiedExpiry(String token) {
+    try {
+      return Optional.ofNullable(extractClaims(token).getExpiration()).map(Date::toInstant);
+    } catch (JwtException | IllegalArgumentException e) {
+      log.trace("Could not read JWT expiry: {}", e.getMessage());
+      return Optional.empty();
+    }
+  }
+
   public String getContactValueFromToken(String token) {
     Claims claims = extractClaims(token);
     return claims.getSubject();

@@ -91,6 +91,10 @@ application:
     playground-expiration: 1209600000 # 14 days for playground demo sessions
     refresh-expiration: 2592000000 # 30 days for local development
 
+  # Live change channel (CEDIT-05): on for development, explicitly; off by default elsewhere.
+  realtime:
+    enabled: ${REALTIME_ENABLED:true}
+
   # Auth cookies: Secure=false so cookies work over http://localhost
   auth:
     cookie:

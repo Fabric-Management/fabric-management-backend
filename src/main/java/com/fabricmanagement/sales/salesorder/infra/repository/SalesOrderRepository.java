@@ -30,6 +30,25 @@ public interface SalesOrderRepository
 
   Optional<SalesOrder> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  /**
+   * The few committed columns a live check needs (CEDIT-05 §6): a closed projection, so neither the
+   * order entity nor its lines or profiles are loaded and nothing is cached between checks.
+   */
+  Optional<LiveRevisionView> findLiveRevisionViewByTenantIdAndId(UUID tenantId, UUID id);
+
+  /** Projection of {@link #findLiveRevisionViewByTenantIdAndId}. */
+  interface LiveRevisionView {
+    UUID getId();
+
+    UUID getTenantId();
+
+    Boolean getIsActive();
+
+    UUID getCreatedBy();
+
+    Long getVersion();
+  }
+
   /** Orders at the given flow stages, oldest first: the planning queue. */
   List<SalesOrder> findByTenantIdAndFlowStageInAndIsActiveTrueOrderByCreatedAtAsc(
       UUID tenantId,
