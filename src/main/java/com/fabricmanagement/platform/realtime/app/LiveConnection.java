@@ -1,11 +1,12 @@
 package com.fabricmanagement.platform.realtime.app;
 
 import com.fabricmanagement.platform.realtime.domain.LiveActor;
+import com.fabricmanagement.platform.realtime.domain.LiveReadResult;
 import com.fabricmanagement.platform.realtime.domain.LiveResource;
-import com.fabricmanagement.platform.realtime.domain.LiveRevision;
 import com.fabricmanagement.platform.realtime.domain.LiveRevisionSource;
 import com.fabricmanagement.platform.realtime.dto.LiveCloseReason;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,6 +40,7 @@ final class LiveConnection {
   private final AtomicBoolean aborted = new AtomicBoolean();
 
   private volatile String lastSentRevision;
+  private volatile String lastSentPresence;
   private volatile Instant lastSentAt;
   private volatile Instant nextCheckAt;
   private volatile String closeCause;
@@ -93,6 +95,17 @@ final class LiveConnection {
     return lastSentRevision;
   }
 
+  /** The presence marker last sent; null for a resource without presence (CEDIT-06). */
+  String lastSentPresence() {
+    return lastSentPresence;
+  }
+
+  /** Whether {@code visible} differs from what this connection last sent, in either marker. */
+  boolean differsFrom(LiveReadResult.Visible visible) {
+    return !visible.revision().value().equals(lastSentRevision)
+        || !Objects.equals(presenceValue(visible), lastSentPresence);
+  }
+
   Instant lastSentAt() {
     return lastSentAt;
   }
@@ -102,8 +115,9 @@ final class LiveConnection {
   }
 
   /** The ready frame was written: the connection becomes open and the opener lets it go. */
-  boolean opened(LiveRevision baseline, Instant at, Instant firstCheckAt) {
-    lastSentRevision = baseline.value();
+  boolean opened(LiveReadResult.Visible baseline, Instant at, Instant firstCheckAt) {
+    lastSentRevision = baseline.revision().value();
+    lastSentPresence = presenceValue(baseline);
     lastSentAt = at;
     nextCheckAt = firstCheckAt;
     boolean open = state.compareAndSet(State.OPENING, State.OPEN);
@@ -169,9 +183,14 @@ final class LiveConnection {
         || !now.isBefore(actor.expiresAt());
   }
 
-  void sent(LiveRevision revision, Instant at) {
-    lastSentRevision = revision.value();
+  void sent(LiveReadResult.Visible visible, Instant at) {
+    lastSentRevision = visible.revision().value();
+    lastSentPresence = presenceValue(visible);
     lastSentAt = at;
+  }
+
+  static String presenceValue(LiveReadResult.Visible visible) {
+    return visible.presence() == null ? null : visible.presence().value();
   }
 
   void heartbeatSent(Instant at) {

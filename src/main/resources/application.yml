@@ -163,6 +163,15 @@ application:
     send-timeout: ${REALTIME_SEND_TIMEOUT:5s}
     read-timeout: ${REALTIME_READ_TIMEOUT:3s}
     retry-after: ${REALTIME_RETRY_AFTER:5s}
+    # CEDIT-06: who holds an edit form open. Independent of `enabled`: presence rows are harmless
+    # without the stream, and the stream only signals them. Technical defaults, not SLAs.
+    edit-session:
+      ttl: ${REALTIME_EDIT_SESSION_TTL:90s}
+      renew-after: ${REALTIME_EDIT_SESSION_RENEW_AFTER:30s}
+      retention: ${REALTIME_EDIT_SESSION_RETENTION:P7D}
+      cleanup-enabled: ${REALTIME_EDIT_SESSION_CLEANUP_ENABLED:true}
+      cleanup-cron: ${REALTIME_EDIT_SESSION_CLEANUP_CRON:0 20 4 * * *}
+      cleanup-batch-size: ${REALTIME_EDIT_SESSION_CLEANUP_BATCH_SIZE:500}
 
   trial:
     base-days: ${TRIAL_BASE_DAYS:90}

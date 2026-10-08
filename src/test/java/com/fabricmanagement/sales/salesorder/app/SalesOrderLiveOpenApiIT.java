@@ -126,6 +126,9 @@ class SalesOrderLiveOpenApiIT extends SalesOrderLiveItSupport {
       assertThat(map(properties, "resourceId")).containsEntry("format", "uuid");
       assertThat(typeOf(map(properties, "revision"))).isEqualTo("string");
       assertThat(map(properties, "revision")).containsEntry("minLength", 1);
+      // CEDIT-06: optional, never mixed with revision.
+      assertThat(typeOf(map(properties, "presenceRevision"))).isEqualTo("string");
+      assertThat(map(properties, "presenceRevision")).containsEntry("minLength", 1);
     }
     Map<String, Object> closed = schema("LiveClosedDto");
     assertThat(list(closed.get("required"))).containsExactlyInAnyOrder("connectionId", "reason");
@@ -232,7 +235,12 @@ class SalesOrderLiveOpenApiIT extends SalesOrderLiveItSupport {
     ((ObjectNode) numericId.get("data")).put("connectionId", 42);
     ObjectNode noData = readyBody.deepCopy();
     noData.remove("data");
-    for (JsonNode broken : List.of(missingRevision, emptyRevision, numericId, noData)) {
+    // CEDIT-06: a sales order's frames carry the presence marker beside the revision.
+    assertThat(readyBody.path("data").path("presenceRevision").asText()).isEqualTo("0");
+    ObjectNode emptyPresence = readyBody.deepCopy();
+    ((ObjectNode) emptyPresence.get("data")).put("presenceRevision", "");
+    for (JsonNode broken :
+        List.of(missingRevision, emptyRevision, numericId, noData, emptyPresence)) {
       assertThat(validateRef(readyRef, broken)).as(broken.toString()).isNotEmpty();
       assertThat(validateStream(broken)).as(broken.toString()).isNotEmpty();
     }

@@ -117,6 +117,7 @@ Plan B (FORCE ROW LEVEL SECURITY + BYPASSRLS ayrıcalıklı rol) production'da v
 | `TenantQueryAdapter` | Port/Adapter: tenant lookup (auth, event yolu) |
 | `CloneTemplateRolesStep` | Onboarding: TEMPLATE rollerini yeni tenant'a kopyala |
 | `SystemDataSourceConfig` | Altyapı: DataSource bean konfigürasyonu |
+| `LiveEditSessionRetentionJob` | CEDIT-06 (2026-10-08): süresi dolmuş/kapanmış düzenleme oturumu (presence) satırlarının zamanlanmış temizliği; aktif tenant listesi sistem rolüyle okunur, her silme açık `tenant_id` filtresiyle tenant başına kısa transaction'da yapılır; iş kaydı değil, teknik satır |
 
 **Kural:** Bu whitelist dışındaki sınıflar `SystemTransactionExecutor` import edemez. Bu kural `ConstitutionArchTest` Rule 14.1 ile build-time'da enforce edilir.
 

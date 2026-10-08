@@ -4,7 +4,6 @@ import com.fabricmanagement.common.infrastructure.tenant.CurrentTenantAccessPort
 import com.fabricmanagement.platform.realtime.domain.LiveActor;
 import com.fabricmanagement.platform.realtime.domain.LiveReadResult;
 import com.fabricmanagement.platform.realtime.domain.LiveResource;
-import com.fabricmanagement.platform.realtime.domain.LiveRevision;
 import com.fabricmanagement.platform.realtime.domain.LiveRevisionSource;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveStreamRejectedException;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveStreamRejectedException.Rejection;
@@ -188,14 +187,14 @@ public class LiveStreamService {
             .orElseThrow(() -> refused(Rejection.CAPACITY));
 
     // Phase 1: everything that may still refuse the request with a normal HTTP error.
-    LiveRevision baseline;
+    LiveReadResult.Visible baseline;
     Instant now;
     LiveChannel channel;
     try {
       LiveReadResult initial = read(actor, source, resourceId);
       baseline =
           switch (initial) {
-            case LiveReadResult.Visible visible -> visible.revision();
+            case LiveReadResult.Visible visible -> visible;
             case LiveReadResult.Hidden hidden ->
                 throw rejected(
                     hidden == LiveReadResult.Hidden.FORBIDDEN
@@ -244,7 +243,12 @@ public class LiveStreamService {
     }
     if (!send(
         connection,
-        new LiveFrame.Ready(new LiveReadyDto(connection.id(), resourceId, baseline.value())))) {
+        new LiveFrame.Ready(
+            new LiveReadyDto(
+                connection.id(),
+                resourceId,
+                baseline.revision().value(),
+                LiveConnection.presenceValue(baseline))))) {
       completeIfClosed(connection);
       return connection.id();
     }
@@ -402,14 +406,16 @@ public class LiveStreamService {
     switch (current) {
       case LiveReadResult.Hidden hidden -> close(connection, LiveCloseReason.ACCESS_REVOKED);
       case LiveReadResult.Visible visible -> {
-        LiveRevision revision = visible.revision();
-        if (!revision.value().equals(connection.lastSentRevision())) {
+        if (connection.differsFrom(visible)) {
           LiveFrame frame =
               new LiveFrame.Invalidated(
                   new LiveInvalidatedDto(
-                      connection.id(), connection.resource().id(), revision.value()));
+                      connection.id(),
+                      connection.resource().id(),
+                      visible.revision().value(),
+                      LiveConnection.presenceValue(visible)));
           if (send(connection, frame)) {
-            connection.sent(revision, now);
+            connection.sent(visible, now);
           }
         } else if (!now.isBefore(connection.lastSentAt().plus(properties.getHeartbeatInterval()))) {
           if (send(connection, LiveFrame.Heartbeat.INSTANCE)) {

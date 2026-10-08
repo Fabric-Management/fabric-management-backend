@@ -7,13 +7,22 @@ package com.fabricmanagement.platform.realtime.domain;
  */
 public sealed interface LiveReadResult permits LiveReadResult.Visible, LiveReadResult.Hidden {
 
-  /** The actor may read the resource; this is its committed revision. */
-  record Visible(LiveRevision revision) implements LiveReadResult {
+  /**
+   * The actor may read the resource; this is its committed revision. {@code presence} is a separate
+   * marker of who edits the resource now (CEDIT-06), or null for a resource without presence. The
+   * two are never combined: each tells the client what to read again.
+   */
+  record Visible(LiveRevision revision, LiveRevision presence) implements LiveReadResult {
 
     public Visible {
       if (revision == null) {
         throw new IllegalArgumentException("A visible resource has a revision");
       }
+    }
+
+    /** A resource without presence. */
+    public Visible(LiveRevision revision) {
+      this(revision, null);
     }
   }
 
