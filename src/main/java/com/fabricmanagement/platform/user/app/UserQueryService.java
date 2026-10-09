@@ -130,19 +130,20 @@ public class UserQueryService {
   }
 
   /**
-   * Current display names of the tenant's active users among {@code userIds}, read in one query.
-   * Inactive, removed or unknown ids are absent from the map. Only names: no contact data, roles or
-   * other personal data (CEDIT-09 field history).
+   * Names of the people who recorded past work (CEDIT-09 field history §8.2), read in one query:
+   * the current directory name of each of the tenant's user records among {@code userIds}. A person
+   * whose account was deactivated or closed keeps their name on what they recorded; deactivation
+   * also stamps {@code deletedAt}, so neither flag hides it. Ids without a user record in this
+   * tenant are absent from the map; no other source is consulted, so a name overwritten on the
+   * record (anonymised) is never brought back. Only names: no contact data, roles or other personal
+   * data. Showing a name grants nothing: sign-in and order access keep their own checks.
    */
   @Transactional(readOnly = true)
-  public Map<UUID, String> findActiveDisplayNames(UUID tenantId, Collection<UUID> userIds) {
+  public Map<UUID, String> findRecordedActorNames(UUID tenantId, Collection<UUID> userIds) {
     if (tenantId == null || userIds == null || userIds.isEmpty()) {
       return Map.of();
     }
-    return userRepository
-        .findByTenantIdAndIdInAndIsActiveTrue(tenantId, Set.copyOf(userIds))
-        .stream()
-        .filter(user -> user.getDeletedAt() == null)
+    return userRepository.findByTenantIdAndIdIn(tenantId, Set.copyOf(userIds)).stream()
         .collect(java.util.stream.Collectors.toMap(User::getId, User::getDisplayName));
   }
 

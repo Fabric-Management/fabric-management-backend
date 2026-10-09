@@ -66,7 +66,7 @@ public class SalesOrderFieldHistoryService {
     boolean hasMore = rows.size() > size;
     List<Row> shown = hasMore ? rows.subList(0, size) : rows;
     Set<UUID> actors = shown.stream().map(Row::actorId).collect(Collectors.toSet());
-    Map<UUID, String> names = users.findActiveDisplayNames(tenantId, actors);
+    Map<UUID, String> names = users.findRecordedActorNames(tenantId, actors);
 
     String nextCursor = null;
     if (hasMore) {

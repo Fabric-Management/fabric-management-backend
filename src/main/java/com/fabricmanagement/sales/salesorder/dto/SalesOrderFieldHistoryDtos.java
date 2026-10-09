@@ -235,8 +235,10 @@ public final class SalesOrderFieldHistoryDtos {
               requiredMode = Schema.RequiredMode.REQUIRED,
               nullable = true,
               description =
-                  "The person's current directory name, not the name at the time of the change;"
-                      + " null when the account is inactive, removed or cannot be resolved.")
+                  "The person's current directory name from their user record in this tenant,"
+                      + " not the name at the time of the change; kept when the account was"
+                      + " deactivated or closed. Null when no user record of this tenant can be"
+                      + " found.")
           String displayName) {}
 
   /** One side of a change: the stored value, or why it cannot be shown. */

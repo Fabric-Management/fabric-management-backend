@@ -23,8 +23,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   boolean existsByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
 
-  /** Active users of a tenant among the given ids, in one query; relations stay unloaded. */
-  List<User> findByTenantIdAndIdInAndIsActiveTrue(UUID tenantId, Collection<UUID> ids);
+  /**
+   * The tenant's user records among the given ids, in one query, deactivated (soft-deleted) ones
+   * included. For showing who recorded past work (CEDIT-09 field history), never for access.
+   */
+  List<User> findByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
   /**
    * Find user by contact value via Contact entity (new system - recommended).

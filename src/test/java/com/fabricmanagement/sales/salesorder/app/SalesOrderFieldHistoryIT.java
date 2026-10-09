@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderFieldHistoryDtos;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 class SalesOrderFieldHistoryIT extends SalesOrderFieldHistoryItSupport {
 
   @Autowired private SalesOrderEditRetentionJob retention;
+  @Autowired private UserService userService;
 
   // ── H01: who, when, what, in which save ───────────────────────────────────
 
@@ -487,13 +489,46 @@ class SalesOrderFieldHistoryIT extends SalesOrderFieldHistoryItSupport {
   // ── H16: actor names ──────────────────────────────────────────────────────
 
   @Test
-  @DisplayName("H16: the current name, a neutral null for an inactive person, never other PII")
+  @DisplayName(
+      "H16: the current name, also of a deactivated person; null only without a record of this"
+          + " tenant; never other PII")
   void actorNames() throws Exception {
     saved(actorA, body(UUID.randomUUID(), open(actorA).baseId(), "notes", set("A")));
     saved(actorB, body(UUID.randomUUID(), open(actorB).baseId(), "paymentTerms", set("45 days")));
+    saved(actorC, body(UUID.randomUUID(), open(actorC).baseId(), "shippingMethod", set("Sea")));
+    saved(actorC, body(UUID.randomUUID(), open(actorC).baseId(), "customerReference", set("PO-1")));
+
+    // A renamed person shows today's directory name.
     jdbc.update(
         "UPDATE common_user.common_user SET first_name = 'Bailey' WHERE id = ?", actorB.id());
-    jdbc.update("UPDATE common_user.common_user SET is_active = false WHERE id = ?", actorA.id());
+    // A person who leaves, through the real deactivation: it closes the account and stamps
+    // deletedAt as well (§8.2) — the history keeps their name on what they saved.
+    assertThat(
+            as(
+                actorC,
+                () -> {
+                  userService.deactivateUser(tenantId, actorA.id(), "left the company");
+                  return null;
+                }))
+        .isNull();
+    Map<String, Object> closed =
+        jdbc.queryForMap(
+            "SELECT is_active, deleted_at FROM common_user.common_user WHERE id = ?", actorA.id());
+    assertThat(closed.get("is_active")).isEqualTo(false);
+    assertThat(closed.get("deleted_at")).isNotNull();
+    // No user record of this tenant: an id nobody has, and a person of another tenant.
+    UUID nobody = UUID.randomUUID();
+    OtherTenant other = otherTenantWithOrder();
+    jdbc.update(
+        "UPDATE sales_ord.order_field_change SET actor_id = ? WHERE sales_order_id = ?"
+            + " AND edit_key = 'shippingMethod'",
+        nobody,
+        orderId);
+    jdbc.update(
+        "UPDATE sales_ord.order_field_change SET actor_id = ? WHERE sales_order_id = ?"
+            + " AND edit_key = 'customerReference'",
+        other.actor().id(),
+        orderId);
     cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
 
     Answer answer = historyHttp(actorC, orderId, null, null);
@@ -501,13 +536,25 @@ class SalesOrderFieldHistoryIT extends SalesOrderFieldHistoryItSupport {
     List<JsonNode> entries = new ArrayList<>();
     answer.body().path("data").path("items").forEach(entries::add);
 
-    JsonNode byB = only(entries, "paymentTerms").path("actor");
     JsonNode byA = only(entries, "notes").path("actor");
-    assertThat(byB.path("displayName").asText()).isEqualTo("Bailey Seller");
     assertThat(byA.path("id").asText()).isEqualTo(actorA.id().toString());
-    assertThat(byA.path("displayName").isNull()).isTrue();
+    assertThat(byA.path("displayName").asText()).isEqualTo("Avery Seller");
     assertThat(fieldNames(byA)).containsExactlyInAnyOrder("id", "displayName");
-    assertThat(answer.text()).doesNotContain("@", "WORKER", "SALES");
+    assertThat(only(entries, "paymentTerms").path("actor").path("displayName").asText())
+        .isEqualTo("Bailey Seller");
+
+    JsonNode unknown = only(entries, "shippingMethod").path("actor");
+    assertThat(unknown.path("id").asText()).isEqualTo(nobody.toString());
+    assertThat(unknown.path("displayName").isNull()).isTrue();
+    JsonNode foreign = only(entries, "customerReference").path("actor");
+    assertThat(foreign.path("id").asText()).isEqualTo(other.actor().id().toString());
+    assertThat(foreign.path("displayName").isNull()).isTrue();
+    assertThat(answer.text()).doesNotContain("Morgan", "@", "WORKER", "SALES");
+
+    // Keeping the name grants nothing: the person who left cannot read the order's history.
+    Answer leaver = historyHttp(actorA, orderId, null, null);
+    assertThat(leaver.status()).isIn(401, 403, 404);
+    assertThat(leaver.text()).doesNotContain("Avery Seller", "Bailey Seller");
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
