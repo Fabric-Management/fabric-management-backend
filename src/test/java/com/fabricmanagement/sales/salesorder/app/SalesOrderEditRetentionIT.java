@@ -181,6 +181,28 @@ class SalesOrderEditRetentionIT extends SalesOrderEditItSupport {
     assertThat(orderVersion()).isEqualTo(beforeExpiry.resultVersion());
   }
 
+  @Test
+  @DisplayName(
+      "TIME-PRECISION-1: an opened and a derived base answer the capturedAt and expiresAt their"
+          + " rows keep, and expire exactly at the answered expiresAt")
+  void answeredBaseTimesAreTheStoredOnes() {
+    SalesOrderEditBase opened = open(actorB);
+    assertThat(opened.capturedAt()).isEqualTo(storedInstant(opened.baseId(), "captured_at"));
+    assertThat(opened.expiresAt()).isEqualTo(storedExpiresAt(opened.baseId()));
+
+    // A save derives its next base in memory and answers it before any read of the row.
+    SalesOrderEditBase derived =
+        saved(actorB, body(UUID.randomUUID(), opened.baseId(), "notes", set("Urgent"))).nextBase();
+    assertThat(derived.capturedAt()).isEqualTo(storedInstant(derived.baseId(), "captured_at"));
+    assertThat(derived.expiresAt()).isEqualTo(storedExpiresAt(derived.baseId()));
+
+    // The expiry the client was told is the stored boundary, to the microsecond.
+    OrderEditBase stored =
+        (OrderEditBase) as(actorB, () -> baseRepository.findById(derived.baseId()).orElseThrow());
+    assertThat(stored.isExpiredAt(derived.expiresAt())).isTrue();
+    assertThat(stored.isExpiredAt(derived.expiresAt().minusNanos(1_000))).isFalse();
+  }
+
   // ── Cleanup: what goes and what stays ─────────────────────────────────────
 
   @Test
@@ -618,6 +640,14 @@ class SalesOrderEditRetentionIT extends SalesOrderEditItSupport {
   private Instant storedExpiresAt(UUID baseId) {
     return jdbc.queryForObject(
             "SELECT expires_at FROM sales_ord.order_edit_base WHERE id = ?",
+            Timestamp.class,
+            baseId)
+        .toInstant();
+  }
+
+  private Instant storedInstant(UUID baseId, String column) {
+    return jdbc.queryForObject(
+            "SELECT " + column + " FROM sales_ord.order_edit_base WHERE id = ?",
             Timestamp.class,
             baseId)
         .toInstant();

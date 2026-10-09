@@ -106,6 +106,26 @@ class LiveEditLeaseServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "L01b: a sub-microsecond clock grants the times PostgreSQL keeps, so the first answer and"
+          + " every later read of the row agree")
+  void grantsAtDatabasePrecision() {
+    Instant fine = NOW.plusNanos(704_264_232);
+    Instant kept = NOW.plusNanos(704_264_000);
+    LiveEditLeaseService onLinux =
+        new LiveEditLeaseService(
+            leases, sessions, control, properties, Clock.fixed(fine, ZoneOffset.UTC));
+    rows(List.of());
+
+    Granted granted = (Granted) onLinux.acquire(order, 0, mine.getId(), user, List.of(notes));
+
+    LiveEditLease lease = granted.leases().getFirst();
+    assertThat(lease.getAcquiredAt()).isEqualTo(kept);
+    assertThat(lease.getRenewedAt()).isEqualTo(kept);
+    assertThat(lease.getExpiresAt()).isEqualTo(kept.plusSeconds(90));
+  }
+
+  @Test
   @DisplayName("L01/L02: another session's held key refuses the whole request without its token")
   void refusesAllOrNothing() {
     LiveEditLease held = lease(notes, theirs, NOW.plusSeconds(60));
