@@ -9,6 +9,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Session;
@@ -44,6 +45,25 @@ public class SalesOrderRevision {
    */
   public void lockFresh(SalesOrder order) {
     entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
+  }
+
+  /**
+   * Share-locks the order row for this transaction and reloads the entity from it (CEDIT-07): a
+   * lease is granted on the committed editability and edit epoch, and no writer of the order can
+   * commit between that decision and the grant. Taken first, like the exclusive lock of writers.
+   */
+  public void lockShared(SalesOrder order) {
+    entityManager.refresh(order, LockModeType.PESSIMISTIC_READ);
+  }
+
+  /**
+   * Ids of the order's active lines as committed now, without locking the line rows (CEDIT-07-F1).
+   * Call it after {@link #lockFresh(SalesOrder)}: a writer that removes a line of this order takes
+   * the order row first, so no line leaves the set before this transaction ends, and the line locks
+   * still come after the leases.
+   */
+  public Set<UUID> activeLineIds(SalesOrder order) {
+    return Set.copyOf(lines.findActiveLineIds(TenantContext.requireTenantId(), order.getId()));
   }
 
   /** Locks one line row and reloads it; call it after the order row is locked. */

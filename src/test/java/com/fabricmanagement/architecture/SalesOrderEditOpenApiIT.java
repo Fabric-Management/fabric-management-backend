@@ -384,7 +384,14 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
   @DisplayName("S2.9/S6.9/S11.2/S15.1: request containers publish exactly the contract properties")
   void requestContainersAreExact() {
     assertThat(properties("SalesOrderEditRequest").keySet())
-        .containsExactlyInAnyOrder("operationId", "baseId", "header", "lines", "resolutions");
+        .containsExactlyInAnyOrder(
+            "operationId",
+            "baseId",
+            "header",
+            "lines",
+            "resolutions",
+            "editSessionId",
+            "leaseTokens");
     assertThat(refOf(property("SalesOrderEditRequest", "header")))
         .isEqualTo(REF + "SalesOrderHeaderEdits");
     assertThat(refOf(asMap(property("SalesOrderEditRequest", "lines").get("items"))))
@@ -438,6 +445,80 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
             assertThat(refOf(property(edit, "value"))).as("%s.value", edit).isEqualTo(REF + value);
           }
         });
+  }
+
+  @Test
+  @DisplayName(
+      "CEDIT-07 L20: four lease operations, bodies only (no session or token in a path), closed"
+          + " requests, the catalogue as a finite enum and no token outside the caller's own lease")
+  void fieldLeaseContract() {
+    String leases = ORDER_PATH + "/edit-leases";
+    Map<String, Object> acquire = mapAt(document, "paths", leases, "post");
+    assertThat(acquire).containsEntry("operationId", "acquireSalesOrderEditLeases");
+    assertThat(mapAt(acquire, "requestBody", "content", "application/json", "schema"))
+        .containsEntry("$ref", REF + "SalesOrderEditLeaseAcquireRequest");
+    assertThat(responseRefs(acquire, "200"))
+        .contains(REF + "ApiResponseSalesOrderEditLeaseGrantDto");
+    assertThat(mapAt(acquire, "responses", "409", "content", PROBLEM_JSON, "schema"))
+        .containsEntry("$ref", REF + "SalesOrderEditLeaseProblem");
+    Map<String, Object> renew = mapAt(document, "paths", leases + "/renew", "post");
+    assertThat(renew).containsEntry("operationId", "renewSalesOrderEditLeases");
+    assertThat(responseRefs(renew, "200"))
+        .contains(REF + "ApiResponseSalesOrderEditLeaseRenewalDto");
+    Map<String, Object> release = mapAt(document, "paths", leases + "/release", "post");
+    assertThat(release).containsEntry("operationId", "releaseSalesOrderEditLeases");
+    Map<String, Object> list = mapAt(document, "paths", leases, "get");
+    assertThat(list).containsEntry("operationId", "listSalesOrderEditLeases");
+    assertThat(responseRefs(list, "200")).contains(REF + "ApiResponseSalesOrderEditLeasesDto");
+    for (Map<String, Object> operation : List.of(acquire, renew, release, list)) {
+      assertThat(pathParameters(operation)).containsExactly("orderId");
+    }
+
+    for (String closed :
+        List.of(
+            "SalesOrderEditLeaseAcquireRequest",
+            "SalesOrderEditLeaseTokensRequest",
+            "SalesOrderEditLeaseKey")) {
+      assertThat(schema(closed).get("additionalProperties")).as(closed).isEqualTo(false);
+    }
+    assertThat(properties("SalesOrderEditLeaseTokensRequest").keySet())
+        .containsExactlyInAnyOrder("editSessionId", "leaseTokens");
+    assertThat(required("SalesOrderEditLeaseAcquireRequest")).contains("editSessionId", "keys");
+    assertThat(property("SalesOrderEditLeaseAcquireRequest", "keys")).containsEntry("maxItems", 50);
+
+    List<String> catalogue = new ArrayList<>();
+    for (com.fabricmanagement.sales.salesorder.domain.OrderEditKey key :
+        com.fabricmanagement.sales.salesorder.domain.OrderEditKey.values()) {
+      catalogue.add(key.wireName());
+    }
+    catalogue.add("line");
+    assertThat(enumOf("SalesOrderEditLeaseField")).containsExactlyInAnyOrderElementsOf(catalogue);
+    assertThat(refOf(property("SalesOrderEditLeaseKey", "key")))
+        .isEqualTo(REF + "SalesOrderEditLeaseField");
+    assertThat(enumOf("SalesOrderEditLeaseMode")).containsExactlyInAnyOrder("OFF", "ENFORCED");
+    assertThat(enumOf("SalesOrderEditLeaseRequirementReason"))
+        .containsExactlyInAnyOrder("NOT_HELD", "HELD_BY_ANOTHER");
+
+    assertThat(properties("SalesOrderEditLeaseDto")).containsKey("leaseToken");
+    assertThat(properties("SalesOrderEditLeaseHolderDto"))
+        .containsKeys("userId", "displayName", "mine", "editSessionId", "expiresAt")
+        .doesNotContainKey("leaseToken");
+    assertThat(properties("SalesOrderEditLeasePolicy"))
+        .containsKeys(
+            "mode",
+            "leaseSeconds",
+            "renewAfterSeconds",
+            "idleAfterSeconds",
+            "idleWarningSeconds",
+            "maxKeysPerRequest",
+            "maxLeasesPerSession");
+
+    // The save carries its proof in the body; a missing lease is its own 409 field.
+    assertThat(properties("SalesOrderEditRequest")).containsKeys("editSessionId", "leaseTokens");
+    assertThat(property("SalesOrderEditRequest", "leaseTokens")).containsEntry("maxItems", 200);
+    assertThat(required("SalesOrderEditRequest")).doesNotContain("editSessionId", "leaseTokens");
+    assertThat(refOf(asMap(property("SalesOrderEditConflictProblem", "leases").get("items"))))
+        .isEqualTo(REF + "SalesOrderEditLeaseRequirement");
   }
 
   @Test

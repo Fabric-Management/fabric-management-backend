@@ -1,10 +1,13 @@
 package com.fabricmanagement.platform.realtime.infra.repository;
 
 import com.fabricmanagement.platform.realtime.domain.LiveEditSession;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -38,6 +41,21 @@ public interface LiveEditSessionRepository extends JpaRepository<LiveEditSession
       @Param("resourceType") String resourceType,
       @Param("resourceId") UUID resourceId,
       @Param("now") Instant now);
+
+  /**
+   * One session of the resource, shared-locked until the transaction ends (CEDIT-07): a lease
+   * decision reads it after this lock, so a close or a renewal of the session cannot cross the
+   * decision. Ended sessions are returned too; the caller judges liveness with its own clock read.
+   */
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query(
+      "select s from LiveEditSession s where s.tenantId = :tenantId and s.id = :id"
+          + " and s.resourceType = :resourceType and s.resourceId = :resourceId")
+  Optional<LiveEditSession> lockForLease(
+      @Param("tenantId") UUID tenantId,
+      @Param("id") UUID id,
+      @Param("resourceType") String resourceType,
+      @Param("resourceId") UUID resourceId);
 
   /**
    * Extends one open, unexpired session of this user on this resource to {@code expiresAt}. Returns

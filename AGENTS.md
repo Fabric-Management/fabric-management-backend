@@ -382,6 +382,11 @@ com.fabricmanagement/
 │   │                               # CEDIT-06: düzenleme oturumu (presence) kaydı da burada
 │   │                               # (common_infrastructure.live_edit_session); erişimi tüketici modül
 │   │                               # her çağrıda kontrol eder, oturum kilit veya yazma yetkisi değildir
+│   │                               # CEDIT-07: alan lease motoru da burada (live_edit_lease,
+│   │                               # live_edit_lease_mode): anahtar = (scope, part), '*' bütün scope;
+│   │                               # her sahiplik dönemi yeni token; kilit sırası tüketici kökü →
+│   │                               # kaynak başına lease advisory'si → session satırı → lease satırları
+│   │                               # (scope, part sırasıyla). Kapsam/yetki ve anahtar kataloğu tüketicide
 │   ├── subscription/               # Subscription, Quota, FeatureCatalog
 │   ├── tenant/                     # Tenant, TenantSettings
 │   ├── tradingpartner/             # TradingPartner, PartnerUser

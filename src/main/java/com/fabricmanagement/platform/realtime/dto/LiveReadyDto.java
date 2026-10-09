@@ -10,7 +10,8 @@ import java.util.UUID;
     name = "LiveReadyDto",
     description =
         "Data of the `ready` frame, always the first frame of a connection. The client reads the"
-            + " current state of the resource (and its editors when it has presence); nothing"
+            + " current state of the resource (and its editors and field leases when it has"
+            + " them); nothing"
             + " missed before this connection is replayed.")
 public record LiveReadyDto(
     @Schema(
@@ -41,7 +42,20 @@ public record LiveReadyDto(
                     + " session opens, closes or expires; the client then reads the editors again."
                     + " It is never mixed with revision.")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        String presenceRevision) {
+        String presenceRevision,
+    @Schema(
+            requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+            minLength = 1,
+            example = "l8e2b6f0c4a1d3e5f7091b2c3d4e5f6a7",
+            description =
+                "Opaque marker of which field leases are held on the resource now (CEDIT-07);"
+                    + " compare for equality only. Absent for a resource without field leases. It"
+                    + " changes when a lease is acquired, released, taken over or expires, or when"
+                    + " the resource stops being editable; a renewal does not change it. The client"
+                    + " then reads the lease list again. It carries no token, value or name and is"
+                    + " never mixed with revision or presenceRevision.")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String leaseRevision) {
 
   public LiveReadyDto {
     Objects.requireNonNull(connectionId, "connectionId");
@@ -52,10 +66,19 @@ public record LiveReadyDto(
     if (presenceRevision != null && presenceRevision.isBlank()) {
       throw new IllegalArgumentException("presenceRevision must not be blank");
     }
+    if (leaseRevision != null && leaseRevision.isBlank()) {
+      throw new IllegalArgumentException("leaseRevision must not be blank");
+    }
+  }
+
+  /** A frame of a resource without field leases. */
+  public LiveReadyDto(
+      UUID connectionId, UUID resourceId, String revision, String presenceRevision) {
+    this(connectionId, resourceId, revision, presenceRevision, null);
   }
 
   /** A frame of a resource without presence. */
   public LiveReadyDto(UUID connectionId, UUID resourceId, String revision) {
-    this(connectionId, resourceId, revision, null);
+    this(connectionId, resourceId, revision, null, null);
   }
 }

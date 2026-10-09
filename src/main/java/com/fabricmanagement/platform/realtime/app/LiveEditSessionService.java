@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
@@ -34,14 +35,14 @@ public class LiveEditSessionService {
 
   private final LiveEditSessionRepository sessions;
   private final LiveEditSessionProperties properties;
+  private final LiveEditLeaseService leases;
   private final Clock clock;
 
   /** Opens a new session of {@code userId} on the resource; every call is a new session. */
   @Transactional
   public LiveEditSession open(LiveResource resource, UUID userId) {
     TenantContext.requireTenantId();
-    LiveEditSession session =
-        LiveEditSession.open(resource, userId, clock.instant(), properties.getTtl());
+    LiveEditSession session = LiveEditSession.open(resource, userId, now(), properties.getTtl());
     return sessions.save(session);
   }
 
@@ -52,7 +53,7 @@ public class LiveEditSessionService {
   @Transactional
   public Instant renew(LiveResource resource, UUID sessionId, UUID userId) {
     UUID tenantId = TenantContext.requireTenantId();
-    Instant now = clock.instant();
+    Instant now = now();
     Instant expiresAt = now.plus(properties.getTtl());
     int renewed =
         sessions.renew(tenantId, sessionId, resource.type(), resource.id(), userId, now, expiresAt);
@@ -62,18 +63,25 @@ public class LiveEditSessionService {
     return expiresAt;
   }
 
-  /** Closes the user's own session; closing twice, or someone else's session, changes nothing. */
+  /**
+   * Closes the user's own session; closing twice, or someone else's session, changes nothing. The
+   * session's field leases end in the same transaction (CEDIT-07): the session row is updated
+   * first, then its lease rows, the order every lease writer uses.
+   */
   @Transactional
   public void close(LiveResource resource, UUID sessionId, UUID userId) {
     UUID tenantId = TenantContext.requireTenantId();
-    sessions.close(tenantId, sessionId, resource.type(), resource.id(), userId, clock.instant());
+    int closed = sessions.close(tenantId, sessionId, resource.type(), resource.id(), userId, now());
+    if (closed == 1) {
+      leases.releaseSession(resource, sessionId, userId);
+    }
   }
 
   /** Sessions live now on the resource, oldest first. */
   @Transactional(readOnly = true)
   public List<LiveEditSession> live(LiveResource resource) {
     UUID tenantId = TenantContext.requireTenantId();
-    return sessions.findLive(tenantId, resource.type(), resource.id(), clock.instant());
+    return sessions.findLive(tenantId, resource.type(), resource.id(), now());
   }
 
   /**
@@ -84,7 +92,7 @@ public class LiveEditSessionService {
   @Transactional(readOnly = true)
   public LiveRevision presenceRevision(LiveResource resource) {
     UUID tenantId = TenantContext.requireTenantId();
-    return digest(sessions.findLiveIds(tenantId, resource.type(), resource.id(), clock.instant()));
+    return digest(sessions.findLiveIds(tenantId, resource.type(), resource.id(), now()));
   }
 
   /** When a client should renew its session, in whole seconds. */
@@ -108,5 +116,14 @@ public class LiveEditSessionService {
         .sorted()
         .forEach(id -> sha256.update((id + "\n").getBytes(StandardCharsets.US_ASCII)));
     return new LiveRevision("p" + HexFormat.of().formatHex(sha256.digest(), 0, 16));
+  }
+
+  /**
+   * The current instant at the precision PostgreSQL keeps (microseconds), so the times {@link
+   * #open} and {@link #renew} answer are the ones a later read of the session row returns, whatever
+   * the clock's resolution (nanoseconds on Linux).
+   */
+  private Instant now() {
+    return clock.instant().truncatedTo(ChronoUnit.MICROS);
   }
 }

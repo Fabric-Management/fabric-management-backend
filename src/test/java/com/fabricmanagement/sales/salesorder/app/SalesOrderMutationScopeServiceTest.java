@@ -66,6 +66,7 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
+            null,
             null);
   }
 

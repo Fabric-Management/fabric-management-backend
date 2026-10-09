@@ -1138,6 +1138,8 @@ class ConstitutionArchTest {
       // save receipts across tenants; explicit tenant_id filter, never the order or its history
       //   - LiveEditSessionRetentionJob  : CEDIT-06 scheduled cleanup of ended edit sessions
       // (presence rows) across tenants; explicit tenant_id filter, never a business record
+      //   - LiveEditLeaseRetentionJob    : CEDIT-07 scheduled cleanup of ended field-lease rows
+      // across tenants; explicit tenant_id filter, never a business record or field history
       //   - OwnershipAssignmentReconciliationMonitor : Scheduled cross-tenant ownership
       // reconciliation
       //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
@@ -1187,6 +1189,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("SalesOrderEditRetentionJob")
               .and()
               .doNotHaveSimpleName("LiveEditSessionRetentionJob")
+              .and()
+              .doNotHaveSimpleName("LiveEditLeaseRetentionJob")
               .and()
               .doNotHaveSimpleName("OwnershipAssignmentReconciliationMonitor")
               .and()

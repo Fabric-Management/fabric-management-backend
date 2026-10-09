@@ -248,7 +248,8 @@ public class LiveStreamService {
                 connection.id(),
                 resourceId,
                 baseline.revision().value(),
-                LiveConnection.presenceValue(baseline))))) {
+                LiveConnection.presenceValue(baseline),
+                LiveConnection.leaseValue(baseline))))) {
       completeIfClosed(connection);
       return connection.id();
     }
@@ -413,7 +414,8 @@ public class LiveStreamService {
                       connection.id(),
                       connection.resource().id(),
                       visible.revision().value(),
-                      LiveConnection.presenceValue(visible)));
+                      LiveConnection.presenceValue(visible),
+                      LiveConnection.leaseValue(visible)));
           if (send(connection, frame)) {
             connection.sent(visible, now);
           }

@@ -40,6 +40,15 @@ public interface SalesOrderLineRepository extends JpaRepository<SalesOrderLine, 
       @Param("tenantId") UUID tenantId, @Param("orderId") UUID orderId);
 
   /**
+   * Ids of the order's active lines, read without loading or locking the line rows (CEDIT-07-F1). A
+   * save calls it after it holds the order row, which every writer that removes a line of the order
+   * takes first, so the answer stays true until that save ends.
+   */
+  @Query(
+      "select l.id from SalesOrderLine l where l.tenantId=:tenantId and l.salesOrderId=:orderId and l.isActive=true")
+  List<UUID> findActiveLineIds(@Param("tenantId") UUID tenantId, @Param("orderId") UUID orderId);
+
+  /**
    * The line a safe-edit add created from this client id, active or removed (CEDIT-03): a client id
    * adds at most one line to an order, ever.
    */

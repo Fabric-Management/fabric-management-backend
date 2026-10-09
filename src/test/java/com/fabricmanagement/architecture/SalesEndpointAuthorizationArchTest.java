@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(154)
+        .hasSize(158)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(154);
+    assertThat(expected).hasSize(158);
   }
 
   @Test
@@ -81,6 +81,22 @@ class SalesEndpointAuthorizationArchTest {
     assertThat(preAuthorize("SalesOrderEditSessionController", "closeSalesOrderEditSession"))
         .isEqualTo(read);
     assertThat(preAuthorize("SalesOrderEditSessionController", "listSalesOrderEditors"))
+        .isEqualTo(read);
+  }
+
+  @Test
+  void editLeasesNeedWriteToAcquireAndRenewButOnlyReadToListAndRelease() throws Exception {
+    // CEDIT-07 §4: a lease is a write right, so taking and keeping one needs write; seeing who
+    // holds what and giving one's own back need read. Object access is checked fresh as well.
+    String write = "@auth.can(authentication, 'sales', 'write')";
+    String read = "@auth.can(authentication, 'sales', 'read')";
+    assertThat(preAuthorize("SalesOrderEditLeaseController", "acquireSalesOrderEditLeases"))
+        .isEqualTo(write);
+    assertThat(preAuthorize("SalesOrderEditLeaseController", "renewSalesOrderEditLeases"))
+        .isEqualTo(write);
+    assertThat(preAuthorize("SalesOrderEditLeaseController", "releaseSalesOrderEditLeases"))
+        .isEqualTo(read);
+    assertThat(preAuthorize("SalesOrderEditLeaseController", "listSalesOrderEditLeases"))
         .isEqualTo(read);
   }
 
@@ -299,6 +315,18 @@ class SalesEndpointAuthorizationArchTest {
         "SalesOrderEditSessionController",
         Category.TRANSACTIONAL_READ,
         "listSalesOrderEditors");
+    add(
+        result,
+        "SalesOrderEditLeaseController",
+        Category.MUTATION,
+        "acquireSalesOrderEditLeases",
+        "renewSalesOrderEditLeases",
+        "releaseSalesOrderEditLeases");
+    add(
+        result,
+        "SalesOrderEditLeaseController",
+        Category.TRANSACTIONAL_READ,
+        "listSalesOrderEditLeases");
     add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
     add(
         result,

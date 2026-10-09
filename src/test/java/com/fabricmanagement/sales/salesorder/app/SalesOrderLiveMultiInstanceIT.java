@@ -409,6 +409,70 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
     }
   }
 
+  @Test
+  @DisplayName(
+      "CEDIT-07 L01/L18 (CE-18): a lease taken on A refuses the same key on B; B's stream and list"
+          + " see it without a token; a release on B is seen at once")
+  void leasesAcrossInstances() throws Exception {
+    grantSales(tenantId, "write", DataScope.GLOBAL);
+    try (Connection owner = ownerConnection();
+        PreparedStatement enforce =
+            owner.prepareStatement(
+                "INSERT INTO common_infrastructure.live_edit_lease_mode"
+                    + " (tenant_id, resource_type, enforced_at, enforced_by)"
+                    + " VALUES (?, 'sales-order', now(), 'multi-instance IT')")) {
+      enforce.setObject(1, tenantId);
+      enforce.executeUpdate();
+    }
+    String tabA =
+        sessions(port, "POST", "", actorA, 201).path("data").path("editSessionId").asText();
+    String tabB =
+        sessions(portB, "POST", "", actorB, 201).path("data").path("editSessionId").asText();
+    LiveSse onB = subscribe(portB, orderId, bearer(token(actorB)));
+    assertThat(ready(onB).body().path("leaseRevision").asText()).isEqualTo("0");
+
+    JsonNode granted =
+        leases(
+            port,
+            "",
+            actorA,
+            "{\"editSessionId\":\"" + tabA + "\",\"keys\":[{\"key\":\"notes\"}]}",
+            200);
+    String token = granted.path("data").path("leases").get(0).path("leaseToken").asText();
+    LiveSse.Frame seen = onB.nextEvent(WAIT);
+    assertThat(seen.body().path("leaseRevision").asText()).startsWith("l");
+    assertThat(seen.body().toString()).doesNotContain(token);
+
+    JsonNode refused =
+        leases(
+            portB,
+            "",
+            actorB,
+            "{\"editSessionId\":\"" + tabB + "\",\"keys\":[{\"key\":\"notes\"}]}",
+            409);
+    assertThat(refused.path("code").asText()).isEqualTo("EDIT_LEASE_UNAVAILABLE");
+    assertThat(refused.toString()).doesNotContain(token).doesNotContain(tabA);
+    JsonNode listed = leases(portB, "", actorB, null, 200).path("data").path("leases");
+    assertThat(listed).hasSize(1);
+    assertThat(listed.get(0).path("userId").asText()).isEqualTo(actorA.id().toString());
+    assertThat(listed.get(0).path("editSessionId").isNull()).isTrue();
+    assertThat(listed.toString()).doesNotContain(token);
+
+    leases(
+        portB,
+        "/release",
+        actorA,
+        "{\"editSessionId\":\"" + tabA + "\",\"leaseTokens\":[\"" + token + "\"]}",
+        204);
+    assertThat(onB.nextEvent(WAIT).body().path("leaseRevision").asText()).isEqualTo("0");
+    leases(
+        portB,
+        "",
+        actorB,
+        "{\"editSessionId\":\"" + tabB + "\",\"keys\":[{\"key\":\"notes\"}]}",
+        200);
+  }
+
   // ── helpers ──────────────────────────────────────────────────────────────
 
   /** Keeps classes compiled from the test sources out of instance B's component scan. */
@@ -501,6 +565,35 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
             HttpRequest.newBuilder(uri)
                 .header("Authorization", "Bearer " + token(actor))
                 .method(method, HttpRequest.BodyPublishers.noBody())
+                .timeout(Duration.ofSeconds(15))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).as(response.body()).isEqualTo(status);
+    String body = response.body();
+    return body == null || body.isBlank() ? objectMapper.nullNode() : objectMapper.readTree(body);
+  }
+
+  /** One edit-lease call through the HTTP API of the given instance; checks the status. */
+  private JsonNode leases(int serverPort, String suffix, Actor actor, String json, int status)
+      throws Exception {
+    URI uri =
+        URI.create(
+            "http://localhost:"
+                + serverPort
+                + "/api/v1/sales/orders/"
+                + orderId
+                + "/edit-leases"
+                + suffix);
+    HttpResponse<String> response =
+        HTTP.send(
+            HttpRequest.newBuilder(uri)
+                .header("Authorization", "Bearer " + token(actor))
+                .header("Content-Type", "application/json")
+                .method(
+                    json == null ? "GET" : "POST",
+                    json == null
+                        ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofString(json))
                 .timeout(Duration.ofSeconds(15))
                 .build(),
             HttpResponse.BodyHandlers.ofString());

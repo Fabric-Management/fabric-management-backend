@@ -33,6 +33,7 @@ class LiveEditSessionServiceTest {
   private final UUID user = UUID.randomUUID();
   private final LiveResource order = new LiveResource("sales-order", UUID.randomUUID());
   private final LiveEditSessionRepository repository = mock(LiveEditSessionRepository.class);
+  private final LiveEditLeaseService leases = mock(LiveEditLeaseService.class);
   private LiveEditSessionProperties properties;
   private LiveEditSessionService service;
 
@@ -40,7 +41,9 @@ class LiveEditSessionServiceTest {
   void setUp() {
     properties = new LiveEditSessionProperties();
     properties.afterPropertiesSet();
-    service = new LiveEditSessionService(repository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+    service =
+        new LiveEditSessionService(
+            repository, properties, leases, Clock.fixed(NOW, ZoneOffset.UTC));
     TenantContext.setCurrentTenantId(tenant);
   }
 
@@ -84,11 +87,47 @@ class LiveEditSessionServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "S02b: a sub-microsecond clock answers the times PostgreSQL keeps, on open and on renewal")
+  void timesAreKeptAtDatabasePrecision() {
+    Instant fine = NOW.plusNanos(704_264_232);
+    Instant kept = NOW.plusNanos(704_264_000);
+    LiveEditSessionService onLinux =
+        new LiveEditSessionService(
+            repository, properties, leases, Clock.fixed(fine, ZoneOffset.UTC));
+    when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    LiveEditSession session = onLinux.open(order, user);
+
+    assertThat(session.getOpenedAt()).isEqualTo(kept);
+    assertThat(session.getExpiresAt()).isEqualTo(kept.plusSeconds(90));
+    UUID id = UUID.randomUUID();
+    when(repository.renew(tenant, id, "sales-order", order.id(), user, kept, kept.plusSeconds(90)))
+        .thenReturn(1);
+    assertThat(onLinux.renew(order, id, user)).isEqualTo(kept.plusSeconds(90));
+  }
+
+  @Test
   @DisplayName("S03: closing names the tenant, resource and user; it never throws")
   void closingIsScoped() {
     UUID id = UUID.randomUUID();
     service.close(order, id, user);
     verify(repository).close(tenant, id, "sales-order", order.id(), user, NOW);
+    // Nothing was closed (already closed, or not the user's): no lease is touched.
+    org.mockito.Mockito.verifyNoInteractions(leases);
+  }
+
+  @Test
+  @DisplayName("CEDIT-07 L12: closing my session ends its leases, after the session row")
+  void closingEndsTheSessionsLeases() {
+    UUID id = UUID.randomUUID();
+    when(repository.close(tenant, id, "sales-order", order.id(), user, NOW)).thenReturn(1);
+
+    service.close(order, id, user);
+
+    org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(repository, leases);
+    sequence.verify(repository).close(tenant, id, "sales-order", order.id(), user, NOW);
+    sequence.verify(leases).releaseSession(order, id, user);
   }
 
   @Test

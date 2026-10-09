@@ -68,16 +68,22 @@ public class SalesOrderEditController {
       description =
           "Only the keys sent change. A retry with the same operation id and content answers the"
               + " recorded result again. Conflicts save nothing and answer 409 EDIT_CONFLICT or"
-              + " EDIT_BASE_EXPIRED with a new base to resolve against; other 409 codes carry"
-              + " only the standard problem fields.")
+              + " EDIT_BASE_EXPIRED with a new base to resolve against. With field leases"
+              + " enforced, the save carries its editSessionId and one lease token per key it"
+              + " writes; a key it does not hold answers 409 EDIT_LEASE_REQUIRED with leases (not"
+              + " a merge conflict: nothing is recorded; acquire the keys and send the same save"
+              + " again), a token that proves none of its keys 422 EDIT_LEASE_TOKEN_UNEXPECTED. A"
+              + " successful save releases the leases it used. Other 409 codes carry only the"
+              + " standard problem fields.")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "200",
       description = "Saved (APPLIED) or nothing differed (NO_CHANGE)")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "409",
       description =
-          "EDIT_CONFLICT or EDIT_BASE_EXPIRED with conflicts and currentBase; EDIT_BASE_UNKNOWN,"
-              + " OPERATION_ID_REUSED, LINE_ALREADY_ADDED or an order rule otherwise",
+          "EDIT_CONFLICT or EDIT_BASE_EXPIRED with conflicts and currentBase;"
+              + " EDIT_LEASE_REQUIRED with leases; EDIT_BASE_UNKNOWN, OPERATION_ID_REUSED,"
+              + " LINE_ALREADY_ADDED or an order rule otherwise",
       content =
           @Content(
               mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,

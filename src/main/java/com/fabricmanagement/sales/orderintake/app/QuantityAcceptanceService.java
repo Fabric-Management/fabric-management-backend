@@ -14,6 +14,7 @@ import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.dto.QuantityAcceptanceDto;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalRepository;
+import com.fabricmanagement.sales.salesorder.domain.OrderEditKey;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -48,6 +49,7 @@ public class QuantityAcceptanceService {
   private final SalesOrderLineRepository lines;
   private final LineAdjustmentGuard adjustments;
   private final com.fabricmanagement.sales.salesorder.app.SalesOrderRevision revision;
+  private final com.fabricmanagement.sales.salesorder.app.SalesOrderLeaseGuard leaseGuard;
   private final LotCompatibilityRequestPort compatibilityRequests;
   private final Clock clock;
 
@@ -83,6 +85,8 @@ public class QuantityAcceptanceService {
           "ORDER_NOT_DRAFT", "Stock choices are recorded while the order is a draft");
     }
     order.assertCommercialContentEditable();
+    // CEDIT-07: the accepted quantity is the line's quantity key; refused while it is leased.
+    leaseGuard.assertLineFieldFree(order, lineId, OrderEditKey.LINE_QUANTITY, actor);
     SalesOrderLine line = access.line(order, lineId);
     revision.lockFresh(line);
     QuantityProposal proposal =
@@ -209,6 +213,8 @@ public class QuantityAcceptanceService {
           "ORDER_NOT_DRAFT", "Stock choices change only while the order is a draft");
     }
     order.assertCommercialContentEditable();
+    // CEDIT-07: withdrawing may move the quantity back to the request; refused while it is leased.
+    leaseGuard.assertLineFieldFree(order, lineId, OrderEditKey.LINE_QUANTITY, actor);
     SalesOrderLine line = access.line(order, lineId);
     revision.lockFresh(line);
     QuantityAcceptance active =

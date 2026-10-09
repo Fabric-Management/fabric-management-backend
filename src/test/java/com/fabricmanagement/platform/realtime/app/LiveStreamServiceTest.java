@@ -287,6 +287,37 @@ class LiveStreamServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "CEDIT-07 L18: the lease marker travels beside the others; only its change sends a frame")
+  void leaseMarkerTravelsBesideTheOthers() {
+    FakeChannel channel = new FakeChannel();
+    open(
+        service,
+        tenantA,
+        userA,
+        new FakeSource(
+            visible("1", "pa", "0"),
+            visible("1", "pa", "0"),
+            visible("1", "pa", "lb"),
+            visible("1", "pa", "lb"),
+            visible("1", "pa", "0")),
+        channel);
+
+    for (int i = 0; i < 4; i++) {
+      advanceAndRun(Duration.ofSeconds(2));
+    }
+
+    assertThat(channel.labels()).containsExactly("ready:1", "invalidated:1", "invalidated:1");
+    assertThat(((LiveFrame.Ready) channel.frames.get(0)).data().leaseRevision()).isEqualTo("0");
+    assertThat(((LiveFrame.Invalidated) channel.frames.get(1)).data().leaseRevision())
+        .isEqualTo("lb");
+    assertThat(((LiveFrame.Invalidated) channel.frames.get(2)).data().leaseRevision())
+        .isEqualTo("0");
+    assertThat(((LiveFrame.Invalidated) channel.frames.get(1)).data().presenceRevision())
+        .isEqualTo("pa");
+  }
+
+  @Test
   @DisplayName("L05/L06: an unchanged revision sends nothing until the heartbeat is due")
   void unchangedRevisionOnlyHeartbeats() {
     FakeChannel channel = new FakeChannel();

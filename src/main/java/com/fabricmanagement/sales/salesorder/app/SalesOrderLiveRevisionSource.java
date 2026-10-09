@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
 import com.fabricmanagement.platform.realtime.app.LiveEditSessionService;
 import com.fabricmanagement.platform.realtime.domain.LiveActor;
 import com.fabricmanagement.platform.realtime.domain.LiveReadResult;
@@ -25,8 +26,10 @@ import org.springframework.stereotype.Component;
  * tenant, creator, active flag and version are read; no detail, line or profile is loaded.
  *
  * <p>A visible order also carries its presence marker (CEDIT-06): who holds its edit form open now,
- * read from the edit sessions only after access was decided. It is a separate marker, never folded
- * into the version.
+ * read from the edit sessions only after access was decided; and its lease marker (CEDIT-07): which
+ * field leases are held now in the order's current edit epoch, read after access too. Each is a
+ * separate marker, never folded into the version; an expiry is seen at the next check without any
+ * write or cleanup.
  */
 @Component
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class SalesOrderLiveRevisionSource implements LiveRevisionSource {
   private final SalesOrderAccessPolicy accessPolicy;
   private final UserQueryService users;
   private final LiveEditSessionService editSessions;
+  private final LiveEditLeaseService editLeases;
 
   @Override
   public String resourceType() {
@@ -64,13 +68,22 @@ public class SalesOrderLiveRevisionSource implements LiveRevisionSource {
         .<LiveReadResult>map(
             order ->
                 new LiveReadResult.Visible(
-                    revision(order.getVersion()), editSessions.presenceRevision(resource(orderId))))
+                    revision(order.getVersion()),
+                    editSessions.presenceRevision(resource(orderId)),
+                    editLeases.leaseRevision(resource(orderId), epoch(order.getEditEpoch()))))
         .orElse(LiveReadResult.Hidden.NOT_FOUND);
   }
 
   /** The live resource of one order, as edit sessions and the channel name it. */
   static LiveResource resource(UUID orderId) {
     return new LiveResource(RESOURCE_TYPE, orderId);
+  }
+
+  private static long epoch(Long epoch) {
+    if (epoch == null) {
+      throw new IllegalStateException("A sales order always has an edit epoch");
+    }
+    return epoch;
   }
 
   private static LiveRevision revision(Long version) {

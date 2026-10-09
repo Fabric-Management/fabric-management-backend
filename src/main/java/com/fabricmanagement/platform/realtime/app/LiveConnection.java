@@ -41,6 +41,7 @@ final class LiveConnection {
 
   private volatile String lastSentRevision;
   private volatile String lastSentPresence;
+  private volatile String lastSentLease;
   private volatile Instant lastSentAt;
   private volatile Instant nextCheckAt;
   private volatile String closeCause;
@@ -100,10 +101,16 @@ final class LiveConnection {
     return lastSentPresence;
   }
 
-  /** Whether {@code visible} differs from what this connection last sent, in either marker. */
+  /** The lease marker last sent; null for a resource without field leases (CEDIT-07). */
+  String lastSentLease() {
+    return lastSentLease;
+  }
+
+  /** Whether {@code visible} differs from what this connection last sent, in any marker. */
   boolean differsFrom(LiveReadResult.Visible visible) {
     return !visible.revision().value().equals(lastSentRevision)
-        || !Objects.equals(presenceValue(visible), lastSentPresence);
+        || !Objects.equals(presenceValue(visible), lastSentPresence)
+        || !Objects.equals(leaseValue(visible), lastSentLease);
   }
 
   Instant lastSentAt() {
@@ -118,6 +125,7 @@ final class LiveConnection {
   boolean opened(LiveReadResult.Visible baseline, Instant at, Instant firstCheckAt) {
     lastSentRevision = baseline.revision().value();
     lastSentPresence = presenceValue(baseline);
+    lastSentLease = leaseValue(baseline);
     lastSentAt = at;
     nextCheckAt = firstCheckAt;
     boolean open = state.compareAndSet(State.OPENING, State.OPEN);
@@ -186,11 +194,16 @@ final class LiveConnection {
   void sent(LiveReadResult.Visible visible, Instant at) {
     lastSentRevision = visible.revision().value();
     lastSentPresence = presenceValue(visible);
+    lastSentLease = leaseValue(visible);
     lastSentAt = at;
   }
 
   static String presenceValue(LiveReadResult.Visible visible) {
     return visible.presence() == null ? null : visible.presence().value();
+  }
+
+  static String leaseValue(LiveReadResult.Visible visible) {
+    return visible.lease() == null ? null : visible.lease().value();
   }
 
   void heartbeatSent(Instant at) {
