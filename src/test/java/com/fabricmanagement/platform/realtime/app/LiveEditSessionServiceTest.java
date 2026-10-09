@@ -87,6 +87,27 @@ class LiveEditSessionServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "S02b: a sub-microsecond clock answers the times PostgreSQL keeps, on open and on renewal")
+  void timesAreKeptAtDatabasePrecision() {
+    Instant fine = NOW.plusNanos(704_264_232);
+    Instant kept = NOW.plusNanos(704_264_000);
+    LiveEditSessionService onLinux =
+        new LiveEditSessionService(
+            repository, properties, leases, Clock.fixed(fine, ZoneOffset.UTC));
+    when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    LiveEditSession session = onLinux.open(order, user);
+
+    assertThat(session.getOpenedAt()).isEqualTo(kept);
+    assertThat(session.getExpiresAt()).isEqualTo(kept.plusSeconds(90));
+    UUID id = UUID.randomUUID();
+    when(repository.renew(tenant, id, "sales-order", order.id(), user, kept, kept.plusSeconds(90)))
+        .thenReturn(1);
+    assertThat(onLinux.renew(order, id, user)).isEqualTo(kept.plusSeconds(90));
+  }
+
+  @Test
   @DisplayName("S03: closing names the tenant, resource and user; it never throws")
   void closingIsScoped() {
     UUID id = UUID.randomUUID();

@@ -18,6 +18,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HexFormat;
@@ -114,7 +115,7 @@ public class LiveEditLeaseService {
   @Transactional
   public boolean enforce(String resourceType, String by) {
     UUID tenantId = TenantContext.requireTenantId();
-    return control.enforce(tenantId, resourceType, clock.instant(), Objects.requireNonNull(by));
+    return control.enforce(tenantId, resourceType, now(), Objects.requireNonNull(by));
   }
 
   // ── a session's own leases ───────────────────────────────────────────────
@@ -147,7 +148,7 @@ public class LiveEditLeaseService {
     control.lockResource(tenantId, resource);
     LiveEditSession session = ownSession(tenantId, resource, sessionId, userId);
     Map<LiveLeaseKey, LiveEditLease> rows = byKey(lockScopes(tenantId, resource, wanted));
-    Instant now = clock.instant();
+    Instant now = now();
     if (!session.isLiveAt(now)) {
       throw new LiveEditSessionNotFoundException();
     }
@@ -232,7 +233,7 @@ public class LiveEditLeaseService {
         asked.isEmpty()
             ? List.of()
             : leases.lockByTokens(tenantId, resource.type(), resource.id(), asked);
-    Instant now = clock.instant();
+    Instant now = now();
     if (!session.isLiveAt(now)) {
       throw new LiveEditSessionNotFoundException();
     }
@@ -268,7 +269,7 @@ public class LiveEditLeaseService {
     }
     List<LiveEditLease> rows =
         leases.lockByTokens(tenantId, resource.type(), resource.id(), Set.copyOf(tokens));
-    Instant now = clock.instant();
+    Instant now = now();
     int released = 0;
     for (LiveEditLease row : rows) {
       if (row.getSessionId().equals(sessionId)
@@ -290,7 +291,7 @@ public class LiveEditLeaseService {
     UUID tenantId = TenantContext.requireTenantId();
     List<LiveEditLease> rows =
         leases.lockUnreleasedOfSession(tenantId, resource.type(), resource.id(), sessionId);
-    Instant now = clock.instant();
+    Instant now = now();
     int released = 0;
     for (LiveEditLease row : rows) {
       if (row.getUserId().equals(userId)) {
@@ -307,7 +308,7 @@ public class LiveEditLeaseService {
   @Transactional(readOnly = true)
   public List<LiveEditLease> held(LiveResource resource, long generation) {
     UUID tenantId = TenantContext.requireTenantId();
-    return leases.findHeld(tenantId, resource.type(), resource.id(), generation, clock.instant());
+    return leases.findHeld(tenantId, resource.type(), resource.id(), generation, now());
   }
 
   /**
@@ -333,7 +334,7 @@ public class LiveEditLeaseService {
       LiveResource resource, long generation, Collection<LiveLeaseKey> keys) {
     UUID tenantId = TenantContext.requireTenantId();
     control.lockResource(tenantId, resource);
-    Instant now = clock.instant();
+    Instant now = now();
     return leases.findHeld(tenantId, resource.type(), resource.id(), generation, now).stream()
         .filter(row -> keys.stream().anyMatch(key -> key.overlaps(row.key())))
         .toList();
@@ -344,7 +345,7 @@ public class LiveEditLeaseService {
   public List<LiveEditLease> heldAny(LiveResource resource, long generation) {
     UUID tenantId = TenantContext.requireTenantId();
     control.lockResource(tenantId, resource);
-    return leases.findHeld(tenantId, resource.type(), resource.id(), generation, clock.instant());
+    return leases.findHeld(tenantId, resource.type(), resource.id(), generation, now());
   }
 
   // ── a save ───────────────────────────────────────────────────────────────
@@ -380,7 +381,7 @@ public class LiveEditLeaseService {
                 .lockForLease(tenantId, sessionId, resource.type(), resource.id())
                 .filter(found -> found.getUserId().equals(userId));
     List<LiveEditLease> rows = lockScopes(tenantId, resource, required);
-    Instant now = clock.instant();
+    Instant now = now();
     boolean sessionLive = session.map(found -> found.isLiveAt(now)).orElse(false);
     Map<LiveLeaseKey, LiveEditLease> byKey = byKey(rows);
 
@@ -416,7 +417,7 @@ public class LiveEditLeaseService {
   /** Ends the leases a successful save used, in the save's transaction. */
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseHeld(Collection<LiveEditLease> held) {
-    Instant now = clock.instant();
+    Instant now = now();
     held.forEach(lease -> lease.release(now));
   }
 
@@ -439,6 +440,16 @@ public class LiveEditLeaseService {
       UUID tenantId, LiveResource resource, Collection<LiveLeaseKey> keys) {
     Set<String> scopes = keys.stream().map(LiveLeaseKey::scope).collect(Collectors.toSet());
     return leases.lockInScopes(tenantId, resource.type(), resource.id(), scopes);
+  }
+
+  /**
+   * The current instant at the precision PostgreSQL keeps (microseconds). A lease is answered from
+   * memory when it is acquired and from its row afterwards; truncating here makes both answers
+   * carry the same acquiredAt, renewedAt and expiresAt, whatever the clock's resolution
+   * (nanoseconds on Linux).
+   */
+  private Instant now() {
+    return clock.instant().truncatedTo(ChronoUnit.MICROS);
   }
 
   private Instant expiry(Instant now, LiveEditSession session) {
