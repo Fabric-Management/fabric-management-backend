@@ -6044,19 +6044,6 @@ CREATE INDEX IF NOT EXISTS idx_live_edit_lease_ended
 COMMENT ON TABLE common_infrastructure.live_edit_lease IS
     'CEDIT-07: field leases (who may change which key now); technical, deleted after retention.';
 
--- Enforcement of field leases per tenant and resource type. No row = OFF (the default). A row is
--- written by an operator (or a test) to switch enforcement on; the application never deletes it.
-CREATE TABLE IF NOT EXISTS common_infrastructure.live_edit_lease_mode (
-    tenant_id UUID NOT NULL,
-    resource_type VARCHAR(40) NOT NULL CHECK (resource_type ~ '^[a-z][a-z0-9-]*$'),
-    enforced_at TIMESTAMPTZ NOT NULL,
-    enforced_by VARCHAR(200) NOT NULL,
-    PRIMARY KEY (tenant_id, resource_type)
-);
-
-COMMENT ON TABLE common_infrastructure.live_edit_lease_mode IS
-    'CEDIT-07: field-lease enforcement switch per tenant and resource type; monotonic.';
-
 
 -- ===================== FROM: V20260329093500__add_sales_order_id_to_work_order.sql =====================
 -- Migration: Add sales_order_id and product_code to prod_work_order

@@ -14,18 +14,12 @@ import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
 import com.fabricmanagement.sales.orderintake.app.ProductCorrectionService;
 import com.fabricmanagement.sales.orderintake.app.QuantityAcceptanceService;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
-import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
 import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditBase;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -64,6 +58,12 @@ import org.springframework.beans.factory.annotation.Autowired;
  * to wait with {@code pg_stat_activity} before the first is released. Waits are bounded (20 s),
  * worker failures are returned to the test, and no result may be a deadlock ({@code 40P01}).
  *
+ * <p>Leases are always enforced (CEDIT-07-F3): a save takes the leases it writes just for itself
+ * and, applied, gives them back in its own transaction, so a writer waiting behind it finds the
+ * keys free. A save that must itself wait at the order row holds an open form whose leases were
+ * taken before the row was locked. The legacy full replace is closed, so its §17.3/§17.4 races are
+ * gone; the lease tests prove that it is refused.
+ *
  * <p>No bean is overridden here beyond the shared fixture's mocks, so this class runs in the shared
  * safe-edit Spring context. The pause points are answers of those existing mocks.
  */
@@ -74,7 +74,6 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
 
   @Autowired private ProductCorrectionService productCorrections;
   @Autowired private QuantityAcceptanceService quantityAcceptances;
-  @Autowired private SalesOrderService salesOrders;
   @Autowired private SalesOrderLineFulfilmentLock fulfilmentLock;
 
   /** The product a new distribution uses (S6.5, S5.3). */
@@ -161,13 +160,15 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
     SalesOrderEditBase baseB = open(actorB);
     long before = orderVersion();
     Hold aHolds = newHold();
+    Map<String, Object> requestB = body(UUID.randomUUID(), baseB.baseId(), "paymentTerms", clear());
+    // B's form holds its field before A locks the order, so B's save itself waits (CEDIT-07-F3).
+    SalesOrderLeaseAutoProof.Held formB = holdForm(actorB, requestB);
 
     CompletableFuture<Object> a =
         saveHolding(
             actorA, body(UUID.randomUUID(), baseA.baseId(), "notes", set("Urgent")), aHolds);
     aHolds.awaitReached();
-    CompletableFuture<Object> b =
-        saveAsync(actorB, body(UUID.randomUUID(), baseB.baseId(), "paymentTerms", clear()));
+    CompletableFuture<Object> b = saveAsync(actorB, formB.proven(requestB));
     awaitWaiting(b, null);
     aHolds.release();
 
@@ -472,6 +473,11 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
   void commitBetweenReadAndLockIsSeenByTheMerge() throws Exception {
     SalesOrderEditBase base = open(actorB);
     long before = orderVersion();
+    Map<String, Object> request =
+        body(UUID.randomUUID(), base.baseId(), "paymentTerms", set("60 days"));
+    // The form holds its field before the order row is locked: the save itself reads, then waits
+    // (CEDIT-07-F3).
+    SalesOrderLeaseAutoProof.Held form = holdForm(actorB, request);
     Object answer;
     try (Connection other = ownerConnection()) {
       try (var lock =
@@ -488,8 +494,7 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
         change.executeUpdate();
       }
       // The save reads the order ("30 days" committed) and then waits for the order row.
-      CompletableFuture<Object> save =
-          saveAsync(actorB, body(UUID.randomUUID(), base.baseId(), "paymentTerms", set("60 days")));
+      CompletableFuture<Object> save = saveAsync(actorB, form.proven(request));
       awaitWaiting(save, null);
       other.commit();
       answer = result(save);
@@ -518,15 +523,17 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
     SalesOrderEditBase base = open(actorB);
     long before = orderVersion();
     Hold pcHolds = newHold();
+    Map<String, Object> request =
+        withLines(
+            body(UUID.randomUUID(), base.baseId()),
+            List.of(update(l2, "tolerance", set(tolerance("3", "3")))));
+    // B's form holds L2's tolerance before the correction starts; the correction changes only L1
+    // and is not stopped by it. B's save itself waits at the root (CEDIT-07-F3).
+    SalesOrderLeaseAutoProof.Held form = holdForm(actorB, request);
 
     CompletableFuture<Object> pc = correctHolding(actorA, l1Before, pcHolds);
     pcHolds.awaitReached();
-    CompletableFuture<Object> save =
-        saveAsync(
-            actorB,
-            withLines(
-                body(UUID.randomUUID(), base.baseId()),
-                List.of(update(l2, "tolerance", set(tolerance("3", "3"))))));
+    CompletableFuture<Object> save = saveAsync(actorB, form.proven(request));
     awaitWaiting(save, null);
     pcHolds.release();
 
@@ -624,77 +631,6 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
     assertThat(lineDecimal(l1, "unit_price")).isEqualByComparingTo("4.5000");
     assertThat(corrections()).isZero();
     assertThat(orderVersion()).isEqualTo(before + 1);
-  }
-
-  @Test
-  @DisplayName(
-      "S17.3/S17.4 (correction first): the legacy PUT waits at the root, then OPTIMISTIC_LOCK")
-  void correctionFirstThenLegacyPut() {
-    long l1Before = lineVersion(l1);
-    long before = orderVersion();
-    UpdateSalesOrderRequest put = legacyRequest(before, "Legacy note", null);
-    Hold pcHolds = newHold();
-
-    CompletableFuture<Object> pc = correctHolding(actorA, l1Before, pcHolds);
-    pcHolds.awaitReached();
-    CompletableFuture<Object> legacy = async(() -> legacyPut(actorC, put));
-    awaitWaiting(legacy, null);
-    pcHolds.release();
-
-    assertThat(result(pc)).isInstanceOf(List.class);
-    Object refused = result(legacy);
-    assertThat(isOptimisticLockFailure(refused))
-        .as("refused as OPTIMISTIC_LOCK: %s", refused)
-        .isTrue();
-    assertThat(lineProduct(l1)).isEqualTo(p9);
-    assertThat(orderText("notes")).isNull();
-    assertThat(orderVersion()).isEqualTo(before + 1);
-  }
-
-  @Test
-  @DisplayName(
-      "S17.3 (PUT first, L1 changed): the correction waits, then ORDER_INTAKE_STALE_VERSION")
-  void legacyPutChangingTheLineFirstThenCorrection() {
-    long l1Before = lineVersion(l1);
-    long before = orderVersion();
-    UpdateSalesOrderRequest put = legacyRequest(before, "Legacy note", new BigDecimal("4.2000"));
-    Hold putHolds = newHold();
-
-    CompletableFuture<Object> legacy = legacyPutHolding(actorC, put, putHolds);
-    putHolds.awaitReached();
-    CompletableFuture<Object> pc = correctAsync(actorA, l1Before);
-    awaitWaiting(pc, null);
-    putHolds.release();
-
-    assertThat(result(legacy)).isNotInstanceOf(Throwable.class);
-    assertThat(failureCode(result(pc))).isEqualTo("ORDER_INTAKE_STALE_VERSION");
-    assertThat(lineProduct(l1)).isEqualTo(p1);
-    assertThat(lineDecimal(l1, "unit_price")).isEqualByComparingTo("4.2000");
-    assertThat(orderText("notes")).isEqualTo("Legacy note");
-    assertThat(corrections()).isZero();
-  }
-
-  @Test
-  @DisplayName("S17.3/S17.4 (PUT first, L1 untouched): the correction waits, then applies")
-  void legacyPutLeavingTheLineFirstThenCorrection() {
-    long l1Before = lineVersion(l1);
-    long before = orderVersion();
-    UpdateSalesOrderRequest put = legacyRequest(before, "Legacy note", null);
-    Hold putHolds = newHold();
-
-    CompletableFuture<Object> legacy = legacyPutHolding(actorC, put, putHolds);
-    putHolds.awaitReached();
-    CompletableFuture<Object> pc = correctAsync(actorA, l1Before);
-    awaitWaiting(pc, null);
-    putHolds.release();
-
-    assertThat(result(legacy)).isNotInstanceOf(Throwable.class);
-    assertThat(result(pc)).isInstanceOf(List.class);
-    assertThat(lineProduct(l1)).isEqualTo(p9);
-    assertThat(lineVersion(l1)).isEqualTo(l1Before + 1);
-    assertThat(orderText("notes")).isEqualTo("Legacy note");
-    assertThat(corrections()).isEqualTo(1);
-    assertThat(orderVersion()).isGreaterThan(before + 1);
   }
 
   @Test
@@ -1136,77 +1072,6 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
                         })));
   }
 
-  private Object legacyPut(Actor actor, UpdateSalesOrderRequest request) {
-    return as(actor, () -> salesOrders.updateOrder(orderId, actor.id(), request));
-  }
-
-  /** A legacy PUT whose transaction stays open, with the order row it locked, until released. */
-  private CompletableFuture<Object> legacyPutHolding(
-      Actor actor, UpdateSalesOrderRequest request, Hold hold) {
-    return async(
-        () ->
-            as(
-                actor,
-                () -> holding(hold, () -> salesOrders.updateOrder(orderId, actor.id(), request))));
-  }
-
-  /**
-   * A legacy full replace with the given version: the header as the fixture has it plus notes, and
-   * both lines sent back exactly as stored, L1 with another price when one is given.
-   */
-  private UpdateSalesOrderRequest legacyRequest(long version, String notes, BigDecimal l1Price) {
-    SalesOrderLine first = loadLine(l1);
-    SalesOrderLine second = loadLine(l2);
-    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
-    request.setVersion(version);
-    request.setOrderDate(ORDER_DATE);
-    request.setDeliveryTerm(DeliveryTerm.FCA);
-    request.setDeliveryPlace("Leeds");
-    request.setIncotermsVersion(IncotermsVersion.INCOTERMS_2020);
-    request.setDeliveryTermStatus(DeliveryTermStatus.PROPOSED);
-    request.setPaymentTerms("30 days");
-    request.setContactName("Jane Hill");
-    request.setContactEmail("jane@example.com");
-    request.setNotes(notes);
-    request.setLines(
-        new ArrayList<>(
-            List.of(
-                lineRequest(first, l1Price == null ? first.getUnitPriceAmount() : l1Price),
-                lineRequest(second, second.getUnitPriceAmount()))));
-    return request;
-  }
-
-  private static UpdateSalesOrderLineRequest lineRequest(SalesOrderLine line, BigDecimal price) {
-    return UpdateSalesOrderLineRequest.builder()
-        .id(line.getId())
-        .productId(line.getProductId())
-        .productDesc(line.getProductDesc())
-        .colorId(line.getColorId())
-        .finishedWidth(line.getFinishedWidth())
-        .finishedWidthUnit(line.getFinishedWidthUnit())
-        .requestedDeliveryDate(line.getRequestedDeliveryDate())
-        .singleLotRequired(line.isSingleLotRequired())
-        .requestedQty(line.getRequestedQty())
-        .unit(line.getUnit())
-        .unitPrice(price)
-        .currency(line.getCurrency())
-        .discountAmount(line.getDiscountAmountValue())
-        .taxAmount(line.getTaxAmountValue())
-        .toleranceUpPct(line.getToleranceUpPct())
-        .toleranceDownPct(line.getToleranceDownPct())
-        .moduleType(line.getModuleType())
-        .moduleSpecs(line.getModuleSpecs())
-        .build();
-  }
-
-  private SalesOrderLine loadLine(UUID lineId) {
-    Object line = as(actorA, () -> lines.findByTenantIdAndId(tenantId, lineId).orElseThrow());
-    if (line instanceof RuntimeException failure) {
-      throw failure;
-    }
-    return (SalesOrderLine) line;
-  }
-
   /** Runs a step on another thread and waits until it committed. */
   private void commitElsewhere(Runnable step) {
     try {
@@ -1368,22 +1233,6 @@ class SalesOrderEditConcurrencyIT extends SalesOrderEditItSupport {
           && sql.getNextException() != null
           && sql.getNextException().getMessage() != null
           && sql.getNextException().getMessage().contains(text)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** The legacy PUT's stale-version refusal, in any of the forms mapped to OPTIMISTIC_LOCK. */
-  private static boolean isOptimisticLockFailure(Object result) {
-    for (Throwable cause = result instanceof Throwable thrown ? thrown : null;
-        cause != null;
-        cause = cause.getCause()) {
-      if (cause instanceof jakarta.persistence.OptimisticLockException
-          || cause instanceof org.springframework.orm.ObjectOptimisticLockingFailureException
-          || cause instanceof org.hibernate.StaleStateException
-          || (cause instanceof DomainException domain
-              && "OPTIMISTIC_LOCK".equals(domain.getErrorCode()))) {
         return true;
       }
     }

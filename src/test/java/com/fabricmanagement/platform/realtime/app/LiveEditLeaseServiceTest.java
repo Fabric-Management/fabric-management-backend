@@ -18,11 +18,9 @@ import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Verificat
 import com.fabricmanagement.platform.realtime.domain.LiveEditLease;
 import com.fabricmanagement.platform.realtime.domain.LiveEditSession;
 import com.fabricmanagement.platform.realtime.domain.LiveLeaseKey;
-import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.platform.realtime.domain.LiveResource;
 import com.fabricmanagement.platform.realtime.domain.LiveRevision;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveEditLeaseLimitException;
-import com.fabricmanagement.platform.realtime.domain.exception.LiveEditLeasesNotEnforcedException;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveEditSessionNotFoundException;
 import com.fabricmanagement.platform.realtime.infra.repository.LiveEditLeaseControlRepository;
 import com.fabricmanagement.platform.realtime.infra.repository.LiveEditLeaseRepository;
@@ -79,7 +77,6 @@ class LiveEditLeaseServiceTest {
     TenantContext.setCurrentTenantId(tenant);
     mine = session(user, Duration.ofMinutes(10));
     theirs = session(otherUser, Duration.ofMinutes(10));
-    when(control.isEnforced(tenant, "sales-order")).thenReturn(true);
     when(leases.save(any())).thenAnswer(call -> withId(call.getArgument(0)));
   }
 
@@ -218,16 +215,6 @@ class LiveEditLeaseServiceTest {
   }
 
   @Test
-  @DisplayName("L14: with leases off nothing is granted and nothing is locked")
-  void offGrantsNothing() {
-    when(control.isEnforced(tenant, "sales-order")).thenReturn(false);
-
-    assertThatThrownBy(() -> service.acquire(order, 0, mine.getId(), user, List.of(notes)))
-        .isInstanceOf(LiveEditLeasesNotEnforcedException.class);
-    verify(control, never()).lockResource(any(), any());
-  }
-
-  @Test
   @DisplayName("L19: the per-session bound refuses the grant as a whole")
   void boundsAreEnforced() {
     rows(List.of());
@@ -309,9 +296,7 @@ class LiveEditLeaseServiceTest {
 
     // The token proves nothing any more, and the key is free for anybody.
     rows(List.of(own));
-    Verification stale =
-        service.verify(
-            order, 0, LiveLeaseMode.ENFORCED, mine.getId(), Set.of(token), user, Set.of(notes));
+    Verification stale = service.verify(order, 0, mine.getId(), Set.of(token), user, Set.of(notes));
     assertThat(stale.proven()).isFalse();
     assertThat(stale.missing()).singleElement().satisfies(m -> assertThat(m.holder()).isNull());
     Granted taken = (Granted) service.acquire(order, 0, theirs.getId(), otherUser, List.of(notes));
@@ -344,9 +329,7 @@ class LiveEditLeaseServiceTest {
     assertThat(lease.getReleasedAt()).isNull();
     assertThat(lease.isHeldBy(mine.getId(), NOW, 0)).isTrue();
 
-    Verification withOld =
-        service.verify(
-            order, 0, LiveLeaseMode.ENFORCED, mine.getId(), Set.of(old), user, Set.of(notes));
+    Verification withOld = service.verify(order, 0, mine.getId(), Set.of(old), user, Set.of(notes));
     assertThat(withOld.proven()).isFalse();
     assertThat(withOld.unexpectedTokens()).containsExactly(old);
   }
@@ -398,33 +381,17 @@ class LiveEditLeaseServiceTest {
     rows(List.of(own, other));
 
     Verification proven =
-        service.verify(
-            order,
-            0,
-            LiveLeaseMode.ENFORCED,
-            mine.getId(),
-            Set.of(own.getToken()),
-            user,
-            Set.of(notes));
+        service.verify(order, 0, mine.getId(), Set.of(own.getToken()), user, Set.of(notes));
     assertThat(proven.proven()).isTrue();
     assertThat(proven.held()).containsExactly(own);
 
-    Verification noToken =
-        service.verify(
-            order, 0, LiveLeaseMode.ENFORCED, mine.getId(), Set.of(), user, Set.of(notes));
+    Verification noToken = service.verify(order, 0, mine.getId(), Set.of(), user, Set.of(notes));
     assertThat(noToken.missing())
         .extracting(LiveEditLeaseService.Missing::key)
         .containsExactly(notes);
 
     Verification blocked =
-        service.verify(
-            order,
-            0,
-            LiveLeaseMode.ENFORCED,
-            mine.getId(),
-            Set.of(own.getToken()),
-            user,
-            Set.of(notes, terms));
+        service.verify(order, 0, mine.getId(), Set.of(own.getToken()), user, Set.of(notes, terms));
     assertThat(blocked.held()).containsExactly(own);
     assertThat(blocked.missing())
         .singleElement()
@@ -433,13 +400,7 @@ class LiveEditLeaseServiceTest {
     UUID surplus = UUID.randomUUID();
     Verification extra =
         service.verify(
-            order,
-            0,
-            LiveLeaseMode.ENFORCED,
-            mine.getId(),
-            Set.of(own.getToken(), surplus),
-            user,
-            Set.of(notes));
+            order, 0, mine.getId(), Set.of(own.getToken(), surplus), user, Set.of(notes));
     assertThat(extra.missing()).isEmpty();
     assertThat(extra.unexpectedTokens()).containsExactly(surplus);
   }
@@ -451,31 +412,23 @@ class LiveEditLeaseServiceTest {
     rows(List.of(own));
 
     Verification late =
-        service.verify(
-            order,
-            0,
-            LiveLeaseMode.ENFORCED,
-            mine.getId(),
-            Set.of(own.getToken()),
-            user,
-            Set.of(notes));
+        service.verify(order, 0, mine.getId(), Set.of(own.getToken()), user, Set.of(notes));
     assertThat(late.missing()).hasSize(1);
   }
 
   @Test
-  @DisplayName("L14/L17: off, no proof is needed, but a key somebody still holds is refused")
-  void offStillHonoursHeldLeases() {
+  @DisplayName(
+      "F3: always enforced: a save without a session or token is never proven; a holder in the way"
+          + " is named")
+  void withoutProofNothingIsProven() {
     rows(List.of());
-    assertThat(
-            service
-                .verify(order, 0, LiveLeaseMode.OFF, null, Set.of(), user, Set.of(notes))
-                .proven())
-        .isTrue();
+    Verification bare = service.verify(order, 0, null, Set.of(), user, Set.of(notes));
+    assertThat(bare.proven()).isFalse();
+    assertThat(bare.missing()).singleElement().satisfies(m -> assertThat(m.holder()).isNull());
 
     LiveEditLease leftOver = lease(notes, theirs, NOW.plusSeconds(30));
     rows(List.of(leftOver));
-    Verification refused =
-        service.verify(order, 0, LiveLeaseMode.OFF, null, Set.of(), user, Set.of(notes));
+    Verification refused = service.verify(order, 0, null, Set.of(), user, Set.of(notes));
     assertThat(refused.missing())
         .singleElement()
         .satisfies(m -> assertThat(m.holder()).isSameAs(leftOver));

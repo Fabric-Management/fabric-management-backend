@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
@@ -144,17 +145,19 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     long version = orderVersion();
     int history = historyRows();
 
+    // Each save takes and gives back its lease (CEDIT-07-F3): presence and leases may move, the
+    // committed version must not.
     SalesOrderEditResult replay = saved(actorA, first);
     assertThat(replay.replayed()).isTrue();
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     SalesOrderEditResult noChange =
         saved(actorB, body(UUID.randomUUID(), baseB.baseId(), "notes", set("One")));
     assertThat(noChange.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     conflicted(actorC, body(UUID.randomUUID(), baseC.baseId(), "notes", set("Two")));
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     try (Connection writer = ownerConnection()) {
       writer.setAutoCommit(false);
@@ -174,8 +177,8 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "L07: quantity acceptance, product correction, legacy PUT and leaving the draft signal;"
-          + " leaving the draft keeps a reader's stream open")
+      "L07: quantity acceptance, product correction and leaving the draft signal; the refused"
+          + " legacy PUT does not; leaving the draft keeps a reader's stream open")
   void otherWritersSignal() {
     LiveSse stream = subscribe(actorB);
     ready(stream);
@@ -196,11 +199,14 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     assertThat(corrected).isNotInstanceOf(RuntimeException.class);
     expectInvalidated(stream, orderVersion());
 
-    // Built first: reading the lines runs in its own tenant step.
+    // Built first: reading the lines runs in its own tenant step. The full replace is closed for
+    // good (CEDIT-07-F3): refused, it commits nothing and signals nothing.
+    long beforePut = orderVersion();
     UpdateSalesOrderRequest legacy = legacyRequest("Legacy");
     Object put = as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), legacy));
-    assertThat(put).isNotInstanceOf(RuntimeException.class);
-    expectInvalidated(stream, orderVersion());
+    assertThat(put).isInstanceOf(DomainException.class);
+    assertThat(((DomainException) put).getErrorCode()).isEqualTo("LEGACY_EDIT_DISABLED");
+    assertThat(orderVersion()).isEqualTo(beforePut);
 
     Object submitted = as(actorA, () -> flows.submit(orderId, actorA.id()));
     assertThat(submitted).isNotInstanceOf(RuntimeException.class);
@@ -225,13 +231,14 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     LiveSse.Frame first = ready(stream);
     seen.add(Long.parseLong(first.revision()));
     while (seen.getLast() < latest) {
-      LiveSse.Frame next = stream.nextEvent(WAIT);
+      // Presence and lease frames of the saves' automatic proof keep the version (CEDIT-07-F3).
+      LiveSse.Frame next = nextRevision(stream);
       assertThat(next.event()).isEqualTo("invalidated");
       seen.add(Long.parseLong(next.revision()));
     }
     assertThat(seen.getLast()).isEqualTo(latest);
     assertThat(seen).isSorted().doesNotHaveDuplicates();
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
   }
 
   @Test

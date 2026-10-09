@@ -173,8 +173,7 @@ application:
       cleanup-cron: ${REALTIME_EDIT_SESSION_CLEANUP_CRON:0 20 4 * * *}
       cleanup-batch-size: ${REALTIME_EDIT_SESSION_CLEANUP_BATCH_SIZE:500}
     # CEDIT-07: field leases (who may change which key now). Technical defaults, not SLAs; all
-    # published to the client. Enforcement is not a setting here: it is a per-tenant row in
-    # common_infrastructure.live_edit_lease_mode (see COLLABORATIVE-EDITING-FIELD-LEASES.md §8).
+    # published to the client. Leases are always enforced; there is no switch (CEDIT-07-F3).
     edit-lease:
       ttl: ${REALTIME_EDIT_LEASE_TTL:90s}
       renew-after: ${REALTIME_EDIT_LEASE_RENEW_AFTER:30s}

@@ -495,6 +495,7 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
     assertThat(enumOf("SalesOrderEditLeaseField")).containsExactlyInAnyOrderElementsOf(catalogue);
     assertThat(refOf(property("SalesOrderEditLeaseKey", "key")))
         .isEqualTo(REF + "SalesOrderEditLeaseField");
+    // Always ENFORCED (CEDIT-07-F3); OFF stays listed until the client stops reading the mode.
     assertThat(enumOf("SalesOrderEditLeaseMode")).containsExactlyInAnyOrder("OFF", "ENFORCED");
     assertThat(enumOf("SalesOrderEditLeaseRequirementReason"))
         .containsExactlyInAnyOrder("NOT_HELD", "HELD_BY_ANOTHER");

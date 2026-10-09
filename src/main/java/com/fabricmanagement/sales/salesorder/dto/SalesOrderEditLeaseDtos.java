@@ -31,8 +31,8 @@ public final class SalesOrderEditLeaseDtos {
       name = "SalesOrderEditLeaseMode",
       enumAsRef = true,
       description =
-          "OFF: leases are not enforced for this order's tenant yet; none is granted and a save"
-              + " needs none. ENFORCED: every save of a leasable key proves the tab's own lease.")
+          "Always ENFORCED: every save of a leasable key proves the tab's own lease. OFF is no"
+              + " longer sent; it stays listed until clients stop reading the mode.")
   public enum Mode {
     OFF,
     ENFORCED

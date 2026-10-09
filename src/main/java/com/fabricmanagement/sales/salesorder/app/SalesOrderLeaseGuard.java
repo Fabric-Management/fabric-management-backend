@@ -3,7 +3,6 @@ package com.fabricmanagement.sales.salesorder.app;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
 import com.fabricmanagement.platform.realtime.domain.LiveEditLease;
 import com.fabricmanagement.platform.realtime.domain.LiveLeaseKey;
-import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.OrderEditKey;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -27,8 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       correction) is refused while any edit session holds an overlapping lease: another person's,
  *       and equally the same person's other tab. A user id is never proof of a lease. A lease on an
  *       unrelated key does not stop it.
- *   <li>The legacy full-replace update is no alternative edit path: with enforcement on it is
- *       refused outright; with enforcement off it is refused while any lease is held on the order.
+ *   <li>The legacy full-replace update is no alternative edit path: it proves no lease, and leases
+ *       are always enforced (CEDIT-07-F3), so it is refused outright.
  * </ul>
  *
  * A status or flow change that makes the order uneditable needs no check here: it moves the order's
@@ -63,17 +62,15 @@ public class SalesOrderLeaseGuard {
     assertFree(order, lineIds.stream().map(SalesOrderLeaseKeys::wholeLine).toList(), actor);
   }
 
-  /** The legacy full replace: refused with enforcement on, or while any lease is held. */
+  /**
+   * The legacy full replace is always refused: it proves no lease, and leases are always enforced
+   * (CEDIT-07-F3). Orders are edited field by field through the safe save.
+   */
   @Transactional(propagation = Propagation.MANDATORY)
   public void assertLegacyReplaceAllowed(SalesOrder order, UUID actor) {
-    if (leases.mode(SalesOrderLiveRevisionSource.RESOURCE_TYPE) == LiveLeaseMode.ENFORCED) {
-      throw OrderDomainException.conflict(
-          LEGACY_EDIT_DISABLED,
-          "This order is edited field by field now; reopen it and save your changes again");
-    }
-    refuseIfHeld(
-        leases.heldAny(SalesOrderLiveRevisionSource.resource(order.getId()), order.getEditEpoch()),
-        actor);
+    throw OrderDomainException.conflict(
+        LEGACY_EDIT_DISABLED,
+        "This order is edited field by field now; reopen it and save your changes again");
   }
 
   private void assertFree(SalesOrder order, Collection<LiveLeaseKey> keys, UUID actor) {

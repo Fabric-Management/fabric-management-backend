@@ -8,7 +8,6 @@ import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Granted;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Refused;
 import com.fabricmanagement.platform.realtime.domain.LiveEditLease;
 import com.fabricmanagement.platform.realtime.domain.LiveLeaseKey;
-import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.platform.realtime.domain.LiveResource;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -136,9 +135,9 @@ public class SalesOrderEditLeaseService {
   /** The lease policy of the bound tenant, as published with every answer. */
   Policy policy() {
     LiveEditLeaseProperties properties = leases.properties();
-    LiveLeaseMode mode = leases.mode(SalesOrderLiveRevisionSource.RESOURCE_TYPE);
+    // Always enforced (CEDIT-07-F3); the field stays on the wire until the client stops reading it.
     return new Policy(
-        SalesOrderEditLeaseDtos.Mode.valueOf(mode.name()),
+        SalesOrderEditLeaseDtos.Mode.ENFORCED,
         properties.ttlSeconds(),
         properties.renewAfterSeconds(),
         properties.idleAfterSeconds(),

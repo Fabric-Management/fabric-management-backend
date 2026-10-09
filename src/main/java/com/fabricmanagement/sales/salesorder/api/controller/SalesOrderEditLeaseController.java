@@ -49,7 +49,7 @@ public class SalesOrderEditLeaseController {
               + " its token (a repeat after a lost answer); any other grant has a new token."
               + " Requires current write access, an editable draft and my open edit session. 409"
               + " EDIT_LEASE_UNAVAILABLE names the holders in the way (no token); 409"
-              + " EDIT_LEASES_NOT_ENFORCED while leases are off; 409 EDIT_LEASE_LIMIT_REACHED;"
+              + " EDIT_LEASE_LIMIT_REACHED;"
               + " 404 EDIT_SESSION_NOT_FOUND for an ended or foreign session; 422"
               + " EDIT_LEASE_KEY_INVALID for a wrong line or a header/line mix-up.")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -58,8 +58,8 @@ public class SalesOrderEditLeaseController {
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "409",
       description =
-          "EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASES_NOT_ENFORCED,"
-              + " EDIT_LEASE_LIMIT_REACHED or an order state code otherwise",
+          "EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASE_LIMIT_REACHED or an order state code"
+              + " otherwise",
       content =
           @Content(
               mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,

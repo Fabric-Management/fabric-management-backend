@@ -32,9 +32,9 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditBase;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOperationView;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
-import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
 import jakarta.persistence.EntityManager;
@@ -422,7 +422,9 @@ class SalesOrderEditAccessIT extends SalesOrderEditItSupport {
   }
 
   @Test
-  @DisplayName("S7.4: UPDATE of a random line id and of another order's line answer the same 422")
+  @DisplayName(
+      "S7.4: UPDATE of a random line id and of another order's line answer the same (lease"
+          + " required, CEDIT-07-F3)")
   void lineNotInBaseIsTheSameForUnknownAndForeignLines() {
     SalesOrderEditBase base = open(actorA);
     OrderRef o2 = sameTenantOrder();
@@ -443,13 +445,15 @@ class SalesOrderEditAccessIT extends SalesOrderEditItSupport {
                 body(UUID.randomUUID(), base.baseId()),
                 List.of(update(o2.lineId(), "pricing", set(pricing("GBP", "4.5000"))))));
 
-    assertThat(failureCode(unknown)).isEqualTo("LINE_NOT_IN_BASE");
-    assertThat(failureCode(foreign)).isEqualTo("LINE_NOT_IN_BASE");
+    // Leases are always enforced (CEDIT-07-F3): neither line is a line of this order, so neither
+    // can be leased and both saves stop at the proof, before the base is read for them.
+    assertThat(failureCode(unknown)).isEqualTo("EDIT_LEASE_REQUIRED");
+    assertThat(failureCode(foreign)).isEqualTo("EDIT_LEASE_REQUIRED");
     // The same answer apart from naming the line the request itself sent.
     assertThat(answerOf((DomainException) foreign)).isEqualTo(answerOf((DomainException) unknown));
-    assertThat(((DomainException) unknown).getHttpStatus()).isEqualTo(422);
-    assertThat(((DomainException) unknown).getDetails()).containsEntry("lineId", randomLine);
-    assertThat(((DomainException) foreign).getDetails()).containsEntry("lineId", o2.lineId());
+    assertThat(((DomainException) unknown).getHttpStatus()).isEqualTo(409);
+    assertThat(requiredLines((DomainException) unknown)).containsExactly(randomLine);
+    assertThat(requiredLines((DomainException) foreign)).containsExactly(o2.lineId());
 
     assertThat(receipts()).isZero();
     assertThat(receiptsOn(o2.orderId())).isZero();
@@ -780,14 +784,6 @@ class SalesOrderEditAccessIT extends SalesOrderEditItSupport {
     return as(actor, () -> edits.openBase(order, actor.id(), actor.authentication()));
   }
 
-  private Object saveOn(Actor actor, UUID order, Map<String, Object> body) {
-    SalesOrderEditRequest request = request(body);
-    return as(
-        actor,
-        () ->
-            edits.save(order, request, actor.id(), actor.authentication(), PATH.formatted(order)));
-  }
-
   private Object operationOn(Actor actor, UUID order, UUID operationId) {
     return as(actor, () -> edits.operation(order, operationId, actor.id()));
   }
@@ -800,8 +796,29 @@ class SalesOrderEditAccessIT extends SalesOrderEditItSupport {
     answer.put("message", failure.getMessage());
     Map<String, Object> details = new LinkedHashMap<>(failure.getDetails());
     details.remove("lineId");
+    if (details.get("leases") instanceof List<?> requirements) {
+      details.put(
+          "leases",
+          requirements.stream()
+              .map(
+                  requirement ->
+                      requirement instanceof SalesOrderEditLeaseDtos.Requirement named
+                          ? new SalesOrderEditLeaseDtos.Requirement(
+                              named.key(), null, named.reason(), named.holder())
+                          : requirement)
+              .toList());
+    }
     answer.put("details", details);
     return answer;
+  }
+
+  /** The lines a lease-required answer names. */
+  private static List<UUID> requiredLines(DomainException failure) {
+    assertThat(failure.getDetails().get("leases")).isInstanceOf(List.class);
+    List<?> requirements = (List<?>) failure.getDetails().get("leases");
+    return requirements.stream()
+        .map(requirement -> ((SalesOrderEditLeaseDtos.Requirement) requirement).lineId())
+        .toList();
   }
 
   /** A specification value with a line-explicit requirement profile input and no facets. */

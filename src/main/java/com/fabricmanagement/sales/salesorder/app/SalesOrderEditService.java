@@ -5,7 +5,6 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Missing;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.Verification;
-import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderAccessPolicy.PermissionFreshness;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderEditApplier.Applied;
@@ -484,10 +483,10 @@ public class SalesOrderEditService {
   }
 
   /**
-   * Checks that the save holds every key it writes (CEDIT-07 §3.3). Enforced: each key needs this
-   * tab's lease and its token. Off: no proof is needed, but a key somebody still holds is refused,
-   * so lowering the mode never frees a held key. A token that proves none of the keys is a client
-   * error (422); a missing lease is 409 with the keys to acquire again. Nothing is recorded.
+   * Checks that the save holds every key it writes (CEDIT-07 §3.3): each key needs this tab's lease
+   * and its token; leases are always enforced (CEDIT-07-F3). A token that proves none of the keys
+   * is a client error (422); a missing lease is 409 with the keys to acquire again. Nothing is
+   * recorded.
    *
    * <p>A line of the save's base that is no longer an active line of the order needs no lease
    * (CEDIT-07-F1): nobody can acquire it, and the merge answers it (an UPDATE conflicts with the
@@ -495,12 +494,10 @@ public class SalesOrderEditService {
    */
   private Verification verifyLeases(
       SalesOrder order, OrderEditBase base, Parsed parsed, LeaseProof proof, UUID actor) {
-    LiveLeaseMode mode = leases.mode(SalesOrderLiveRevisionSource.RESOURCE_TYPE);
     Verification verification =
         leases.verify(
             SalesOrderLiveRevisionSource.resource(order.getId()),
             order.getEditEpoch(),
-            mode,
             proof.sessionId(),
             proof.tokens(),
             actor,

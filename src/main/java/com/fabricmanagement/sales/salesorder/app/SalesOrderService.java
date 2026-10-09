@@ -275,8 +275,8 @@ public class SalesOrderService {
     // The version covers the lines: move it now, so a stale second save cannot pass.
     revision.linesChanged(order);
 
-    // CEDIT-07: the full replace is no way around field leases. Refused with enforcement on, and
-    // while anyone holds a lease on the order otherwise. Checked under the order lock.
+    // CEDIT-07-F3: the full replace proves no lease and leases are always enforced, so it is
+    // always refused; orders are edited field by field through the safe save.
     leaseGuard.assertLegacyReplaceAllowed(order, currentUserId);
 
     // 3. Validate the catalogue lines. Totals are not stored: they derive from the lines.

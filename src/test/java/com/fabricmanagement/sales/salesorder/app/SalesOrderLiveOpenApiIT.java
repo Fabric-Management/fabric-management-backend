@@ -202,10 +202,11 @@ class SalesOrderLiveOpenApiIT extends SalesOrderLiveItSupport {
     LiveSse stream = subscribe(actorB);
     LiveSse.Frame ready = ready(stream);
     saved(actorA, body(UUID.randomUUID(), open(actorA).baseId(), "notes", set("Schema check")));
-    LiveSse.Frame invalidated = stream.nextEvent(WAIT);
+    LiveSse.Frame invalidated = nextRevision(stream);
     assertThat(invalidated.event()).isEqualTo("invalidated");
     liveStreams.closeAll(LiveCloseReason.RECONNECT_REQUIRED);
-    LiveSse.Frame closed = stream.nextEvent(WAIT);
+    // Presence and lease frames of the save's automatic proof may come first (CEDIT-07-F3).
+    LiveSse.Frame closed = stream.await(frame -> "closed".equals(frame.event()), WAIT);
     assertThat(closed.event()).isEqualTo("closed");
 
     Map<String, Object> byEvent =

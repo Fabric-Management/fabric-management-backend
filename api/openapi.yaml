@@ -51894,9 +51894,9 @@ paths:
         \ already holds keeps its token (a repeat after a lost answer); any other\
         \ grant has a new token. Requires current write access, an editable draft\
         \ and my open edit session. 409 EDIT_LEASE_UNAVAILABLE names the holders in\
-        \ the way (no token); 409 EDIT_LEASES_NOT_ENFORCED while leases are off; 409\
-        \ EDIT_LEASE_LIMIT_REACHED; 404 EDIT_SESSION_NOT_FOUND for an ended or foreign\
-        \ session; 422 EDIT_LEASE_KEY_INVALID for a wrong line or a header/line mix-up."
+        \ the way (no token); 409 EDIT_LEASE_LIMIT_REACHED; 404 EDIT_SESSION_NOT_FOUND\
+        \ for an ended or foreign session; 422 EDIT_LEASE_KEY_INVALID for a wrong\
+        \ line or a header/line mix-up."
       operationId: acquireSalesOrderEditLeases
       parameters:
       - in: path
@@ -51950,8 +51950,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/SalesOrderEditLeaseProblem"
-          description: "EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASES_NOT_ENFORCED,\
-            \ EDIT_LEASE_LIMIT_REACHED or an order state code otherwise"
+          description: EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASE_LIMIT_REACHED
+            or an order state code otherwise
         "422":
           content:
             application/problem+json:
@@ -82110,9 +82110,9 @@ components:
       - key
     SalesOrderEditLeaseMode:
       type: string
-      description: "OFF: leases are not enforced for this order's tenant yet; none\
-        \ is granted and a save needs none. ENFORCED: every save of a leasable key\
-        \ proves the tab's own lease."
+      description: "Always ENFORCED: every save of a leasable key proves the tab's\
+        \ own lease. OFF is no longer sent; it stays listed until clients stop reading\
+        \ the mode."
       enum:
       - "OFF"
       - ENFORCED
