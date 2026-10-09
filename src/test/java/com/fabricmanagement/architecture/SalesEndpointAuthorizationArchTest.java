@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(158)
+        .hasSize(159)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(158);
+    assertThat(expected).hasSize(159);
   }
 
   @Test
@@ -98,6 +98,14 @@ class SalesEndpointAuthorizationArchTest {
         .isEqualTo(read);
     assertThat(preAuthorize("SalesOrderEditLeaseController", "listSalesOrderEditLeases"))
         .isEqualTo(read);
+  }
+
+  @Test
+  void theFieldHistoryNeedsSalesReadOnly() throws Exception {
+    // CEDIT-09 §3.1: reading the order's saved field changes needs literal sales:read; write,
+    // draft state, session or lease are not required. Object access is checked fresh per page.
+    assertThat(preAuthorize("SalesOrderFieldHistoryController", "getSalesOrderFieldHistory"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -327,6 +335,11 @@ class SalesEndpointAuthorizationArchTest {
         "SalesOrderEditLeaseController",
         Category.TRANSACTIONAL_READ,
         "listSalesOrderEditLeases");
+    add(
+        result,
+        "SalesOrderFieldHistoryController",
+        Category.TRANSACTIONAL_READ,
+        "getSalesOrderFieldHistory");
     add(result, "OrderDeliveryController", Category.TRANSACTIONAL_READ, "listOrderDeliveries");
     add(
         result,

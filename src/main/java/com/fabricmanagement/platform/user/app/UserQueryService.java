@@ -129,6 +129,23 @@ public class UserQueryService {
     return userRepository.existsByTenantIdAndIdAndIsActiveTrue(tenantId, userId);
   }
 
+  /**
+   * Current display names of the tenant's active users among {@code userIds}, read in one query.
+   * Inactive, removed or unknown ids are absent from the map. Only names: no contact data, roles or
+   * other personal data (CEDIT-09 field history).
+   */
+  @Transactional(readOnly = true)
+  public Map<UUID, String> findActiveDisplayNames(UUID tenantId, Collection<UUID> userIds) {
+    if (tenantId == null || userIds == null || userIds.isEmpty()) {
+      return Map.of();
+    }
+    return userRepository
+        .findByTenantIdAndIdInAndIsActiveTrue(tenantId, Set.copyOf(userIds))
+        .stream()
+        .filter(user -> user.getDeletedAt() == null)
+        .collect(java.util.stream.Collectors.toMap(User::getId, User::getDisplayName));
+  }
+
   @Transactional(readOnly = true)
   public Optional<PermissionIdentity> findPermissionIdentity(UUID tenantId, UUID userId) {
     return userRepository

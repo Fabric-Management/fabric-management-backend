@@ -23,6 +23,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   boolean existsByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
 
+  /** Active users of a tenant among the given ids, in one query; relations stay unloaded. */
+  List<User> findByTenantIdAndIdInAndIsActiveTrue(UUID tenantId, Collection<UUID> ids);
+
   /**
    * Find user by contact value via Contact entity (new system - recommended).
    *

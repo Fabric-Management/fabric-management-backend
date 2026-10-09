@@ -201,6 +201,15 @@ public record CreateBatchRequest(
   `LiveStreamOpenApiCustomizer` frame zarflarını (`ApiResponseLiveReadyDto` …) yayınlar, stream şeması bu
   zarfların `anyOf`'udur ve `x-fabric-live-frames` uzantısı SSE `event` adını zarf şemasına eşler. İstisna
   yalnız bu stream'ler içindir; normal controller/DTO ve envelope kuralları gevşemez.
+- **Alan geçmişi okuma istisnası (CEDIT-09):** `sales_ord.order_field_change` değerleri yalnız
+  `OrderFieldChangeHistoryRepository` içinde `jsonb::text` olarak okunur ve
+  `SalesOrderFieldHistoryMapper` bunları kendi kesin okuyucusuyla (`USE_BIG_DECIMAL_FOR_FLOATS`,
+  sondaki sıfırlar korunur) anahtar başına kapalı şekillere çevirir; entity'nin `JsonNode` eşlemesi
+  ve ortak `ObjectMapper` bu yolda kullanılmaz (ortak okuyucu ondalıkları `double` yapar). Bilinen
+  ondalıklar API'de kesin ondalık string'dir; serbest `moduleSpecs` değişmeden taşınır. Sayfalar
+  `NamedParameterJdbcTemplate` ile `(order_version, id)` seek sorgusudur (OFFSET yok, sınırlı limit).
+  İstisna yalnız bu okuma içindir; başka DTO'lara, genel Jackson ayarlarına veya diğer JSONB
+  okumalarına kalıp olarak kopyalanmaz.
 
 ### 5.1 Exception Hiyerarşisi
 
