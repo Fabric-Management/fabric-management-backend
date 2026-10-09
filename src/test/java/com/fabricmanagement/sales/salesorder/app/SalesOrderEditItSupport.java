@@ -56,6 +56,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -151,8 +152,13 @@ public abstract class SalesOrderEditItSupport {
     return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
   }
 
-  /** A clock the tests move forward; otherwise the system clock in UTC. */
+  /**
+   * A clock the tests move forward; otherwise the system clock in UTC. Like the application clock
+   * (TimeConfig) it ticks in microseconds, the precision PostgreSQL keeps, so what a test reads
+   * back from a row is what the service answered.
+   */
   public static final class MutableClock extends Clock {
+    private static final Duration PRECISION = Duration.ofNanos(1_000);
     private volatile Duration offset = Duration.ZERO;
 
     public void advance(Duration duration) {
@@ -170,12 +176,12 @@ public abstract class SalesOrderEditItSupport {
 
     @Override
     public Clock withZone(ZoneId zone) {
-      return Clock.offset(Clock.system(zone), offset);
+      return Clock.tick(Clock.offset(Clock.system(zone), offset), PRECISION);
     }
 
     @Override
     public Instant instant() {
-      return Instant.now().plus(offset);
+      return Instant.now().plus(offset).truncatedTo(ChronoUnit.MICROS);
     }
   }
 

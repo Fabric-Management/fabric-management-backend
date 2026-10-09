@@ -1552,9 +1552,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
           + " duration fields are refused on the wire")
   void boundsAndWireShape() throws Exception {
     enforce();
-    // A sub-microsecond clock, as on Linux: the first grant answers from memory and the repeat from
-    // the row, which PostgreSQL keeps in microseconds; both must carry the same acquiredAt.
-    clock.advance(Duration.ofNanos(1));
     UUID tab = openSession(actorA);
     Grant first = granted(actorA, tab, notes());
     Grant repeat = granted(actorA, tab, notes());
