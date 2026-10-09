@@ -5933,8 +5933,10 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_field_change (
     CONSTRAINT ck_order_field_change_line CHECK (
         change_kind NOT IN ('LINE_ADDED', 'LINE_REMOVED') OR line_id IS NOT NULL)
 );
-CREATE INDEX IF NOT EXISTS idx_order_field_change_order
-    ON sales_ord.order_field_change (tenant_id, sales_order_id, changed_at);
+-- CEDIT-09: an order's history page, newest order version first, by a seek on (version, id);
+-- also the order foreign key's side. The change time is shown only and never orders a page.
+CREATE INDEX IF NOT EXISTS idx_order_field_change_order_version
+    ON sales_ord.order_field_change (tenant_id, sales_order_id, order_version DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_order_field_change_operation
     ON sales_ord.order_field_change (tenant_id, operation_id);
 -- A line's history, and the line foreign key's side.

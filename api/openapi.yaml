@@ -160,6 +160,8 @@ tags:
   name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
+- description: "Who changed which field of an order, when, from what to what"
+  name: Sales Order Field History
 - description: "Canonical FABRIC, YARN, and FIBER stock availability by product, colour,\
     \ lot, and quality"
   name: Stock Availability
@@ -52599,6 +52601,107 @@ paths:
       summary: My edit form is still open
       tags:
       - Sales Order Edit Sessions
+  /api/v1/sales/orders/{orderId}/field-history:
+    get:
+      description: "Field changes saved with the safe edit: each changed key with\
+        \ the value before and after, whole lines added or removed, who saved it,\
+        \ when, in which save and the resulting order version, and the conflict decision\
+        \ if one decided it. Changes of every person are shown. Other commands (legacy\
+        \ update, product correction, quantity acceptance, lifecycle steps) do not\
+        \ write this history; an empty list does not mean the order never changed.\
+        \ Requires current read access to the active order, in any status; no write\
+        \ access, edit session or lease. Read-only: nothing is opened, locked or written.\
+        \ Pages are stable: the first page fixes snapshotVersion and later pages (cursor)\
+        \ never show a newer change; read without a cursor to start again from the\
+        \ newest. 422 VALIDATION_ERROR names limit or cursor in errors; 404 for an\
+        \ order that does not exist or cannot be read now."
+      operationId: getSalesOrderFieldHistory
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: "Entries per page, 1 to 100"
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 30
+          maximum: 100
+          minimum: 1
+      - description: "nextCursor of the previous page, unchanged; omit it for the\
+          \ newest page"
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+          maxLength: 2048
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseSalesOrderFieldHistoryPage"
+          description: One page of the history
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Saved field changes of the order, newest first"
+      tags:
+      - Sales Order Field History
   /api/v1/sales/orders/{orderId}/live-events:
     get:
       description: "Server-Sent Events. Authentication is the normal access token\
@@ -63595,6 +63698,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SalesOrderEditorsDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseSalesOrderFieldHistoryPage:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryPage"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -82413,6 +82534,537 @@ components:
       enum:
       - SET
       - CLEAR
+    SalesOrderFieldHistoryActor:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName:
+          type:
+          - string
+          - "null"
+          description: "The person's current directory name, not the name at the time\
+            \ of the change; null when the account is inactive, removed or cannot\
+            \ be resolved."
+        id:
+          type: string
+          format: uuid
+      required:
+      - displayName
+      - id
+    SalesOrderFieldHistoryAgreement:
+      type: object
+      additionalProperties: false
+      properties:
+        context:
+          anyOf:
+          - $ref: "#/components/schemas/AgreementContext"
+          - type: "null"
+        note:
+          type:
+          - string
+          - "null"
+      required:
+      - context
+      - note
+    SalesOrderFieldHistoryChangeKind:
+      type: string
+      description: "SET: a value was saved. CLEAR: the key was cleared on purpose.\
+        \ LINE_ADDED / LINE_REMOVED: a whole line was added or removed; the other\
+        \ side of the change is null."
+      enum:
+      - SET
+      - CLEAR
+      - LINE_ADDED
+      - LINE_REMOVED
+    SalesOrderFieldHistoryContact:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type:
+          - string
+          - "null"
+        name:
+          type:
+          - string
+          - "null"
+        phone:
+          type:
+          - string
+          - "null"
+        whatsapp:
+          type: boolean
+      required:
+      - email
+      - name
+      - phone
+      - whatsapp
+    SalesOrderFieldHistoryDeliveryTerms:
+      type: object
+      additionalProperties: false
+      properties:
+        contractReference:
+          type:
+          - string
+          - "null"
+        incotermsVersion:
+          anyOf:
+          - $ref: "#/components/schemas/IncotermsVersion"
+          - type: "null"
+        place:
+          type:
+          - string
+          - "null"
+        status:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryTermStatus"
+          - type: "null"
+        term:
+          anyOf:
+          - $ref: "#/components/schemas/DeliveryTerm"
+          - type: "null"
+      required:
+      - contractReference
+      - incotermsVersion
+      - place
+      - status
+      - term
+    SalesOrderFieldHistoryEditKey:
+      type: string
+      description: "Safe-edit key wire names (CEDIT-02 §2.2/§2.3), and `line` for\
+        \ a whole line added or removed."
+      enum:
+      - customerReference
+      - orderDate
+      - requestedDeliveryDate
+      - deliveryTerms
+      - paymentTerms
+      - agreementContext
+      - contact
+      - shippingAddress
+      - billingAddress
+      - shippingMethod
+      - notes
+      - deadline
+      - line.productDesc
+      - line.colorId
+      - line.finishedWidth
+      - line.requestedDeliveryDate
+      - line.singleLotRequired
+      - line.shipmentPreference
+      - line.quantity
+      - line.pricing
+      - line.tolerance
+      - line.specification
+      - line
+    SalesOrderFieldHistoryEntry:
+      type: object
+      additionalProperties: false
+      properties:
+        actor:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryActor"
+        changeKind:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryChangeKind"
+        changedAt:
+          type: string
+          format: date-time
+          description: "When it was saved; shown only, never used for ordering."
+        editKey:
+          type: string
+          description: "The key exactly as stored, also when this version does not\
+            \ know it (then knownEditKey is null and both values are UNAVAILABLE).\
+            \ Never rewritten."
+          maxLength: 40
+        id:
+          type: string
+          format: uuid
+        knownEditKey:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryEditKey"
+          - type: "null"
+          description: "editKey when it is in the published catalogue (SalesOrderFieldHistoryEditKey),\
+            \ otherwise null. It decides the shape of the values: text keys (customerReference,\
+            \ paymentTerms, shippingAddress, billingAddress, shippingMethod, notes,\
+            \ line.productDesc) a string; orderDate, deadline, line.requestedDeliveryDate\
+            \ a calendar date; line.colorId a UUID; line.singleLotRequired a boolean;\
+            \ line.shipmentPreference its enum name; requestedDeliveryDate SalesOrderFieldHistoryRequestedDate;\
+            \ deliveryTerms SalesOrderFieldHistoryDeliveryTerms; agreementContext\
+            \ SalesOrderFieldHistoryAgreement; contact SalesOrderFieldHistoryContact;\
+            \ line.finishedWidth SalesOrderFieldHistoryWidth; line.quantity SalesOrderFieldHistoryQuantity;\
+            \ line.pricing SalesOrderFieldHistoryPricing; line.tolerance SalesOrderFieldHistoryTolerance;\
+            \ line.specification SalesOrderFieldHistorySpecification; line (a whole\
+            \ line) SalesOrderFieldHistoryLine."
+        lineId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The line of a line key or of a whole-line change; null for
+            the header.
+        newValue:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryValue"
+        oldValue:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryValue"
+        operationId:
+          type: string
+          format: uuid
+          description: The save that made the change; entries of one save share it.
+        orderVersion:
+          type: integer
+          format: int64
+          description: The order version the save produced.
+          minimum: 0
+        resolution:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderEditResolutionChoice"
+          - type: "null"
+          description: "The conflict decision that decided this change, as stored;\
+            \ null when the save had no conflict here. Null exactly when resolutionScope\
+            \ is null."
+        resolutionScope:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryResolutionScope"
+          - type: "null"
+      required:
+      - actor
+      - changeKind
+      - changedAt
+      - editKey
+      - id
+      - knownEditKey
+      - lineId
+      - newValue
+      - oldValue
+      - operationId
+      - orderVersion
+      - resolution
+      - resolutionScope
+    SalesOrderFieldHistoryLine:
+      type: object
+      additionalProperties: false
+      properties:
+        colorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        finishedWidth:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryWidth"
+          - type: "null"
+        lineId:
+          type: string
+          format: uuid
+        pricing:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryPricing"
+          - type: "null"
+        productDesc:
+          type:
+          - string
+          - "null"
+        productId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        quantity:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryQuantity"
+          - type: "null"
+        requestedDeliveryDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: Calendar date; no time zone applies.
+        shipmentPreference:
+          anyOf:
+          - $ref: "#/components/schemas/LineShipmentPreference"
+          - type: "null"
+        singleLotRequired:
+          type: boolean
+        specification:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistorySpecification"
+          - type: "null"
+        tolerance:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryTolerance"
+          - type: "null"
+      required:
+      - colorId
+      - finishedWidth
+      - lineId
+      - pricing
+      - productDesc
+      - productId
+      - quantity
+      - requestedDeliveryDate
+      - shipmentPreference
+      - singleLotRequired
+      - specification
+      - tolerance
+    SalesOrderFieldHistoryPage:
+      type: object
+      additionalProperties: false
+      description: "Newest first by orderVersion, then id, both descending. Every\
+        \ page of one cursor chain shows only changes up to snapshotVersion, so a\
+        \ change saved meanwhile never shifts or repeats an entry; reading again without\
+        \ a cursor starts a new chain with a new snapshotVersion. One save may continue\
+        \ on the next page."
+      properties:
+        hasMore:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrderFieldHistoryEntry"
+          maxItems: 100
+        nextCursor:
+          type:
+          - string
+          - "null"
+          description: "Opaque; send it unchanged as cursor to read the next older\
+            \ page. Null on the last page. It is not an access proof: access is checked\
+            \ on every page."
+          maxLength: 2048
+        snapshotVersion:
+          type: integer
+          format: int64
+          description: "The order version this chain was read up to: the order's version\
+            \ when the first page was read. Order versions also advance by commands\
+            \ that do not write field history, so a higher order version does not\
+            \ mean that there are newer entries."
+          minimum: 0
+      required:
+      - hasMore
+      - items
+      - nextCursor
+      - snapshotVersion
+    SalesOrderFieldHistoryPricing:
+      type: object
+      additionalProperties: false
+      properties:
+        currency:
+          type:
+          - string
+          - "null"
+        discountAmount:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        taxAmount:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        unitPrice:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+      required:
+      - currency
+      - discountAmount
+      - taxAmount
+      - unitPrice
+    SalesOrderFieldHistoryProfileReference:
+      type: object
+      additionalProperties: false
+      properties:
+        profileId:
+          type: string
+          format: uuid
+        profileVersion:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - profileId
+      - profileVersion
+    SalesOrderFieldHistoryQuantity:
+      type: object
+      additionalProperties: false
+      properties:
+        requestedQty:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        unit:
+          type:
+          - string
+          - "null"
+      required:
+      - requestedQty
+      - unit
+    SalesOrderFieldHistoryRequestedDate:
+      type: object
+      additionalProperties: false
+      properties:
+        date:
+          type:
+          - string
+          - "null"
+          format: date
+          description: Calendar date; no time zone applies.
+        event:
+          anyOf:
+          - $ref: "#/components/schemas/RequestedDeliveryEvent"
+          - type: "null"
+        place:
+          type:
+          - string
+          - "null"
+        status:
+          anyOf:
+          - $ref: "#/components/schemas/RequestedDateStatus"
+          - type: "null"
+      required:
+      - date
+      - event
+      - place
+      - status
+    SalesOrderFieldHistoryResolutionScope:
+      type: string
+      description: "FIELD: the conflict decision was made for this key. LINE: it was\
+        \ made for the whole line the key belongs to (for example a product change\
+        \ accepted) or for a whole line added or removed."
+      enum:
+      - FIELD
+      - LINE
+    SalesOrderFieldHistorySpecification:
+      type: object
+      additionalProperties: false
+      properties:
+        moduleSpecs:
+          anyOf:
+          - $ref: "#/components/schemas/JsonNode"
+            additionalProperties: true
+          - type: "null"
+          description: Free module specs exactly as saved. Numbers in it carry no
+            unit or exactness guarantee; do not compute with them.
+        moduleType:
+          type:
+          - string
+          - "null"
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - DYE_FINISHING
+          - null
+        requirementProfile:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryProfileReference"
+          - type: "null"
+          description: The requirement-profile version pinned by the line at that
+            time; null when the line had no profile. Never the profile's current version.
+      required:
+      - moduleSpecs
+      - moduleType
+      - requirementProfile
+    SalesOrderFieldHistoryTolerance:
+      type: object
+      additionalProperties: false
+      properties:
+        downPct:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        upPct:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+      required:
+      - downPct
+      - upPct
+    SalesOrderFieldHistoryUnavailableReason:
+      type: string
+      description: "UNSUPPORTED_SHAPE: the stored value does not have the shape this\
+        \ version reads for its key. REFERENCE_UNAVAILABLE: a reference inside it\
+        \ (a requirement profile) is incomplete and cannot be read."
+      enum:
+      - UNSUPPORTED_SHAPE
+      - REFERENCE_UNAVAILABLE
+    SalesOrderFieldHistoryValue:
+      type: object
+      additionalProperties: false
+      description: KNOWN with data null is a saved empty value (or the absent side
+        of a whole-line change). UNAVAILABLE carries no data and always a reason.
+      properties:
+        data:
+          anyOf:
+          - type: string
+          - type: string
+            format: date
+          - type: boolean
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryRequestedDate"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryDeliveryTerms"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryAgreement"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryContact"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryWidth"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryQuantity"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryPricing"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryTolerance"
+          - $ref: "#/components/schemas/SalesOrderFieldHistorySpecification"
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryLine"
+          - type: "null"
+          description: The value in the shape the entry's knownEditKey names. The
+            value in the shape its entry's editKey names; null when KNOWN as empty
+            and always null when UNAVAILABLE.
+        reason:
+          anyOf:
+          - $ref: "#/components/schemas/SalesOrderFieldHistoryUnavailableReason"
+          - type: "null"
+        state:
+          $ref: "#/components/schemas/SalesOrderFieldHistoryValueState"
+      required:
+      - data
+      - reason
+      - state
+    SalesOrderFieldHistoryValueState:
+      type: string
+      description: "KNOWN: data is the stored value; null data is a saved empty value.\
+        \ UNAVAILABLE: the stored value cannot be shown in this version; it is not\
+        \ an empty value."
+      enum:
+      - KNOWN
+      - UNAVAILABLE
+    SalesOrderFieldHistoryWidth:
+      type: object
+      additionalProperties: false
+      properties:
+        unit:
+          type:
+          - string
+          - "null"
+        value:
+          type:
+          - string
+          - "null"
+          description: "Exact decimal as text (no exponent); compare as a decimal,\
+            \ never as a float."
+          pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+      required:
+      - unit
+      - value
     SalesOrderFlagFieldEdit:
       type: object
       additionalProperties: false
