@@ -135,9 +135,7 @@ public class SalesOrderEditLeaseService {
   /** The lease policy of the bound tenant, as published with every answer. */
   Policy policy() {
     LiveEditLeaseProperties properties = leases.properties();
-    // Always enforced (CEDIT-07-F3); the field stays on the wire until the client stops reading it.
     return new Policy(
-        SalesOrderEditLeaseDtos.Mode.ENFORCED,
         properties.ttlSeconds(),
         properties.renewAfterSeconds(),
         properties.idleAfterSeconds(),

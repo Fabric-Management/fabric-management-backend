@@ -495,8 +495,9 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
     assertThat(enumOf("SalesOrderEditLeaseField")).containsExactlyInAnyOrderElementsOf(catalogue);
     assertThat(refOf(property("SalesOrderEditLeaseKey", "key")))
         .isEqualTo(REF + "SalesOrderEditLeaseField");
-    // Always ENFORCED (CEDIT-07-F3); OFF stays listed until the client stops reading the mode.
-    assertThat(enumOf("SalesOrderEditLeaseMode")).containsExactlyInAnyOrder("OFF", "ENFORCED");
+    // Leases are always enforced (CEDIT-07-F3): no mode schema and no mode in the policy.
+    assertThat(mapAt(document, "components", "schemas"))
+        .doesNotContainKey("SalesOrderEditLeaseMode");
     assertThat(enumOf("SalesOrderEditLeaseRequirementReason"))
         .containsExactlyInAnyOrder("NOT_HELD", "HELD_BY_ANOTHER");
 
@@ -505,8 +506,8 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
         .containsKeys("userId", "displayName", "mine", "editSessionId", "expiresAt")
         .doesNotContainKey("leaseToken");
     assertThat(properties("SalesOrderEditLeasePolicy"))
+        .doesNotContainKey("mode")
         .containsKeys(
-            "mode",
             "leaseSeconds",
             "renewAfterSeconds",
             "idleAfterSeconds",

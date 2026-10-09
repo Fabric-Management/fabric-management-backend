@@ -1570,8 +1570,8 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
     assertThat(listed.body().toString())
         .doesNotContain(token(first).toString())
         .doesNotContain(tab.toString());
-    assertThat(listed.body().path("data").path("policy").path("mode").asText())
-        .isEqualTo("ENFORCED");
+    // Always enforced (CEDIT-07-F3): the policy carries no mode.
+    assertThat(listed.body().path("data").path("policy").has("mode")).isFalse();
     assertThat(listed.body().path("data").path("policy").path("renewAfterSeconds").asLong())
         .isEqualTo(30);
     Answer own = http("GET", path, actorA, null);

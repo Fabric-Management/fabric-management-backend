@@ -82108,22 +82108,16 @@ components:
             \ keys."
       required:
       - key
-    SalesOrderEditLeaseMode:
-      type: string
-      description: "Always ENFORCED: every save of a leasable key proves the tab's\
-        \ own lease. OFF is no longer sent; it stays listed until clients stop reading\
-        \ the mode."
-      enum:
-      - "OFF"
-      - ENFORCED
     SalesOrderEditLeasePolicy:
       type: object
-      description: "Renew a held lease every renewAfterSeconds, but only while the\
-        \ person really works in the form (typing, choosing, focusing a field; never\
-        \ an open connection, a presence renewal or a stream keepalive). Without such\
-        \ input for idleAfterSeconds the client stops renewing and lets its leases\
-        \ expire; it warns idleWarningSeconds before. A lease that is not renewed\
-        \ ends leaseSeconds after its last renewal, and never outlives its edit session."
+      description: "Leases are always enforced: every save of a leasable key proves\
+        \ the tab's own lease. Renew a held lease every renewAfterSeconds, but only\
+        \ while the person really works in the form (typing, choosing, focusing a\
+        \ field; never an open connection, a presence renewal or a stream keepalive).\
+        \ Without such input for idleAfterSeconds the client stops renewing and lets\
+        \ its leases expire; it warns idleWarningSeconds before. A lease that is not\
+        \ renewed ends leaseSeconds after its last renewal, and never outlives its\
+        \ edit session."
       properties:
         idleAfterSeconds:
           type: integer
@@ -82150,8 +82144,6 @@ components:
           format: int32
           example: 200
           minimum: 1
-        mode:
-          $ref: "#/components/schemas/SalesOrderEditLeaseMode"
         renewAfterSeconds:
           type: integer
           format: int64
@@ -82163,7 +82155,6 @@ components:
       - leaseSeconds
       - maxKeysPerRequest
       - maxLeasesPerSession
-      - mode
       - renewAfterSeconds
     SalesOrderEditLeaseProblem:
       type: object
