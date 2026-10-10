@@ -577,6 +577,45 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
         .doesNotContain(SalesOrderEditLeaseField.NOTES);
   }
 
+  @Test
+  @DisplayName(
+      "CE-04 (CEDIT-10): the value another person saved meanwhile is no conflict, yet it still"
+          + " needs its lease: without it EDIT_LEASE_REQUIRED and nothing recorded; with it"
+          + " NO_CHANGE")
+  void sameValueSavedMeanwhileStillNeedsItsLease() {
+    UUID baseA = open(actorA).baseId();
+    UUID tabB = openSession(actorB);
+    UUID bTerms = token(granted(actorB, tabB, header(SalesOrderEditLeaseField.PAYMENT_TERMS)));
+    saved(
+        actorB,
+        proof(
+            body(UUID.randomUUID(), open(actorB).baseId(), "paymentTerms", set("60 days")),
+            tabB,
+            bTerms));
+    long version = orderVersion();
+    int receipts = receipts();
+    int history = historyRows();
+
+    // A's stale form asks for the same value: the merge would answer NO_CHANGE, but the lease
+    // check comes first and a no-op skips neither it nor the authorization (S3.5).
+    UUID tabA = openSession(actorA);
+    Map<String, Object> same = body(UUID.randomUUID(), baseA, "paymentTerms", set("60 days"));
+    assertThat(failureCode(save(actorA, proof(same, tabA)))).isEqualTo("EDIT_LEASE_REQUIRED");
+    assertThat(receipts()).isEqualTo(receipts);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(orderVersion()).isEqualTo(version);
+
+    // The same operation, now proven, is the no-change; it moves nothing and releases the lease.
+    UUID aTerms = token(granted(actorA, tabA, header(SalesOrderEditLeaseField.PAYMENT_TERMS)));
+    SalesOrderEditResult result = saved(actorA, proof(same, tabA, aTerms));
+    assertThat(result.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
+    assertThat(orderText("payment_terms")).isEqualTo("60 days");
+    assertThat(orderVersion()).isEqualTo(version);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(receipts("NO_CHANGE")).isEqualTo(1);
+    assertThat(leases(actorB)).isEmpty();
+  }
+
   // ── L12–L13: access ───────────────────────────────────────────────────────
 
   @Test
