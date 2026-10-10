@@ -13,6 +13,8 @@ import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.realtime.app.LiveEditLeaseProperties;
+import com.fabricmanagement.platform.realtime.app.LiveEditSessionService;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
@@ -210,6 +212,10 @@ public abstract class SalesOrderEditItSupport {
   @Autowired private UserDepartmentRepository userDepartments;
   @Autowired private TradingPartnerRegistryRepository registries;
   @Autowired private TradingPartnerRepository partners;
+  @Autowired private SalesOrderEditSessionService proofSessions;
+  @Autowired private LiveEditSessionService proofLiveSessions;
+  @Autowired private SalesOrderEditLeaseService proofLeases;
+  @Autowired private LiveEditLeaseProperties proofLimits;
 
   @MockitoBean protected PermissionEvaluator permissionEvaluator;
   @MockitoBean protected ProductSalesDefinitionQueryService productDefinitions;
@@ -229,6 +235,8 @@ public abstract class SalesOrderEditItSupport {
   protected UUID d1;
   protected UUID p1;
   protected UUID p2;
+
+  private SalesOrderLeaseAutoProof leaseProof;
 
   /** A user of a tenant, as the security context carries it. */
   public record Actor(UUID tenantId, UUID id, List<String> departmentCodes) {
@@ -429,12 +437,81 @@ public abstract class SalesOrderEditItSupport {
 
   /** Saves a request as the user: a result, or the failure it raised. */
   protected Object save(Actor actor, Map<String, Object> body) {
+    return saveOn(actor, orderId, body);
+  }
+
+  /**
+   * Saves a request on the given order as the user, with the field leases it writes taken for this
+   * save only (CEDIT-07-F3, {@link SalesOrderLeaseAutoProof}) unless the test turned that off or
+   * the body carries its own proof: a result, or the failure it raised.
+   */
+  protected Object saveOn(Actor actor, UUID order, Map<String, Object> body) {
+    String path = PATH.formatted(order);
     SalesOrderEditRequest request = request(body);
+    if (!proveLeases()) {
+      return as(actor, () -> edits.save(order, request, actor.id(), actor.authentication(), path));
+    }
+    SalesOrderLeaseAutoProof proof = leaseProof();
     return as(
         actor,
         () ->
-            edits.save(
-                orderId, request, actor.id(), actor.authentication(), PATH.formatted(orderId)));
+            proof.save(
+                order,
+                actor.id(),
+                body,
+                () -> request,
+                sent ->
+                    edits.save(
+                        order,
+                        sent == body ? request : request(sent),
+                        actor.id(),
+                        actor.authentication(),
+                        path)));
+  }
+
+  /**
+   * Whether saves take the field leases they write by themselves (CEDIT-07-F3). Leases are always
+   * enforced; the lease tests turn this off and prove every save themselves.
+   */
+  protected boolean proveLeases() {
+    return true;
+  }
+
+  /**
+   * Opens a form of the user that takes the leases this body writes and keeps them past its save,
+   * as a person keeps the field (CEDIT-07-F3); save with {@code form.proven(body)}.
+   */
+  protected SalesOrderLeaseAutoProof.Held holdForm(Actor actor, Map<String, Object> body) {
+    SalesOrderEditRequest request = request(body);
+    Object held = as(actor, () -> leaseProof().hold(orderId, actor.id(), request));
+    if (held instanceof RuntimeException failure) {
+      throw failure;
+    }
+    return (SalesOrderLeaseAutoProof.Held) held;
+  }
+
+  /** Closes the form: its session ends and so do its leases. */
+  protected void closeForm(Actor actor, SalesOrderLeaseAutoProof.Held form) {
+    Object closed =
+        as(
+            actor,
+            () -> {
+              leaseProof().close(orderId, actor.id(), form);
+              return form;
+            });
+    if (closed instanceof RuntimeException failure) {
+      throw failure;
+    }
+  }
+
+  /** The automatic proof of this test: one per test, shared by its threads. */
+  protected synchronized SalesOrderLeaseAutoProof leaseProof() {
+    if (leaseProof == null) {
+      leaseProof =
+          new SalesOrderLeaseAutoProof(
+              proofSessions, proofLiveSessions, proofLeases, proofLimits, jdbc);
+    }
+    return leaseProof;
   }
 
   /** Saves and expects a saved result. */

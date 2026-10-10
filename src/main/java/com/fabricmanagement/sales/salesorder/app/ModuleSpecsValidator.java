@@ -6,7 +6,6 @@ import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementFacet
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -50,31 +49,8 @@ public class ModuleSpecsValidator {
   }
 
   /**
-   * Validates the given line's {@code moduleSpecs} against its {@code moduleType} for an update
-   * request.
-   *
-   * @throws OrderDomainException if a required field is missing or specs are null when needed
-   */
-  public void validate(UpdateSalesOrderLineRequest line) {
-    validate(line.getModuleType(), line.getModuleSpecs(), line.getRequirementProfile(), null);
-  }
-
-  /**
-   * Validates an existing line update against the effective typed profile. An omitted profile keeps
-   * the current profile, so an older client cannot silently reintroduce a legacy requirement key.
-   */
-  public void validate(
-      UpdateSalesOrderLineRequest line, RequirementProfileSnapshot currentRequirementProfile) {
-    validate(
-        line.getModuleType(),
-        line.getModuleSpecs(),
-        line.getRequirementProfile(),
-        currentRequirementProfile);
-  }
-
-  /**
    * Validates a line's module type and specs against the requested typed profile and the line's
-   * current one (null for a new line). The legacy line requests and the safe edit (CEDIT-03) share
+   * current one (null for a new line). The create line request and the safe edit (CEDIT-03) share
    * this rule.
    */
   public void validate(

@@ -6,16 +6,11 @@ import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseProperties;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseRetentionJob;
-import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveEditSessionNotFoundException;
 import com.fabricmanagement.sales.orderintake.app.ProductCorrectionService;
 import com.fabricmanagement.sales.orderintake.app.QuantityAcceptanceService;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
-import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
 import com.fabricmanagement.sales.salesorder.domain.RequestedDateStatus;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos.Grant;
@@ -26,8 +21,6 @@ import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseField;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseKey;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.URI;
@@ -37,7 +30,6 @@ import java.net.http.HttpResponse;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,8 +53,8 @@ import org.springframework.security.access.AccessDeniedException;
  * database's own lock-wait signal, never with sleeps; time moves only through the test clock.
  *
  * <p>Fixture (see {@link SalesOrderEditItSupport}): tenant with actors A, B, C and order O with
- * lines L1 and L2. Leases are enforced per test with {@link #enforce()}; without it the tenant is
- * in the default OFF mode, as every existing tenant is after this deploy.
+ * lines L1 and L2. Leases are always enforced (CEDIT-07-F3). Every save here carries the proof the
+ * test gives it, or none: the automatic proof of {@link SalesOrderEditItSupport} is off.
  */
 class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
@@ -71,18 +63,22 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   @Autowired private SalesOrderEditLeaseService leaseApi;
   @Autowired private SalesOrderEditSessionService sessions;
-  @Autowired private LiveEditLeaseService engine;
   @Autowired private LiveEditLeaseProperties leaseProperties;
   @Autowired private LiveEditLeaseRetentionJob leaseRetention;
   @Autowired private OrderPartiesService parties;
   @Autowired private QuantityAcceptanceService quantityAcceptances;
   @Autowired private ProductCorrectionService productCorrections;
   @Autowired private OrderFlowService flows;
-  @Autowired private SalesOrderService salesOrders;
 
   private ExecutorService pool;
   private int maxPerSession;
   private int maxPerResource;
+
+  /** Every save here proves what the test gives it, or nothing. */
+  @Override
+  protected boolean proveLeases() {
+    return false;
+  }
 
   @BeforeEach
   void startPool() {
@@ -104,7 +100,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @DisplayName(
       "L01 (CE-05): two sessions race for one key in both orders; one wins, no token leaks")
   void oneWinnerInBothOrders() throws Exception {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID tabB = openSession(actorB);
 
@@ -153,7 +148,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @DisplayName(
       "L02 (CE-10): different keys and lines are held together; two tabs of one person collide")
   void differentKeysCoexistButTabsCollide() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID tabA2 = openSession(actorA);
     UUID tabB = openSession(actorB);
@@ -178,7 +172,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @DisplayName(
       "L03: header/line mix-ups, foreign lines, repeats and parts of a composite are refused")
   void keysAreChecked() throws Exception {
-    enforce();
     UUID tab = openSession(actorA);
 
     assertThat(
@@ -214,7 +207,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @Test
   @DisplayName("L04 (CE-16): removing a line and changing one of its keys race in both orders")
   void wholeLineAndFieldRace() throws Exception {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID tabB = openSession(actorB);
     SalesOrderEditLeaseKey whole = line(SalesOrderEditLeaseField.LINE, l1);
@@ -260,7 +252,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L05 (CE-09): after expiry a new period has a new token; late renew, release and save of the"
           + " old one change nothing; the same session again and a cleaned row get new tokens too")
   void newPeriodNewToken() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID old = token(granted(actorA, tabA, notes()));
     UUID baseId = open(actorA).baseId();
@@ -306,7 +297,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @DisplayName(
       "L06: a save that waits for the order lock while its lease expires is judged after the wait")
   void expiryWhileWaitingIsSeen() throws Exception {
-    enforce();
     UUID tab = openSession(actorA);
     UUID token = token(granted(actorA, tab, notes()));
     UUID baseId = open(actorA).baseId();
@@ -342,7 +332,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L07: between a save's check and its commit no lease changes hands; a waiting acquire and a"
           + " waiting close see the saved, released state afterwards")
   void saveSerialisesWithTransferAndClose() throws Exception {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID token = token(granted(actorA, tabA, notes()));
     UUID baseId = open(actorA).baseId();
@@ -388,7 +377,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @Test
   @DisplayName("L08 (CE-13): one key without its lease: nothing changes, no history, no receipt")
   void oneMissingLeaseSavesNothing() {
-    enforce();
     UUID tab = openSession(actorA);
     UUID token = token(granted(actorA, tab, notes()));
     UUID baseId = open(actorA).baseId();
@@ -422,7 +410,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @Test
   @DisplayName("L09: a successful save releases the leases it used and nothing else")
   void successReleasesOnlyUsedLeases() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID tabB = openSession(actorB);
     Grant mine = granted(actorA, tabA, notes(), header(SalesOrderEditLeaseField.PAYMENT_TERMS));
@@ -449,7 +436,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L10 (CE-20): a lost answer is replayed after the lease was released and taken by another;"
           + " no second release, no new history")
   void replayAfterTheLeaseMoved() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID token = token(granted(actorA, tabA, notes()));
     UUID baseId = open(actorA).baseId();
@@ -477,7 +463,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L11: re-acquire and resend under the same operation id; other content is refused; NO_CHANGE"
           + " releases; conflict and validation failure keep the lease; USE_MINE saves with it")
   void saveOutcomesAndTheLease() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseId = open(actorA).baseId();
     UUID operation = UUID.randomUUID();
@@ -592,6 +577,45 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
         .doesNotContain(SalesOrderEditLeaseField.NOTES);
   }
 
+  @Test
+  @DisplayName(
+      "CE-04 (CEDIT-10): the value another person saved meanwhile is no conflict, yet it still"
+          + " needs its lease: without it EDIT_LEASE_REQUIRED and nothing recorded; with it"
+          + " NO_CHANGE")
+  void sameValueSavedMeanwhileStillNeedsItsLease() {
+    UUID baseA = open(actorA).baseId();
+    UUID tabB = openSession(actorB);
+    UUID bTerms = token(granted(actorB, tabB, header(SalesOrderEditLeaseField.PAYMENT_TERMS)));
+    saved(
+        actorB,
+        proof(
+            body(UUID.randomUUID(), open(actorB).baseId(), "paymentTerms", set("60 days")),
+            tabB,
+            bTerms));
+    long version = orderVersion();
+    int receipts = receipts();
+    int history = historyRows();
+
+    // A's stale form asks for the same value: the merge would answer NO_CHANGE, but the lease
+    // check comes first and a no-op skips neither it nor the authorization (S3.5).
+    UUID tabA = openSession(actorA);
+    Map<String, Object> same = body(UUID.randomUUID(), baseA, "paymentTerms", set("60 days"));
+    assertThat(failureCode(save(actorA, proof(same, tabA)))).isEqualTo("EDIT_LEASE_REQUIRED");
+    assertThat(receipts()).isEqualTo(receipts);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(orderVersion()).isEqualTo(version);
+
+    // The same operation, now proven, is the no-change; it moves nothing and releases the lease.
+    UUID aTerms = token(granted(actorA, tabA, header(SalesOrderEditLeaseField.PAYMENT_TERMS)));
+    SalesOrderEditResult result = saved(actorA, proof(same, tabA, aTerms));
+    assertThat(result.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
+    assertThat(orderText("payment_terms")).isEqualTo("60 days");
+    assertThat(orderVersion()).isEqualTo(version);
+    assertThat(historyRows()).isEqualTo(history);
+    assertThat(receipts("NO_CHANGE")).isEqualTo(1);
+    assertThat(leases(actorB)).isEmpty();
+  }
+
   // ── L12–L13: access ───────────────────────────────────────────────────────
 
   @Test
@@ -599,7 +623,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L12: closing a session ends its leases; an inactive user, a suspended tenant or lost"
           + " permission acquires, renews and saves nothing; release needs read only")
   void accessLossStopsLeases() {
-    enforce();
     UUID tabA = openSession(actorA);
     granted(actorA, tabA, notes());
     as(actorA, () -> run(() -> sessions.close(orderId, tabA, actorA.id())));
@@ -650,7 +673,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L13 (CE-17): another tenant sees no lease row through RLS; nobody uses another's session or"
           + " tokens")
   void isolation() throws Exception {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID token = token(granted(actorA, tabA, notes()));
 
@@ -671,38 +693,33 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
     assertThat(
             count(other.tenantId(), "SELECT count(*) FROM common_infrastructure.live_edit_lease"))
         .isZero();
-    assertThat(count(tenantId, "SELECT count(*) FROM common_infrastructure.live_edit_lease_mode"))
-        .isEqualTo(1);
-    assertThat(
-            count(
-                other.tenantId(),
-                "SELECT count(*) FROM common_infrastructure.live_edit_lease_mode"))
-        .isZero();
   }
 
   // ── L14–L17: other writers, state changes and the mode ────────────────────
 
   @Test
   @DisplayName(
-      "L14: off, nothing is granted and the safe save works without proof (CEDIT-04); on, the"
-          + " legacy full replace is refused")
-  void offModeAndLegacyReplace() {
+      "L14 (CEDIT-07-F3): leases are always enforced with no switch: a key is granted, the legacy"
+          + " full replace no longer exists (405, nothing changes) and a tokenless save is refused")
+  void alwaysEnforcedAndNoLegacyReplace() throws Exception {
     UUID tab = openSession(actorA);
-    assertThat(failureCode(acquire(actorA, tab, notes()))).isEqualTo("EDIT_LEASES_NOT_ENFORCED");
-    assertThat(
-            saved(actorA, body(UUID.randomUUID(), open(actorA).baseId(), "notes", set("Off")))
-                .outcome())
-        .isEqualTo(SalesOrderEditOutcome.APPLIED);
-    UpdateSalesOrderRequest put = legacyRequest("Legacy while off");
-    assertThat(as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), put)))
-        .isNotInstanceOf(RuntimeException.class);
+    granted(actorA, tab, notes());
+    long version = orderVersion();
 
-    enforce();
-    UpdateSalesOrderRequest blocked = legacyRequest("Legacy while on");
-    assertThat(
-            failureCode(as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), blocked))))
-        .isEqualTo("LEGACY_EDIT_DISABLED");
-    assertThat(orderText("notes")).isEqualTo("Legacy while off");
+    // The full replace is gone: a PUT on the order, authorised and well-formed as the old
+    // endpoint took it, reaches no handler and changes nothing.
+    Map<String, Object> legacy = new LinkedHashMap<>();
+    legacy.put("version", version);
+    legacy.put("orderDate", ORDER_DATE.toString());
+    legacy.put("notes", "Legacy");
+    legacy.put("lines", List.of());
+    String json = objectMapper.writeValueAsString(legacy);
+    Answer put = http("PUT", "/api/v1/sales/orders/" + orderId, actorA, json);
+    assertThat(put.status()).isEqualTo(405);
+    assertThat(put.body().path("code").asText()).isEqualTo("METHOD_NOT_ALLOWED");
+    assertThat(orderText("notes")).isNull();
+    assertThat(orderVersion()).isEqualTo(version);
+
     assertThat(
             failureCode(
                 save(
@@ -716,7 +733,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L15: a held key refuses the requested-date section, quantity acceptance and product"
           + " correction, the same person's other tab too; an unrelated lease does not")
   void otherWritersRespectLeases() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID dates =
         token(granted(actorA, tabA, header(SalesOrderEditLeaseField.REQUESTED_DELIVERY_DATE)));
@@ -761,7 +777,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @Test
   @DisplayName("L15: a command and an acquire race in both orders; the later one sees the earlier")
   void commandAndAcquireRace() throws Exception {
-    enforce();
     UUID tabA = openSession(actorA);
     SalesOrderEditLeaseKey dates = header(SalesOrderEditLeaseField.REQUESTED_DELIVERY_DATE);
 
@@ -831,7 +846,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L16: leaving the draft voids every lease at once; back in the draft, the old token still"
           + " neither renews nor saves")
   void leavingTheDraftVoidsLeases() {
-    enforce();
     UUID tab = openSession(actorA);
     UUID token = token(granted(actorA, tab, notes()));
     UUID baseId = open(actorA).baseId();
@@ -856,11 +870,9 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "L17: enforcement is monotonic; lowering it by hand frees no held key; a tokenless old"
-          + " client is refused explicitly")
-  void modeChangesNeverFreeHeldKeys() {
-    assertThat((Boolean) as(actorA, () -> engine.enforce("sales-order", "first"))).isTrue();
-    assertThat((Boolean) as(actorA, () -> engine.enforce("sales-order", "again"))).isFalse();
+      "L17 (CEDIT-07-F3): a tokenless old client is refused explicitly; a held key stays held for"
+          + " everybody else until it is released")
+  void tokenlessClientsAreRefused() {
     UUID tabA = openSession(actorA);
     UUID token = token(granted(actorA, tabA, notes()));
 
@@ -870,19 +882,21 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
         .singleElement()
         .satisfies(r -> assertThat(r.reason()).isEqualTo(RequirementReason.HELD_BY_ANOTHER));
 
-    // An operator removes the mode row: the held key stays held.
-    jdbc.update(
-        "DELETE FROM common_infrastructure.live_edit_lease_mode WHERE tenant_id = ?", tenantId);
-    Object stillHeld =
-        save(actorB, body(UUID.randomUUID(), open(actorB).baseId(), "notes", set("B")));
-    assertThat(failureCode(stillHeld)).isEqualTo("EDIT_LEASE_REQUIRED");
-    UpdateSalesOrderRequest put = legacyRequest("Legacy");
-    assertThat(failureCode(as(actorB, () -> salesOrders.updateOrder(orderId, actorB.id(), put))))
-        .isEqualTo("EDIT_LEASE_HELD");
-
     release(actorA, tabA, token);
+    Object stillTokenless =
+        save(actorB, body(UUID.randomUUID(), open(actorB).baseId(), "notes", set("B")));
+    assertThat(requirements(stillTokenless))
+        .singleElement()
+        .satisfies(r -> assertThat(r.reason()).isEqualTo(RequirementReason.NOT_HELD));
+    UUID tabB = openSession(actorB);
+    UUID tokenB = token(granted(actorB, tabB, notes()));
     assertThat(
-            saved(actorB, body(UUID.randomUUID(), open(actorB).baseId(), "notes", set("B")))
+            saved(
+                    actorB,
+                    proof(
+                        body(UUID.randomUUID(), open(actorB).baseId(), "notes", set("B")),
+                        tabB,
+                        tokenB))
                 .outcome())
         .isEqualTo(SalesOrderEditOutcome.APPLIED);
   }
@@ -894,7 +908,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "R1: a renewal and leaving the draft race in both orders; a token of the old epoch is never"
           + " reported renewed, and back in the draft it stays lost")
   void renewalAndLeavingTheDraftRace() throws Exception {
-    enforce();
     UUID tab = openSession(actorA);
     UUID token = token(granted(actorA, tab, notes()));
 
@@ -966,7 +979,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "R2: void leases of an older epoch fill neither bound; real holdings of the current epoch still"
           + " do")
   void boundsIgnoreVoidLeases() {
-    enforce();
     leaseProperties.setMaxLeasesPerSession(1);
     leaseProperties.setMaxLeasesPerResource(1);
     UUID tabA = openSession(actorA);
@@ -998,7 +1010,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "R3: a repeat and a renewal from a clock behind the one that granted the lease keep the token,"
           + " write consistent times and never pass the session; a later transfer still voids it")
   void clockDifferenceBetweenInstances() {
-    enforce();
     UUID tab = openSession(actorA);
     clock.advance(Duration.ofSeconds(5));
     UUID token = token(granted(actorA, tab, notes()));
@@ -1041,7 +1052,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "R3 follow-up: a renewal with no consistent extension ends the period on the server; the"
           + " lost token saves nothing, is listed nowhere and blocks nobody")
   void inconsistentRenewalEndsThePeriod() {
-    enforce();
     // Opened and granted on an instance 100 s ahead: session and lease end at t+190, the lease's
     // renewal time is t+100.
     clock.advance(Duration.ofSeconds(100));
@@ -1098,7 +1108,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "R3 follow-up: a repeated acquire with no consistent extension starts a new period with a new"
           + " token; the old token saves nothing, the new one does")
   void inconsistentRepeatStartsANewPeriod() {
-    enforce();
     clock.advance(Duration.ofSeconds(100));
     UUID tab = openSession(actorA);
     UUID old = token(granted(actorA, tab, notes()));
@@ -1153,7 +1162,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL01: A's lease ended and B removed the line; A's stale UPDATE reaches the merge and"
           + " conflicts, nothing is written and the line stays removed")
   void staleUpdateOfARemovedLineConflicts() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseA = open(actorA).baseId();
     granted(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, l1));
@@ -1183,7 +1191,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL02: a stale REMOVE of a line already removed is a no change without any lease; the retry"
           + " answers the same receipt")
   void staleRemoveOfARemovedLineIsNoChange() {
-    enforce();
     UUID baseA = open(actorA).baseId();
     removeL1ByB();
     long version = orderVersion();
@@ -1211,7 +1218,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL03: beside a removed line, an active key still needs its lease; with it the save conflicts"
           + " on the removed line and writes none of its other changes")
   void removedLineBesideAnActiveKey() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseA = open(actorA).baseId();
     removeL1ByB();
@@ -1259,7 +1265,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL04: a stale REMOVE of a removed line beside a proven change applies only the real change"
           + " and releases the lease it used")
   void removedLineBesideAProvenChange() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseA = open(actorA).baseId();
     removeL1ByB();
@@ -1290,7 +1295,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL05: an active line still needs its lease for UPDATE and REMOVE; the gone-line exception"
           + " is no bypass")
   void activeLinesStillNeedLeases() {
-    enforce();
     UUID baseA = open(actorA).baseId();
     int receiptsBefore = receipts();
 
@@ -1325,7 +1329,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL06: an id the base does not know is never a removed line: a made-up id still needs a"
           + " lease, a line added since the base is refused by the base check, nothing is written")
   void unknownLinesKeepTheirChecks() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseA = open(actorA).baseId();
     UUID madeUp = UUID.randomUUID();
@@ -1382,7 +1385,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL07: the removed line's old token is unexpected and records nothing; the same operation"
           + " without it reaches the conflict")
   void oldTokenOfARemovedLine() {
-    enforce();
     UUID tabA = openSession(actorA);
     UUID baseA = open(actorA).baseId();
     UUID old = token(granted(actorA, tabA, line(SalesOrderEditLeaseField.LINE_PRICING, l1)));
@@ -1407,7 +1409,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL08: a removal that commits while the stale save waits for the order row is seen: the"
           + " active lines are read after that lock")
   void removalWhileTheSaveWaits() throws Exception {
-    enforce();
     UUID baseA = open(actorA).baseId();
     CountDownLatch locked = new CountDownLatch(1);
     CountDownLatch unlock = new CountDownLatch(1);
@@ -1437,7 +1438,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "DL08: a stale save that takes the order row before the removal decides on the line as it is"
           + " then: still active, so it needs its lease; the removal follows")
   void staleSaveBeforeTheRemoval() throws Exception {
-    enforce();
     UUID baseA = open(actorA).baseId();
     UUID tabB = openSession(actorB);
     UUID whole = token(granted(actorB, tabB, line(SalesOrderEditLeaseField.LINE, l1)));
@@ -1476,19 +1476,18 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "DL09: off, the merge answers as before; a replayed conflict needs no lease and releases"
-          + " nobody's; enforced, a stale REMOVE needs no proof")
-  void replayAndOffModeAroundARemovedLine() {
+      "DL09: a replayed conflict of a removed line needs no lease and releases nobody's; a stale"
+          + " REMOVE of it needs no proof")
+  void replayAroundARemovedLine() {
     UUID baseA = open(actorA).baseId();
     UUID baseC = open(actorC).baseId();
-    saved(actorB, withLines(body(UUID.randomUUID(), open(actorB).baseId()), List.of(remove(l1))));
+    removeL1ByB();
     Map<String, Object> stale = staleL1Update(UUID.randomUUID(), baseA);
 
     JsonNode first = conflicted(actorA, stale);
     assertThat(first.path("conflicts").get(0).path("reason").asText())
         .isEqualTo("LINE_REMOVED_ON_SERVER");
 
-    enforce();
     UUID tabB = openSession(actorB);
     granted(actorB, tabB, notes());
     JsonNode again = conflicted(actorA, stale);
@@ -1510,7 +1509,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L18 (CE-18): acquire, release and expiry change the stream's lease marker only; renewal is"
           + " quiet; a reconnect starts from the current marker")
   void streamSignalsLeases() {
-    enforce();
     UUID tab = openSession(actorA);
     LiveSse stream = subscribe(actorB);
     LiveSse.Frame first = ready(stream);
@@ -1551,7 +1549,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
       "L19: bounds refuse as a whole; a repeated acquire keeps its token; unknown, null and"
           + " duration fields are refused on the wire")
   void boundsAndWireShape() throws Exception {
-    enforce();
     UUID tab = openSession(actorA);
     Grant first = granted(actorA, tab, notes());
     Grant repeat = granted(actorA, tab, notes());
@@ -1610,8 +1607,8 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
     assertThat(listed.body().toString())
         .doesNotContain(token(first).toString())
         .doesNotContain(tab.toString());
-    assertThat(listed.body().path("data").path("policy").path("mode").asText())
-        .isEqualTo("ENFORCED");
+    // Always enforced (CEDIT-07-F3): the policy carries no mode.
+    assertThat(listed.body().path("data").path("policy").has("mode")).isFalse();
     assertThat(listed.body().path("data").path("policy").path("renewAfterSeconds").asLong())
         .isEqualTo(30);
     Answer own = http("GET", path, actorA, null);
@@ -1632,13 +1629,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
-
-  private void enforce() {
-    Object result = as(actorA, () -> engine.enforce("sales-order", "CEDIT-07 IT"));
-    if (result instanceof RuntimeException failure) {
-      throw failure;
-    }
-  }
 
   private UUID openSession(Actor actor) {
     Object result = as(actor, () -> sessions.open(orderId, actor.id()));
@@ -1900,55 +1890,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   private String leasesPath() {
     return "/api/v1/sales/orders/" + orderId + "/edit-leases";
-  }
-
-  /** A legacy full replace at the current version: header as fixed, lines exactly as stored. */
-  private UpdateSalesOrderRequest legacyRequest(String notes) {
-    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
-    request.setVersion(orderVersion());
-    request.setOrderDate(ORDER_DATE);
-    request.setDeliveryTerm(DeliveryTerm.FCA);
-    request.setDeliveryPlace("Leeds");
-    request.setIncotermsVersion(IncotermsVersion.INCOTERMS_2020);
-    request.setDeliveryTermStatus(DeliveryTermStatus.PROPOSED);
-    request.setPaymentTerms("30 days");
-    request.setContactName("Jane Hill");
-    request.setContactEmail("jane@example.com");
-    request.setNotes(notes);
-    request.setLines(
-        new ArrayList<>(List.of(lineRequest(loadLine(l1)), lineRequest(loadLine(l2)))));
-    return request;
-  }
-
-  private static UpdateSalesOrderLineRequest lineRequest(SalesOrderLine line) {
-    return UpdateSalesOrderLineRequest.builder()
-        .id(line.getId())
-        .productId(line.getProductId())
-        .productDesc(line.getProductDesc())
-        .colorId(line.getColorId())
-        .finishedWidth(line.getFinishedWidth())
-        .finishedWidthUnit(line.getFinishedWidthUnit())
-        .requestedDeliveryDate(line.getRequestedDeliveryDate())
-        .singleLotRequired(line.isSingleLotRequired())
-        .requestedQty(line.getRequestedQty())
-        .unit(line.getUnit())
-        .unitPrice(line.getUnitPriceAmount())
-        .currency(line.getCurrency())
-        .discountAmount(line.getDiscountAmountValue())
-        .taxAmount(line.getTaxAmountValue())
-        .toleranceUpPct(line.getToleranceUpPct())
-        .toleranceDownPct(line.getToleranceDownPct())
-        .moduleType(line.getModuleType())
-        .moduleSpecs(line.getModuleSpecs())
-        .build();
-  }
-
-  private SalesOrderLine loadLine(UUID lineId) {
-    Object line = as(actorA, () -> lines.findByTenantIdAndId(tenantId, lineId).orElseThrow());
-    if (line instanceof RuntimeException failure) {
-      throw failure;
-    }
-    return (SalesOrderLine) line;
   }
 
   private record Answer(int status, JsonNode body) {}

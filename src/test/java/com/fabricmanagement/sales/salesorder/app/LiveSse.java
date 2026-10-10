@@ -74,6 +74,7 @@ final class LiveSse implements AutoCloseable {
   private final StringBuffer raw = new StringBuffer();
   private final Thread reader;
   private volatile boolean ended;
+  private volatile String revision;
 
   private LiveSse(HttpResponse<InputStream> response) throws IOException {
     this.response = response;
@@ -128,6 +129,11 @@ final class LiveSse implements AutoCloseable {
 
   boolean ended() {
     return ended;
+  }
+
+  /** The committed version of the last ready or invalidated frame taken from the stream. */
+  String revision() {
+    return revision;
   }
 
   /** The next frame (heartbeats included); fails if none comes in time or the stream ended. */
@@ -209,6 +215,9 @@ final class LiveSse implements AutoCloseable {
       if (frame == END) {
         frames.add(END);
         throw new AssertionError("The stream ended; received " + received);
+      }
+      if (frame != null && ("ready".equals(frame.event()) || "invalidated".equals(frame.event()))) {
+        revision = frame.revision();
       }
       return frame;
     } catch (InterruptedException interrupted) {

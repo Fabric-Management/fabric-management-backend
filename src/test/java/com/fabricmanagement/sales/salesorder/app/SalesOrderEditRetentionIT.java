@@ -603,12 +603,6 @@ class SalesOrderEditRetentionIT extends SalesOrderEditItSupport {
     return (SalesOrderEditBase) result;
   }
 
-  private Object saveOn(Actor actor, UUID order, Map<String, Object> body) {
-    var request = request(body);
-    String path = PATH.formatted(order);
-    return as(actor, () -> edits.save(order, request, actor.id(), actor.authentication(), path));
-  }
-
   private static UUID currentBaseOf(Object failure) {
     if (failure instanceof SalesOrderEditConflictException conflict) {
       return UUID.fromString(conflict.body().path("currentBase").path("baseId").asText());

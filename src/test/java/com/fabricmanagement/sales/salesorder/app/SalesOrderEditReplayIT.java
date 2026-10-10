@@ -156,7 +156,13 @@ class SalesOrderEditReplayIT extends SalesOrderEditItSupport {
   void sameRequestTwiceAtOnce() throws Exception {
     SalesOrderEditBase base = open(actorB);
     long version = orderVersion();
-    Map<String, Object> request = requestR(UUID.randomUUID(), base.baseId());
+    Map<String, Object> plain = requestR(UUID.randomUUID(), base.baseId());
+    // Leases are always enforced (CEDIT-07-F3). One tab takes the keys before the order row is
+    // locked and both workers send that tab's same proven request, so no acquire runs in the race:
+    // the two lock waiters below are the two save transactions themselves. The first to apply
+    // gives the leases back; the other is answered as a replay before any lease is checked.
+    SalesOrderLeaseAutoProof.Held tab = holdForm(actorB, plain);
+    Map<String, Object> request = tab.proven(plain);
     ExecutorService workers = Executors.newFixedThreadPool(2);
     Object one;
     Object two;
@@ -176,6 +182,7 @@ class SalesOrderEditReplayIT extends SalesOrderEditItSupport {
       }
     } finally {
       workers.shutdownNow();
+      closeForm(actorB, tab);
     }
 
     List<SalesOrderEditResult> results =
@@ -616,12 +623,6 @@ class SalesOrderEditReplayIT extends SalesOrderEditItSupport {
       throw failure;
     }
     return (SalesOrderEditBase) result;
-  }
-
-  private Object saveOn(Actor actor, UUID order, Map<String, Object> body) {
-    var request = request(body);
-    String path = PATH.formatted(order);
-    return as(actor, () -> edits.save(order, request, actor.id(), actor.authentication(), path));
   }
 
   private long versionOf(UUID order) {

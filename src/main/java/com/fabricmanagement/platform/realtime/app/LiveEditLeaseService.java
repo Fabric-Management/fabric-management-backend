@@ -4,11 +4,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.realtime.domain.LiveEditLease;
 import com.fabricmanagement.platform.realtime.domain.LiveEditSession;
 import com.fabricmanagement.platform.realtime.domain.LiveLeaseKey;
-import com.fabricmanagement.platform.realtime.domain.LiveLeaseMode;
 import com.fabricmanagement.platform.realtime.domain.LiveResource;
 import com.fabricmanagement.platform.realtime.domain.LiveRevision;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveEditLeaseLimitException;
-import com.fabricmanagement.platform.realtime.domain.exception.LiveEditLeasesNotEnforcedException;
 import com.fabricmanagement.platform.realtime.domain.exception.LiveEditSessionNotFoundException;
 import com.fabricmanagement.platform.realtime.infra.repository.LiveEditLeaseControlRepository;
 import com.fabricmanagement.platform.realtime.infra.repository.LiveEditLeaseRepository;
@@ -42,7 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  * who may lease which keys of its resource, maps its catalogue to {@link LiveLeaseKey}s, names the
  * resource's current editability generation and calls this service only after its own access check,
  * in the bound tenant. Ownership lives in PostgreSQL only, so every instance sees the same holder
- * and nothing depends on which instance a request reaches.
+ * and nothing depends on which instance a request reaches. Leases are always enforced: there is no
+ * mode that grants nothing or lets a save through without proof (CEDIT-07-F3).
  *
  * <p>Lock order, the same for every caller: the consumer's own resource lock (if it takes one),
  * then the per-resource lease lock (decisions that may grant a lease or rely on nobody holding
@@ -98,26 +97,6 @@ public class LiveEditLeaseService {
     }
   }
 
-  // ── mode ──────────────────────────────────────────────────────────────────
-
-  /** Whether leases are enforced for this kind of resource in the bound tenant now. */
-  @Transactional(readOnly = true)
-  public LiveLeaseMode mode(String resourceType) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return control.isEnforced(tenantId, resourceType) ? LiveLeaseMode.ENFORCED : LiveLeaseMode.OFF;
-  }
-
-  /**
-   * Switches enforcement on for the bound tenant (CEDIT-07 §3.4). Monotonic: nothing in the
-   * application switches it off. Activation in a real environment is an operation step; see the
-   * field-lease contract. Returns true when this call switched it on.
-   */
-  @Transactional
-  public boolean enforce(String resourceType, String by) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return control.enforce(tenantId, resourceType, now(), Objects.requireNonNull(by));
-  }
-
   // ── a session's own leases ───────────────────────────────────────────────
 
   /**
@@ -141,9 +120,6 @@ public class LiveEditLeaseService {
     }
     if (wanted.size() > properties.getMaxKeysPerRequest()) {
       throw new IllegalArgumentException("Too many keys in one acquire");
-    }
-    if (!control.isEnforced(tenantId, resource.type())) {
-      throw new LiveEditLeasesNotEnforcedException();
     }
     control.lockResource(tenantId, resource);
     LiveEditSession session = ownSession(tenantId, resource, sessionId, userId);
@@ -340,14 +316,6 @@ public class LiveEditLeaseService {
         .toList();
   }
 
-  /** As {@link #heldOverlapping} for a writer that replaces the whole resource. */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public List<LiveEditLease> heldAny(LiveResource resource, long generation) {
-    UUID tenantId = TenantContext.requireTenantId();
-    control.lockResource(tenantId, resource);
-    return leases.findHeld(tenantId, resource.type(), resource.id(), generation, now());
-  }
-
   // ── a save ───────────────────────────────────────────────────────────────
 
   /**
@@ -355,17 +323,14 @@ public class LiveEditLeaseService {
    * session row (shared) and the lease rows of the keys' scopes stay locked until the save ends, so
    * no lease of these keys changes hands between this check and the save's commit.
    *
-   * <p>{@code ENFORCED}: each required key needs a lease held now by {@code sessionId}, owned by
-   * {@code userId}, whose token was sent; and no other session may hold an overlapping lease.
-   * {@code OFF}: no proof is needed, but a key that somebody still holds is refused all the same,
-   * so lowering the mode never frees a held field. In both modes a token that proves none of the
-   * required keys is reported, never silently ignored.
+   * <p>Each required key needs a lease held now by {@code sessionId}, owned by {@code userId},
+   * whose token was sent; and no other session may hold an overlapping lease. A token that proves
+   * none of the required keys is reported, never silently ignored.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public Verification verify(
       LiveResource resource,
       long generation,
-      LiveLeaseMode mode,
       UUID sessionId,
       Set<UUID> tokens,
       UUID userId,
@@ -404,7 +369,7 @@ public class LiveEditLeaseService {
               .findFirst();
       if (own != null && inTheWay.isEmpty()) {
         held.add(own);
-      } else if (mode == LiveLeaseMode.ENFORCED || inTheWay.isPresent()) {
+      } else {
         missing.add(new Missing(key, inTheWay.orElse(null)));
       }
     }

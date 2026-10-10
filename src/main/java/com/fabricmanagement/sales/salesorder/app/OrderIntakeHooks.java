@@ -1,25 +1,20 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import com.fabricmanagement.platform.user.domain.SystemUser;
-import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.app.ConfirmationGate;
 import com.fabricmanagement.sales.salesorder.domain.CatalogLineInput;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * The order-intake rules the classic sales-order write paths must honour (SOI). {@link
- * SalesOrderService} calls only this seam, so create, full replace, confirmation and cancellation
- * share one implementation of the intake rules instead of each carrying its own copy.
+ * SalesOrderService} calls only this seam, so create, confirmation and cancellation share one
+ * implementation of the intake rules instead of each carrying its own copy.
  */
 @Component
 @RequiredArgsConstructor
@@ -34,26 +29,6 @@ public class OrderIntakeHooks {
   public void validateLines(
       UUID tenantId, UUID customerId, Collection<? extends CatalogLineInput> lines) {
     catalogLineValidator.validate(tenantId, customerId, lines);
-  }
-
-  /**
-   * A line's product changes only through the traced correction command (SOI R04, R19); the full
-   * replace of a draft may not swap it silently.
-   */
-  public void assertProductsUnchanged(
-      Collection<SalesOrderLine> existing, Collection<UpdateSalesOrderLineRequest> incoming) {
-    Map<UUID, UUID> current =
-        existing.stream()
-            .collect(Collectors.toMap(SalesOrderLine::getId, SalesOrderLine::getProductId));
-    for (UpdateSalesOrderLineRequest line : incoming) {
-      if (line.getId() != null
-          && current.containsKey(line.getId())
-          && !Objects.equals(current.get(line.getId()), line.getProductId())) {
-        throw OrderIntakeException.rule(
-            "PRODUCT_CORRECTION_REQUIRED",
-            "Change a line's product with the product correction; it is traced and re-checked");
-      }
-    }
   }
 
   /** Refuses a confirmation or an approval request the intake rules block; changes nothing. */

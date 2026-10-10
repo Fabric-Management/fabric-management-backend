@@ -1514,15 +1514,6 @@ CREATE POLICY rls_tenant_isolation ON common_infrastructure.live_edit_lease
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
--- Table: common_infrastructure.live_edit_lease_mode (CEDIT-07)
-ALTER TABLE common_infrastructure.live_edit_lease_mode ENABLE ROW LEVEL SECURITY;
-ALTER TABLE common_infrastructure.live_edit_lease_mode FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS rls_tenant_isolation ON common_infrastructure.live_edit_lease_mode;
-CREATE POLICY rls_tenant_isolation ON common_infrastructure.live_edit_lease_mode
-    FOR ALL
-    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
-    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
-
 -- Table: sales_ord.sales_order
 ALTER TABLE sales_ord.sales_order ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_ord.sales_order FORCE ROW LEVEL SECURITY;

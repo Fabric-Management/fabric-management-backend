@@ -31,8 +31,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 /**
  * The three safe-edit endpoints through real HTTP, Jackson and the error envelope (CEDIT-03 §7):
- * every refused body leaves the database as it was. Also the create and legacy-update regression of
- * the now strict requirement profile (S15.16–S15.19).
+ * every refused body leaves the database as it was. Also the create regression of the now strict
+ * requirement profile and the removed legacy update (S15.16–S15.19, CEDIT-07-F3). Every save takes
+ * the leases it writes first (see {@code saveRequest}).
  */
 class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
 
@@ -387,9 +388,25 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
   }
 
   @Test
-  @DisplayName("S15.16, S15.18: create and legacy update still accept valid profiles verbatim")
-  void createAndLegacyUpdateKeepValidProfiles() throws Exception {
-    Map<String, Object> profile = profileInput(Map.of());
+  @DisplayName(
+      "S15.16, S15.18: create keeps a valid profile verbatim; the legacy update no longer exists"
+          + " (CEDIT-07-F3)")
+  void createKeepsValidProfilesAndLegacyUpdateIsGone() throws Exception {
+    // S15.18: a free source value is kept exactly.
+    Map<String, Object> constraint =
+        pairs(
+            "field",
+            "handFeel",
+            "status",
+            "RESOLVED_UNSUPPORTED",
+            "sourceValue",
+            Map.of("anyKey", List.of(1, Map.of("nested", true))),
+            "meaning",
+            "as sampled",
+            "reason",
+            "not modelled yet");
+    Map<String, Object> profile =
+        profileInput(Map.of("unmodelledConstraints", List.of(constraint)));
     MvcResult created =
         perform(
                 actorB,
@@ -409,21 +426,19 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
                 Integer.class,
                 newOrder))
         .isEqualTo(1);
-
-    // S15.18: a free source value is kept exactly.
-    Map<String, Object> constraint =
-        pairs(
-            "field",
-            "handFeel",
-            "status",
-            "RESOLVED_UNSUPPORTED",
-            "sourceValue",
-            Map.of("anyKey", List.of(1, Map.of("nested", true))),
-            "meaning",
-            "as sampled",
-            "reason",
-            "not modelled yet");
     JsonNode line = order.path("lines").get(0);
+    String stored =
+        jdbc.queryForObject(
+            "SELECT requirement_profile_snapshot::text FROM sales_ord.sales_order_line"
+                + " WHERE id = ?::uuid",
+            String.class,
+            line.path("id").asText());
+    assertThat(
+            objectMapper.readTree(stored).path("unmodelledConstraints").get(0).path("sourceValue"))
+        .isEqualTo(objectMapper.valueToTree(constraint.get("sourceValue")));
+
+    // S15.16: the full replace was removed (CEDIT-07-F3); a well-formed, authorised PUT reaches no
+    // handler and changes nothing.
     Map<String, Object> lineUpdate =
         pairs(
             "id",
@@ -435,7 +450,7 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
             "unit",
             "M",
             "requirementProfile",
-            profileInput(Map.of("unmodelledConstraints", List.of(constraint))));
+            profileInput(Map.of()));
     Map<String, Object> update =
         pairs(
             "version",
@@ -450,16 +465,15 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(update)))
-        .andExpect(status().isOk());
-    String stored =
-        jdbc.queryForObject(
-            "SELECT requirement_profile_snapshot::text FROM sales_ord.sales_order_line"
-                + " WHERE id = ?::uuid",
-            String.class,
-            line.path("id").asText());
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     assertThat(
-            objectMapper.readTree(stored).path("unmodelledConstraints").get(0).path("sourceValue"))
-        .isEqualTo(objectMapper.valueToTree(constraint.get("sourceValue")));
+            jdbc.queryForObject(
+                "SELECT requirement_profile_snapshot::text FROM sales_ord.sales_order_line"
+                    + " WHERE id = ?::uuid",
+                String.class,
+                line.path("id").asText()))
+        .isEqualTo(stored);
   }
 
   @Test
@@ -489,10 +503,59 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
 
   // ── helpers ───────────────────────────────────────────────────────────────
 
+  /**
+   * Posts a save. Leases are always enforced (CEDIT-07-F3): a body that reads as a save takes the
+   * leases it writes first and carries their proof; any other body is sent exactly as given.
+   */
   private ResultActions saveRequest(Actor actor, String request) throws Exception {
-    return perform(
-        actor,
-        post(SAVES, orderId).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(request));
+    Map<String, Object> body = readable(request);
+    if (body == null) {
+      return postSave(actor, request);
+    }
+    TenantContext.setCurrentTenantId(actor.tenantId());
+    TenantContext.setCurrentUserId(actor.id());
+    try {
+      return leaseProof()
+          .save(
+              orderId,
+              actor.id(),
+              body,
+              () -> request(body),
+              sent -> postSave(actor, sent == body ? request : jsonUnchecked(sent)));
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
+  private ResultActions postSave(Actor actor, String request) {
+    try {
+      return perform(
+          actor,
+          post(SAVES, orderId)
+              .with(csrf())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(request));
+    } catch (Exception failure) {
+      throw new IllegalStateException(failure);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> readable(String request) {
+    try {
+      Object body = objectMapper.readValue(request, Object.class);
+      return body instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
+    } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
+      return null;
+    }
+  }
+
+  private String jsonUnchecked(Object value) {
+    try {
+      return objectMapper.writeValueAsString(value);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+      throw new IllegalStateException(failure);
+    }
   }
 
   private ResultActions perform(Actor actor, MockHttpServletRequestBuilder request)

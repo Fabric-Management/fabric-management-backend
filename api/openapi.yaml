@@ -50531,85 +50531,6 @@ paths:
       summary: Get order by ID
       tags:
       - Sales Orders
-    put:
-      description: "Only DRAFT orders can be updated. Requires version field for optimistic\
-        \ locking. Lines use full-replace strategy: lines with id are updated, lines\
-        \ without id are created, missing lines are soft-deleted."
-      operationId: updateOrder
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateSalesOrderRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseSalesOrderDto"
-          description: Order updated successfully
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Optimistic locking conflict or order not in DRAFT status
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Update a draft sales order
-      tags:
-      - Sales Orders
   /api/v1/sales/orders/{id}/cancel:
     post:
       operationId: cancelOrder
@@ -51894,9 +51815,9 @@ paths:
         \ already holds keeps its token (a repeat after a lost answer); any other\
         \ grant has a new token. Requires current write access, an editable draft\
         \ and my open edit session. 409 EDIT_LEASE_UNAVAILABLE names the holders in\
-        \ the way (no token); 409 EDIT_LEASES_NOT_ENFORCED while leases are off; 409\
-        \ EDIT_LEASE_LIMIT_REACHED; 404 EDIT_SESSION_NOT_FOUND for an ended or foreign\
-        \ session; 422 EDIT_LEASE_KEY_INVALID for a wrong line or a header/line mix-up."
+        \ the way (no token); 409 EDIT_LEASE_LIMIT_REACHED; 404 EDIT_SESSION_NOT_FOUND\
+        \ for an ended or foreign session; 422 EDIT_LEASE_KEY_INVALID for a wrong\
+        \ line or a header/line mix-up."
       operationId: acquireSalesOrderEditLeases
       parameters:
       - in: path
@@ -51950,8 +51871,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/SalesOrderEditLeaseProblem"
-          description: "EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASES_NOT_ENFORCED,\
-            \ EDIT_LEASE_LIMIT_REACHED or an order state code otherwise"
+          description: EDIT_LEASE_UNAVAILABLE with holders; EDIT_LEASE_LIMIT_REACHED
+            or an order state code otherwise
         "422":
           content:
             application/problem+json:
@@ -82108,22 +82029,16 @@ components:
             \ keys."
       required:
       - key
-    SalesOrderEditLeaseMode:
-      type: string
-      description: "OFF: leases are not enforced for this order's tenant yet; none\
-        \ is granted and a save needs none. ENFORCED: every save of a leasable key\
-        \ proves the tab's own lease."
-      enum:
-      - "OFF"
-      - ENFORCED
     SalesOrderEditLeasePolicy:
       type: object
-      description: "Renew a held lease every renewAfterSeconds, but only while the\
-        \ person really works in the form (typing, choosing, focusing a field; never\
-        \ an open connection, a presence renewal or a stream keepalive). Without such\
-        \ input for idleAfterSeconds the client stops renewing and lets its leases\
-        \ expire; it warns idleWarningSeconds before. A lease that is not renewed\
-        \ ends leaseSeconds after its last renewal, and never outlives its edit session."
+      description: "Leases are always enforced: every save of a leasable key proves\
+        \ the tab's own lease. Renew a held lease every renewAfterSeconds, but only\
+        \ while the person really works in the form (typing, choosing, focusing a\
+        \ field; never an open connection, a presence renewal or a stream keepalive).\
+        \ Without such input for idleAfterSeconds the client stops renewing and lets\
+        \ its leases expire; it warns idleWarningSeconds before. A lease that is not\
+        \ renewed ends leaseSeconds after its last renewal, and never outlives its\
+        \ edit session."
       properties:
         idleAfterSeconds:
           type: integer
@@ -82150,8 +82065,6 @@ components:
           format: int32
           example: 200
           minimum: 1
-        mode:
-          $ref: "#/components/schemas/SalesOrderEditLeaseMode"
         renewAfterSeconds:
           type: integer
           format: int64
@@ -82163,7 +82076,6 @@ components:
       - leaseSeconds
       - maxKeysPerRequest
       - maxLeasesPerSession
-      - mode
       - renewAfterSeconds
     SalesOrderEditLeaseProblem:
       type: object
@@ -82542,9 +82454,10 @@ components:
           type:
           - string
           - "null"
-          description: "The person's current directory name, not the name at the time\
-            \ of the change; null when the account is inactive, removed or cannot\
-            \ be resolved."
+          description: "The person's current directory name from their user record\
+            \ in this tenant, not the name at the time of the change; kept when the\
+            \ account was deactivated or closed. Null when no user record of this\
+            \ tenant can be found."
         id:
           type: string
           format: uuid
@@ -86363,192 +86276,6 @@ components:
         validUntil:
           type: string
           format: date
-    UpdateSalesOrderLineRequest:
-      type: object
-      properties:
-        colorId:
-          type: string
-          format: uuid
-          description: Colour card of this distribution (active tenant colour card)
-        currency:
-          type: string
-          description: Agreed sales currency of this line (ISO 4217)
-          example: USD
-          pattern: "[A-Z]{3}"
-        discountAmount:
-          type: number
-          description: Discount on this line in the line currency; needs a unit price
-          minimum: 0
-        finishedWidth:
-          type: number
-          description: Finished width; must be one of the product's defined widths
-          minimum: 0.01
-        finishedWidthUnit:
-          type: string
-          description: Unit of the finished width
-          enum:
-          - CM
-          - IN
-          pattern: CM|IN|cm|in
-        id:
-          type: string
-          format: uuid
-        moduleSpecs:
-          type: object
-          additionalProperties: true
-        moduleType:
-          type: string
-          enum:
-          - FIBER
-          - YARN
-          - FABRIC
-          - DYE_FINISHING
-        productDesc:
-          type: string
-          description: Optional line note; never a substitute for the product
-        productId:
-          type: string
-          format: uuid
-        requestedDeliveryDate:
-          type: string
-          format: date
-          description: Customer-requested delivery date of this distribution
-        requestedQty:
-          type: number
-          minimum: 0.001
-        requirementProfile:
-          $ref: "#/components/schemas/RequirementProfileInput"
-          description: Typed requirement profile update; omitted value preserves current
-            profile
-        shipmentPreference:
-          $ref: "#/components/schemas/LineShipmentPreference"
-          description: How the distribution may ship once ready; omitted means AS_READY
-            (LINE-PREFERENCES-1)
-        singleLotRequired:
-          type: boolean
-          description: The customer requires this distribution from a single dye lot
-        taxAmount:
-          type: number
-          description: Tax on this line in the line currency; needs a unit price
-          minimum: 0
-        toleranceDownPct:
-          type: number
-          description: Quantity tolerance below the requested quantity agreed for
-            this line (%)
-          maximum: 100
-          minimum: 0
-        toleranceUpPct:
-          type: number
-          description: Quantity tolerance above the requested quantity agreed for
-            this line (%)
-          maximum: 100
-          minimum: 0
-        unit:
-          type: string
-        unitPrice:
-          type: number
-          description: Agreed unit price in the line currency; omitted while not agreed
-          minimum: 0
-      required:
-      - productId
-      - requestedQty
-      - unit
-    UpdateSalesOrderRequest:
-      type: object
-      properties:
-        agreementContext:
-          $ref: "#/components/schemas/AgreementContext"
-          description: Where the conversation that led to the order took place
-        agreementContextNote:
-          type: string
-          description: Description of an OTHER context
-          maxLength: 500
-          minLength: 0
-        billingAddress:
-          type: string
-        contactEmail:
-          type: string
-          format: email
-          description: Contact e-mail
-          maxLength: 254
-          minLength: 0
-        contactName:
-          type: string
-          description: Customer contact person for this order
-          maxLength: 120
-          minLength: 0
-        contactPhone:
-          type: string
-          description: Contact mobile phone
-          maxLength: 30
-          minLength: 0
-        contactWhatsapp:
-          type: boolean
-          description: Whether the contact may be notified on WhatsApp at this phone
-        customerReference:
-          type: string
-        deadline:
-          type: string
-          format: date
-        deliveryContractReference:
-          type: string
-          description: The contract that fixed the term
-          maxLength: 200
-          minLength: 0
-        deliveryPlace:
-          type: string
-          description: Place named with the term (under C-terms the destination)
-          maxLength: 200
-          minLength: 0
-        deliveryTerm:
-          $ref: "#/components/schemas/DeliveryTerm"
-          description: Incoterms rule agreed for the order; omit until one is agreed
-        deliveryTermStatus:
-          $ref: "#/components/schemas/DeliveryTermStatus"
-          description: Proposed (default) or agreed by a prior contract; agreement
-            by the customer is set only by the customer's approval
-        incotermsVersion:
-          $ref: "#/components/schemas/IncotermsVersion"
-          description: Incoterms edition; defaults to 2020 when a term is given
-        lines:
-          type: array
-          items:
-            $ref: "#/components/schemas/UpdateSalesOrderLineRequest"
-        metadata:
-          type: object
-          additionalProperties: true
-        moduleType:
-          type: string
-          deprecated: true
-          description: "Deprecated: ignored; derived from line module types."
-          enum:
-          - FIBER
-          - YARN
-          - FABRIC
-          - DYE_FINISHING
-        notes:
-          type: string
-        orderDate:
-          type: string
-          format: date
-        paymentTerms:
-          type: string
-          description: Agreed payment terms
-          maxLength: 200
-          minLength: 0
-        requestedDeliveryDate:
-          type: string
-          format: date
-        shippingAddress:
-          type: string
-        shippingMethod:
-          type: string
-        version:
-          type: integer
-          format: int64
-      required:
-      - orderDate
-      - version
     UpdateSubcontractOrderRequest:
       type: object
       properties:

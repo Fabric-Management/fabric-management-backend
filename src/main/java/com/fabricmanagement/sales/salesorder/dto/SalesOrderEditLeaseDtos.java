@@ -28,17 +28,6 @@ public final class SalesOrderEditLeaseDtos {
   public static final int MAX_TOKENS = 200;
 
   @Schema(
-      name = "SalesOrderEditLeaseMode",
-      enumAsRef = true,
-      description =
-          "OFF: leases are not enforced for this order's tenant yet; none is granted and a save"
-              + " needs none. ENFORCED: every save of a leasable key proves the tab's own lease.")
-  public enum Mode {
-    OFF,
-    ENFORCED
-  }
-
-  @Schema(
       name = "SalesOrderEditLeaseRequirementReason",
       enumAsRef = true,
       description =
@@ -132,18 +121,21 @@ public final class SalesOrderEditLeaseDtos {
     }
   }
 
-  /** The server's lease timings and bounds; the client never hard-codes them. */
+  /**
+   * The server's lease timings and bounds; the client never hard-codes them. Leases are always
+   * enforced (CEDIT-07-F3), so there is no mode.
+   */
   @Schema(
       name = "SalesOrderEditLeasePolicy",
       description =
-          "Renew a held lease every renewAfterSeconds, but only while the person really works in"
+          "Leases are always enforced: every save of a leasable key proves the tab's own lease."
+              + " Renew a held lease every renewAfterSeconds, but only while the person really works in"
               + " the form (typing, choosing, focusing a field; never an open connection, a"
               + " presence renewal or a stream keepalive). Without such input for"
               + " idleAfterSeconds the client stops renewing and lets its leases expire; it warns"
               + " idleWarningSeconds before. A lease that is not renewed ends leaseSeconds after"
               + " its last renewal, and never outlives its edit session.")
   public record Policy(
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Mode mode,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "1", example = "90")
           long leaseSeconds,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "1", example = "30")

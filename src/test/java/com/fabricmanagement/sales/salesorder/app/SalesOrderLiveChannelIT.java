@@ -19,15 +19,9 @@ import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalRepository;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
-import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditBase;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -51,7 +45,6 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
   @Autowired private QuantityAcceptanceService quantityAcceptances;
   @Autowired private ProductCorrectionService productCorrections;
   @Autowired private QuantityProposalRepository proposals;
-  @Autowired private SalesOrderService salesOrders;
   @Autowired private OrderFlowService flows;
 
   @Test
@@ -144,17 +137,19 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     long version = orderVersion();
     int history = historyRows();
 
+    // Each save takes and gives back its lease (CEDIT-07-F3): presence and leases may move, the
+    // committed version must not.
     SalesOrderEditResult replay = saved(actorA, first);
     assertThat(replay.replayed()).isTrue();
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     SalesOrderEditResult noChange =
         saved(actorB, body(UUID.randomUUID(), baseB.baseId(), "notes", set("One")));
     assertThat(noChange.outcome()).isEqualTo(SalesOrderEditOutcome.NO_CHANGE);
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     conflicted(actorC, body(UUID.randomUUID(), baseC.baseId(), "notes", set("Two")));
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
 
     try (Connection writer = ownerConnection()) {
       writer.setAutoCommit(false);
@@ -174,8 +169,8 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "L07: quantity acceptance, product correction, legacy PUT and leaving the draft signal;"
-          + " leaving the draft keeps a reader's stream open")
+      "L07: quantity acceptance, product correction and leaving the draft signal; leaving the"
+          + " draft keeps a reader's stream open")
   void otherWritersSignal() {
     LiveSse stream = subscribe(actorB);
     ready(stream);
@@ -194,12 +189,6 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     Object corrected =
         as(actorA, () -> productCorrections.correct(orderId, correction, actorA.id()));
     assertThat(corrected).isNotInstanceOf(RuntimeException.class);
-    expectInvalidated(stream, orderVersion());
-
-    // Built first: reading the lines runs in its own tenant step.
-    UpdateSalesOrderRequest legacy = legacyRequest("Legacy");
-    Object put = as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), legacy));
-    assertThat(put).isNotInstanceOf(RuntimeException.class);
     expectInvalidated(stream, orderVersion());
 
     Object submitted = as(actorA, () -> flows.submit(orderId, actorA.id()));
@@ -225,13 +214,14 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
     LiveSse.Frame first = ready(stream);
     seen.add(Long.parseLong(first.revision()));
     while (seen.getLast() < latest) {
-      LiveSse.Frame next = stream.nextEvent(WAIT);
+      // Presence and lease frames of the saves' automatic proof keep the version (CEDIT-07-F3).
+      LiveSse.Frame next = nextRevision(stream);
       assertThat(next.event()).isEqualTo("invalidated");
       seen.add(Long.parseLong(next.revision()));
     }
     assertThat(seen.getLast()).isEqualTo(latest);
     assertThat(seen).isSorted().doesNotHaveDuplicates();
-    expectQuiet(stream);
+    expectNoNewRevision(stream);
   }
 
   @Test
@@ -369,54 +359,5 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
                     true,
                     "record-" + UUID.randomUUID()),
                 actorA.id()));
-  }
-
-  /** A legacy full replace at the current version: header as fixed, lines exactly as stored. */
-  private UpdateSalesOrderRequest legacyRequest(String notes) {
-    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
-    request.setVersion(orderVersion());
-    request.setOrderDate(ORDER_DATE);
-    request.setDeliveryTerm(DeliveryTerm.FCA);
-    request.setDeliveryPlace("Leeds");
-    request.setIncotermsVersion(IncotermsVersion.INCOTERMS_2020);
-    request.setDeliveryTermStatus(DeliveryTermStatus.PROPOSED);
-    request.setPaymentTerms("30 days");
-    request.setContactName("Jane Hill");
-    request.setContactEmail("jane@example.com");
-    request.setNotes(notes);
-    request.setLines(
-        new ArrayList<>(List.of(lineRequest(loadLine(l1)), lineRequest(loadLine(l2)))));
-    return request;
-  }
-
-  private static UpdateSalesOrderLineRequest lineRequest(SalesOrderLine line) {
-    return UpdateSalesOrderLineRequest.builder()
-        .id(line.getId())
-        .productId(line.getProductId())
-        .productDesc(line.getProductDesc())
-        .colorId(line.getColorId())
-        .finishedWidth(line.getFinishedWidth())
-        .finishedWidthUnit(line.getFinishedWidthUnit())
-        .requestedDeliveryDate(line.getRequestedDeliveryDate())
-        .singleLotRequired(line.isSingleLotRequired())
-        .requestedQty(line.getRequestedQty())
-        .unit(line.getUnit())
-        .unitPrice(line.getUnitPriceAmount())
-        .currency(line.getCurrency())
-        .discountAmount(line.getDiscountAmountValue())
-        .taxAmount(line.getTaxAmountValue())
-        .toleranceUpPct(line.getToleranceUpPct())
-        .toleranceDownPct(line.getToleranceDownPct())
-        .moduleType(line.getModuleType())
-        .moduleSpecs(line.getModuleSpecs())
-        .build();
-  }
-
-  private SalesOrderLine loadLine(UUID lineId) {
-    Object line = as(actorA, () -> lines.findByTenantIdAndId(tenantId, lineId).orElseThrow());
-    if (line instanceof RuntimeException failure) {
-      throw failure;
-    }
-    return (SalesOrderLine) line;
   }
 }

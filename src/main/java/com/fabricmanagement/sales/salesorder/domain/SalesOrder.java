@@ -792,36 +792,6 @@ public class SalesOrder extends BaseEntity {
     }
   }
 
-  public void updateDraft(SalesOrderUpdateCommand cmd) {
-    if (!status.canEdit()) {
-      throw new OrderDomainException(
-          "Cannot edit order "
-              + orderNumber
-              + ": current status "
-              + status
-              + " does not allow editing. Only DRAFT orders can be modified.",
-          409);
-    }
-    this.customerReference = cmd.customerReference();
-    this.orderDate = cmd.orderDate();
-    syncLegacyRequestedDate(cmd.requestedDeliveryDate());
-    applyDeliveryTerms(cmd.deliveryTerms());
-    applyDeliveryTermStatus(cmd.deliveryTermStatus(), cmd.deliveryContractReference());
-    this.paymentTerms = cmd.paymentTerms();
-    applyAgreementContext(cmd.agreementContext(), cmd.agreementContextNote());
-    this.contactName = cmd.contactName();
-    this.contactEmail = cmd.contactEmail();
-    this.contactPhone = cmd.contactPhone();
-    this.contactWhatsapp = cmd.contactWhatsapp();
-    this.shippingAddress = cmd.shippingAddress();
-    this.billingAddress = cmd.billingAddress();
-    this.shippingMethod = cmd.shippingMethod();
-    this.notes = cmd.notes();
-    this.metadata = cmd.metadata();
-    this.moduleType = cmd.derivedModuleType();
-    this.deadline = cmd.deadline();
-  }
-
   /**
    * The customer approved the sent version (the flow is at {@link
    * OrderFlowStage#CUSTOMER_APPROVED}): the order is confirmed and its delivery term agreed. The

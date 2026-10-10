@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(159)
+        .hasSize(158)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(159);
+    assertThat(expected).hasSize(158);
   }
 
   @Test
@@ -392,7 +392,6 @@ class SalesEndpointAuthorizationArchTest {
         result,
         "SalesOrderController",
         Category.MUTATION,
-        "updateOrder",
         "deleteOrder",
         "startProcessing",
         "shipOrder",

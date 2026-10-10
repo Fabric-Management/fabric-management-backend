@@ -235,16 +235,46 @@ public abstract class SalesOrderLiveItSupport extends SalesOrderEditItSupport {
     return first;
   }
 
-  /** The next data frame says the committed version changed to this one. */
+  /**
+   * The next data frame that changes the committed version says it changed to this one. Frames that
+   * only say who edits or holds which field (presence and leases at the same version: the edit
+   * session and leases of a save's automatic proof, CEDIT-07-F3) are passed over.
+   */
   protected static void expectInvalidated(LiveSse stream, long version) {
-    LiveSse.Frame frame = stream.nextEvent(WAIT);
+    LiveSse.Frame frame = nextRevision(stream);
     assertThat(frame.event()).isEqualTo("invalidated");
     assertThat(frame.revision()).isEqualTo(Long.toString(version));
+  }
+
+  /** The next data frame other than presence and leases at the version last seen. */
+  protected static LiveSse.Frame nextRevision(LiveSse stream) {
+    String seen = stream.revision();
+    while (true) {
+      LiveSse.Frame frame = stream.nextEvent(WAIT);
+      if (!sameRevision(frame, seen)) {
+        return frame;
+      }
+    }
   }
 
   /** Two keepalives pass without any data frame: nothing committed changed the revision. */
   protected static void expectQuiet(LiveSse stream) {
     assertThat(stream.eventsUntilHeartbeats(2, WAIT)).isEmpty();
+  }
+
+  /**
+   * Two keepalives pass without a data frame that changes the committed version; presence and
+   * leases may change meanwhile (the automatic proof of a save, CEDIT-07-F3).
+   */
+  protected static void expectNoNewRevision(LiveSse stream) {
+    String seen = stream.revision();
+    assertThat(stream.eventsUntilHeartbeats(2, WAIT))
+        .filteredOn(frame -> !sameRevision(frame, seen))
+        .isEmpty();
+  }
+
+  private static boolean sameRevision(LiveSse.Frame frame, String seen) {
+    return "invalidated".equals(frame.event()) && seen != null && seen.equals(frame.revision());
   }
 
   /** The stream ends with a closed frame of this reason and nothing after it. */

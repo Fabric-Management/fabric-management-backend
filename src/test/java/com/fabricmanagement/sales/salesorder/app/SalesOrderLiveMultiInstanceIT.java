@@ -15,6 +15,7 @@ import com.fabricmanagement.platform.user.domain.PermissionTemplate;
 import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -415,15 +416,6 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
           + " see it without a token; a release on B is seen at once")
   void leasesAcrossInstances() throws Exception {
     grantSales(tenantId, "write", DataScope.GLOBAL);
-    try (Connection owner = ownerConnection();
-        PreparedStatement enforce =
-            owner.prepareStatement(
-                "INSERT INTO common_infrastructure.live_edit_lease_mode"
-                    + " (tenant_id, resource_type, enforced_at, enforced_by)"
-                    + " VALUES (?, 'sales-order', now(), 'multi-instance IT')")) {
-      enforce.setObject(1, tenantId);
-      enforce.executeUpdate();
-    }
     String tabA =
         sessions(port, "POST", "", actorA, 201).path("data").path("editSessionId").asText();
     String tabB =
@@ -618,19 +610,44 @@ class SalesOrderLiveMultiInstanceIT extends SalesOrderLiveItSupport {
     UUID baseId =
         UUID.fromString(objectMapper.readTree(opened.body()).path("data").path("baseId").asText());
 
-    String body =
-        objectMapper.writeValueAsString(body(UUID.randomUUID(), baseId, "notes", set(notes)));
-    HttpResponse<String> saved =
-        HTTP.send(
-            HttpRequest.newBuilder(URI.create(base + "/edit-operations"))
-                .header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .timeout(Duration.ofSeconds(15))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+    // Leases are always enforced (CEDIT-07-F3): the save carries the proof of the notes lease.
+    Map<String, Object> request = body(UUID.randomUUID(), baseId, "notes", set(notes));
+    Object answer =
+        as(
+            actor,
+            () ->
+                leaseProof()
+                    .save(
+                        orderId,
+                        actor.id(),
+                        request,
+                        () -> request(request),
+                        sent -> post(base + "/edit-operations", token, sent)));
+    if (answer instanceof RuntimeException failure) {
+      throw failure;
+    }
+    @SuppressWarnings("unchecked")
+    HttpResponse<String> saved = (HttpResponse<String>) answer;
     assertThat(saved.statusCode()).as(saved.body()).isEqualTo(200);
     JsonNode result = objectMapper.readTree(saved.body()).path("data");
     assertThat(result.path("outcome").asText()).isEqualTo("APPLIED");
+  }
+
+  private HttpResponse<String> post(String uri, String token, Map<String, Object> body) {
+    try {
+      return HTTP.send(
+          HttpRequest.newBuilder(URI.create(uri))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+              .timeout(Duration.ofSeconds(15))
+              .build(),
+          HttpResponse.BodyHandlers.ofString());
+    } catch (IOException failure) {
+      throw new UncheckedIOException(failure);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
   }
 }

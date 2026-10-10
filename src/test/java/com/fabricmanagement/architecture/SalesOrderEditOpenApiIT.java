@@ -158,6 +158,17 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
   }
 
   @Test
+  @DisplayName(
+      "CEDIT-07-F3: the legacy full replace is gone: no PUT on the order and no update request"
+          + " schemas; the order itself is still read and deleted there")
+  void legacyFullReplaceIsGone() {
+    Map<String, Object> order = mapAt(document, "paths", "/api/v1/sales/orders/{id}");
+    assertThat(order).containsKeys("get", "delete").doesNotContainKey("put");
+    assertThat(mapAt(document, "components", "schemas"))
+        .doesNotContainKeys("UpdateSalesOrderRequest", "UpdateSalesOrderLineRequest");
+  }
+
+  @Test
   @DisplayName("S8.1/S11.1: only the save's 409 is the typed SalesOrderEditConflictProblem")
   void typedConflictProblem() {
     Map<String, Object> conflict =
@@ -495,7 +506,9 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
     assertThat(enumOf("SalesOrderEditLeaseField")).containsExactlyInAnyOrderElementsOf(catalogue);
     assertThat(refOf(property("SalesOrderEditLeaseKey", "key")))
         .isEqualTo(REF + "SalesOrderEditLeaseField");
-    assertThat(enumOf("SalesOrderEditLeaseMode")).containsExactlyInAnyOrder("OFF", "ENFORCED");
+    // Leases are always enforced (CEDIT-07-F3): no mode schema and no mode in the policy.
+    assertThat(mapAt(document, "components", "schemas"))
+        .doesNotContainKey("SalesOrderEditLeaseMode");
     assertThat(enumOf("SalesOrderEditLeaseRequirementReason"))
         .containsExactlyInAnyOrder("NOT_HELD", "HELD_BY_ANOTHER");
 
@@ -504,8 +517,8 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
         .containsKeys("userId", "displayName", "mine", "editSessionId", "expiresAt")
         .doesNotContainKey("leaseToken");
     assertThat(properties("SalesOrderEditLeasePolicy"))
+        .doesNotContainKey("mode")
         .containsKeys(
-            "mode",
             "leaseSeconds",
             "renewAfterSeconds",
             "idleAfterSeconds",
