@@ -17,20 +17,16 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderUpdateCommand;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,7 +40,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,9 +65,7 @@ public class SalesOrderService {
   private final DomainEventPublisher domainEventPublisher;
   private final DocumentNumberGenerator documentNumberGenerator;
   private final SalesOrderTotalsQuery totalsQuery;
-  private final SalesOrderRevision revision;
   private final SalesOrderAccessPolicy accessPolicy;
-  private final DeliveryCommitmentService deliveryCommitments;
   private final com.fabricmanagement.sales.salesorder.infra.repository
           .OrderCoverActivationRepository
       orderCoverActivationRepository;
@@ -80,9 +73,7 @@ public class SalesOrderService {
   private final OrderIntakeHooks orderIntakeHooks;
   private final CustomerRequestService customerRequestService;
   private final OrderApprovalInvalidator approvalInvalidator;
-  private final LineAllocationPolicy lineAllocations;
   private final OrderCreationReplay creationReplay;
-  private final SalesOrderLeaseGuard leaseGuard;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -216,7 +207,7 @@ public class SalesOrderService {
     TradingPartnerDto partner = partnerService.findById(tenantId, tradingPartnerId).orElse(null);
 
     // The two-arg SalesOrderDto.from(...) substitutes an empty line list. Creation must echo the
-    // lines it just persisted, as updateOrder and findById do — callers chain off the response.
+    // lines it just persisted, as findById does — callers chain off the response.
     List<SalesOrderLineResponse> lineResponses =
         savedLines.stream().map(this::mapLineToResponse).toList();
 
@@ -229,169 +220,12 @@ public class SalesOrderService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // UPDATE
+  // RULES SHARED WITH THE SAFE EDIT
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Update a draft sales order. Uses full-replace strategy for lines.
-   *
-   * @param orderId Order ID
-   * @param request Update request with version for optimistic locking
-   * @return Updated order DTO
-   */
-  @Transactional
-  public SalesOrderDto updateOrder(
-      UUID orderId, UUID currentUserId, UpdateSalesOrderRequest request) {
-    UUID tenantId = TenantContext.requireTenantId();
-
-    // 1. Fetch managed entity (Hibernate loads version)
-    SalesOrder order = getOrderOrThrow(tenantId, orderId);
-    if (!accessPolicy.canWrite(tenantId, currentUserId, order)) {
-      throw new AccessDeniedException("You do not have access to update this sales order.");
-    }
-
-    // Only sales' draft is edited: with planning or the customer it must be withdrawn first.
-    if (order.getFlowStage() != com.fabricmanagement.sales.salesorder.domain.OrderFlowStage.DRAFT) {
-      throw new OrderDomainException(
-          "Order "
-              + order.getOrderNumber()
-              + " is "
-              + order.getFlowStage()
-              + ": withdraw it to the draft before editing",
-          409);
-    }
-
-    // 2. Optimistic lock — compare, DON'T setVersion
-    if (!order.getVersion().equals(request.getVersion())) {
-      throw new ObjectOptimisticLockingFailureException(SalesOrder.class.getSimpleName(), orderId);
-    }
-
-    // The delivery term of an agreed commitment changes only through a new commitment.
-    DeliveryTerms terms =
-        DeliveryTerms.of(
-            request.getDeliveryTerm(), request.getDeliveryPlace(), request.getIncotermsVersion());
-    deliveryCommitments.assertTermsEditable(order, terms);
-
-    // The version covers the lines: move it now, so a stale second save cannot pass.
-    revision.linesChanged(order);
-
-    // CEDIT-07-F3: the full replace proves no lease and leases are always enforced, so it is
-    // always refused; orders are edited field by field through the safe save.
-    leaseGuard.assertLegacyReplaceAllowed(order, currentUserId);
-
-    // 3. Validate the catalogue lines. Totals are not stored: they derive from the lines.
-    orderIntakeHooks.validateLines(tenantId, order.getTradingPartnerId(), request.getLines());
-
-    // 4. Line sync (full-replace)
-    List<SalesOrderLine> existingLines =
-        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
-    orderIntakeHooks.assertProductsUnchanged(existingLines, request.getLines());
-
-    Set<UUID> incomingLineIds =
-        request.getLines().stream()
-            .map(UpdateSalesOrderLineRequest::getId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-
-    // 4a. Soft-delete lines not in request; their delivery allocations go with them.
-    List<UUID> removedLineIds = new ArrayList<>();
-    existingLines.stream()
-        .filter(line -> !incomingLineIds.contains(line.getId()))
-        .forEach(
-            line -> {
-              line.delete();
-              removedLineIds.add(line.getId());
-            });
-    lineAllocations.linesRemoved(order.getId(), removedLineIds);
-
-    // 4b. Update existing + create new lines
-    List<SalesOrderLine> syncedLines = new ArrayList<>();
-    for (UpdateSalesOrderLineRequest lineReq : request.getLines()) {
-      if (lineReq.getId() != null) {
-        // Update existing
-        SalesOrderLine existing =
-            existingLines.stream()
-                .filter(l -> l.getId().equals(lineReq.getId()))
-                .findFirst()
-                .orElseThrow(() -> new OrderDomainException("Line not found: " + lineReq.getId()));
-        validateRequirementProfileContextChange(existing, lineReq);
-        moduleSpecsValidator.validate(lineReq, existing.getRequirementProfileSnapshot());
-        updateLineFromRequest(existing, lineReq);
-        if (lineReq.getRequirementProfile() != null) {
-          requirementProfileService.apply(
-              existing, lineReq.getRequirementProfile(), lineReq.getModuleSpecs());
-        }
-        syncedLines.add(existing);
-      } else {
-        // Create new
-        moduleSpecsValidator.validate(lineReq);
-        SalesOrderLine newLine = mapUpdateLineRequestToEntity(lineReq, order.getId());
-        SalesOrderLine persistedLine = lineRepository.save(newLine);
-        if (lineReq.getRequirementProfile() != null) {
-          requirementProfileService.apply(
-              persistedLine, lineReq.getRequirementProfile(), lineReq.getModuleSpecs());
-        }
-        syncedLines.add(persistedLine);
-      }
-    }
-
-    // 5. Build domain command and apply
-    SalesOrderUpdateCommand cmd =
-        new SalesOrderUpdateCommand(
-            request.getCustomerReference(),
-            request.getOrderDate(),
-            request.getRequestedDeliveryDate(),
-            terms,
-            request.getDeliveryTermStatus(),
-            request.getDeliveryContractReference(),
-            request.getPaymentTerms(),
-            request.getAgreementContext(),
-            request.getAgreementContextNote(),
-            blankToNull(request.getContactName()),
-            blankToNull(request.getContactEmail()),
-            blankToNull(request.getContactPhone()),
-            contactWhatsapp(request.getContactPhone(), request.getContactWhatsapp()),
-            request.getShippingAddress(),
-            request.getBillingAddress(),
-            request.getShippingMethod(),
-            request.getNotes(),
-            request.getMetadata(),
-            deriveOrderModuleType(syncedLines),
-            request.getDeadline());
-
-    order.updateDraft(cmd); // throws 409 if not DRAFT
-    SalesOrder saved = orderRepository.save(order);
-
-    // 6. Response
-    TradingPartnerDto partner =
-        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
-    List<SalesOrderLineResponse> lineResponses =
-        syncedLines.stream()
-            .filter(SalesOrderLine::getIsActive)
-            .map(this::mapLineToResponse)
-            .toList();
-
-    log.info(
-        "Sales order updated: uid={}, linesAdded={}, linesRemoved={}",
-        saved.getUid(),
-        request.getLines().stream().filter(l -> l.getId() == null).count(),
-        existingLines.size() - incomingLineIds.size());
-
-    return SalesOrderDto.from(saved, partner, lineResponses, OrderCurrencyTotals.of(syncedLines));
-  }
-
-  private void validateRequirementProfileContextChange(
-      SalesOrderLine existing, UpdateSalesOrderLineRequest requested) {
-    assertProfileContextChange(
-        existing,
-        requested.getProductId(),
-        requested.getModuleType(),
-        requested.getRequirementProfile());
-  }
-
-  /**
    * A profiled line whose product or module type changes needs a new profile from a new basis; the
-   * legacy update and the safe edit (CEDIT-03) apply the same rule.
+   * safe edit (CEDIT-03) applies this rule.
    */
   static void assertProfileContextChange(
       SalesOrderLine existing,
@@ -419,28 +253,6 @@ public class SalesOrderService {
     }
   }
 
-  private void updateLineFromRequest(SalesOrderLine line, UpdateSalesOrderLineRequest req) {
-    // ADR-0014 D8: the line's deliveries must still fit its quantity and unit.
-    lineAllocations.assertChange(line, req.getRequestedQty(), req.getUnit());
-    line.setProductId(req.getProductId());
-    line.setProductDesc(req.getProductDesc());
-    line.setRequestedQty(req.getRequestedQty());
-    line.setUnit(req.getUnit());
-    // Each line keeps its own agreed currency; the price can still be open on a draft.
-    line.updatePricing(
-        req.getCurrency(), req.getUnitPrice(), req.getDiscountAmount(), req.getTaxAmount());
-    recordTolerance(line, req.getToleranceUpPct(), req.getToleranceDownPct());
-
-    line.setModuleType(req.getModuleType());
-    line.setModuleSpecs(req.getModuleSpecs());
-    line.setColorId(req.getColorId());
-    line.setFinishedWidth(req.getFinishedWidth());
-    line.setFinishedWidthUnit(normaliseWidthUnit(req.getFinishedWidthUnit()));
-    line.setRequestedDeliveryDate(req.getRequestedDeliveryDate());
-    line.setSingleLotRequired(Boolean.TRUE.equals(req.getSingleLotRequired()));
-    line.setShipmentPreference(req.getShipmentPreference());
-  }
-
   /** A line's shipment preference as requested; omitted means "as ready" (LINE-PREFERENCES-1). */
   static LineShipmentPreference shipmentPreferenceOrDefault(LineShipmentPreference requested) {
     return requested == null ? LineShipmentPreference.AS_READY : requested;
@@ -448,39 +260,6 @@ public class SalesOrderService {
 
   static String normaliseWidthUnit(String unit) {
     return unit == null || unit.isBlank() ? null : unit.trim().toUpperCase(java.util.Locale.ROOT);
-  }
-
-  private SalesOrderLine mapUpdateLineRequestToEntity(
-      UpdateSalesOrderLineRequest request, UUID orderId) {
-    SalesOrderLine.validatePricing(
-        request.getRequestedQty(),
-        request.getCurrency(),
-        request.getUnitPrice(),
-        request.getDiscountAmount(),
-        request.getTaxAmount());
-    SalesOrderLine line =
-        SalesOrderLine.builder()
-            .salesOrderId(orderId)
-            .productId(request.getProductId())
-            .productDesc(request.getProductDesc())
-            .requestedQty(request.getRequestedQty())
-            .unit(request.getUnit())
-            .currency(request.getCurrency())
-            .unitPriceAmount(request.getUnitPrice())
-            .discountAmountValue(request.getDiscountAmount())
-            .taxAmountValue(request.getTaxAmount())
-            .lineStatus(SalesOrderLineStatus.PENDING)
-            .moduleType(request.getModuleType())
-            .moduleSpecs(request.getModuleSpecs())
-            .colorId(request.getColorId())
-            .finishedWidth(request.getFinishedWidth())
-            .finishedWidthUnit(normaliseWidthUnit(request.getFinishedWidthUnit()))
-            .requestedDeliveryDate(request.getRequestedDeliveryDate())
-            .singleLotRequired(Boolean.TRUE.equals(request.getSingleLotRequired()))
-            .shipmentPreference(shipmentPreferenceOrDefault(request.getShipmentPreference()))
-            .build();
-    recordTolerance(line, request.getToleranceUpPct(), request.getToleranceDownPct());
-    return line;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

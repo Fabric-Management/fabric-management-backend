@@ -8,7 +8,6 @@ import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
@@ -28,7 +27,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -62,29 +60,6 @@ public class SalesOrderController {
       @Valid @RequestBody CreateSalesOrderRequest request) {
     SalesOrderDto order = orderService.createOrder(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(order));
-  }
-
-  @PutMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
-  @Operation(
-      summary = "Update a draft sales order",
-      description =
-          "Only DRAFT orders can be updated. "
-              + "Requires version field for optimistic locking. "
-              + "Lines use full-replace strategy: lines with id are updated, "
-              + "lines without id are created, missing lines are soft-deleted.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponse(
-      responseCode = "200",
-      description = "Order updated successfully")
-  @io.swagger.v3.oas.annotations.responses.ApiResponse(
-      responseCode = "409",
-      description = "Optimistic locking conflict or order not in DRAFT status")
-  public ResponseEntity<ApiResponse<SalesOrderDto>> updateOrder(
-      @PathVariable UUID id,
-      @Valid @RequestBody UpdateSalesOrderRequest request,
-      Authentication authentication) {
-    SalesOrderDto order = orderService.updateOrder(id, currentUserId(authentication), request);
-    return ResponseEntity.ok(ApiResponse.success(order, "Sales order updated"));
   }
 
   @GetMapping("/{id}")

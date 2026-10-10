@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * The three safe-edit endpoints through real HTTP, Jackson and the error envelope (CEDIT-03 §7):
  * every refused body leaves the database as it was. Also the create regression of the now strict
- * requirement profile and the closed legacy update (S15.16–S15.19, CEDIT-07-F3). Every save takes
+ * requirement profile and the removed legacy update (S15.16–S15.19, CEDIT-07-F3). Every save takes
  * the leases it writes first (see {@code saveRequest}).
  */
 class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
@@ -389,9 +389,9 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
 
   @Test
   @DisplayName(
-      "S15.16, S15.18: create keeps a valid profile verbatim; the legacy update is closed for good"
+      "S15.16, S15.18: create keeps a valid profile verbatim; the legacy update no longer exists"
           + " (CEDIT-07-F3)")
-  void createKeepsValidProfilesAndLegacyUpdateIsClosed() throws Exception {
+  void createKeepsValidProfilesAndLegacyUpdateIsGone() throws Exception {
     // S15.18: a free source value is kept exactly.
     Map<String, Object> constraint =
         pairs(
@@ -437,8 +437,8 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
             objectMapper.readTree(stored).path("unmodelledConstraints").get(0).path("sourceValue"))
         .isEqualTo(objectMapper.valueToTree(constraint.get("sourceValue")));
 
-    // S15.16: the full replace proves no lease and leases are always enforced, so it is refused
-    // whatever it carries and changes nothing.
+    // S15.16: the full replace was removed (CEDIT-07-F3); a well-formed, authorised PUT reaches no
+    // handler and changes nothing.
     Map<String, Object> lineUpdate =
         pairs(
             "id",
@@ -465,8 +465,8 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(update)))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("LEGACY_EDIT_DISABLED"));
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     assertThat(
             jdbc.queryForObject(
                 "SELECT requirement_profile_snapshot::text FROM sales_ord.sales_order_line"

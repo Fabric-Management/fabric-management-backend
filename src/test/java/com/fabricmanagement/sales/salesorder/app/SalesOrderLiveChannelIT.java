@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
@@ -20,15 +19,9 @@ import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalRepository;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
-import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditBase;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -52,7 +45,6 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
   @Autowired private QuantityAcceptanceService quantityAcceptances;
   @Autowired private ProductCorrectionService productCorrections;
   @Autowired private QuantityProposalRepository proposals;
-  @Autowired private SalesOrderService salesOrders;
   @Autowired private OrderFlowService flows;
 
   @Test
@@ -177,8 +169,8 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "L07: quantity acceptance, product correction and leaving the draft signal; the refused"
-          + " legacy PUT does not; leaving the draft keeps a reader's stream open")
+      "L07: quantity acceptance, product correction and leaving the draft signal; leaving the"
+          + " draft keeps a reader's stream open")
   void otherWritersSignal() {
     LiveSse stream = subscribe(actorB);
     ready(stream);
@@ -198,15 +190,6 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
         as(actorA, () -> productCorrections.correct(orderId, correction, actorA.id()));
     assertThat(corrected).isNotInstanceOf(RuntimeException.class);
     expectInvalidated(stream, orderVersion());
-
-    // Built first: reading the lines runs in its own tenant step. The full replace is closed for
-    // good (CEDIT-07-F3): refused, it commits nothing and signals nothing.
-    long beforePut = orderVersion();
-    UpdateSalesOrderRequest legacy = legacyRequest("Legacy");
-    Object put = as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), legacy));
-    assertThat(put).isInstanceOf(DomainException.class);
-    assertThat(((DomainException) put).getErrorCode()).isEqualTo("LEGACY_EDIT_DISABLED");
-    assertThat(orderVersion()).isEqualTo(beforePut);
 
     Object submitted = as(actorA, () -> flows.submit(orderId, actorA.id()));
     assertThat(submitted).isNotInstanceOf(RuntimeException.class);
@@ -376,54 +359,5 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
                     true,
                     "record-" + UUID.randomUUID()),
                 actorA.id()));
-  }
-
-  /** A legacy full replace at the current version: header as fixed, lines exactly as stored. */
-  private UpdateSalesOrderRequest legacyRequest(String notes) {
-    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
-    request.setVersion(orderVersion());
-    request.setOrderDate(ORDER_DATE);
-    request.setDeliveryTerm(DeliveryTerm.FCA);
-    request.setDeliveryPlace("Leeds");
-    request.setIncotermsVersion(IncotermsVersion.INCOTERMS_2020);
-    request.setDeliveryTermStatus(DeliveryTermStatus.PROPOSED);
-    request.setPaymentTerms("30 days");
-    request.setContactName("Jane Hill");
-    request.setContactEmail("jane@example.com");
-    request.setNotes(notes);
-    request.setLines(
-        new ArrayList<>(List.of(lineRequest(loadLine(l1)), lineRequest(loadLine(l2)))));
-    return request;
-  }
-
-  private static UpdateSalesOrderLineRequest lineRequest(SalesOrderLine line) {
-    return UpdateSalesOrderLineRequest.builder()
-        .id(line.getId())
-        .productId(line.getProductId())
-        .productDesc(line.getProductDesc())
-        .colorId(line.getColorId())
-        .finishedWidth(line.getFinishedWidth())
-        .finishedWidthUnit(line.getFinishedWidthUnit())
-        .requestedDeliveryDate(line.getRequestedDeliveryDate())
-        .singleLotRequired(line.isSingleLotRequired())
-        .requestedQty(line.getRequestedQty())
-        .unit(line.getUnit())
-        .unitPrice(line.getUnitPriceAmount())
-        .currency(line.getCurrency())
-        .discountAmount(line.getDiscountAmountValue())
-        .taxAmount(line.getTaxAmountValue())
-        .toleranceUpPct(line.getToleranceUpPct())
-        .toleranceDownPct(line.getToleranceDownPct())
-        .moduleType(line.getModuleType())
-        .moduleSpecs(line.getModuleSpecs())
-        .build();
-  }
-
-  private SalesOrderLine loadLine(UUID lineId) {
-    Object line = as(actorA, () -> lines.findByTenantIdAndId(tenantId, lineId).orElseThrow());
-    if (line instanceof RuntimeException failure) {
-      throw failure;
-    }
-    return (SalesOrderLine) line;
   }
 }

@@ -10,11 +10,7 @@ import com.fabricmanagement.platform.realtime.domain.exception.LiveEditSessionNo
 import com.fabricmanagement.sales.orderintake.app.ProductCorrectionService;
 import com.fabricmanagement.sales.orderintake.app.QuantityAcceptanceService;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
-import com.fabricmanagement.sales.salesorder.domain.DeliveryTermStatus;
-import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
 import com.fabricmanagement.sales.salesorder.domain.RequestedDateStatus;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseDtos.Grant;
@@ -25,8 +21,6 @@ import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseField;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditLeaseKey;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditOutcome;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderEditResult;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.URI;
@@ -36,7 +30,6 @@ import java.net.http.HttpResponse;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +69,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
   @Autowired private QuantityAcceptanceService quantityAcceptances;
   @Autowired private ProductCorrectionService productCorrections;
   @Autowired private OrderFlowService flows;
-  @Autowired private SalesOrderService salesOrders;
 
   private ExecutorService pool;
   private int maxPerSession;
@@ -668,21 +660,27 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   @Test
   @DisplayName(
-      "L14 (CEDIT-07-F3): leases are always enforced with no switch: a key is granted, a"
-          + " tokenless save is refused, and the legacy full replace is refused every time")
-  void alwaysEnforcedAndLegacyReplace() {
+      "L14 (CEDIT-07-F3): leases are always enforced with no switch: a key is granted, the legacy"
+          + " full replace no longer exists (405, nothing changes) and a tokenless save is refused")
+  void alwaysEnforcedAndNoLegacyReplace() throws Exception {
     UUID tab = openSession(actorA);
-    UUID token = token(granted(actorA, tab, notes()));
+    granted(actorA, tab, notes());
+    long version = orderVersion();
 
-    UpdateSalesOrderRequest put = legacyRequest("Legacy");
-    assertThat(failureCode(as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), put))))
-        .isEqualTo("LEGACY_EDIT_DISABLED");
-    release(actorA, tab, token);
-    // Nobody holds anything now: the full replace is refused all the same.
-    UpdateSalesOrderRequest again = legacyRequest("Legacy again");
-    assertThat(failureCode(as(actorA, () -> salesOrders.updateOrder(orderId, actorA.id(), again))))
-        .isEqualTo("LEGACY_EDIT_DISABLED");
+    // The full replace is gone: a PUT on the order, authorised and well-formed as the old
+    // endpoint took it, reaches no handler and changes nothing.
+    Map<String, Object> legacy = new LinkedHashMap<>();
+    legacy.put("version", version);
+    legacy.put("orderDate", ORDER_DATE.toString());
+    legacy.put("notes", "Legacy");
+    legacy.put("lines", List.of());
+    String json = objectMapper.writeValueAsString(legacy);
+    Answer put = http("PUT", "/api/v1/sales/orders/" + orderId, actorA, json);
+    assertThat(put.status()).isEqualTo(405);
+    assertThat(put.body().path("code").asText()).isEqualTo("METHOD_NOT_ALLOWED");
     assertThat(orderText("notes")).isNull();
+    assertThat(orderVersion()).isEqualTo(version);
+
     assertThat(
             failureCode(
                 save(
@@ -1853,55 +1851,6 @@ class SalesOrderEditLeaseIT extends SalesOrderLiveItSupport {
 
   private String leasesPath() {
     return "/api/v1/sales/orders/" + orderId + "/edit-leases";
-  }
-
-  /** A legacy full replace at the current version: header as fixed, lines exactly as stored. */
-  private UpdateSalesOrderRequest legacyRequest(String notes) {
-    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
-    request.setVersion(orderVersion());
-    request.setOrderDate(ORDER_DATE);
-    request.setDeliveryTerm(DeliveryTerm.FCA);
-    request.setDeliveryPlace("Leeds");
-    request.setIncotermsVersion(IncotermsVersion.INCOTERMS_2020);
-    request.setDeliveryTermStatus(DeliveryTermStatus.PROPOSED);
-    request.setPaymentTerms("30 days");
-    request.setContactName("Jane Hill");
-    request.setContactEmail("jane@example.com");
-    request.setNotes(notes);
-    request.setLines(
-        new ArrayList<>(List.of(lineRequest(loadLine(l1)), lineRequest(loadLine(l2)))));
-    return request;
-  }
-
-  private static UpdateSalesOrderLineRequest lineRequest(SalesOrderLine line) {
-    return UpdateSalesOrderLineRequest.builder()
-        .id(line.getId())
-        .productId(line.getProductId())
-        .productDesc(line.getProductDesc())
-        .colorId(line.getColorId())
-        .finishedWidth(line.getFinishedWidth())
-        .finishedWidthUnit(line.getFinishedWidthUnit())
-        .requestedDeliveryDate(line.getRequestedDeliveryDate())
-        .singleLotRequired(line.isSingleLotRequired())
-        .requestedQty(line.getRequestedQty())
-        .unit(line.getUnit())
-        .unitPrice(line.getUnitPriceAmount())
-        .currency(line.getCurrency())
-        .discountAmount(line.getDiscountAmountValue())
-        .taxAmount(line.getTaxAmountValue())
-        .toleranceUpPct(line.getToleranceUpPct())
-        .toleranceDownPct(line.getToleranceDownPct())
-        .moduleType(line.getModuleType())
-        .moduleSpecs(line.getModuleSpecs())
-        .build();
-  }
-
-  private SalesOrderLine loadLine(UUID lineId) {
-    Object line = as(actorA, () -> lines.findByTenantIdAndId(tenantId, lineId).orElseThrow());
-    if (line instanceof RuntimeException failure) {
-      throw failure;
-    }
-    return (SalesOrderLine) line;
   }
 
   private record Answer(int status, JsonNode body) {}

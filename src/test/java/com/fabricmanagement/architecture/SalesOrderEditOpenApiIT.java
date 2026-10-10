@@ -158,6 +158,17 @@ class SalesOrderEditOpenApiIT extends SalesOrderEditItSupport {
   }
 
   @Test
+  @DisplayName(
+      "CEDIT-07-F3: the legacy full replace is gone: no PUT on the order and no update request"
+          + " schemas; the order itself is still read and deleted there")
+  void legacyFullReplaceIsGone() {
+    Map<String, Object> order = mapAt(document, "paths", "/api/v1/sales/orders/{id}");
+    assertThat(order).containsKeys("get", "delete").doesNotContainKey("put");
+    assertThat(mapAt(document, "components", "schemas"))
+        .doesNotContainKeys("UpdateSalesOrderRequest", "UpdateSalesOrderLineRequest");
+  }
+
+  @Test
   @DisplayName("S8.1/S11.1: only the save's 409 is the typed SalesOrderEditConflictProblem")
   void typedConflictProblem() {
     Map<String, Object> conflict =

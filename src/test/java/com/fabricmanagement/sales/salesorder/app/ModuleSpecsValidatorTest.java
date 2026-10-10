@@ -11,7 +11,6 @@ import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfi
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileInput;
 import com.fabricmanagement.sales.salesorder.domain.requirement.RequirementProfileSnapshot;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
-import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -54,13 +53,9 @@ class ModuleSpecsValidatorTest {
     RequirementProfileInput currentInput = profile();
     RequirementProfileSnapshot current =
         RequirementProfileSnapshot.resolve(UUID.randomUUID(), 1, currentInput, null, false);
-    UpdateSalesOrderLineRequest update =
-        UpdateSalesOrderLineRequest.builder()
-            .moduleType(ModuleType.FABRIC)
-            .moduleSpecs(Map.of("width", "151 cm"))
-            .build();
-
-    assertThatThrownBy(() -> validator.validate(update, current))
+    // As the safe edit (CEDIT-03) asks for an existing line that sends no new profile.
+    assertThatThrownBy(
+            () -> validator.validate(ModuleType.FABRIC, Map.of("width", "151 cm"), null, current))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("conflicts with typed requirement facet WIDTH");
   }
@@ -69,13 +64,8 @@ class ModuleSpecsValidatorTest {
   void omittedProfileRejectsEveryLegacyRequirementKeyEvenWhenTheCurrentFacetKindDiffers() {
     RequirementProfileSnapshot current =
         RequirementProfileSnapshot.resolve(UUID.randomUUID(), 1, profile(), null, false);
-    UpdateSalesOrderLineRequest update =
-        UpdateSalesOrderLineRequest.builder()
-            .moduleType(ModuleType.FABRIC)
-            .moduleSpecs(Map.of("originReq", "TR"))
-            .build();
-
-    assertThatThrownBy(() -> validator.validate(update, current))
+    assertThatThrownBy(
+            () -> validator.validate(ModuleType.FABRIC, Map.of("originReq", "GB"), null, current))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining(
             "cannot be written while an existing typed requirement profile is retained");

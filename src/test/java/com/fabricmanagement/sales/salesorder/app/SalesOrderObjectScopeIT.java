@@ -4,9 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,7 +35,6 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import com.fabricmanagement.testsupport.PostgresImage;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +49,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -96,7 +92,6 @@ class SalesOrderObjectScopeIT {
   }
 
   @Autowired private MockMvc mockMvc;
-  @Autowired private ObjectMapper objectMapper;
   @Autowired private TenantRepository tenantRepository;
   @Autowired private OrganizationRepository organizationRepository;
   @Autowired private RoleRepository roleRepository;
@@ -282,40 +277,6 @@ class SalesOrderObjectScopeIT {
     performAs(userB, get("/api/v1/sales/orders/partner/{partnerId}", partnerAId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.length()").value(2));
-  }
-
-  @Test
-  void outOfScopeUpdateIsRejectedAndOrderRemainsUnchanged() throws Exception {
-    grantWrite(userB, DataScope.OWN);
-    String originalReference = orderA.getCustomerReference();
-    Long originalVersion = orderA.getVersion();
-    Map<String, Object> request =
-        Map.of(
-            "version",
-            originalVersion,
-            "customerReference",
-            "changed",
-            "orderDate",
-            orderA.getOrderDate().toString(),
-            "currency",
-            "GBP",
-            "lines",
-            List.of());
-
-    performAs(
-            userB,
-            put("/api/v1/sales/orders/{id}", orderA.getId())
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isForbidden());
-
-    TenantContext.setCurrentTenantId(tenantAId);
-    SalesOrder unchanged =
-        salesOrderRepository.findByTenantIdAndId(tenantAId, orderA.getId()).orElseThrow();
-    org.assertj.core.api.Assertions.assertThat(unchanged.getCustomerReference())
-        .isEqualTo(originalReference);
-    org.assertj.core.api.Assertions.assertThat(unchanged.getVersion()).isEqualTo(originalVersion);
   }
 
   private ResultActions performAs(TestUser user, MockHttpServletRequestBuilder request)

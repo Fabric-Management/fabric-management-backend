@@ -68,7 +68,6 @@ class SalesOrderServiceCreateTest {
   @Mock
   private com.fabricmanagement.sales.orderintake.app.CustomerRequestService customerRequestService;
 
-  @Mock private DeliveryCommitmentService deliveryCommitments;
   @InjectMocks private SalesOrderService salesOrderService;
 
   @Captor private ArgumentCaptor<SalesOrder> orderCaptor;

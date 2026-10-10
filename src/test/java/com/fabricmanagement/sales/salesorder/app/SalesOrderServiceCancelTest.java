@@ -38,7 +38,6 @@ class SalesOrderServiceCancelTest {
   // SOI intake checks; a mock is a no-op that reports no blockers.
   @Mock private OrderIntakeHooks orderIntakeHooks;
 
-  @Mock private DeliveryCommitmentService deliveryCommitments;
   @Mock private OrderApprovalInvalidator approvalInvalidator;
   @InjectMocks private SalesOrderService salesOrderService;
 
