@@ -528,6 +528,12 @@ public class JwtService {
     return claims.get("role", String.class);
   }
 
+  /** A token issued for a demo persona (it carries {@code demo_impersonation}). */
+  public boolean isDemoImpersonationToken(String token) {
+    Claims claims = extractClaims(token);
+    return Boolean.TRUE.equals(claims.get("demo_impersonation", Boolean.class));
+  }
+
   public boolean isPlaygroundToken(String token) {
     Claims claims = extractClaims(token);
     Boolean isPlayground = claims.get("is_playground", Boolean.class);

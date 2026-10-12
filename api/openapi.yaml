@@ -25557,8 +25557,12 @@ paths:
       - Permission Catalogue
   /api/v1/playground/impersonate/{userId}:
     post:
-      description: "Validates the current tenant is in demo mode, verifies the target\
-        \ user belongs to that tenant, and generates a new JWT token for that persona."
+      description: "Demo tenants only. The target must be an active user of the caller's\
+        \ tenant. Signed-in session: the persona's access token is returned in the\
+        \ body and no cookie is written; the calling browser tab sends it as an Authorization\
+        \ header and asks again when it expires. The owner's own session stays as\
+        \ it is, so other tabs are unaffected. A persona token cannot call this endpoint.\
+        \ Anonymous playground: the token is set as the access cookie, as before."
       operationId: impersonate
       parameters:
       - description: Target user ID to impersonate
@@ -25575,7 +25579,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PlaygroundImpersonateResponse"
-          description: Persona switched successfully
+          description: Persona token issued
         "400":
           content:
             application/problem+json:
@@ -25593,13 +25597,10 @@ paths:
           description: Unauthorized
         "403":
           content: {}
-          description: Demo mode is required or user is outside the current tenant
+          description: "Demo mode is required, or the caller is itself a persona"
         "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
+          content: {}
+          description: The target is not an active user of this tenant
         "409":
           content:
             application/problem+json:
@@ -25624,7 +25625,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Switch persona in the current playground session
+      summary: Get a token to view the demo as another user
       tags:
       - Playground Auth
   /api/v1/playground/init:

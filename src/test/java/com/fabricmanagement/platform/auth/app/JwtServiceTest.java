@@ -110,6 +110,23 @@ class JwtServiceTest {
   }
 
   @Test
+  @DisplayName("only a demo impersonation token is recognised as a persona token")
+  void isDemoImpersonationToken_tellsPersonaTokensFromOwnerTokens() {
+    User user = buildUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+
+    assertThat(
+            jwtService.isDemoImpersonationToken(
+                jwtService.generateDemoImpersonationAccessToken(user, null, "p@example.com")))
+        .isTrue();
+    assertThat(jwtService.isDemoImpersonationToken(jwtService.generateAccessToken(user))).isFalse();
+  }
+
+  @Test
   @DisplayName("demo impersonation context matches real login context for data-scope inputs")
   void generateDemoImpersonationAccessToken_matchesRealLoginSecurityContextClaims() {
     User user = buildWorkerUser();

@@ -226,7 +226,33 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").exists())
         .andExpect(jsonPath("$.userId").value(fixture.worker().getId().toString()))
-        .andExpect(cookie().value(AuthCookieSupport.REFRESH_TOKEN_COOKIE_NAME, "refresh-token"));
+        // The persona belongs to the calling tab only: the shared cookies stay the owner's.
+        .andExpect(cookie().doesNotExist("access_token"))
+        .andExpect(cookie().doesNotExist(AuthCookieSupport.REFRESH_TOKEN_COOKIE_NAME));
+  }
+
+  @Test
+  @DisplayName("A persona token acts as the persona over the owner's cookie and cannot mint more")
+  void personaTokenActsAsPersonaAndCannotMint() throws Exception {
+    DemoTenantFixture fixture = createDemoTenantFixture(true, "TRIAL");
+    String ownerToken = jwtService.generateAccessToken(fixture.owner());
+    MvcResult minted =
+        mockMvc
+            .perform(
+                post("/api/v1/playground/impersonate/" + fixture.worker().getId())
+                    .cookie(new Cookie("access_token", ownerToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    String personaToken =
+        JsonPath.read(minted.getResponse().getContentAsString(), "$.token").toString();
+
+    mockMvc
+        .perform(
+            post("/api/v1/playground/impersonate/" + fixture.owner().getId())
+                .cookie(new Cookie("access_token", ownerToken))
+                .header("Authorization", "Bearer " + personaToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("IMPERSONATION_FROM_PERSONA"));
   }
 
   @Test

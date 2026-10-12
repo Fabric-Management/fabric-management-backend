@@ -86,6 +86,35 @@ class PlaygroundServiceTest {
   }
 
   @Test
+  @DisplayName("impersonate refuses an inactive user of the tenant")
+  void impersonateRefusesInactiveUser() {
+    UUID tenantId = UUID.randomUUID();
+    User user = user(tenantId, "Worker", "One", "worker@example.com");
+    user.setIsActive(false);
+    when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
+    when(userRepository.findByTenantIdAndId(tenantId, user.getId())).thenReturn(Optional.of(user));
+
+    assertThatThrownBy(() -> service.impersonate(tenantId, user.getId(), null, true))
+        .isInstanceOf(PlatformDomainException.class)
+        .extracting("errorCode", "httpStatus")
+        .containsExactly("IMPERSONATION_TARGET_UNAVAILABLE", 404);
+
+    verify(jwtService, never()).generateDemoImpersonationAccessToken(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("impersonate refuses a user outside the tenant")
+  void impersonateRefusesUserOutsideTenant() {
+    UUID tenantId = UUID.randomUUID();
+    when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
+
+    assertThatThrownBy(() -> service.impersonate(tenantId, UUID.randomUUID(), null, true))
+        .isInstanceOf(PlatformDomainException.class)
+        .extracting("errorCode", "httpStatus")
+        .containsExactly("IMPERSONATION_TARGET_UNAVAILABLE", 404);
+  }
+
+  @Test
   @DisplayName("impersonate refuses when tenant is not in demo mode")
   void impersonateRefusesOutsideDemoMode() {
     UUID tenantId = UUID.randomUUID();
