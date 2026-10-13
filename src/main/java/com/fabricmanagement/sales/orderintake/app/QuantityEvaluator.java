@@ -4,6 +4,7 @@ import com.fabricmanagement.production.core.batch.api.query.ProposalStockQuerySe
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
 import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalReason;
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalSearch;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult.EvaluationStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
@@ -27,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,15 +43,26 @@ import java.util.stream.Collectors;
  * STOCK-PROPOSAL-2). Pure: no persistence, no clock, no security. The caller converts units and
  * reads what quotes hold.
  *
- * <p>Compatibility and the single-lot requirement are prerequisites. When free stock can meet the
- * request within the agreed tolerance, the main proposal is one of those free options (Fatih,
- * 2026-10-12); otherwise it is the best construction overall. Among the candidates the tenant comes
- * first: free stock, then no single piece left, then lots that fit the remaining target taken
- * whole, then older stock, fewer lots and, last, closeness to the request. Stock other quotes hold
- * is evaluated only when free stock has no option within the agreed tolerance. The nearest options
- * below and at-or-above the request are kept beside the main one, and options outside the tolerance
- * are shown, never withheld. Options are returned in ascending quantity with the main option's
- * index. A tolerance side that was not agreed allows no deviation on that side.
+ * <p>Compatibility and the single-lot requirement are prerequisites, and no computed option leaves
+ * one or two pieces in a lot (Fatih, 2026-10-13): a lot is closed or keeps at least three. Among
+ * candidates the tenant comes first: more lots closed, then older stock, then fewer lots, then
+ * closeness. The proposal opens at (Fatih, 2026-10-13):
+ *
+ * <ol>
+ *   <li>the best free option meeting the request within the tolerance (the request up to the upper
+ *       limit), searched exactly over every combination;
+ *   <li>otherwise the nearest free option above the request, outside the tolerance;
+ *   <li>otherwise the best free option below the request: within the tolerance by the ranking, else
+ *       the nearest below;
+ *   <li>otherwise held stock, which is never applicable.
+ * </ol>
+ *
+ * <p>Stock others hold is evaluated only when free stock cannot reach the lower tolerance limit.
+ * The best option below the request, the nearest options on both sides and the best below the
+ * request by the ranking alone are listed beside the opening one; options outside the tolerance are
+ * shown, never withheld. Options are returned in ascending quantity with the opening option's
+ * index. Both tolerance limits are required: a missing side is missing information, never read as
+ * 0%; the caller refuses to evaluate without them.
  */
 public final class QuantityEvaluator {
 
@@ -63,9 +74,9 @@ public final class QuantityEvaluator {
   private QuantityEvaluator() {}
 
   /**
-   * Everything the evaluation needs, already in the canonical unit. Tolerances are percentages; a
-   * missing side was not agreed and allows no deviation. {@code manualPieceIds} is the
-   * salesperson's own pick, evaluated as one more option with the same checks.
+   * Everything the evaluation needs, already in the canonical unit. Tolerances are percentages and
+   * both are required; 0 explicitly accepts no deviation on that side. {@code manualPieceIds} is
+   * the salesperson's own pick, evaluated as one more option with the same checks.
    */
   public record Input(
       BigDecimal requestedQuantity,
@@ -88,6 +99,10 @@ public final class QuantityEvaluator {
       holds = holds == null ? StockHolds.NONE : holds;
       manualPieceIds =
           manualPieceIds == null ? List.of() : manualPieceIds.stream().distinct().toList();
+      if (agreedToleranceUpPct == null || agreedToleranceDownPct == null) {
+        throw new IllegalArgumentException(
+            "Both tolerance limits are required; a missing side is never read as 0%");
+      }
     }
   }
 
@@ -226,8 +241,77 @@ public final class QuantityEvaluator {
       int closedLots,
       List<Instant> dates,
       long units,
-      String pieceKey,
-      boolean mainCandidate) {}
+      String pieceKey) {}
+
+  /**
+   * What one tier's stock offers across its compatible sets of lots: the best meeting the request
+   * within the tolerance ({@code covering}), the nearest at or above it ({@code above}), the best
+   * below it within the tolerance ({@code shortWithin}), the nearest below it ({@code below}), the
+   * best below it by the ranking alone ({@code tenantBelow}: an old lot closed, kept visible as in
+   * the 12 October decision) and nearer pending combinations.
+   */
+  private record Found(
+      List<Ranked> covering,
+      List<Ranked> above,
+      List<Ranked> shortWithin,
+      List<Ranked> below,
+      List<Ranked> tenantBelow,
+      List<Ranked> pending) {
+
+    static final Found NONE =
+        new Found(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+    /** Some option meets the request, or falls short of it within the tolerance. */
+    boolean reachesLowerLimit() {
+      return !covering.isEmpty() || !above.isEmpty() || !shortWithin.isEmpty();
+    }
+
+    /** Only the options that take stock others hold. */
+    Found onlyHeld() {
+      return new Found(
+          held(covering),
+          held(above),
+          held(shortWithin),
+          held(below),
+          held(tenantBelow),
+          held(pending));
+    }
+
+    private static List<Ranked> held(List<Ranked> candidates) {
+      return candidates.stream()
+          .filter(ranked -> ranked.option().source() == StockSource.HELD)
+          .toList();
+    }
+
+    /**
+     * Where the proposal opens (Fatih, 2026-10-13): the best meeting the request within the
+     * tolerance, otherwise the nearest above it, otherwise the best below it.
+     */
+    Optional<Ranked> opening(
+        Comparator<Ranked> ranking, Comparator<Ranked> aboveOrder, Comparator<Ranked> belowOrder) {
+      return covering.stream()
+          .min(ranking)
+          .or(() -> above.stream().min(aboveOrder))
+          .or(() -> shortSide(ranking, belowOrder));
+    }
+
+    /** The best below the request: within the tolerance by the ranking, else the nearest below. */
+    Optional<Ranked> shortSide(Comparator<Ranked> ranking, Comparator<Ranked> belowOrder) {
+      return shortWithin.stream().min(ranking).or(() -> below.stream().min(belowOrder));
+    }
+
+    Optional<Ranked> nearestAbove(Comparator<Ranked> aboveOrder) {
+      return above.stream().min(aboveOrder);
+    }
+
+    Optional<Ranked> nearestBelow(Comparator<Ranked> belowOrder) {
+      return below.stream().min(belowOrder);
+    }
+
+    Optional<Ranked> bestBelow(Comparator<Ranked> ranking) {
+      return tenantBelow.stream().min(ranking);
+    }
+  }
 
   private record Counts(int eligible, int unknown, int excluded, Set<String> unknownReasons) {
     static Counts of(List<ProposalLot> lots) {
@@ -277,16 +361,25 @@ public final class QuantityEvaluator {
     private final Map<UUID, UUID> lotOfPiece = new LinkedHashMap<>();
     private final Map<UUID, LotFree> free = new LinkedHashMap<>();
     private boolean limitExceeded;
+    private final long windowLow;
+    private final long windowHigh;
+    private final Map<UUID, Integer> ageRanks = new LinkedHashMap<>();
 
     /**
-     * The tenant-first ranking: prerequisites met, free stock, no single piece left, more lots
-     * taken whole, older stock, fewer lots, closer to the request, covering the request, then the
-     * pieces themselves.
+     * The tenant-first ranking: prerequisites met, free stock, no remnant (only a manual pick can
+     * leave one), more lots taken whole, older stock, fewer lots, closer to the request, covering
+     * the request, then the pieces themselves.
      */
     private final Comparator<Ranked> tenantFirst;
 
     /** Ascending quantity; same quantity by the tenant-first ranking. */
     private final Comparator<Ranked> listedOrder;
+
+    /** The nearest at or above the request first, then the ranking. */
+    private final Comparator<Ranked> aboveOrder;
+
+    /** The nearest below the request first, then the ranking. */
+    private final Comparator<Ranked> belowOrder;
 
     Search(Input input, List<ProposalLot> lots, Counts counts, boolean aged, String fingerprint) {
       this.input = input;
@@ -298,6 +391,9 @@ public final class QuantityEvaluator {
       // Built after the target: a field initialiser would run before it is assigned.
       this.tenantFirst = tenantFirstFor(target);
       this.listedOrder = Comparator.comparingLong(Ranked::units).thenComparing(tenantFirst);
+      this.aboveOrder = Comparator.comparingLong(Ranked::units).thenComparing(tenantFirst);
+      this.belowOrder =
+          Comparator.comparingLong(Ranked::units).reversed().thenComparing(tenantFirst);
       this.lotsById = new LinkedHashMap<>();
       for (ProposalLot lot : lots) {
         lotsById.put(lot.batchId(), lot);
@@ -306,6 +402,34 @@ public final class QuantityEvaluator {
           lotOfPiece.put(piece.stockUnitId(), lot.batchId());
         }
         free.put(lot.batchId(), lotFree(lot));
+      }
+      // The agreed tolerance as a window of search units around the target.
+      BigDecimal units = BigDecimal.valueOf(target);
+      this.windowHigh =
+          target
+              + units
+                  .multiply(input.agreedToleranceUpPct())
+                  .divide(HUNDRED, 0, RoundingMode.FLOOR)
+                  .longValueExact();
+      this.windowLow =
+          Math.max(
+              1,
+              target
+                  - units
+                      .multiply(input.agreedToleranceDownPct())
+                      .divide(HUNDRED, 0, RoundingMode.FLOOR)
+                      .longValueExact());
+      List<Instant> dates =
+          lots.stream()
+              .map(ProposalLot::productionDate)
+              .filter(Objects::nonNull)
+              .distinct()
+              .sorted()
+              .toList();
+      for (ProposalLot lot : lots) {
+        ageRanks.put(
+            lot.batchId(),
+            lot.productionDate() == null ? Integer.MAX_VALUE : dates.indexOf(lot.productionDate()));
       }
     }
 
@@ -323,46 +447,38 @@ public final class QuantityEvaluator {
 
     Evaluation run() {
       List<Run> runs = runs();
-      List<Ranked> freeCandidates = candidates(Tier.FREE, runs);
-      List<Ranked> freeWithin = withinTolerance(freeCandidates);
-      // Free stock is sufficient when it has an option within the tolerance (Fatih, 2026-10-12).
-      List<Ranked> heldCandidates =
-          !freeWithin.isEmpty()
-              ? List.of()
-              : candidates(Tier.HELD, runs).stream()
-                  .filter(ranked -> ranked.option().source() == StockSource.HELD)
-                  .toList();
+      Found freeOptions = candidates(Tier.FREE, runs);
+      // Held stock only when free stock cannot reach the lower tolerance limit (Fatih,
+      // 2026-10-13); then it is an option to weigh, never to apply.
+      Found heldOptions =
+          freeOptions.reachesLowerLimit() ? Found.NONE : candidates(Tier.HELD, runs).onlyHeld();
+
+      Optional<Ranked> freeOpening = freeOptions.opening(tenantFirst, aboveOrder, belowOrder);
+      Optional<Ranked> heldOpening = heldOptions.opening(tenantFirst, aboveOrder, belowOrder);
+      Optional<Ranked> opening = freeOpening.or(() -> heldOpening);
 
       List<Ranked> chosen = new ArrayList<>();
-      Optional<Ranked> main =
-          !freeWithin.isEmpty()
-              ? freeWithin.stream().min(tenantFirst)
-              : concat(freeCandidates, heldCandidates).stream()
-                  .filter(Ranked::mainCandidate)
-                  .filter(Ranked::definite)
-                  .min(tenantFirst);
-      main.ifPresent(chosen::add);
-      // The tenant-first construction stays visible when the tolerance picked another main.
-      freeCandidates.stream()
-          .filter(Ranked::mainCandidate)
-          .filter(Ranked::definite)
-          .min(tenantFirst)
-          .ifPresent(chosen::add);
-      chosen.addAll(nearest(freeCandidates));
-      chosen.addAll(nearest(heldCandidates));
-      // When held stock is evaluated, its own best candidate is an alternative too.
-      best(heldCandidates).ifPresent(chosen::add);
+      opening.ifPresent(chosen::add);
+      // Beside it: the best below the request, the nearest above and below, and the best below
+      // by the ranking alone (closing an old lot stays visible).
+      freeOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
+      freeOptions.nearestAbove(aboveOrder).ifPresent(chosen::add);
+      freeOptions.nearestBelow(belowOrder).ifPresent(chosen::add);
+      freeOptions.bestBelow(tenantFirst).ifPresent(chosen::add);
+      chosen.addAll(freeOptions.pending());
+      heldOpening.ifPresent(chosen::add);
+      heldOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
 
-      // The same pieces are listed once; the main placement wins.
+      // The same pieces are listed once; the opening placement wins.
       Map<String, Ranked> unique = new LinkedHashMap<>();
       for (Ranked ranked : chosen) {
         unique.putIfAbsent(ranked.pieceKey(), ranked);
       }
       List<Ranked> listed = new ArrayList<>();
-      String mainKey = main.map(Ranked::pieceKey).orElse(null);
+      String openingKey = opening.map(Ranked::pieceKey).orElse(null);
       for (Ranked ranked : unique.values()) {
         OptionPlacement placement =
-            ranked.pieceKey().equals(mainKey)
+            ranked.pieceKey().equals(openingKey)
                 ? OptionPlacement.MAIN
                 : ranked.units() < target ? OptionPlacement.BELOW : OptionPlacement.ABOVE;
         listed.add(withOption(ranked, ranked.option().as(placement, false)));
@@ -444,178 +560,87 @@ public final class QuantityEvaluator {
     }
 
     /**
-     * The tier's main constructions (definite runs) and nearest options (all runs). A pending
-     * combination is kept only when it uses several lots no definite group covers and is nearer to
-     * the request than the definite options on its side (SOI S05).
+     * What one tier's stock offers, per compatible set of lots. Definite runs (single lot,
+     * confirmed group, tone acceptance) give: the best meeting the request within the tolerance,
+     * the nearest at or above it, the best below it within the tolerance and the nearest below it.
+     * A pending combination is kept only when it uses several lots no definite group covers and is
+     * nearer to the request than the definite options on its side (SOI S05). No computed selection
+     * leaves one or two pieces in a lot.
      */
-    private List<Ranked> candidates(Tier tier, List<Run> runs) {
+    private Found candidates(Tier tier, List<Run> runs) {
       Map<UUID, WholePieceSearch.Lot> pools = pools(tier);
-      List<Ranked> definite = new ArrayList<>();
-      List<Ranked> pending = new ArrayList<>();
+      List<Ranked> covering = new ArrayList<>();
+      List<Ranked> above = new ArrayList<>();
+      List<Ranked> shortWithin = new ArrayList<>();
+      List<Ranked> below = new ArrayList<>();
+      List<Ranked> tenantBelow = new ArrayList<>();
+      List<Ranked> pendingAbove = new ArrayList<>();
+      List<Ranked> pendingBelow = new ArrayList<>();
       for (Run run : runs) {
-        List<WholePieceSearch.Lot> runLots =
-            run.lots().stream().map(pools::get).filter(Objects::nonNull).toList();
-        if (runLots.stream().allMatch(lot -> lot.pieces().isEmpty())) {
+        List<ProposalSearch.SearchLot> runLots =
+            run.lots().stream()
+                .map(pools::get)
+                .filter(Objects::nonNull)
+                .filter(lot -> !lot.pieces().isEmpty())
+                .map(lot -> new ProposalSearch.SearchLot(lot, ageRanks.get(lot.id())))
+                .toList();
+        if (runLots.isEmpty()) {
           continue;
         }
         if (run.definite()) {
-          construct(runLots).ifPresent(selection -> definite.add(ranked(run, selection, true)));
-        }
-        WholePieceSearch.Result nearest = WholePieceSearch.search(runLots, target, true);
-        limitExceeded |= nearest.limitExceeded();
-        List<WholePieceSearch.Selection> found = new ArrayList<>();
-        nearest.exact().ifPresent(found::add);
-        nearest.above().ifPresent(found::add);
-        nearest.below().ifPresent(found::add);
-        for (WholePieceSearch.Selection selection : found) {
-          Ranked ranked = ranked(run, selection, false);
-          if (run.definite()) {
-            definite.add(ranked);
-          } else if (selection.lotCount() >= 2 && !coveredByDefiniteGroup(selection, runs)) {
-            pending.add(ranked);
+          found(ProposalSearch.bestWithin(runLots, target, windowHigh, target))
+              .ifPresent(selection -> covering.add(ranked(run, selection)));
+          found(ProposalSearch.smallestFrom(runLots, target))
+              .ifPresent(selection -> above.add(ranked(run, selection)));
+          if (windowLow < target) {
+            found(ProposalSearch.bestWithin(runLots, windowLow, target - 1, target))
+                .ifPresent(selection -> shortWithin.add(ranked(run, selection)));
           }
+          found(ProposalSearch.largestUpTo(runLots, target - 1))
+              .ifPresent(selection -> below.add(ranked(run, selection)));
+          if (target > 1) {
+            found(ProposalSearch.bestWithin(runLots, 1, target - 1, target))
+                .ifPresent(selection -> tenantBelow.add(ranked(run, selection)));
+          }
+        } else {
+          found(ProposalSearch.smallestFrom(runLots, target))
+              .filter(selection -> severalUncoveredLots(selection, runs))
+              .ifPresent(selection -> pendingAbove.add(ranked(run, selection)));
+          found(ProposalSearch.largestUpTo(runLots, target - 1))
+              .filter(selection -> severalUncoveredLots(selection, runs))
+              .ifPresent(selection -> pendingBelow.add(ranked(run, selection)));
         }
       }
-      List<Ranked> all = new ArrayList<>(definite);
-      for (Ranked candidate : pending) {
-        boolean below = candidate.units() < target;
-        Optional<Ranked> definiteBest = nearestOnSide(definite, below);
-        long distance = Math.abs(candidate.units() - target);
-        if (definiteBest.isEmpty() || distance < Math.abs(definiteBest.get().units() - target)) {
-          all.add(candidate);
-        }
-      }
-      return all;
+      List<Ranked> pending = new ArrayList<>();
+      Optional<Ranked> definiteAbove = above.stream().min(aboveOrder);
+      pendingAbove.stream()
+          .min(aboveOrder)
+          .filter(
+              candidate ->
+                  definiteAbove.isEmpty() || candidate.units() < definiteAbove.get().units())
+          .ifPresent(pending::add);
+      Optional<Ranked> definiteBelow = below.stream().min(belowOrder);
+      pendingBelow.stream()
+          .min(belowOrder)
+          .filter(
+              candidate ->
+                  definiteBelow.isEmpty() || candidate.units() > definiteBelow.get().units())
+          .ifPresent(pending::add);
+      return new Found(covering, above, shortWithin, below, tenantBelow, pending);
     }
 
-    /** Definite candidates that meet the request within the agreed tolerance. */
-    private static List<Ranked> withinTolerance(List<Ranked> candidates) {
-      return candidates.stream()
-          .filter(Ranked::definite)
-          .filter(ranked -> ranked.option().toleranceStatus() == ToleranceStatus.WITHIN)
-          .toList();
+    private Optional<WholePieceSearch.Selection> found(ProposalSearch.Result result) {
+      limitExceeded |= result.limitExceeded();
+      return result.best();
     }
 
-    /** The best within the tolerance, otherwise the best tenant-first construction. */
-    private Optional<Ranked> best(List<Ranked> candidates) {
-      List<Ranked> within = withinTolerance(candidates);
-      if (!within.isEmpty()) {
-        return within.stream().min(tenantFirst);
-      }
-      return candidates.stream()
-          .filter(Ranked::mainCandidate)
-          .filter(Ranked::definite)
-          .min(tenantFirst);
-    }
-
-    /** The nearest definite option on each side and nearer pending ones. */
-    private List<Ranked> nearest(List<Ranked> candidates) {
-      List<Ranked> result = new ArrayList<>();
-      for (boolean below : new boolean[] {true, false}) {
-        nearestOnSide(candidates.stream().filter(Ranked::definite).toList(), below)
-            .ifPresent(result::add);
-        nearestOnSide(candidates.stream().filter(ranked -> !ranked.definite()).toList(), below)
-            .ifPresent(result::add);
-      }
-      return result;
-    }
-
-    private Optional<Ranked> nearestOnSide(List<Ranked> candidates, boolean below) {
-      Comparator<Ranked> closeness =
-          below
-              ? Comparator.comparingLong(Ranked::units).reversed()
-              : Comparator.comparingLong(Ranked::units);
-      return candidates.stream()
-          .filter(ranked -> below ? ranked.units() < target : ranked.units() >= target)
-          .min(closeness.thenComparing(tenantFirst));
-    }
-
-    private boolean coveredByDefiniteGroup(WholePieceSearch.Selection selection, List<Run> runs) {
+    private boolean severalUncoveredLots(WholePieceSearch.Selection selection, List<Run> runs) {
       Set<UUID> used =
           selection.takes().stream()
               .map(WholePieceSearch.LotTake::lotId)
               .collect(Collectors.toSet());
-      return runs.stream().filter(Run::definite).anyMatch(run -> run.lots().containsAll(used));
-    }
-
-    /**
-     * The tenant-first construction for one compatible set of lots. Lots that fit the remaining
-     * target are taken whole, oldest first and larger first, with the target updated after each.
-     * One lot then completes the rest: the first lot (same order) with a combination that leaves no
-     * single piece, choosing its combination nearest the remaining target; only when no lot has one
-     * may a single piece stay.
-     */
-    private Optional<WholePieceSearch.Selection> construct(List<WholePieceSearch.Lot> runLots) {
-      List<WholePieceSearch.Lot> order =
-          runLots.stream()
-              .filter(lot -> !lot.pieces().isEmpty())
-              .sorted(
-                  Comparator.comparing(
-                          (WholePieceSearch.Lot lot) -> lotsById.get(lot.id()).productionDate(),
-                          Comparator.nullsLast(Comparator.naturalOrder()))
-                      .thenComparing(
-                          Comparator.comparingLong(
-                                  (WholePieceSearch.Lot lot) ->
-                                      Math.min(lot.total(), lot.capacity()))
-                              .reversed())
-                      .thenComparing(WholePieceSearch.Lot::id))
-              .toList();
-      List<WholePieceSearch.LotTake> takes = new ArrayList<>();
-      Set<UUID> used = new LinkedHashSet<>();
-      long remaining = target;
-      for (WholePieceSearch.Lot lot : order) {
-        long total = lot.total();
-        if (total <= remaining && total <= lot.capacity()) {
-          List<UUID> all = lot.pieces().stream().map(WholePieceSearch.Piece::id).toList();
-          takes.add(new WholePieceSearch.LotTake(lot.id(), all, total, 0));
-          used.add(lot.id());
-          remaining -= total;
-        }
-      }
-      if (remaining > 0) {
-        Optional<WholePieceSearch.LotTake> completion = Optional.empty();
-        for (boolean allowRemnant : new boolean[] {false, true}) {
-          for (WholePieceSearch.Lot lot : order) {
-            if (used.contains(lot.id())) {
-              continue;
-            }
-            WholePieceSearch.Result within =
-                WholePieceSearch.search(List.of(lot), remaining, allowRemnant);
-            limitExceeded |= within.limitExceeded();
-            Optional<WholePieceSearch.Selection> best = closest(within, remaining);
-            if (best.isPresent()) {
-              completion = Optional.of(best.get().takes().getFirst());
-              break;
-            }
-          }
-          if (completion.isPresent()) {
-            break;
-          }
-        }
-        completion.ifPresent(takes::add);
-      }
-      if (takes.isEmpty()) {
-        return Optional.empty();
-      }
-      long total = takes.stream().mapToLong(WholePieceSearch.LotTake::units).sum();
-      return Optional.of(new WholePieceSearch.Selection(total, takes));
-    }
-
-    /** Exact first; otherwise the nearer of above and below, above (covering) on a tie. */
-    private static Optional<WholePieceSearch.Selection> closest(
-        WholePieceSearch.Result result, long remaining) {
-      if (result.exact().isPresent()) {
-        return result.exact();
-      }
-      if (result.above().isEmpty()) {
-        return result.below();
-      }
-      if (result.below().isEmpty()) {
-        return result.above();
-      }
-      long up = result.above().get().total() - remaining;
-      long down = remaining - result.below().get().total();
-      return down < up ? result.below() : result.above();
+      return used.size() >= 2
+          && runs.stream().filter(Run::definite).noneMatch(run -> run.lots().containsAll(used));
     }
 
     /**
@@ -701,22 +726,20 @@ public final class QuantityEvaluator {
 
     // ---------------------------------------------------------------- options
 
-    private Ranked ranked(Run run, WholePieceSearch.Selection selection, boolean mainCandidate) {
+    private Ranked ranked(Run run, WholePieceSearch.Selection selection) {
       QuantityOption option =
           option(
               "S:" + pieceKey(selection.takes()),
               selection.takes(),
               run.compatibility(),
               run.definite() ? null : BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED);
-      return rank(option, run.definite(), selection.takes(), mainCandidate);
+      return rank(option, run.definite(), selection.takes());
     }
 
     private Ranked rank(
-        QuantityOption option,
-        boolean definite,
-        List<WholePieceSearch.LotTake> takes,
-        boolean mainCandidate) {
-      int penalty = option.leavesSingleRemnant() ? 2 : option.remnantUnknown() ? 1 : 0;
+        QuantityOption option, boolean definite, List<WholePieceSearch.LotTake> takes) {
+      // Only a manual pick can leave a remnant; computed selections never do.
+      int penalty = option.leavesRemnant() ? 1 : 0;
       int closed = (int) takes.stream().filter(take -> take.remainingPieces() == 0).count();
       List<Instant> dates =
           option.lots().stream()
@@ -731,8 +754,7 @@ public final class QuantityEvaluator {
           closed,
           dates,
           takes.stream().mapToLong(WholePieceSearch.LotTake::units).sum(),
-          pieceKey(takes),
-          mainCandidate);
+          pieceKey(takes));
     }
 
     /**
@@ -768,7 +790,7 @@ public final class QuantityEvaluator {
       BigDecimal difference = quantity.subtract(input.requestedQuantity());
       BigDecimal percent =
           difference.multiply(HUNDRED).divide(input.requestedQuantity(), 1, RoundingMode.HALF_UP);
-      boolean remnant = parts.stream().anyMatch(QuantityOption.LotPart::singleRemnant);
+      boolean remnant = parts.stream().anyMatch(QuantityOption.LotPart::remnant);
       OptionKind kind =
           difference.signum() == 0
               ? remnant ? OptionKind.REQUESTED_WITH_REMNANT : OptionKind.EXACT
@@ -811,16 +833,24 @@ public final class QuantityEvaluator {
               .reduce(BigDecimal.ZERO, BigDecimal::add);
       int unknownInLot =
           (int) lot.pieces().stream().filter(piece -> piece.state() == PieceState.UNKNOWN).count();
-      boolean single = take.remainingPieces() == 1;
-      ProposalPiece remnantPiece = null;
-      if (single) {
-        // The one pool piece left: free pieces first, as the free pool was searched.
-        remnantPiece =
-            remainingEligible.stream()
-                .filter(piece -> !input.holds().pieceHolds().containsKey(piece.stockUnitId()))
-                .findFirst()
-                .orElse(remainingEligible.isEmpty() ? null : remainingEligible.getFirst());
-      }
+      // One or two pool pieces left (Fatih, 2026-10-13); free pieces first, as the free pool is
+      // the one searched. Pieces of unknown state are never counted: they are not offered.
+      boolean remnant = WholePieceSearch.isRemnant(take.remainingPieces());
+      List<ProposalPiece> remnantPieces =
+          !remnant
+              ? List.of()
+              : remainingEligible.stream()
+                  .sorted(
+                      Comparator.comparing(
+                          (ProposalPiece piece) ->
+                              input.holds().pieceHolds().containsKey(piece.stockUnitId())))
+                  .limit(take.remainingPieces())
+                  .toList();
+      BigDecimal remnantCanonical =
+          remnantPieces.stream()
+              .map(ProposalPiece::canonicalMeasure)
+              .filter(Objects::nonNull)
+              .reduce(BigDecimal.ZERO, BigDecimal::add);
       boolean closes = lot.pieces().stream().allMatch(piece -> taken.contains(piece.stockUnitId()));
       return new QuantityOption.LotPart(
           lot.batchId(),
@@ -831,9 +861,9 @@ public final class QuantityEvaluator {
           remainingEligible.size(),
           input.toLineUnit().apply(remainingCanonical),
           unknownInLot,
-          single,
-          remnantPiece == null ? null : remnantPiece.stockUnitId(),
-          remnantPiece == null ? null : input.toLineUnit().apply(remnantPiece.canonicalMeasure()),
+          remnant,
+          remnantPieces.stream().map(ProposalPiece::stockUnitId).toList(),
+          remnant ? input.toLineUnit().apply(remnantCanonical) : null,
           closes);
     }
 
@@ -936,14 +966,13 @@ public final class QuantityEvaluator {
           null);
     }
 
-    /** Against the agreed tolerance; a side that was not agreed allows no deviation. */
+    /** Against the agreed tolerance; 0% on a side accepts no deviation on that side. */
     private ToleranceStatus tolerance(BigDecimal difference) {
       if (difference.signum() == 0) {
         return ToleranceStatus.WITHIN;
       }
-      BigDecimal agreed =
+      BigDecimal limit =
           difference.signum() > 0 ? input.agreedToleranceUpPct() : input.agreedToleranceDownPct();
-      BigDecimal limit = agreed == null ? BigDecimal.ZERO : agreed;
       boolean outside =
           difference.abs().multiply(HUNDRED).compareTo(input.requestedQuantity().multiply(limit))
               > 0;
@@ -1022,7 +1051,7 @@ public final class QuantityEvaluator {
       QuantityOption option =
           option("M:" + pieceKey(takes), takes, compatibility, block)
               .as(OptionPlacement.MANUAL, false);
-      return rank(option, block == null, takes, false);
+      return rank(option, block == null, takes);
     }
 
     private long units(List<UUID> pieceIds) {
@@ -1042,8 +1071,7 @@ public final class QuantityEvaluator {
           ranked.closedLots(),
           ranked.dates(),
           ranked.units(),
-          ranked.pieceKey(),
-          ranked.mainCandidate());
+          ranked.pieceKey());
     }
 
     /** Marks, per side, the option nearest the request; manual picks are not computed options. */
@@ -1073,7 +1101,7 @@ public final class QuantityEvaluator {
     /** Each option's facts in criterion order; never an age claim without known dates. */
     private List<QuantityOption> withReasons(List<QuantityOption> options) {
       boolean anyHolds = input.holds().any();
-      boolean anyRemnant = options.stream().anyMatch(QuantityOption::leavesSingleRemnant);
+      boolean anyRemnant = options.stream().anyMatch(QuantityOption::leavesRemnant);
       Instant oldest =
           aged
               ? lots.stream()
@@ -1093,27 +1121,29 @@ public final class QuantityEvaluator {
       for (QuantityOption option : options) {
         List<ProposalReason> reasons = new ArrayList<>();
         if (option.source() == StockSource.HELD && option.placement() != OptionPlacement.MANUAL) {
-          reasons.add(ProposalReason.of(ProposalReason.Code.FREE_STOCK_INSUFFICIENT));
+          // Without a complete search the absence of a free option is only what was found.
+          reasons.add(
+              ProposalReason.of(
+                  limitExceeded
+                      ? ProposalReason.Code.FREE_STOCK_NOT_FOUND
+                      : ProposalReason.Code.FREE_STOCK_INSUFFICIENT));
         } else if (option.source() == StockSource.FREE && anyHolds) {
           reasons.add(ProposalReason.of(ProposalReason.Code.FREE_STOCK_ONLY));
         }
-        if (option.leavesSingleRemnant()) {
+        if (option.leavesRemnant()) {
+          // Only a manual pick: how many pieces stay behind and how much they hold.
+          List<QuantityOption.LotPart> remnantLots =
+              option.lots().stream().filter(QuantityOption.LotPart::remnant).toList();
           BigDecimal remnant =
-              option.lots().stream()
-                  .filter(QuantityOption.LotPart::singleRemnant)
+              remnantLots.stream()
                   .map(QuantityOption.LotPart::remnantQuantity)
                   .filter(Objects::nonNull)
-                  .findFirst()
-                  .orElse(null);
-          int lotsWithRemnant =
-              (int) option.lots().stream().filter(QuantityOption.LotPart::singleRemnant).count();
+                  .reduce(BigDecimal.ZERO, BigDecimal::add);
+          int pieces = remnantLots.stream().mapToInt(part -> part.remnantPieceIds().size()).sum();
           reasons.add(
-              new ProposalReason(
-                  ProposalReason.Code.LEAVES_SINGLE_PIECE, remnant, lotsWithRemnant, null));
-        } else if (option.remnantUnknown()) {
-          reasons.add(ProposalReason.of(ProposalReason.Code.SINGLE_PIECE_MAY_REMAIN));
+              new ProposalReason(ProposalReason.Code.LEAVES_REMNANT, remnant, pieces, null));
         } else if (anyRemnant) {
-          reasons.add(ProposalReason.of(ProposalReason.Code.NO_SINGLE_PIECE_LEFT));
+          reasons.add(ProposalReason.of(ProposalReason.Code.NO_REMNANT));
         }
         int closed = (int) option.lots().stream().filter(QuantityOption.LotPart::closesLot).count();
         if (closed > 0) {
@@ -1132,7 +1162,12 @@ public final class QuantityEvaluator {
         } else if (options.size() > 1 && option.difference().abs().compareTo(closest) == 0) {
           reasons.add(
               new ProposalReason(
-                  ProposalReason.Code.CLOSEST_TO_REQUEST, option.difference().abs(), null, null));
+                  limitExceeded
+                      ? ProposalReason.Code.CLOSEST_FOUND
+                      : ProposalReason.Code.CLOSEST_TO_REQUEST,
+                  option.difference().abs(),
+                  null,
+                  null));
         }
         result.add(option.withReasons(reasons));
       }
@@ -1150,12 +1185,6 @@ public final class QuantityEvaluator {
       }
     }
     return 0;
-  }
-
-  private static <T> List<T> concat(List<T> left, List<T> right) {
-    List<T> all = new ArrayList<>(left);
-    all.addAll(right);
-    return all;
   }
 
   private static String pieceKey(List<WholePieceSearch.LotTake> takes) {

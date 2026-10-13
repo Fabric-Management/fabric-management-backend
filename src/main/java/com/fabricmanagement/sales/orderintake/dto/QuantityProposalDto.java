@@ -46,8 +46,9 @@ public record QuantityProposalDto(
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
             description =
-                "False when a search limit was reached: the options found are not claimed to be"
-                    + " the nearest or the best")
+                "True when no search limit was reached: the nearest options and, within the"
+                    + " tolerance, the main option are exact. False: the options are the ones"
+                    + " found, never claimed to be the nearest or the best")
         boolean searchComplete,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int eligiblePieces,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,
@@ -114,14 +115,16 @@ public record QuantityProposalDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
-                  "Against the tolerance agreed for the line; a side without a tolerance allows"
-                      + " no deviation. Options outside it are shown, never withheld")
+                  "Against the tolerance agreed for the line; both limits are required and 0"
+                      + " accepts no deviation that way. Options outside it are shown, never"
+                      + " withheld")
           QuantityOption.ToleranceStatus toleranceStatus,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean leavesSingleRemnant,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
-              description = "Pieces of unknown state may leave a single remnant (SOI 3.1)")
-          boolean remnantUnknown,
+              description =
+                  "One or two pieces stay in a used lot. Never for a computed option; a manual"
+                      + " pick may, with acknowledgement")
+          boolean leavesRemnant,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int lotCount,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
@@ -148,8 +151,7 @@ public record QuantityProposalDto(
           option.difference(),
           option.differencePercent(),
           option.toleranceStatus(),
-          option.leavesSingleRemnant(),
-          option.remnantUnknown(),
+          option.leavesRemnant(),
           option.lotCount(),
           option.reasons().stream().map(Reason::from).toList(),
           option.lots().stream().map(Lot::from).toList(),
@@ -171,7 +173,7 @@ public record QuantityProposalDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               nullable = true,
-              description = "A number of lots")
+              description = "A number of lots, or of pieces for LEAVES_REMNANT")
           Integer count,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
@@ -207,9 +209,14 @@ public record QuantityProposalDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal remainingQuantity,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean exhausted,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean singleRemnant,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean remnantUnknown,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "One or two pieces of the pool stay in the lot (a manual pick only)")
+          boolean remnant,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
+              description = "What those pieces hold, in the line unit")
           BigDecimal remnantQuantity) {
 
     static Lot from(QuantityOption.LotPart part) {
@@ -225,8 +232,7 @@ public record QuantityProposalDto(
           part.remainingQuantity(),
           part.exhausted(),
           part.unknownPieces(),
-          part.singleRemnant(),
-          part.remnantUnknown(),
+          part.remnant(),
           part.remnantQuantity());
     }
   }

@@ -74839,8 +74839,9 @@ components:
           type: number
         searchComplete:
           type: boolean
-          description: "False when a search limit was reached: the options found are\
-            \ not claimed to be the nearest or the best"
+          description: "True when no search limit was reached: the nearest options\
+            \ and, within the tolerance, the main option are exact. False: the options\
+            \ are the ones found, never claimed to be the nearest or the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -75093,13 +75094,13 @@ components:
         toleranceDownPct:
           type: number
           description: Quantity tolerance below the requested quantity agreed for
-            this line (%)
+            this line (%); 0 when no deviation is accepted
           maximum: 100
           minimum: 0
         toleranceUpPct:
           type: number
           description: Quantity tolerance above the requested quantity agreed for
-            this line (%)
+            this line (%); 0 when no deviation is accepted
           maximum: 100
           minimum: 0
         unit:
@@ -75108,6 +75109,8 @@ components:
       - productId
       - requestedQty
       - singleLotRequired
+      - toleranceDownPct
+      - toleranceUpPct
       - unit
     OrderIntakeStockPreviewTotals:
       type: object
@@ -79341,8 +79344,9 @@ components:
           format: uuid
         searchComplete:
           type: boolean
-          description: "False when a search limit was reached: the options found are\
-            \ not claimed to be the nearest or the best"
+          description: "True when no search limit was reached: the nearest options\
+            \ and, within the tolerance, the main option are exact. False: the options\
+            \ are the ones found, never claimed to be the nearest or the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -79456,14 +79460,15 @@ components:
           description: "Eligible pieces the option leaves in the lot, held or free"
         remainingQuantity:
           type: number
+        remnant:
+          type: boolean
+          description: One or two pieces of the pool stay in the lot (a manual pick
+            only)
         remnantQuantity:
           type:
           - number
           - "null"
-        remnantUnknown:
-          type: boolean
-        singleRemnant:
-          type: boolean
+          description: "What those pieces hold, in the line unit"
         unknownPieces:
           type: integer
           format: int32
@@ -79478,9 +79483,8 @@ components:
       - quantity
       - remainingPieces
       - remainingQuantity
+      - remnant
       - remnantQuantity
-      - remnantUnknown
-      - singleRemnant
       - unknownPieces
     QuantityProposalOption:
       type: object
@@ -79501,8 +79505,10 @@ components:
             $ref: "#/components/schemas/QuantityProposalHeldStock"
         kind:
           $ref: "#/components/schemas/QuantityOptionKind"
-        leavesSingleRemnant:
+        leavesRemnant:
           type: boolean
+          description: "One or two pieces stay in a used lot. Never for a computed\
+            \ option; a manual pick may, with acknowledgement"
         lotCount:
           type: integer
           format: int32
@@ -79526,16 +79532,13 @@ components:
             \ criteria. Words come from these codes; none are derived by the client"
           items:
             $ref: "#/components/schemas/QuantityProposalReason"
-        remnantUnknown:
-          type: boolean
-          description: Pieces of unknown state may leave a single remnant (SOI 3.1)
         source:
           $ref: "#/components/schemas/StockProposalSource"
         toleranceStatus:
           $ref: "#/components/schemas/StockProposalToleranceStatus"
-          description: "Against the tolerance agreed for the line; a side without\
-            \ a tolerance allows no deviation. Options outside it are shown, never\
-            \ withheld"
+          description: "Against the tolerance agreed for the line; both limits are\
+            \ required and 0 accepts no deviation that way. Options outside it are\
+            \ shown, never withheld"
       required:
       - apply
       - compatibility
@@ -79543,7 +79546,7 @@ components:
       - differencePercent
       - heldStock
       - kind
-      - leavesSingleRemnant
+      - leavesRemnant
       - lotCount
       - lots
       - nearest
@@ -79551,7 +79554,6 @@ components:
       - placement
       - quantity
       - reasons
-      - remnantUnknown
       - source
       - toleranceStatus
     QuantityProposalReason:
@@ -79564,7 +79566,7 @@ components:
           - integer
           - "null"
           format: int32
-          description: A number of lots
+          description: "A number of lots, or of pieces for LEAVES_REMNANT"
         quantity:
           type:
           - number
@@ -83427,13 +83429,13 @@ components:
         toleranceDownPct:
           type: number
           description: Quantity tolerance below the requested quantity agreed for
-            this line (%)
+            this line (%); 0 when no deviation is accepted
           maximum: 100
           minimum: 0
         toleranceUpPct:
           type: number
           description: Quantity tolerance above the requested quantity agreed for
-            this line (%)
+            this line (%); 0 when no deviation is accepted
           maximum: 100
           minimum: 0
         unit:
@@ -83445,6 +83447,8 @@ components:
       required:
       - productId
       - requestedQty
+      - toleranceDownPct
+      - toleranceUpPct
       - unit
     SalesOrderLineResponse:
       type: object
@@ -84322,15 +84326,16 @@ components:
       type: string
       enum:
       - FREE_STOCK_INSUFFICIENT
+      - FREE_STOCK_NOT_FOUND
       - FREE_STOCK_ONLY
-      - NO_SINGLE_PIECE_LEFT
-      - LEAVES_SINGLE_PIECE
-      - SINGLE_PIECE_MAY_REMAIN
+      - NO_REMNANT
+      - LEAVES_REMNANT
       - CLOSES_LOTS
       - OLDER_STOCK
       - FEWEST_LOTS
       - EXACT_REQUEST
       - CLOSEST_TO_REQUEST
+      - CLOSEST_FOUND
     StockProposalSource:
       type: string
       enum:

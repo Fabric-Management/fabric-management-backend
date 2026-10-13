@@ -610,12 +610,24 @@ public abstract class SalesOrderEditItSupport {
     return operation;
   }
 
+  /**
+   * A new line. Both tolerance limits are required (Fatih, 2026-10-13); a test that does not name
+   * them agrees 5% / 5%, as a new line starts in the form.
+   */
   protected static Map<String, Object> add(UUID clientLineId, UUID productId, Object... fields) {
     Map<String, Object> operation = new LinkedHashMap<>();
     operation.put("operation", "ADD");
     operation.put("clientLineId", clientLineId);
     operation.put("productId", productId);
-    operation.put("fields", pairs(fields));
+    Map<String, Object> given = new LinkedHashMap<>(pairs(fields));
+    given.putIfAbsent(
+        "tolerance",
+        pairs(
+            "operation",
+            "SET",
+            "value",
+            pairs("upPct", new BigDecimal("5"), "downPct", new BigDecimal("5"))));
+    operation.put("fields", given);
     return operation;
   }
 

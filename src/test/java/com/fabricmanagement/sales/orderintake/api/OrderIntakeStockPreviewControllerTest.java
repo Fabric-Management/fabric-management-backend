@@ -168,6 +168,27 @@ class OrderIntakeStockPreviewControllerTest {
   }
 
   @Test
+  @WithMockUser
+  void aMissingToleranceSideIsRefused_zeroIsAValueBlankIsNot() throws Exception {
+    allowSalesRead();
+
+    mockMvc
+        .perform(
+            post(PATH)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"productId":"%s","requestedQty":100,"unit":"M","singleLotRequired":false,
+                     "toleranceUpPct":0}
+                    """
+                        .formatted(PRODUCT_ID)))
+        .andExpect(status().isUnprocessableEntity());
+
+    verify(previewService, never()).preview(any(), any());
+  }
+
+  @Test
   void theAuthenticatedActorGetsThePreview() throws Exception {
     UUID actor = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();

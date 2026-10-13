@@ -94,8 +94,9 @@ public record OrderIntakeStockPreviewDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
-                  "False when a search limit was reached: the options found are not claimed to"
-                      + " be the nearest or the best")
+                  "True when no search limit was reached: the nearest options and, within the"
+                      + " tolerance, the main option are exact. False: the options are the ones"
+                      + " found, never claimed to be the nearest or the best")
           boolean searchComplete,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int eligiblePieces,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,

@@ -152,11 +152,11 @@ class OrderIntakeStockPreviewServiceTest {
     stock(
         lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100"), eligible("100")),
         lot(UUID.randomUUID(), "LOT-B", eligible("100"), eligible("120")));
-    SalesOrderLine line = savedLine("200", "M", false, null, null);
+    SalesOrderLine line = savedLine("200", "M", false, "0", "0");
 
     OrderIntakeStockPreviewDto.Evaluation stored = storedEvaluation(line);
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("200", "M", false, null, null), actor);
+        service.preview(request("200", "M", false, "0", "0"), actor);
 
     assertThat(preview.evaluation()).isEqualTo(stored);
     assertThat(preview.evaluation().options()).isNotEmpty();
@@ -179,11 +179,11 @@ class OrderIntakeStockPreviewServiceTest {
   @Test
   void anUnknownMeasureIsTheSavedLinesUnknownAndReadsNoStock() {
     when(stockQuery.measureFor(ProductType.FABRIC)).thenReturn(Optional.empty());
-    SalesOrderLine line = savedLine("250", "M", false, null, null);
+    SalesOrderLine line = savedLine("250", "M", false, "0", "0");
 
     OrderIntakeStockPreviewDto.Evaluation stored = storedEvaluation(line);
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("250", "M", false, null, null), actor);
+        service.preview(request("250", "M", false, "0", "0"), actor);
 
     assertThat(preview.evaluation()).isEqualTo(stored);
     assertThat(preview.evaluation().status()).isEqualTo(EvaluationStatus.UNKNOWN);
@@ -200,11 +200,11 @@ class OrderIntakeStockPreviewServiceTest {
   @Test
   void aKgLineForAMetreProductIsUnitNotConvertible_andTheLotsStayReadableInMetres() {
     stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100"), eligible("100")));
-    SalesOrderLine line = savedLine("120", "KG", false, null, null);
+    SalesOrderLine line = savedLine("120", "KG", false, "0", "0");
 
     OrderIntakeStockPreviewDto.Evaluation stored = storedEvaluation(line);
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("120", "KG", false, null, null), actor);
+        service.preview(request("120", "KG", false, "0", "0"), actor);
 
     assertThat(preview.evaluation()).isEqualTo(stored);
     assertThat(preview.evaluation().status()).isEqualTo(EvaluationStatus.UNKNOWN);
@@ -222,7 +222,7 @@ class OrderIntakeStockPreviewServiceTest {
   @Test
   void theSavedPathStillSeedsAnUnknownFingerprintWithTheLineId() {
     stock(lot(UUID.randomUUID(), "LOT-A", eligible("100")));
-    SalesOrderLine line = savedLine("120", "KG", false, null, null);
+    SalesOrderLine line = savedLine("120", "KG", false, "0", "0");
     when(access.writableOrder(order.getId(), actor)).thenReturn(order);
     when(access.line(order, line.getId())).thenReturn(line);
 
@@ -241,7 +241,7 @@ class OrderIntakeStockPreviewServiceTest {
   void stockIsReadOncePerPreview() {
     stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100")));
 
-    service.preview(request("100", "M", false, null, null), actor);
+    service.preview(request("100", "M", false, "0", "0"), actor);
 
     verify(stockQuery, times(1)).find(any());
   }
@@ -251,7 +251,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("200")));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("25000", "CM", false, null, null), actor);
+        service.preview(request("25000", "CM", false, "0", "0"), actor);
 
     assertThat(preview.evaluation().status()).isNotEqualTo(EvaluationStatus.UNKNOWN);
     OrderIntakeStockPreviewDto.Lot lot = preview.lots().getFirst();
@@ -268,9 +268,9 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(lotA, "LOT-A", eligible("100")), lot(lotB, "LOT-B", eligible("100")));
 
     OrderIntakeStockPreviewDto anyLot =
-        service.preview(request("200", "M", false, null, null), actor);
+        service.preview(request("200", "M", false, "0", "0"), actor);
     OrderIntakeStockPreviewDto singleLot =
-        service.preview(request("200", "M", true, null, null), actor);
+        service.preview(request("200", "M", true, "0", "0"), actor);
 
     assertThat(anyLot.evaluation().options())
         .anySatisfy(option -> assertThat(option.lots()).hasSize(2));
@@ -278,13 +278,12 @@ class OrderIntakeStockPreviewServiceTest {
         .allSatisfy(option -> assertThat(option.lots()).hasSizeLessThanOrEqualTo(1));
 
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
-    OrderIntakeStockPreviewDto none =
-        service.preview(request("250", "M", false, null, null), actor);
+    OrderIntakeStockPreviewDto none = service.preview(request("250", "M", false, "0", "0"), actor);
     OrderIntakeStockPreviewDto agreed =
         service.preview(request("250", "M", false, "50", "50"), actor);
 
     // A tolerance is a reference: options outside it are shown and marked, never withheld. A side
-    // that was not agreed allows no deviation.
+    // agreed as 0% explicitly allows no deviation.
     assertThat(none.evaluation().options())
         .isNotEmpty()
         .allSatisfy(
@@ -305,6 +304,66 @@ class OrderIntakeStockPreviewServiceTest {
                     .isEqualTo(QuantityOption.ToleranceStatus.WITHIN));
   }
 
+  // ── Both tolerance limits are required (Fatih, 2026-10-13) ───────────────
+
+  @Test
+  void aMissingToleranceSideIsRefused_neverReadAsZero_andNoStockIsRead() {
+    stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100")));
+    clearInvocations(stockQuery, quoteHolds);
+
+    assertThatThrownBy(() -> service.preview(request("100", "M", false, "5", null), actor))
+        .isInstanceOf(OrderIntakeException.class)
+        .extracting(error -> ((OrderIntakeException) error).getErrorCode())
+        .isEqualTo("ORDER_INTAKE_TOLERANCE_REQUIRED");
+    assertThatThrownBy(() -> service.preview(request("100", "M", false, null, "5"), actor))
+        .isInstanceOf(OrderIntakeException.class);
+
+    verify(stockQuery, never()).find(any());
+    verify(quoteHolds, never()).find(any());
+  }
+
+  @Test
+  void aSavedLineWithoutATolerance_getsNoProposal_andNothingIsStored() {
+    stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100")));
+    // A line the system opened without the salesperson (a customer request) has no tolerance.
+    SalesOrderLine line = savedLine("100", "M", false, null, null);
+    when(access.writableOrder(order.getId(), actor)).thenReturn(order);
+    when(access.line(order, line.getId())).thenReturn(line);
+
+    assertThatThrownBy(() -> evaluations.evaluate(order.getId(), line.getId(), actor))
+        .isInstanceOf(OrderIntakeException.class)
+        .extracting(error -> ((OrderIntakeException) error).getErrorCode())
+        .isEqualTo("ORDER_INTAKE_TOLERANCE_REQUIRED");
+    verify(proposals, never()).save(any());
+  }
+
+  @Test
+  void zeroOnBothSides_makesOnlyTheExactRequestWithinTolerance() {
+    // 100 + 50 leaves three pieces, so it is an option; nothing may leave one or two.
+    stock(
+        lot(
+            UUID.randomUUID(),
+            "LOT-A",
+            eligible("100"),
+            eligible("50"),
+            eligible("30"),
+            eligible("30"),
+            eligible("30")));
+
+    OrderIntakeStockPreviewDto exact = service.preview(request("150", "M", false, "0", "0"), actor);
+
+    assertThat(exact.evaluation().options())
+        .isNotEmpty()
+        .allSatisfy(
+            option ->
+                assertThat(option.toleranceStatus())
+                    .isEqualTo(
+                        option.quantity().compareTo(new BigDecimal("150")) == 0
+                            ? QuantityOption.ToleranceStatus.WITHIN
+                            : QuantityOption.ToleranceStatus.OUTSIDE));
+    assertThat(main(exact).quantity()).isEqualByComparingTo("150");
+  }
+
   // ── Quote intents ────────────────────────────────────────────────────────
 
   @Test
@@ -312,26 +371,34 @@ class OrderIntakeStockPreviewServiceTest {
     UUID lotA = UUID.randomUUID();
     UUID lotB = UUID.randomUUID();
     stock(
-        lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")),
+        lot(
+            lotA,
+            "LOT-A",
+            eligible("100"),
+            eligible("100"),
+            eligible("100"),
+            eligible("100"),
+            eligible("100"),
+            eligible("100")),
         lot(lotB, "LOT-B", eligible("100")));
     when(quoteHolds.find(any()))
         .thenReturn(
             holds(
                 List.of(
-                    intent(lotA, UUID.randomUUID(), UUID.randomUUID(), "80", "80"),
+                    intent(lotA, UUID.randomUUID(), UUID.randomUUID(), "380", "380"),
                     intent(lotB, UUID.randomUUID(), UUID.randomUUID(), "500", "500")),
                 List.of()));
     OrderIntakeStockPreviewDto preview =
         service.preview(request("250", "M", false, "20", "20"), actor);
 
-    assertThat(lotView(preview, lotA).heldByQuotes().canonical()).isEqualByComparingTo("80");
+    assertThat(lotView(preview, lotA).heldByQuotes().canonical()).isEqualByComparingTo("380");
     assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("220");
     assertThat(lotView(preview, lotB).free().canonical()).isEqualByComparingTo("0");
     assertThat(preview.totals().free().canonical()).isEqualByComparingTo("220");
-    assertThat(preview.totals().heldByQuotes().canonical()).isEqualByComparingTo("580");
+    assertThat(preview.totals().heldByQuotes().canonical()).isEqualByComparingTo("880");
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("30");
     assertThat(preview.totals().freeComplete()).isTrue();
-    // 200 m free is within 20% of 250 m, so held stock is never evaluated.
+    // 200 m free (two pieces, four left) is within 20% of 250 m: held stock is never evaluated.
     assertThat(preview.evaluation().options())
         .isNotEmpty()
         .allSatisfy(
@@ -363,7 +430,7 @@ class OrderIntakeStockPreviewServiceTest {
                 List.of()));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     OrderIntakeStockPreviewDto.Lot lot = lotView(preview, lotA);
     assertThat(lot.free()).isNull();
@@ -407,7 +474,7 @@ class OrderIntakeStockPreviewServiceTest {
                 List.of()));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("50");
     // 50 m free cannot give a whole 100 m piece: every option takes from the quote's intent.
@@ -449,7 +516,7 @@ class OrderIntakeStockPreviewServiceTest {
                     hold(third.stockUnitId(), lotA, quoteLine))));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("290");
     assertThat(lotView(preview, lotA).heldPieces())
@@ -483,7 +550,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(preview.evaluation().options())
         .isNotEmpty()
@@ -586,7 +653,8 @@ class OrderIntakeStockPreviewServiceTest {
         .satisfies(
             option -> {
               assertThat(option.quantity()).isEqualByComparingTo("200");
-              assertThat(option.leavesSingleRemnant()).isTrue();
+              // A manual pick may leave a single piece; only with acknowledgement.
+              assertThat(option.leavesRemnant()).isTrue();
               assertThat(option.toleranceStatus())
                   .isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE);
               assertThat(option.apply().allowed()).isTrue();
@@ -602,7 +670,7 @@ class OrderIntakeStockPreviewServiceTest {
     UUID gone = UUID.randomUUID();
 
     assertThatThrownBy(
-            () -> service.preview(request("100", "M", false, null, null, List.of(gone)), actor))
+            () -> service.preview(request("100", "M", false, "0", "0", List.of(gone)), actor))
         .isInstanceOf(OrderIntakeException.class)
         .hasMessageContaining(gone.toString());
   }
@@ -626,7 +694,7 @@ class OrderIntakeStockPreviewServiceTest {
                 List.of(hold(held.stockUnitId(), lotA, quoteLine))));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("200", "M", false, null, null), actor);
+        service.preview(request("200", "M", false, "0", "0"), actor);
 
     OrderIntakeStockPreviewDto.Lot lot = lotView(preview, lotA);
     OrderIntakeStockPreviewDto.HeldPiece piece = lot.heldPieces().getFirst();
@@ -680,7 +748,7 @@ class OrderIntakeStockPreviewServiceTest {
                 List.of(hold(held.stockUnitId(), lotA, quoteLine))));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     OrderIntakeStockPreviewDto.Lot lot = lotView(preview, lotA);
     assertThat(lot.free().canonical()).isEqualByComparingTo("200");
@@ -704,7 +772,7 @@ class OrderIntakeStockPreviewServiceTest {
     doReturn(Set.of()).when(quoteScopes).findReadableQuoteIds(any(), any(), any());
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     OrderIntakeStockPreviewDto.Intent intent = lotView(preview, lotA).intents().getFirst();
     assertThat(intent.quoteNumber()).isNull();
@@ -732,7 +800,7 @@ class OrderIntakeStockPreviewServiceTest {
             piece("70", PieceState.EXCLUDED)));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     // 100 m, not 50 m (pending stock is not ready) and not null (a missing measurement on a piece
     // that is not ready does not make the ready-free quantity unknown).
@@ -755,7 +823,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(UUID.randomUUID(), "LOT-A", piece("120", PieceState.UNKNOWN)));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("100");
     assertThat(preview.totals().unknown().canonical()).isEqualByComparingTo("120");
@@ -766,7 +834,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock();
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(preview.lots()).isEmpty();
     assertThat(preview.totals().free().canonical()).isEqualByComparingTo("0");
@@ -788,7 +856,7 @@ class OrderIntakeStockPreviewServiceTest {
             piece("70", PieceState.EXCLUDED)));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(preview.totals().free().canonical()).isEqualByComparingTo("40");
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("60");
@@ -805,7 +873,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(UUID.randomUUID(), "LOT-A", eligible("60"), eligible("60"), unmeasured()));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertThat(preview.totals().free().canonical()).isEqualByComparingTo("120");
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("0");
@@ -823,7 +891,7 @@ class OrderIntakeStockPreviewServiceTest {
             holds(List.of(), List.of(hold(pending.stockUnitId(), lotA, UUID.randomUUID()))));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertNotReadyHoldLeavesFreeKnown(preview, lotA, pending);
   }
@@ -838,7 +906,7 @@ class OrderIntakeStockPreviewServiceTest {
             holds(List.of(), List.of(hold(excluded.stockUnitId(), lotA, UUID.randomUUID()))));
 
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("100", "M", false, null, null), actor);
+        service.preview(request("100", "M", false, "0", "0"), actor);
 
     assertNotReadyHoldLeavesFreeKnown(preview, lotA, excluded);
   }
@@ -876,7 +944,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100")));
     clearInvocations(proposals);
 
-    service.preview(request("100", "M", false, null, null), actor);
+    service.preview(request("100", "M", false, "0", "0"), actor);
 
     verify(proposals, never()).save(any());
     verify(quoteHolds, times(1)).find(any());

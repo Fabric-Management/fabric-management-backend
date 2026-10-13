@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.orderintake.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
@@ -30,11 +31,13 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
- * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A01, A04 on the evaluation level: the main proposal from
- * the free options that meet the request within the tolerance, ranked tenant-first (no single piece
- * left, lots that fit taken whole, older stock, fewer lots, closeness), otherwise the best
- * construction; the nearest options below and above; quantity order with the main index; held stock
- * only when free stock has no option within tolerance; and the manual pick. Data is fictional.
+ * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A04 on the evaluation level (Fatih, 2026-10-12 and
+ * 2026-10-13): no computed option leaves one or two pieces in a lot; the proposal opens at the best
+ * free option meeting the request within the tolerance (more lots closed, older stock, fewer lots,
+ * closeness), else the nearest above, else the best below, else held stock; the best below, the
+ * nearest on both sides and the best below by the ranking alone stay listed; quantity order with
+ * the opening index; held stock only when free stock cannot reach the lower tolerance limit; the
+ * manual pick. Data is fictional.
  */
 class QuantityEvaluatorTest {
 
@@ -45,60 +48,86 @@ class QuantityEvaluatorTest {
   private final UUID p2 = new UUID(0, 2);
   private final UUID p3 = new UUID(0, 3);
 
-  // ── The decision record's examples ───────────────────────────────────────
+  // ── No computed option leaves one or two pieces (Fatih, 2026-10-13) ────────
 
   @Test
-  void pieces120_110_90For200_theOnlyOptionWithinToleranceIsTheMain_evenLeavingASinglePiece() {
+  void pieces120_110_90For200_everyPartialTakeLeavesOneOrTwoPieces_soTheWholeLotOpens() {
     var result = evaluate(spec("200").lots(lot(p1, "P1", null, 120, 110, 90)).tolerance("5", "5"));
 
-    // 110 + 90 meets the request but leaves the 120 m piece alone; it is still the only option
-    // within the tolerance, so it is the main one, and applying it asks for confirmation.
-    QuantityOption main = main(result);
-    assertThat(main.quantity()).isEqualByComparingTo("200");
-    assertThat(main.leavesSingleRemnant()).isTrue();
-    assertThat(main.lots().getFirst().remnantQuantity()).isEqualByComparingTo("120");
-    assertThat(main.reasons())
-        .extracting(ProposalReason::code)
-        .containsSubsequence(
-            ProposalReason.Code.LEAVES_SINGLE_PIECE, ProposalReason.Code.EXACT_REQUEST);
-    // The construction that leaves no single piece is kept beside it, not hidden.
-    QuantityOption below = byQuantity(result, "120");
+    // 110 + 90 would leave the 120 m piece, 120 alone would leave two: neither is offered.
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("320");
+    assertThat(opening.lots().getFirst().closesLot()).isTrue();
+    assertThat(opening.leavesRemnant()).isFalse();
+    assertThat(opening.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
+    assertThat(quantities(result)).containsExactly("320");
+  }
+
+  @Test
+  void aLotOfFourMayKeepThreePieces_neverTwo() {
+    var result =
+        evaluate(spec("100").lots(lot(p1, "P1", null, 100, 100, 100, 100)).tolerance("0", "0"));
+
+    assertThat(main(result).quantity()).isEqualByComparingTo("100");
+    assertThat(main(result).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
+    assertThat(result.options())
+        .noneMatch(option -> option.quantity().compareTo(new BigDecimal("200")) == 0);
+  }
+
+  // ── Where the proposal opens (Fatih, 2026-10-13) ─────────────────────────
+
+  @Test
+  void theBestMeetingTheRequestWithinTolerance_opens_closingALotBeforeFewerLotsAndCloseness() {
+    UUID old = new UUID(0, 31);
+    UUID fresh = new UUID(0, 32);
+    var result =
+        evaluate(
+            spec("250")
+                .lots(
+                    lot(old, "OLD", OLD, 100, 100),
+                    lot(fresh, "NEW", NEW, 100, 100, 100, 100, 100, 100))
+                .confirmed(Set.of(old, fresh))
+                .tolerance("20", "20"));
+
+    // 300 m either way: the old lot closed plus one new piece beats three new pieces.
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("300");
+    assertThat(opening.toleranceStatus()).isEqualTo(ToleranceStatus.WITHIN);
+    assertThat(part(opening, old).closesLot()).isTrue();
+    assertThat(part(opening, fresh).remainingEligiblePieces()).isEqualTo(5);
+  }
+
+  @Test
+  void withNothingWithinTolerance_theNearestAboveOpens_andTheBestBelowStaysListed() {
+    var result =
+        evaluate(
+            spec("450")
+                .lots(lot(p1, "P1", null, 100, 100, 100, 100, 100, 100))
+                .tolerance("5", "5"));
+
+    // Takes leave at least three pieces: 100, 200, 300 or the whole 600 m.
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("600");
+    assertThat(opening.placement()).isEqualTo(OptionPlacement.MAIN);
+    assertThat(opening.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
+    QuantityOption below = byQuantity(result, "300");
     assertThat(below.placement()).isEqualTo(OptionPlacement.BELOW);
     assertThat(below.nearest()).isTrue();
-    assertThat(below.leavesSingleRemnant()).isFalse();
-    assertThat(below.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
-    assertThat(below.reasons())
-        .extracting(ProposalReason::code)
-        .contains(ProposalReason.Code.NO_SINGLE_PIECE_LEFT);
   }
 
   @Test
-  void withoutAnyOptionWithinTolerance_theTenantFirstConstructionIsTheMain() {
-    var result = evaluate(spec("200").lots(lot(p1, "P1", null, 120, 110, 90)).tolerance("0", "0"));
-
-    // 200 m is exact, so it is within even a zero tolerance; here the request moves out of reach.
-    var unreachable =
-        evaluate(spec("205").lots(lot(p1, "P1", null, 120, 110, 90)).tolerance("0", "0"));
-
-    assertThat(main(result).quantity()).isEqualByComparingTo("200");
-    assertThat(main(unreachable).quantity()).isEqualByComparingTo("120");
-    assertThat(main(unreachable).leavesSingleRemnant()).isFalse();
-    assertThat(main(unreachable).toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
-  }
-
-  @Test
-  void withinTolerance_noSinglePieceAndLotClosureComeBeforeCloseness() {
+  void withNothingAtOrAboveTheRequest_theBestBelowOpens() {
     var result =
-        evaluate(spec("200").lots(lot(p1, "P1", null, 100, 100, 100)).tolerance("50", "50"));
+        evaluate(spec("700").lots(lot(p1, "P1", OLD, 100, 100, 100, 95)).tolerance("5", "5"));
 
-    // 200 m is exact but leaves one piece; 300 m closes the lot; 100 m leaves two pieces.
-    assertThat(main(result).quantity()).isEqualByComparingTo("300");
-    assertThat(main(result).lots().getFirst().closesLot()).isTrue();
-    assertThat(quantities(result)).containsExactly("100", "200", "300");
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("395");
+    assertThat(opening.difference()).isEqualByComparingTo("-305");
+    assertThat(opening.lots().getFirst().closesLot()).isTrue();
   }
 
   @Test
-  void aLotYouCannotCombineWithIsNotTheMainWhenAnotherLotMeetsTheRequest() {
+  void aLotYouCannotCombineWithIsNotTheOpening_butClosingItStaysAnAlternative() {
     var result =
         evaluate(
             spec("700")
@@ -118,7 +147,7 @@ class QuantityEvaluatorTest {
   }
 
   @Test
-  void aLotThatFitsTheRemainingTargetIsClosed_insteadOfTakingOneOfItsPieces() {
+  void lot23087_theNewLotMeetsTheRequest_closingTheOldLotIsTheBestBelow() {
     UUID lot23087 = new UUID(0, 23087);
     UUID newer = new UUID(0, 99);
     var result =
@@ -130,15 +159,51 @@ class QuantityEvaluatorTest {
                 .confirmed(Set.of(lot23087, newer))
                 .tolerance("5", "5"));
 
-    QuantityOption main = main(result);
-    QuantityOption.LotPart closed = part(main, lot23087);
-    assertThat(closed.quantity()).isEqualByComparingTo("290");
-    assertThat(closed.closesLot()).isTrue();
-    assertThat(part(main, newer).quantity()).isEqualByComparingTo("400");
-    assertThat(main.quantity()).isEqualByComparingTo("690");
-    assertThat(main.reasons())
+    // The old lot is closed or untouched: one or two of its pieces would leave two or one.
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("700");
+    assertThat(opening.batchIds()).containsExactly(newer);
+    assertThat(opening.lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
+    QuantityOption below = byQuantity(result, "690");
+    assertThat(below.placement()).isEqualTo(OptionPlacement.BELOW);
+    assertThat(below.toleranceStatus()).isEqualTo(ToleranceStatus.WITHIN);
+    assertThat(part(below, lot23087).closesLot()).isTrue();
+    assertThat(part(below, newer).quantity()).isEqualByComparingTo("400");
+    assertThat(below.reasons())
         .extracting(ProposalReason::code)
         .contains(ProposalReason.Code.CLOSES_LOTS);
+  }
+
+  @Test
+  void aManualPickMayLeaveTwoPieces_onlyWithAcknowledgement() {
+    UUID a = new UUID(4, 1);
+    List<ProposalPiece> rest = both(pieces(new UUID(4, 2), 60), pieces(new UUID(4, 3), 50));
+    var result =
+        evaluate(
+            spec("100")
+                .lots(lot(p1, "P1", null, both(pieces(a, 100), rest)))
+                .tolerance("0", "0")
+                .manual(a));
+
+    QuantityOption manual =
+        result.options().stream()
+            .filter(option -> option.placement() == OptionPlacement.MANUAL)
+            .findFirst()
+            .orElseThrow();
+    assertThat(manual.leavesRemnant()).isTrue();
+    assertThat(manual.needsRemnantAcknowledgement()).isTrue();
+    assertThat(manual.blockedReason()).isNull();
+    assertThat(manual.lots().getFirst().remnantPieceIds()).hasSize(2);
+    assertThat(manual.reasons())
+        .filteredOn(reason -> reason.code() == ProposalReason.Code.LEAVES_REMNANT)
+        .singleElement()
+        .satisfies(
+            reason -> {
+              assertThat(reason.count()).isEqualTo(2);
+              assertThat(reason.quantity()).isEqualByComparingTo("110");
+            });
+    // The computed option closes the lot instead.
+    assertThat(main(result).quantity()).isEqualByComparingTo("210");
   }
 
   @Test
@@ -164,7 +229,7 @@ class QuantityEvaluatorTest {
   }
 
   @Test
-  void s04_closingBothConfirmedLotsIsTheMain_theNearestOptionsAreKeptBesideIt() {
+  void s04_closingBothConfirmedLotsOpens_aSingleLotIsTheNearestBelow() {
     var result =
         evaluate(
             spec("500")
@@ -172,14 +237,14 @@ class QuantityEvaluatorTest {
                 .confirmed(Set.of(p1, p2))
                 .tolerance("20", "20"));
 
-    assertThat(quantities(result)).containsExactly("400", "500", "600");
+    // 400 and 500 m would leave two or one piece in a lot; they are not offered.
+    assertThat(quantities(result)).containsExactly("300", "600");
     assertThat(main(result).quantity()).isEqualByComparingTo("600");
     assertThat(main(result).compatibility()).isEqualTo(Compatibility.CONFIRMED);
     assertThat(main(result).lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
-    assertThat(byQuantity(result, "400").placement()).isEqualTo(OptionPlacement.BELOW);
-    assertThat(byQuantity(result, "400").nearest()).isTrue();
-    assertThat(byQuantity(result, "500").leavesSingleRemnant()).isTrue();
-    assertThat(result.mainOptionIndex()).isEqualTo(2);
+    assertThat(byQuantity(result, "300").placement()).isEqualTo(OptionPlacement.BELOW);
+    assertThat(byQuantity(result, "300").nearest()).isTrue();
+    assertThat(result.mainOptionIndex()).isEqualTo(1);
   }
 
   // ── Quantity order and the main index ────────────────────────────────────
@@ -261,16 +326,15 @@ class QuantityEvaluatorTest {
                 .tolerance("10", "10"));
 
     assertThat(byQuantity(result, "600").toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
-    assertThat(byQuantity(result, "400").toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
-    assertThat(byQuantity(result, "500").toleranceStatus()).isEqualTo(ToleranceStatus.WITHIN);
-    // The only option within 10% is the main one, though it leaves a single piece.
-    assertThat(main(result).quantity()).isEqualByComparingTo("500");
-    assertThat(main(result).leavesSingleRemnant()).isTrue();
+    assertThat(byQuantity(result, "300").toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
+    // Nothing meets 500 m within 10% without leaving one or two pieces: the nearest above opens.
+    assertThat(main(result).quantity()).isEqualByComparingTo("600");
+    assertThat(main(result).leavesRemnant()).isFalse();
   }
 
   @Test
-  void aToleranceSideThatWasNotAgreedAllowsNoDeviation() {
-    var result = evaluate(spec("250").lots(lot(p1, "P1", null, 100, 100, 100)));
+  void zeroOnASideIsAnExplicitValue_noDeviationThatWayIsWithin() {
+    var result = evaluate(spec("250").lots(lot(p1, "P1", null, 100, 100, 100)).tolerance("0", "0"));
 
     assertThat(result.options())
         .isNotEmpty()
@@ -278,7 +342,72 @@ class QuantityEvaluatorTest {
             option -> assertThat(option.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE));
   }
 
-  // ── Free stock first; held stock only when free has nothing within tolerance
+  @Test
+  void aMissingToleranceSideIsRefused_neverReadAsZero() {
+    ProposalLot stock = lot(p1, "P1", null, 100, 100, 100);
+
+    assertThatThrownBy(() -> evaluate(spec("250").lots(stock).noTolerance(true, false)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> evaluate(spec("250").lots(stock).noTolerance(false, true)))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  // ── The main proposal over every combination within tolerance ────────────
+
+  @Test
+  void closingTwoLotsWithinTolerance_beatsTheNearestCombinationThatLeavesASinglePiece() {
+    // The closing review's counterexample (2026-10-13). The nearest exact search alone found
+    // A + 100 m of B (fewer lots, older first), leaving a single 50 m piece in B.
+    UUID a = new UUID(0, 21);
+    UUID b = new UUID(0, 22);
+    UUID c = new UUID(0, 23);
+    var result =
+        evaluate(
+            spec("300")
+                .lots(
+                    lot(a, "A", OLD, 100, 100),
+                    lot(b, "B", Instant.parse("2025-09-01T00:00:00Z"), 50, 50, 50),
+                    lot(c, "C", NEW, 75, 75))
+                .confirmed(Set.of(a, b, c))
+                .tolerance("5", "5"));
+
+    QuantityOption main = main(result);
+    assertThat(main.quantity()).isEqualByComparingTo("300");
+    assertThat(main.batchIds()).containsExactlyInAnyOrder(b, c);
+    assertThat(main.leavesRemnant()).isFalse();
+    assertThat(main.lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
+    assertThat(result.searchComplete()).isTrue();
+    assertThat(result.status()).isEqualTo(EvaluationStatus.EXACT);
+  }
+
+  @Test
+  void aSearchLimitWordsClosenessAsFound_neverAsTheClosest() {
+    // Thirteen lots in one confirmed group exceed the search; single lots still give 100 m (three
+    // pieces left) and the whole 400 m.
+    List<ProposalLot> many = new ArrayList<>();
+    Set<UUID> group = new java.util.HashSet<>();
+    for (int i = 0; i <= WholePieceSearch.MAX_LOTS; i++) {
+      UUID id = new UUID(5, i);
+      many.add(lot(id, "L" + i, null, 100, 100, 100, 100));
+      group.add(id);
+    }
+    var result =
+        evaluate(
+            spec("150")
+                .lots(many.toArray(ProposalLot[]::new))
+                .confirmed(group)
+                .tolerance("0", "0"));
+
+    assertThat(result.searchComplete()).isFalse();
+    assertThat(result.options()).isNotEmpty();
+    assertThat(result.options())
+        .flatExtracting(QuantityOption::reasons)
+        .extracting(ProposalReason::code)
+        .doesNotContain(ProposalReason.Code.CLOSEST_TO_REQUEST)
+        .contains(ProposalReason.Code.CLOSEST_FOUND);
+  }
+
+  // ── Free stock first; held stock only when free cannot reach the lower limit
 
   @Test
   void aFreeOptionWithinToleranceKeepsHeldStockOutOfTheOptions() {
@@ -616,8 +745,9 @@ class QuantityEvaluatorTest {
     private List<ProposalLot> lots = List.of();
     private List<Set<UUID>> confirmed = List.of();
     private boolean singleLot;
-    private BigDecimal up;
-    private BigDecimal down;
+    // Both limits are required (Fatih, 2026-10-13); a test about something else agrees 0% openly.
+    private BigDecimal up = BigDecimal.ZERO;
+    private BigDecimal down = BigDecimal.ZERO;
     private QuantityEvaluator.StockHolds holds = QuantityEvaluator.StockHolds.NONE;
     private List<UUID> manual = List.of();
 
@@ -644,6 +774,12 @@ class QuantityEvaluatorTest {
     Spec tolerance(String upPct, String downPct) {
       up = new BigDecimal(upPct);
       down = new BigDecimal(downPct);
+      return this;
+    }
+
+    Spec noTolerance(boolean upMissing, boolean downMissing) {
+      up = upMissing ? null : up;
+      down = downMissing ? null : down;
       return this;
     }
 

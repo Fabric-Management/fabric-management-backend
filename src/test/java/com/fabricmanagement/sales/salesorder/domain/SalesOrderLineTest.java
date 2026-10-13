@@ -289,6 +289,23 @@ class SalesOrderLineTest {
   }
 
   @Test
+  void tolerance_oneLimitAloneIsRefused_zeroIsAValue() {
+    SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
+    UUID actor = UUID.randomUUID();
+    java.time.Instant at = java.time.Instant.parse("2026-10-13T10:00:00Z");
+
+    assertThatThrownBy(() -> line.recordTolerance(BigDecimal.ZERO, null, actor, at))
+        .isInstanceOf(OrderDomainException.class);
+    assertThatThrownBy(() -> line.recordTolerance(null, new BigDecimal("5"), actor, at))
+        .isInstanceOf(OrderDomainException.class);
+    assertThat(line.getToleranceUpPct()).isNull();
+
+    line.recordTolerance(BigDecimal.ZERO, BigDecimal.ZERO, actor, at);
+    assertThat(line.getToleranceUpPct()).isEqualByComparingTo("0");
+    assertThat(line.getToleranceDownPct()).isEqualByComparingTo("0");
+  }
+
+  @Test
   void tolerance_isBetweenZeroAndAHundredAndClearedWithBothLimits() {
     SalesOrderLine line = lineWithRequestedQty(new BigDecimal("100"));
 

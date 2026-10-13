@@ -108,7 +108,10 @@ class SalesOrderLeaseKeysTest {
                 UUID.randomUUID(),
                 "fields",
                 Map.of(
-                    "quantity", set(Map.of("requestedQty", new BigDecimal("5"), "unit", "M"))))));
+                    "quantity",
+                    set(Map.of("requestedQty", new BigDecimal("5"), "unit", "M")),
+                    "tolerance",
+                    set(Map.of("upPct", new BigDecimal("5"), "downPct", new BigDecimal("5")))))));
     SalesOrderEditInstructions.Parsed parsed = parse(body);
 
     assertThat(SalesOrderLeaseKeys.required(parsed))

@@ -227,6 +227,13 @@ public class QuantityEvaluationService {
    * transaction proxy.
    */
   public EvaluationRun run(EvaluationRequest request) {
+    // Both limits are required (Fatih, 2026-10-13): a missing side is missing information, never
+    // 0%. No proposal is computed, so no earlier one is presented as current.
+    if (request.toleranceUpPct() == null || request.toleranceDownPct() == null) {
+      throw OrderIntakeException.rule(
+          "TOLERANCE_REQUIRED",
+          "Enter both the upper and the lower tolerance; write 0% when no deviation is accepted");
+    }
     UUID tenantId = TenantContext.requireTenantId();
     ProductSalesDefinitionDto product =
         productDefinitions

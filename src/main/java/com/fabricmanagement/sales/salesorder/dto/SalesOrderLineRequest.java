@@ -79,14 +79,28 @@ public class SalesOrderLineRequest implements CatalogLineInput {
   @DecimalMin(value = "0", message = "Tax cannot be negative")
   private BigDecimal taxAmount;
 
-  @Schema(description = "Quantity tolerance above the requested quantity agreed for this line (%)")
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      description =
+          "Quantity tolerance above the requested quantity agreed for this line (%); 0 when no"
+              + " deviation is accepted")
+  @NotNull(
+      message =
+          "Enter both the upper and the lower tolerance; write 0 when no deviation is accepted")
   @DecimalMin(value = "0", message = "A tolerance cannot be negative")
   @jakarta.validation.constraints.DecimalMax(
       value = "100",
       message = "A tolerance cannot exceed 100 percent")
   private BigDecimal toleranceUpPct;
 
-  @Schema(description = "Quantity tolerance below the requested quantity agreed for this line (%)")
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      description =
+          "Quantity tolerance below the requested quantity agreed for this line (%); 0 when no"
+              + " deviation is accepted")
+  @NotNull(
+      message =
+          "Enter both the upper and the lower tolerance; write 0 when no deviation is accepted")
   @DecimalMin(value = "0", message = "A tolerance cannot be negative")
   @jakarta.validation.constraints.DecimalMax(
       value = "100",

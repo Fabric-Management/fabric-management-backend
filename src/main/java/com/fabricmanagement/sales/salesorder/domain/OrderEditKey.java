@@ -30,7 +30,8 @@ public enum OrderEditKey {
   LINE_SHIPMENT_PREFERENCE("line.shipmentPreference", true, true),
   LINE_QUANTITY("line.quantity", true, true),
   LINE_PRICING("line.pricing", true, false),
-  LINE_TOLERANCE("line.tolerance", true, false),
+  // Both limits always (Fatih, 2026-10-13); 0 is a value, a blank is missing information.
+  LINE_TOLERANCE("line.tolerance", true, true),
   LINE_SPECIFICATION("line.specification", true, true);
 
   /** The key of a conflict or history row about a whole line (removed, product changed, added). */
