@@ -105,7 +105,10 @@ public class OpenApiExportIT {
           new NullableReference(
               "OrderIntakeStockPreviewTotals",
               "notCoveredByReadyStock",
-              "OrderIntakeStockPreviewQuantity"));
+              "OrderIntakeStockPreviewQuantity"),
+          // STOCK-PROPOSAL-2: an applicable option has no blocked reason.
+          new NullableReference(
+              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =
@@ -232,20 +235,42 @@ public class OpenApiExportIT {
 
     assertThat(requiredOf(document, "OrderIntakeStockPreviewRequest"))
         .containsExactlyInAnyOrder("productId", "requestedQty", "unit", "singleLotRequired");
+    assertThat(schemaProperty(document, "OrderIntakeStockPreviewRequest", "manualPieceIds"))
+        .containsEntry("type", "array");
     assertPercentageBounds(document, "OrderIntakeStockPreviewRequest", "toleranceUpPct");
     assertPercentageBounds(document, "OrderIntakeStockPreviewRequest", "toleranceDownPct");
 
     assertThat(requiredOf(document, "OrderIntakeStockPreview"))
         .containsExactlyInAnyOrder(
-            "unit",
-            "canonicalUnit",
-            "evaluation",
+            "unit", "canonicalUnit", "evaluation", "lots", "totals", "unconvertibleIntentCount");
+    assertThat(mapAt(document, "components", "schemas"))
+        .doesNotContainKey("OrderIntakeStockPreviewOptionCheck");
+    // STOCK-PROPOSAL-2: ordered options with the main index; each option carries its capability.
+    assertThat(requiredOf(document, "OrderIntakeStockPreviewEvaluation"))
+        .contains("options", "mainOptionIndex", "searchComplete")
+        .doesNotContain("optionsOutsideAgreedTolerance");
+    assertThat(requiredOf(document, "QuantityProposal"))
+        .contains("options", "mainOptionIndex", "searchComplete");
+    assertThat(requiredOf(document, "QuantityProposalOption"))
+        .contains(
+            "optionKey",
+            "role",
+            "nearest",
+            "source",
+            "quantity",
+            "difference",
+            "toleranceStatus",
+            "reasons",
             "lots",
-            "optionChecks",
-            "totals",
-            "unconvertibleIntentCount");
-    assertThat(requiredOf(document, "OrderIntakeStockPreviewOptionLotCheck"))
-        .contains("exceedsFree", "heldPieceIds", "unverifiedHoldPieceIds");
+            "heldStock",
+            "apply");
+    assertThat(requiredOf(document, "QuantityProposalLot"))
+        .contains("closesLot", "remainingPieces", "remainingQuantity", "pieceIds");
+    assertThat(requiredOf(document, "StockProposalApplyCapability"))
+        .containsExactlyInAnyOrder(
+            "action", "allowed", "reason", "routesTo", "needsApproval", "needsConfirmation");
+    assertThat(mapAt(document, "components", "schemas", "StockProposalRole"))
+        .containsEntry("enum", List.of("MAIN", "BELOW", "ABOVE", "MANUAL"));
     assertThat(schemaProperty(document, "OrderIntakeStockPreviewHeldPiece", "holdStatus"))
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");
     assertThat(mapAt(document, "components", "schemas", "OrderIntakeStockPreviewHoldStatus"))

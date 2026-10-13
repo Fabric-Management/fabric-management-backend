@@ -118,6 +118,29 @@ class WholePieceSearchTest {
   }
 
   @Test
+  void aLotCapacityBoundsEveryTake_freeStockNetOfQuoteIntents() {
+    Lot full = lot(100, 100, 100, 100);
+    Lot capped = new Lot(full.id(), full.pieces(), 150 * M);
+
+    Result result = WholePieceSearch.search(List.of(capped), 200 * M, true);
+
+    assertThat(result.exact()).isEmpty();
+    assertThat(result.above()).isEmpty();
+    assertThat(result.below()).get().extracting(Selection::total).isEqualTo(100 * M);
+  }
+
+  @Test
+  void aLotWithNoCapacityOffersNothing() {
+    Lot empty = new Lot(UUID.randomUUID(), lot(100, 100).pieces(), 0);
+
+    Result result = WholePieceSearch.search(List.of(empty), 100 * M, true);
+
+    assertThat(result.exact()).isEmpty();
+    assertThat(result.below()).isEmpty();
+    assertThat(result.limitExceeded()).isFalse();
+  }
+
+  @Test
   void noPiecesMeansNoSelections() {
     Result result =
         WholePieceSearch.search(List.of(new Lot(UUID.randomUUID(), List.of())), 500 * M, false);

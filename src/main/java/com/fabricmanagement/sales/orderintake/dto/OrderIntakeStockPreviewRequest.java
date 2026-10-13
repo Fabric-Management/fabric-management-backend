@@ -5,13 +5,17 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * An order line that is not saved yet, as the order form holds it (STOCK-PREVIEW-1). The
  * constraints and messages are those of a saved line ({@code SalesOrderLineRequest}), so a preview
  * accepts what a line accepts. Tolerances are on the percent scale the line stores (5 means 5%).
+ * {@code manualPieceIds} is the salesperson's own pick ("change pieces"), evaluated as a MANUAL
+ * option with the same checks (STOCK-PROPOSAL-2).
  */
 @Schema(name = "OrderIntakeStockPreviewRequest")
 public record OrderIntakeStockPreviewRequest(
@@ -50,4 +54,10 @@ public record OrderIntakeStockPreviewRequest(
                 "Quantity tolerance below the requested quantity agreed for this line (%)")
         @DecimalMin(value = "0", message = "A tolerance cannot be negative")
         @DecimalMax(value = "100", message = "A tolerance cannot exceed 100 percent")
-        BigDecimal toleranceDownPct) {}
+        BigDecimal toleranceDownPct,
+    @Schema(
+            description =
+                "Pieces the salesperson picked; evaluated as a MANUAL option beside the computed"
+                    + " ones. Pieces that are no longer offerable are refused (409)")
+        @Size(max = 500, message = "At most 500 pieces can be picked")
+        List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds) {}

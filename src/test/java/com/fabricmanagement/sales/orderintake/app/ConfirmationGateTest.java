@@ -23,6 +23,7 @@ import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptance;
 import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceBasis;
 import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -260,7 +261,7 @@ class ConfirmationGateTest {
         java.util.stream.IntStream.range(0, lots.size())
             .mapToObj(
                 index ->
-                    new QuantityOption.LotPart(
+                    QuantityOptionFixtures.lot(
                         lots.get(index),
                         "LOT" + index,
                         List.of(pieces.get(index)),
@@ -272,7 +273,7 @@ class ConfirmationGateTest {
                         null))
             .toList();
     QuantityOption option =
-        new QuantityOption(
+        QuantityOptionFixtures.option(
             "ABOVE:0123456789abcdef",
             QuantityOption.OptionKind.ABOVE,
             QuantityOption.Compatibility.SINGLE_LOT,

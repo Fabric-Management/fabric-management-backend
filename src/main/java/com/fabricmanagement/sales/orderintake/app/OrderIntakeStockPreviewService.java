@@ -5,12 +5,10 @@ import com.fabricmanagement.production.core.batch.api.query.ProposalStockQuerySe
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
-import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService;
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService.HeldPieceView;
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService.LotIntentView;
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService.QuoteHolds;
 import com.fabricmanagement.production.core.batch.domain.PrimaryMeasure;
-import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto.FreeIncompleteReason;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto.HoldStatus;
@@ -36,10 +34,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Current stock for an order line that is not saved yet (STOCK-PREVIEW-1 A3). The evaluation comes
- * from {@link QuantityEvaluationService#run}, the path a saved line takes, and the lot view is
- * built from the very stock read that evaluation used. What quotes hold is read from production and
- * shown beside the options; the options themselves are never changed (D3). Reserves, records and
+ * Current stock for an order line that is not saved yet (STOCK-PREVIEW-1 A3, STOCK-PROPOSAL-2). The
+ * evaluation comes from {@link QuantityEvaluationService#run}, the path a saved line takes, and the
+ * lot view is built from the very stock and quote-hold reads that evaluation used. Options use free
+ * stock first and say themselves what other quotes hold that they would take. Reserves, records and
  * sends nothing.
  *
  * <p>A piece hold is VERIFIED only when its quote line has an active intent on the same lot; its
@@ -56,7 +54,6 @@ public class OrderIntakeStockPreviewService {
 
   private final QuantityEvaluationService evaluations;
   private final ProposalStockQueryService stockQuery;
-  private final QuoteHoldQueryService quoteHolds;
   private final QuoteScopeQueryService quoteScopes;
 
   public OrderIntakeStockPreviewDto preview(OrderIntakeStockPreviewRequest request, UUID actor) {
@@ -75,12 +72,10 @@ public class OrderIntakeStockPreviewService {
                 Boolean.TRUE.equals(request.singleLotRequired()),
                 request.toleranceUpPct(),
                 request.toleranceDownPct(),
-                List.of()));
+                List.of(),
+                request.manualPieceIds()));
     List<ProposalLot> stockLots = run.stock().lots();
-    QuoteHolds holds =
-        stockLots.isEmpty()
-            ? new QuoteHolds(List.of(), List.of())
-            : quoteHolds.find(stockLots.stream().map(ProposalLot::batchId).toList());
+    QuoteHolds holds = run.holds();
     Set<UUID> readableQuotes = readableQuotes(tenantId, actor, holds.intents());
     Units units = new Units(stockQuery, run.measure(), request.unit());
 
@@ -98,12 +93,12 @@ public class OrderIntakeStockPreviewService {
                         holdsByLot.getOrDefault(lot.batchId(), List.of())))
             .toList();
 
+    // Every quote an option's held stock names is one of the lots' intents: same readable set.
     return new OrderIntakeStockPreviewDto(
         request.unit(),
         run.canonicalUnit(),
-        OrderIntakeStockPreviewDto.Evaluation.from(run.evaluation().result()),
+        OrderIntakeStockPreviewDto.Evaluation.from(run.evaluation().result(), readableQuotes),
         lots.stream().map(facts -> toLot(facts, units, readableQuotes)).toList(),
-        optionChecks(run, lots),
         totals(request, run, lots, units),
         lots.stream().mapToInt(LotFacts::unconvertibleIntents).sum());
   }
@@ -148,7 +143,17 @@ public class OrderIntakeStockPreviewService {
                       intent.expiresAt());
                 })
             .toList(),
-        facts.holds().stream().map(hold -> toHeldPiece(hold, facts, readableQuotes)).toList());
+        facts.holds().stream().map(hold -> toHeldPiece(hold, facts, readableQuotes)).toList(),
+        facts.lot().pieces().stream()
+            .filter(piece -> piece.state() == PieceState.ELIGIBLE)
+            .map(
+                piece ->
+                    new OrderIntakeStockPreviewDto.Piece(
+                        piece.stockUnitId(),
+                        piece.pieceNo(),
+                        units.quantity(piece.canonicalMeasure()),
+                        facts.heldPieceIds().contains(piece.stockUnitId())))
+            .toList());
   }
 
   private OrderIntakeStockPreviewDto.HeldPiece toHeldPiece(
@@ -169,67 +174,6 @@ public class OrderIntakeStockPreviewService {
         readable ? intent.quoteNumber() : null,
         readable ? intent.marketerName() : null,
         intent.expiresAt());
-  }
-
-  private List<OrderIntakeStockPreviewDto.OptionCheck> optionChecks(
-      QuantityEvaluationService.EvaluationRun run, List<LotFacts> lots) {
-    Map<UUID, LotFacts> lotsById =
-        lots.stream().collect(Collectors.toMap(facts -> facts.lot().batchId(), facts -> facts));
-    Map<UUID, BigDecimal> pieceMeasures = new HashMap<>();
-    lots.forEach(
-        facts ->
-            facts.lot().pieces().stream()
-                .filter(piece -> piece.canonicalMeasure() != null)
-                .forEach(
-                    piece -> pieceMeasures.put(piece.stockUnitId(), piece.canonicalMeasure())));
-    return run.evaluation().result().options().stream()
-        .map(option -> optionCheck(option, lotsById, pieceMeasures))
-        .toList();
-  }
-
-  private OrderIntakeStockPreviewDto.OptionCheck optionCheck(
-      QuantityOption option, Map<UUID, LotFacts> lotsById, Map<UUID, BigDecimal> pieceMeasures) {
-    List<OrderIntakeStockPreviewDto.OptionLotCheck> parts =
-        option.lots().stream().map(part -> partCheck(part, lotsById, pieceMeasures)).toList();
-    boolean covered =
-        parts.stream()
-            .allMatch(
-                part ->
-                    Boolean.FALSE.equals(part.exceedsFree())
-                        && part.heldPieceIds().isEmpty()
-                        && part.unverifiedHoldPieceIds().isEmpty());
-    return new OrderIntakeStockPreviewDto.OptionCheck(option.optionKey(), covered, parts);
-  }
-
-  /**
-   * The two separate checks of one lot part: (a) it takes more than the lot's free quantity, (b) it
-   * uses pieces held by a quote. The part's quantity is summed from its pieces' canonical measures,
-   * never read from the option, whose line-unit figure falls back to the canonical value when the
-   * units do not convert.
-   */
-  private OrderIntakeStockPreviewDto.OptionLotCheck partCheck(
-      QuantityOption.LotPart part,
-      Map<UUID, LotFacts> lotsById,
-      Map<UUID, BigDecimal> pieceMeasures) {
-    LotFacts facts = lotsById.get(part.batchId());
-    List<UUID> pieceIds = part.pieceIds();
-    BigDecimal partQuantity =
-        pieceIds.stream()
-            .map(pieceMeasures::get)
-            .filter(Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    Boolean exceedsFree =
-        facts == null || facts.free() == null ? null : partQuantity.compareTo(facts.free()) > 0;
-    List<UUID> held =
-        facts == null
-            ? List.of()
-            : pieceIds.stream().filter(facts.verifiedHoldPieceIds()::contains).toList();
-    List<UUID> unverified =
-        facts == null
-            ? List.of()
-            : pieceIds.stream().filter(facts.unverifiedHoldPieceIds()::contains).toList();
-    return new OrderIntakeStockPreviewDto.OptionLotCheck(
-        part.batchId(), exceedsFree, held, unverified);
   }
 
   private OrderIntakeStockPreviewDto.Totals totals(
@@ -370,6 +314,13 @@ public class OrderIntakeStockPreviewService {
           unverifiedEligible.size(),
           free,
           reasons);
+    }
+
+    /** Pieces with any hold record, verified or not. */
+    Set<UUID> heldPieceIds() {
+      Set<UUID> held = new LinkedHashSet<>(verifiedHoldPieceIds);
+      held.addAll(unverifiedHoldPieceIds);
+      return held;
     }
 
     /** The active intent of the hold's quote line on this lot, if any. */

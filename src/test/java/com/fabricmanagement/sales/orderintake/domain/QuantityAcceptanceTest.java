@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -159,7 +160,7 @@ class QuantityAcceptanceTest {
       "3.1: pieces of unknown state make the remnant verdict unknown; it must still be acknowledged")
   void unknownPiecesMakeTheRemnantUnknown() {
     QuantityOption.LotPart oneLeftOneUnknown =
-        new QuantityOption.LotPart(
+        QuantityOptionFixtures.lot(
             UUID.randomUUID(),
             "P1",
             List.of(UUID.randomUUID()),
@@ -170,7 +171,7 @@ class QuantityAcceptanceTest {
             null,
             null);
     QuantityOption.LotPart emptiedButUnknown =
-        new QuantityOption.LotPart(
+        QuantityOptionFixtures.lot(
             UUID.randomUUID(),
             "P2",
             List.of(UUID.randomUUID()),
@@ -181,7 +182,7 @@ class QuantityAcceptanceTest {
             null,
             null);
     QuantityOption.LotPart twoLeft =
-        new QuantityOption.LotPart(
+        QuantityOptionFixtures.lot(
             UUID.randomUUID(),
             "P3",
             List.of(UUID.randomUUID()),
@@ -198,7 +199,7 @@ class QuantityAcceptanceTest {
     assertThat(twoLeft.remnantUnknown()).isFalse();
 
     QuantityOption option =
-        new QuantityOption(
+        QuantityOptionFixtures.option(
             "EXACT:0123456789abcdef",
             QuantityOption.OptionKind.EXACT,
             QuantityOption.Compatibility.SINGLE_LOT,
@@ -220,7 +221,7 @@ class QuantityAcceptanceTest {
 
   static QuantityOption option(QuantityOption.OptionKind kind, boolean remnant) {
     UUID piece = UUID.randomUUID();
-    return new QuantityOption(
+    return QuantityOptionFixtures.option(
         kind + ":0123456789abcdef",
         kind,
         QuantityOption.Compatibility.SINGLE_LOT,
@@ -230,7 +231,7 @@ class QuantityAcceptanceTest {
         new BigDecimal("-57.6"),
         false,
         List.of(
-            new QuantityOption.LotPart(
+            QuantityOptionFixtures.lot(
                 UUID.randomUUID(),
                 "P1",
                 List.of(piece),
