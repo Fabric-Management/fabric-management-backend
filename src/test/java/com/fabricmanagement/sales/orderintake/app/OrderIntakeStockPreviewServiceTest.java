@@ -581,7 +581,7 @@ class OrderIntakeStockPreviewServiceTest {
             actor);
 
     assertThat(preview.evaluation().options())
-        .filteredOn(option -> option.role() == QuantityOption.OptionRole.MANUAL)
+        .filteredOn(option -> option.placement() == QuantityOption.OptionPlacement.MANUAL)
         .singleElement()
         .satisfies(
             option -> {
@@ -593,7 +593,7 @@ class OrderIntakeStockPreviewServiceTest {
               assertThat(option.apply().needsConfirmation()).isTrue();
             });
     assertThat(preview.evaluation().mainOptionIndex()).isNotNull();
-    assertThat(main(preview).role()).isEqualTo(QuantityOption.OptionRole.MAIN);
+    assertThat(main(preview).placement()).isEqualTo(QuantityOption.OptionPlacement.MAIN);
   }
 
   @Test

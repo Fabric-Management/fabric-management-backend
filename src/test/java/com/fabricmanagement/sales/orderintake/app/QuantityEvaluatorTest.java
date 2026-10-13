@@ -13,7 +13,7 @@ import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluation
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.BlockedReason;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.Compatibility;
-import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.OptionRole;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.OptionPlacement;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockSource;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.ToleranceStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.WholePieceSearch;
@@ -63,7 +63,7 @@ class QuantityEvaluatorTest {
             ProposalReason.Code.LEAVES_SINGLE_PIECE, ProposalReason.Code.EXACT_REQUEST);
     // The construction that leaves no single piece is kept beside it, not hidden.
     QuantityOption below = byQuantity(result, "120");
-    assertThat(below.role()).isEqualTo(OptionRole.BELOW);
+    assertThat(below.placement()).isEqualTo(OptionPlacement.BELOW);
     assertThat(below.nearest()).isTrue();
     assertThat(below.leavesSingleRemnant()).isFalse();
     assertThat(below.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
@@ -112,7 +112,7 @@ class QuantityEvaluatorTest {
     assertThat(main(result).batchIds()).containsExactly(p2);
     assertThat(main(result).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
     QuantityOption x = byQuantity(result, "300");
-    assertThat(x.role()).isEqualTo(OptionRole.BELOW);
+    assertThat(x.placement()).isEqualTo(OptionPlacement.BELOW);
     assertThat(x.lots().getFirst().closesLot()).isTrue();
     assertThat(x.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
   }
@@ -176,7 +176,7 @@ class QuantityEvaluatorTest {
     assertThat(main(result).quantity()).isEqualByComparingTo("600");
     assertThat(main(result).compatibility()).isEqualTo(Compatibility.CONFIRMED);
     assertThat(main(result).lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
-    assertThat(byQuantity(result, "400").role()).isEqualTo(OptionRole.BELOW);
+    assertThat(byQuantity(result, "400").placement()).isEqualTo(OptionPlacement.BELOW);
     assertThat(byQuantity(result, "400").nearest()).isTrue();
     assertThat(byQuantity(result, "500").leavesSingleRemnant()).isTrue();
     assertThat(result.mainOptionIndex()).isEqualTo(2);
@@ -193,8 +193,9 @@ class QuantityEvaluatorTest {
     Collections.sort(sorted);
     assertThat(ordered).isEqualTo(sorted);
     assertThat(result.mainOptionIndex()).isNotNull();
-    assertThat(result.options().get(result.mainOptionIndex()).role()).isEqualTo(OptionRole.MAIN);
-    assertThat(result.options()).filteredOn(o -> o.role() == OptionRole.MAIN).hasSize(1);
+    assertThat(result.options().get(result.mainOptionIndex()).placement())
+        .isEqualTo(OptionPlacement.MAIN);
+    assertThat(result.options()).filteredOn(o -> o.placement() == OptionPlacement.MAIN).hasSize(1);
   }
 
   @Test
@@ -429,13 +430,14 @@ class QuantityEvaluatorTest {
 
     QuantityOption manual =
         result.options().stream()
-            .filter(option -> option.role() == OptionRole.MANUAL)
+            .filter(option -> option.placement() == OptionPlacement.MANUAL)
             .findFirst()
             .orElseThrow();
     assertThat(manual.quantity()).isEqualByComparingTo("200");
     assertThat(manual.blockedReason()).isEqualTo(BlockedReason.SINGLE_LOT_REQUIRED);
     assertThat(manual.optionKey()).startsWith("M:");
-    assertThat(result.options().get(result.mainOptionIndex()).role()).isEqualTo(OptionRole.MAIN);
+    assertThat(result.options().get(result.mainOptionIndex()).placement())
+        .isEqualTo(OptionPlacement.MAIN);
   }
 
   @Test
@@ -461,7 +463,7 @@ class QuantityEvaluatorTest {
 
     assertThat(evaluation.manualUnavailablePieceIds()).containsExactly(pending);
     assertThat(evaluation.result().options())
-        .noneMatch(option -> option.role() == OptionRole.MANUAL);
+        .noneMatch(option -> option.placement() == OptionPlacement.MANUAL);
   }
 
   // ── Evidence that stays unknown ──────────────────────────────────────────
@@ -550,7 +552,7 @@ class QuantityEvaluatorTest {
 
   private static QuantityOption byQuantity(QuantityEvaluationResult result, String quantity) {
     return result.options().stream()
-        .filter(option -> option.role() != OptionRole.MANUAL)
+        .filter(option -> option.placement() != OptionPlacement.MANUAL)
         .filter(option -> option.quantity().compareTo(new BigDecimal(quantity)) == 0)
         .findFirst()
         .orElseThrow(() -> new AssertionError("No " + quantity + " option in " + result.options()));

@@ -12,7 +12,7 @@ import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.Com
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.HeldStock;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.HeldStockKind;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.OptionKind;
-import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.OptionRole;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.OptionPlacement;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockSource;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.ToleranceStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.WholePieceSearch;
@@ -353,7 +353,7 @@ public final class QuantityEvaluator {
       // When held stock is evaluated, its own best candidate is an alternative too.
       best(heldCandidates).ifPresent(chosen::add);
 
-      // The same pieces are listed once; the main role wins.
+      // The same pieces are listed once; the main placement wins.
       Map<String, Ranked> unique = new LinkedHashMap<>();
       for (Ranked ranked : chosen) {
         unique.putIfAbsent(ranked.pieceKey(), ranked);
@@ -361,11 +361,11 @@ public final class QuantityEvaluator {
       List<Ranked> listed = new ArrayList<>();
       String mainKey = main.map(Ranked::pieceKey).orElse(null);
       for (Ranked ranked : unique.values()) {
-        OptionRole role =
+        OptionPlacement placement =
             ranked.pieceKey().equals(mainKey)
-                ? OptionRole.MAIN
-                : ranked.units() < target ? OptionRole.BELOW : OptionRole.ABOVE;
-        listed.add(withOption(ranked, ranked.option().as(role, false)));
+                ? OptionPlacement.MAIN
+                : ranked.units() < target ? OptionPlacement.BELOW : OptionPlacement.ABOVE;
+        listed.add(withOption(ranked, ranked.option().as(placement, false)));
       }
 
       List<UUID> unavailable = List.of();
@@ -381,7 +381,7 @@ public final class QuantityEvaluator {
       options = withReasons(options);
       Integer mainIndex = null;
       for (int i = 0; i < options.size(); i++) {
-        if (options.get(i).role() == OptionRole.MAIN) {
+        if (options.get(i).placement() == OptionPlacement.MAIN) {
           mainIndex = i;
         }
       }
@@ -781,7 +781,7 @@ public final class QuantityEvaluator {
       }
       return new QuantityOption(
           key,
-          OptionRole.ABOVE,
+          OptionPlacement.ABOVE,
           false,
           kind,
           compatibility,
@@ -1020,7 +1020,8 @@ public final class QuantityEvaluator {
         block = BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED;
       }
       QuantityOption option =
-          option("M:" + pieceKey(takes), takes, compatibility, block).as(OptionRole.MANUAL, false);
+          option("M:" + pieceKey(takes), takes, compatibility, block)
+              .as(OptionPlacement.MANUAL, false);
       return rank(option, block == null, takes, false);
     }
 
@@ -1050,7 +1051,7 @@ public final class QuantityEvaluator {
       Ranked nearestBelow = null;
       Ranked nearestAbove = null;
       for (Ranked ranked : listed) {
-        if (ranked.option().role() == OptionRole.MANUAL) {
+        if (ranked.option().placement() == OptionPlacement.MANUAL) {
           continue;
         }
         if (ranked.units() < target) {
@@ -1064,7 +1065,7 @@ public final class QuantityEvaluator {
       List<QuantityOption> options = new ArrayList<>();
       for (Ranked ranked : listed) {
         boolean nearest = ranked == nearestBelow || ranked == nearestAbove;
-        options.add(ranked.option().as(ranked.option().role(), nearest));
+        options.add(ranked.option().as(ranked.option().placement(), nearest));
       }
       return options;
     }
@@ -1091,7 +1092,7 @@ public final class QuantityEvaluator {
       List<QuantityOption> result = new ArrayList<>();
       for (QuantityOption option : options) {
         List<ProposalReason> reasons = new ArrayList<>();
-        if (option.source() == StockSource.HELD && option.role() != OptionRole.MANUAL) {
+        if (option.source() == StockSource.HELD && option.placement() != OptionPlacement.MANUAL) {
           reasons.add(ProposalReason.of(ProposalReason.Code.FREE_STOCK_INSUFFICIENT));
         } else if (option.source() == StockSource.FREE && anyHolds) {
           reasons.add(ProposalReason.of(ProposalReason.Code.FREE_STOCK_ONLY));

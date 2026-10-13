@@ -254,7 +254,7 @@ public class OpenApiExportIT {
     assertThat(requiredOf(document, "QuantityProposalOption"))
         .contains(
             "optionKey",
-            "role",
+            "placement",
             "nearest",
             "source",
             "quantity",
@@ -269,7 +269,7 @@ public class OpenApiExportIT {
     assertThat(requiredOf(document, "StockProposalApplyCapability"))
         .containsExactlyInAnyOrder(
             "action", "allowed", "reason", "routesTo", "needsApproval", "needsConfirmation");
-    assertThat(mapAt(document, "components", "schemas", "StockProposalRole"))
+    assertThat(mapAt(document, "components", "schemas", "StockProposalPlacement"))
         .containsEntry("enum", List.of("MAIN", "BELOW", "ABOVE", "MANUAL"));
     assertThat(schemaProperty(document, "OrderIntakeStockPreviewHeldPiece", "holdStatus"))
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");

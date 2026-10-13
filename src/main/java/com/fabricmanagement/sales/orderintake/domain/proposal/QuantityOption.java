@@ -14,7 +14,8 @@ import java.util.UUID;
  * applying an option is a separate command.
  *
  * @param optionKey stable within one evaluation; the same pieces give the same key
- * @param role the main proposal, a nearer smaller or larger quantity, or the salesperson's own pick
+ * @param placement the main proposal, a nearer smaller or larger quantity, or the salesperson's own
+ *     pick
  * @param nearest the option nearest to the request on its side (below, or at and above); only then
  *     may it be called the nearest smaller or larger option
  * @param kind the quantity relative to the request, kept for the acceptance flow
@@ -25,7 +26,7 @@ import java.util.UUID;
  */
 public record QuantityOption(
     String optionKey,
-    OptionRole role,
+    OptionPlacement placement,
     boolean nearest,
     OptionKind kind,
     Compatibility compatibility,
@@ -84,7 +85,7 @@ public record QuantityOption(
   public QuantityOption withReasons(List<ProposalReason> newReasons) {
     return new QuantityOption(
         optionKey,
-        role,
+        placement,
         nearest,
         kind,
         compatibility,
@@ -100,11 +101,11 @@ public record QuantityOption(
         blockedReason);
   }
 
-  /** The same option in another role. */
-  public QuantityOption as(OptionRole newRole, boolean newNearest) {
+  /** The same option in another placement. */
+  public QuantityOption as(OptionPlacement newPlacement, boolean newNearest) {
     return new QuantityOption(
         optionKey,
-        newRole,
+        newPlacement,
         newNearest,
         kind,
         compatibility,
@@ -121,8 +122,8 @@ public record QuantityOption(
   }
 
   /** What the option is to the salesperson. */
-  @Schema(name = "StockProposalRole", enumAsRef = true)
-  public enum OptionRole {
+  @Schema(name = "StockProposalPlacement", enumAsRef = true)
+  public enum OptionPlacement {
     /** The first candidate of the tenant-first ranking; not necessarily the nearest quantity. */
     MAIN,
     /** A computed alternative below the request. */

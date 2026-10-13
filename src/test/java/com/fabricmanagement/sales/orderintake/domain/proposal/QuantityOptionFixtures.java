@@ -25,7 +25,7 @@ public final class QuantityOptionFixtures {
       List<QuantityOption.LotPart> lots) {
     return new QuantityOption(
         optionKey,
-        QuantityOption.OptionRole.MAIN,
+        QuantityOption.OptionPlacement.MAIN,
         false,
         kind,
         compatibility,

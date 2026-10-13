@@ -79516,6 +79516,8 @@ components:
             \ Only such an option may be called the nearest smaller or larger quantity"
         optionKey:
           type: string
+        placement:
+          $ref: "#/components/schemas/StockProposalPlacement"
         quantity:
           type: number
         reasons:
@@ -79527,8 +79529,6 @@ components:
         remnantUnknown:
           type: boolean
           description: Pieces of unknown state may leave a single remnant (SOI 3.1)
-        role:
-          $ref: "#/components/schemas/StockProposalRole"
         source:
           $ref: "#/components/schemas/StockProposalSource"
         toleranceStatus:
@@ -79548,10 +79548,10 @@ components:
       - lots
       - nearest
       - optionKey
+      - placement
       - quantity
       - reasons
       - remnantUnknown
-      - role
       - source
       - toleranceStatus
     QuantityProposalReason:
@@ -84311,6 +84311,13 @@ components:
       enum:
       - PIECE_HOLD
       - LOT_INTENT
+    StockProposalPlacement:
+      type: string
+      enum:
+      - MAIN
+      - BELOW
+      - ABOVE
+      - MANUAL
     StockProposalReasonCode:
       type: string
       enum:
@@ -84324,13 +84331,6 @@ components:
       - FEWEST_LOTS
       - EXACT_REQUEST
       - CLOSEST_TO_REQUEST
-    StockProposalRole:
-      type: string
-      enum:
-      - MAIN
-      - BELOW
-      - ABOVE
-      - MANUAL
     StockProposalSource:
       type: string
       enum:

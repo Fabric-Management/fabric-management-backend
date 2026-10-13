@@ -94,7 +94,7 @@ public record QuantityProposalDto(
   @JsonInclude(JsonInclude.Include.ALWAYS)
   public record Option(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String optionKey,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityOption.OptionRole role,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityOption.OptionPlacement placement,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
@@ -139,7 +139,7 @@ public record QuantityProposalDto(
     public static Option from(QuantityOption option, Set<UUID> readableQuotes) {
       return new Option(
           option.optionKey(),
-          option.role(),
+          option.placement(),
           option.nearest(),
           option.kind(),
           option.compatibility(),
