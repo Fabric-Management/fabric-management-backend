@@ -26,6 +26,7 @@ import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
 import com.fabricmanagement.sales.orderintake.domain.RemainingNeed;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.dto.QuantityAcceptanceDto;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
@@ -608,7 +609,7 @@ class QuantityAcceptanceServiceTest {
 
   private QuantityProposal proposal(QuantityOption option) {
     QuantityEvaluationResult result =
-        new QuantityEvaluationResult(
+        QuantityOptionFixtures.result(
             QuantityEvaluationResult.EvaluationStatus.OPTIONS,
             new BigDecimal("500"),
             "M",
@@ -667,7 +668,7 @@ class QuantityAcceptanceServiceTest {
         java.util.stream.IntStream.range(0, lots.size())
             .mapToObj(
                 index ->
-                    new QuantityOption.LotPart(
+                    QuantityOptionFixtures.lot(
                         lots.get(index),
                         "LOT" + index,
                         List.of(pieces.get(index)),
@@ -678,7 +679,7 @@ class QuantityAcceptanceServiceTest {
                         null,
                         null))
             .toList();
-    return new QuantityOption(
+    return QuantityOptionFixtures.option(
         kind + ":0123456789abcdef",
         kind,
         lots.size() > 1

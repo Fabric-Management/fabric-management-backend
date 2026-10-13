@@ -6,13 +6,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * Current stock for an order line that is not saved yet (STOCK-PREVIEW-1). Guidance for the
- * salesperson only: nothing is reserved or recorded and it never reaches the customer. The
- * evaluation is the one a saved line with the same inputs gets. Beside it, what other quotes hold
- * is reported per lot, and every option says whether it is covered by free stock.
+ * Current stock for an order line that is not saved yet (STOCK-PREVIEW-1, STOCK-PROPOSAL-2).
+ * Guidance for the salesperson only: nothing is reserved or recorded and it never reaches the
+ * customer. The evaluation is the one a saved line with the same inputs gets; every option says
+ * whether it uses free stock, what other quotes hold that it would take and whether it can be
+ * applied. Beside it, what other quotes hold is reported per lot.
  *
  * <p>Unknown stays unknown: an unknown piece is never free, a quantity that cannot be stated in a
  * unit is null rather than zero, and a free quantity that depends on an unconvertible quote intent
@@ -31,7 +33,6 @@ public record OrderIntakeStockPreviewDto(
         String canonicalUnit,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Evaluation evaluation,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Lot> lots,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OptionCheck> optionChecks,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Totals totals,
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
@@ -70,13 +71,32 @@ public record OrderIntakeStockPreviewDto(
 
   /** The evaluation a saved line with the same inputs gets (SOI D2), without its fingerprint. */
   @Schema(name = "OrderIntakeStockPreviewEvaluation")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
   public record Evaluation(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
           QuantityEvaluationResult.EvaluationStatus status,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal requestedQuantity,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String unit,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String canonicalUnit,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<QuantityProposalDto.Option> options,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description =
+                  "Ascending quantity; same quantity in the tenant-first ranking, then a"
+                      + " deterministic order. Keep this order")
+          List<QuantityProposalDto.Option> options,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
+              description =
+                  "Index of the main proposal in options; it may sit anywhere in the list. Null"
+                      + " when no option can be the main one")
+          Integer mainOptionIndex,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description =
+                  "False when a search limit was reached: the options found are not claimed to"
+                      + " be the nearest or the best")
+          boolean searchComplete,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int eligiblePieces,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int excludedPieces,
@@ -86,22 +106,25 @@ public record OrderIntakeStockPreviewDto(
                   "Why the evaluation or some pieces are unknown, e.g. UNIT_NOT_CONVERTIBLE,"
                       + " MEASURE_UNKNOWN, QUANTITY_BELOW_RESOLUTION")
           List<String> unknownReasons,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean agedByProductionDate,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int optionsOutsideAgreedTolerance) {
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "Every lot with offerable stock has a known production date")
+          boolean agedByProductionDate) {
 
-    public static Evaluation from(QuantityEvaluationResult result) {
+    public static Evaluation from(QuantityEvaluationResult result, Set<UUID> readableQuotes) {
       return new Evaluation(
           result.status(),
           result.requestedQuantity(),
           result.unit(),
           result.canonicalUnit(),
-          result.options().stream().map(QuantityProposalDto.Option::from).toList(),
+          QuantityProposalDto.options(result, readableQuotes),
+          result.mainOptionIndex(),
+          result.searchComplete(),
           result.eligiblePieces(),
           result.unknownPieces(),
           result.excludedPieces(),
           result.unknownReasons(),
-          result.agedByProductionDate(),
-          result.optionsOutsideAgreedTolerance());
+          result.agedByProductionDate());
     }
   }
 
@@ -151,7 +174,24 @@ public record OrderIntakeStockPreviewDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
           List<FreeIncompleteReason> freeIncompleteReasons,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Intent> intents,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<HeldPiece> heldPieces) {}
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<HeldPiece> heldPieces,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description =
+                  "Offerable pieces (recorded measure, confirmed saleability), for a manual pick")
+          List<Piece> pieces) {}
+
+  /**
+   * One offerable piece. {@code held}: a hold record exists on it (verified or not); a pick using
+   * it is evaluated as held stock.
+   */
+  @Schema(name = "OrderIntakeStockPreviewPiece")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
+  public record Piece(
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID stockUnitId,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String pieceNo,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Quantity quantity,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean held) {}
 
   /**
    * An active quote lot-quantity intent. The quote and marketer are named only when the viewer may
@@ -184,39 +224,6 @@ public record OrderIntakeStockPreviewDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String quoteNumber,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String marketerName,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) LocalDate expiresAt) {}
-
-  /** Whether one evaluation option is covered by free stock, and why not. */
-  @Schema(name = "OrderIntakeStockPreviewOptionCheck")
-  public record OptionCheck(
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String optionKey,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              description =
-                  "True only when no lot part exceeds or may exceed free stock and no part uses a"
-                      + " held or unverified-hold piece")
-          boolean coveredByFreeStock,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OptionLotCheck> lots) {}
-
-  /** The two separate checks for one lot part of an option. */
-  @Schema(name = "OrderIntakeStockPreviewOptionLotCheck")
-  @JsonInclude(JsonInclude.Include.ALWAYS)
-  public record OptionLotCheck(
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID batchId,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              nullable = true,
-              description =
-                  "The part takes more than the lot's free quantity; null when that free quantity"
-                      + " cannot be determined")
-          Boolean exceedsFree,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              description = "Pieces of the part held by another quote (verified)")
-          List<UUID> heldPieceIds,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              description = "Pieces of the part with a hold record that cannot be verified")
-          List<UUID> unverifiedHoldPieceIds) {}
 
   /** The line's stock across lots. */
   @Schema(name = "OrderIntakeStockPreviewTotals")

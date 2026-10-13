@@ -16,6 +16,16 @@ public final class OrderIntakeRequests {
 
   private OrderIntakeRequests() {}
 
+  /**
+   * Optional body of a saved line's evaluation (STOCK-PROPOSAL-2): the salesperson's own pick,
+   * evaluated as a MANUAL option beside the computed ones.
+   */
+  @Schema(name = "EvaluateLineQuantityRequest")
+  public record EvaluateLineQuantity(
+      @Schema(description = "Pieces the salesperson picked; refused (409) when no longer offerable")
+          @Size(max = 500, message = "At most 500 pieces can be picked")
+          List<@NotNull UUID> manualPieceIds) {}
+
   @Schema(name = "RecordCustomerToneAcceptanceRequest")
   public record RecordToneAcceptance(
       @NotNull

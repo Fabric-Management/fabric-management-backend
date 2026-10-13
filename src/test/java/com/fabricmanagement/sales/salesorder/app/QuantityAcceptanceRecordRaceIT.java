@@ -21,6 +21,7 @@ import com.fabricmanagement.sales.orderintake.domain.AcceptanceChannel;
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.dto.QuantityAcceptanceDto;
@@ -154,7 +155,7 @@ class QuantityAcceptanceRecordRaceIT extends SalesOrderEditItSupport {
         .find(any(), any());
 
     above =
-        new QuantityOption(
+        QuantityOptionFixtures.option(
             "ABOVE:0123456789abcdef",
             QuantityOption.OptionKind.ABOVE,
             QuantityOption.Compatibility.SINGLE_LOT,
@@ -164,7 +165,7 @@ class QuantityAcceptanceRecordRaceIT extends SalesOrderEditItSupport {
             new BigDecimal("2"),
             false,
             List.of(
-                new QuantityOption.LotPart(
+                QuantityOptionFixtures.lot(
                     lot,
                     "LOT-1",
                     List.of(piece),
@@ -188,7 +189,7 @@ class QuantityAcceptanceRecordRaceIT extends SalesOrderEditItSupport {
                                     p1,
                                     new BigDecimal("1000"),
                                     "M",
-                                    new QuantityEvaluationResult(
+                                    QuantityOptionFixtures.result(
                                         QuantityEvaluationResult.EvaluationStatus.OPTIONS,
                                         new BigDecimal("1000"),
                                         "M",

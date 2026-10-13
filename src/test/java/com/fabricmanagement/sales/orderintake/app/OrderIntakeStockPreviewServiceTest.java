@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.orderintake.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
@@ -25,13 +26,16 @@ import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryServic
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService.QuoteHolds;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.domain.PrimaryMeasure;
+import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalReason;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult.EvaluationStatus;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto.FreeIncompleteReason;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto.HoldStatus;
-import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto.OptionLotCheck;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest;
+import com.fabricmanagement.sales.orderintake.dto.QuantityProposalDto;
 import com.fabricmanagement.sales.orderintake.infra.repository.CustomerToneAcceptanceRepository;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalRepository;
 import com.fabricmanagement.sales.quote.app.QuoteScopeQueryService;
@@ -58,10 +62,11 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * STOCK-PREVIEW-1 A3/A4 on the service level, with the real {@link QuantityEvaluationService} and
- * {@link QuantityEvaluator}: parity with a saved line, the lot view from the same stock read, quote
- * intents and piece holds, the two separate option checks and the undeterminable free quantity.
- * Data is fictional.
+ * STOCK-PREVIEW-1 A3/A4 and STOCK-PROPOSAL-2 on the service level, with the real {@link
+ * QuantityEvaluationService} and {@link QuantityEvaluator}: parity with a saved line, the lot view
+ * from the same stock and hold reads, quote intents and piece holds, free stock first with held
+ * stock only when free stock has no option within tolerance, the undeterminable free quantity and
+ * the manual pick. Data is fictional.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -97,10 +102,12 @@ class OrderIntakeStockPreviewServiceTest {
             access,
             productDefinitions,
             stockQuery,
+            quoteHolds,
+            quoteScopes,
             toneAcceptances,
             proposals,
             Clock.fixed(NOW, ZoneOffset.UTC));
-    service = new OrderIntakeStockPreviewService(evaluations, stockQuery, quoteHolds, quoteScopes);
+    service = new OrderIntakeStockPreviewService(evaluations, stockQuery, quoteScopes);
     order = SalesOrder.builder().tradingPartnerId(customerId).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
 
@@ -271,27 +278,42 @@ class OrderIntakeStockPreviewServiceTest {
         .allSatisfy(option -> assertThat(option.lots()).hasSizeLessThanOrEqualTo(1));
 
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
-    OrderIntakeStockPreviewDto free =
+    OrderIntakeStockPreviewDto none =
         service.preview(request("250", "M", false, null, null), actor);
     OrderIntakeStockPreviewDto agreed =
-        service.preview(request("250", "M", false, "5", "5"), actor);
+        service.preview(request("250", "M", false, "50", "50"), actor);
 
-    assertThat(free.evaluation().optionsOutsideAgreedTolerance()).isZero();
-    assertThat(agreed.evaluation().optionsOutsideAgreedTolerance()).isPositive();
+    // A tolerance is a reference: options outside it are shown and marked, never withheld. A side
+    // that was not agreed allows no deviation.
+    assertThat(none.evaluation().options())
+        .isNotEmpty()
+        .allSatisfy(
+            option ->
+                assertThat(option.toleranceStatus())
+                    .isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE));
+    assertThat(agreed.evaluation().options())
+        .extracting(QuantityProposalDto.Option::quantity)
+        .usingElementComparator(BigDecimal::compareTo)
+        .containsExactlyElementsOf(
+            none.evaluation().options().stream()
+                .map(QuantityProposalDto.Option::quantity)
+                .toList());
+    assertThat(agreed.evaluation().options())
+        .allSatisfy(
+            option ->
+                assertThat(option.toleranceStatus())
+                    .isEqualTo(QuantityOption.ToleranceStatus.WITHIN));
   }
 
   // ── Quote intents ────────────────────────────────────────────────────────
 
   @Test
-  void intentsLowerFreeNeverBelowZero_andLeaveTheOptionsUnchanged() {
+  void intentsLowerFreeNeverBelowZero_andFreeOptionsStayWithinIt() {
     UUID lotA = UUID.randomUUID();
     UUID lotB = UUID.randomUUID();
     stock(
         lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")),
         lot(lotB, "LOT-B", eligible("100")));
-    OrderIntakeStockPreviewDto withoutHolds =
-        service.preview(request("250", "M", false, null, null), actor);
-
     when(quoteHolds.find(any()))
         .thenReturn(
             holds(
@@ -300,7 +322,7 @@ class OrderIntakeStockPreviewServiceTest {
                     intent(lotB, UUID.randomUUID(), UUID.randomUUID(), "500", "500")),
                 List.of()));
     OrderIntakeStockPreviewDto preview =
-        service.preview(request("250", "M", false, null, null), actor);
+        service.preview(request("250", "M", false, "20", "20"), actor);
 
     assertThat(lotView(preview, lotA).heldByQuotes().canonical()).isEqualByComparingTo("80");
     assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("220");
@@ -309,7 +331,23 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(preview.totals().heldByQuotes().canonical()).isEqualByComparingTo("580");
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("30");
     assertThat(preview.totals().freeComplete()).isTrue();
-    assertThat(preview.evaluation()).isEqualTo(withoutHolds.evaluation());
+    // 200 m free is within 20% of 250 m, so held stock is never evaluated.
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
+        .allSatisfy(
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.FREE);
+              assertThat(option.heldStock()).isEmpty();
+              assertThat(option.apply().allowed()).isTrue();
+              assertThat(option.lots())
+                  .allSatisfy(
+                      part -> {
+                        assertThat(part.batchId()).isEqualTo(lotA);
+                        assertThat(part.quantity()).isLessThanOrEqualTo(new BigDecimal("220"));
+                      });
+              assertThat(option.reasons().getFirst().code())
+                  .isEqualTo(ProposalReason.Code.FREE_STOCK_ONLY);
+            });
   }
 
   @Test
@@ -339,19 +377,27 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(preview.totals().freeIncompleteReasons())
         .containsExactly(FreeIncompleteReason.UNCONVERTIBLE_INTENT);
     assertThat(preview.unconvertibleIntentCount()).isEqualTo(1);
-    assertThat(preview.optionChecks()).isNotEmpty();
-    assertThat(preview.optionChecks())
+    // No free quantity can be stated, so nothing is offered as free; the lot comes as held stock.
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
         .allSatisfy(
-            check -> {
-              assertThat(check.coveredByFreeStock()).isFalse();
-              assertThat(check.lots()).allSatisfy(part -> assertThat(part.exceedsFree()).isNull());
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.HELD);
+              assertThat(option.apply().allowed()).isFalse();
+              assertThat(option.apply().reason())
+                  .isEqualTo(QuantityOption.BlockedReason.HELD_BY_ANOTHER_QUOTE);
+              assertThat(option.reasons().getFirst().code())
+                  .isEqualTo(ProposalReason.Code.FREE_STOCK_INSUFFICIENT);
+              assertThat(option.heldStock())
+                  .extracting(QuantityProposalDto.HeldStock::kind)
+                  .contains(QuantityOption.HeldStockKind.LOT_INTENT);
             });
   }
 
-  // ── The two separate option checks ───────────────────────────────────────
+  // ── Free stock first; held stock only when free stock falls short ────────
 
   @Test
-  void checkA_aPartTakingMoreThanTheLotsFreeQuantityIsNotCoveredByFreeStock() {
+  void aPartTakingMoreThanTheLotsFreeQuantityIsHeldStock_namingTheIntent() {
     UUID lotA = UUID.randomUUID();
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
     when(quoteHolds.find(any()))
@@ -364,26 +410,33 @@ class OrderIntakeStockPreviewServiceTest {
         service.preview(request("100", "M", false, null, null), actor);
 
     assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("50");
-    assertThat(preview.optionChecks()).isNotEmpty();
-    assertThat(preview.optionChecks())
+    // 50 m free cannot give a whole 100 m piece: every option takes from the quote's intent.
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
         .allSatisfy(
-            check -> {
-              assertThat(check.coveredByFreeStock()).isFalse();
-              OptionLotCheck part = check.lots().getFirst();
-              assertThat(part.exceedsFree()).isTrue();
-              assertThat(part.heldPieceIds()).isEmpty();
-              assertThat(part.unverifiedHoldPieceIds()).isEmpty();
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.HELD);
+              assertThat(option.apply().reason())
+                  .isEqualTo(QuantityOption.BlockedReason.HELD_BY_ANOTHER_QUOTE);
+              assertThat(option.apply().routesTo()).isNull();
+              assertThat(option.heldStock())
+                  .singleElement()
+                  .satisfies(
+                      held -> {
+                        assertThat(held.kind()).isEqualTo(QuantityOption.HeldStockKind.LOT_INTENT);
+                        assertThat(held.verified()).isTrue();
+                        assertThat(held.quoteNumber()).isEqualTo("Q-0001");
+                        assertThat(held.quantity()).isEqualByComparingTo("250");
+                      });
             });
   }
 
   @Test
-  void checkB_aQuoteHeldPieceIsNotCoveredByFreeStock_evenWhenTheLotHasEnoughFree() {
+  void quoteHeldPiecesAreNeverFree_evenWhenTheLotHasEnoughFreeQuantity() {
     UUID lotA = UUID.randomUUID();
     ProposalPiece first = eligible("100");
     ProposalPiece second = eligible("100");
     ProposalPiece third = eligible("100");
-    // Three pieces: 100 m is one whole piece leaving two, so the only option is EXACT. With two
-    // pieces one would be left as a single remnant, and the evaluator offers ABOVE 200 m instead.
     stock(lot(lotA, "LOT-A", first, second, third));
     UUID quoteLine = UUID.randomUUID();
     when(quoteHolds.find(any()))
@@ -406,29 +459,152 @@ class OrderIntakeStockPreviewServiceTest {
               assertThat(piece.quoteNumber()).isEqualTo("Q-0001");
               assertThat(piece.expiresAt()).isEqualTo(EXPIRES);
             });
-    assertThat(preview.optionChecks()).isNotEmpty();
-    assertThat(preview.optionChecks())
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
         .allSatisfy(
-            check -> {
-              assertThat(check.coveredByFreeStock()).isFalse();
-              OptionLotCheck part = check.lots().getFirst();
-              assertThat(part.exceedsFree()).isFalse();
-              assertThat(part.heldPieceIds()).isNotEmpty();
-              assertThat(part.unverifiedHoldPieceIds()).isEmpty();
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.HELD);
+              assertThat(option.heldStock())
+                  .filteredOn(held -> held.kind() == QuantityOption.HeldStockKind.PIECE_HOLD)
+                  .singleElement()
+                  .satisfies(
+                      held -> {
+                        assertThat(held.verified()).isTrue();
+                        assertThat(held.quoteNumber()).isEqualTo("Q-0001");
+                        assertThat(held.marketerName()).isEqualTo("Sales Rep");
+                        assertThat(held.pieceIds()).isNotEmpty();
+                      });
             });
   }
 
   @Test
-  void anOptionWithinFreeStockAndWithoutHeldPiecesIsCoveredByFreeStock() {
+  void withoutHoldsEveryOptionIsFreeAndApplicable_andSaysNothingAboutHolds() {
     UUID lotA = UUID.randomUUID();
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
 
     OrderIntakeStockPreviewDto preview =
         service.preview(request("100", "M", false, null, null), actor);
 
-    assertThat(preview.optionChecks()).isNotEmpty();
-    assertThat(preview.optionChecks())
-        .allSatisfy(check -> assertThat(check.coveredByFreeStock()).isTrue());
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
+        .allSatisfy(
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.FREE);
+              assertThat(option.apply().allowed()).isTrue();
+              assertThat(option.reasons())
+                  .extracting(QuantityProposalDto.Reason::code)
+                  .doesNotContain(
+                      ProposalReason.Code.FREE_STOCK_ONLY,
+                      ProposalReason.Code.FREE_STOCK_INSUFFICIENT);
+            });
+  }
+
+  @Test
+  void aFreeOptionWithinToleranceKeepsAnotherQuotesNearerStockOutOfTheProposal() {
+    UUID older = UUID.randomUUID();
+    UUID free = UUID.randomUUID();
+    ProposalPiece heldPiece = eligible("500");
+    stock(
+        lot(older, "LOT-HELD", heldPiece),
+        lot(free, "LOT-FREE", eligible("100"), eligible("100"), eligible("100"), eligible("90")));
+    UUID quoteLine = UUID.randomUUID();
+    when(quoteHolds.find(any()))
+        .thenReturn(
+            holds(
+                List.of(intent(older, UUID.randomUUID(), quoteLine, "500", "500")),
+                List.of(hold(heldPiece.stockUnitId(), older, quoteLine))));
+
+    OrderIntakeStockPreviewDto preview =
+        service.preview(request("400", "M", true, "5", "5"), actor);
+
+    // 390 m free is within 5% of 400 m: the held 500 m is neither the proposal nor an option.
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
+        .allSatisfy(
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.FREE);
+              assertThat(option.lots())
+                  .allSatisfy(part -> assertThat(part.batchId()).isEqualTo(free));
+            });
+    assertThat(main(preview).quantity()).isEqualByComparingTo("390");
+    assertThat(main(preview).lots().getFirst().closesLot()).isTrue();
+  }
+
+  @Test
+  void whenNoFreeOptionIsWithinTolerance_heldStockIsAnExplainedAlternative_mainStaysFree() {
+    UUID held = UUID.randomUUID();
+    UUID free = UUID.randomUUID();
+    ProposalPiece heldPiece = eligible("400");
+    stock(
+        lot(held, "LOT-HELD", heldPiece), lot(free, "LOT-FREE", eligible("100"), eligible("100")));
+    UUID quoteLine = UUID.randomUUID();
+    when(quoteHolds.find(any()))
+        .thenReturn(
+            holds(
+                List.of(intent(held, UUID.randomUUID(), quoteLine, "400", "400")),
+                List.of(hold(heldPiece.stockUnitId(), held, quoteLine))));
+
+    OrderIntakeStockPreviewDto preview =
+        service.preview(request("400", "M", true, "5", "5"), actor);
+
+    QuantityProposalDto.Option main = main(preview);
+    assertThat(main.source()).isEqualTo(QuantityOption.StockSource.FREE);
+    assertThat(main.quantity()).isEqualByComparingTo("200");
+    assertThat(main.toleranceStatus()).isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE);
+    assertThat(preview.evaluation().options())
+        .filteredOn(option -> option.source() == QuantityOption.StockSource.HELD)
+        .singleElement()
+        .satisfies(
+            option -> {
+              assertThat(option.quantity()).isEqualByComparingTo("400");
+              assertThat(option.reasons().getFirst().code())
+                  .isEqualTo(ProposalReason.Code.FREE_STOCK_INSUFFICIENT);
+              assertThat(option.apply().allowed()).isFalse();
+              assertThat(option.apply().reason())
+                  .isEqualTo(QuantityOption.BlockedReason.HELD_BY_ANOTHER_QUOTE);
+            });
+  }
+
+  // ── Manual pick ──────────────────────────────────────────────────────────
+
+  @Test
+  void aManualPickIsEvaluatedWithTheSameChecks_besideTheComputedOptions() {
+    UUID lotA = UUID.randomUUID();
+    ProposalPiece first = eligible("100");
+    ProposalPiece second = eligible("100");
+    stock(lot(lotA, "LOT-A", first, second, eligible("100")));
+
+    OrderIntakeStockPreviewDto preview =
+        service.preview(
+            request(
+                "250", "M", false, "5", "5", List.of(first.stockUnitId(), second.stockUnitId())),
+            actor);
+
+    assertThat(preview.evaluation().options())
+        .filteredOn(option -> option.placement() == QuantityOption.OptionPlacement.MANUAL)
+        .singleElement()
+        .satisfies(
+            option -> {
+              assertThat(option.quantity()).isEqualByComparingTo("200");
+              assertThat(option.leavesSingleRemnant()).isTrue();
+              assertThat(option.toleranceStatus())
+                  .isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE);
+              assertThat(option.apply().allowed()).isTrue();
+              assertThat(option.apply().needsConfirmation()).isTrue();
+            });
+    assertThat(preview.evaluation().mainOptionIndex()).isNotNull();
+    assertThat(main(preview).placement()).isEqualTo(QuantityOption.OptionPlacement.MAIN);
+  }
+
+  @Test
+  void aManualPickOfAPieceThatIsNoLongerOfferableIsRefusedAsStale() {
+    stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100")));
+    UUID gone = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () -> service.preview(request("100", "M", false, null, null, List.of(gone)), actor))
+        .isInstanceOf(OrderIntakeException.class)
+        .hasMessageContaining(gone.toString());
   }
 
   // ── Piece holds: verified and unverified ─────────────────────────────────
@@ -471,16 +647,23 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(preview.totals().freeIncompleteReasons())
         .containsExactly(FreeIncompleteReason.UNVERIFIED_HOLD);
 
-    // The only way to 200 is both pieces of LOT-A, so the option uses the unverified piece.
-    assertThat(preview.optionChecks()).isNotEmpty();
-    assertThat(preview.optionChecks())
+    // LOT-A's free quantity cannot be stated, so it offers nothing free; as held stock the
+    // option names no quote and cannot be applied.
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
         .allSatisfy(
-            check -> {
-              assertThat(check.coveredByFreeStock()).isFalse();
-              OptionLotCheck part = partOf(check, lotA);
-              assertThat(part.exceedsFree()).isNull();
-              assertThat(part.unverifiedHoldPieceIds()).containsExactly(held.stockUnitId());
-              assertThat(part.heldPieceIds()).isEmpty();
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.HELD);
+              assertThat(option.apply().reason())
+                  .isEqualTo(QuantityOption.BlockedReason.HOLD_UNVERIFIED);
+              assertThat(option.heldStock())
+                  .allSatisfy(
+                      entry -> {
+                        assertThat(entry.verified()).isFalse();
+                        assertThat(entry.quoteNumber()).isNull();
+                        assertThat(entry.marketerName()).isNull();
+                        assertThat(entry.pieceIds()).containsExactly(held.stockUnitId());
+                      });
             });
   }
 
@@ -564,7 +747,7 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(lot.unmeasuredPieces()).isEqualTo(1);
     assertThat(lot.eligiblePieces()).isZero();
     assertThat(preview.evaluation().options()).isEmpty();
-    assertThat(preview.optionChecks()).isEmpty();
+    assertThat(preview.evaluation().mainOptionIndex()).isNull();
   }
 
   @Test
@@ -678,11 +861,13 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(lot.unverifiedHoldPieces()).isZero();
     assertThat(preview.totals().freeComplete()).isTrue();
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("0");
-    assertThat(preview.optionChecks())
+    assertThat(preview.evaluation().options())
+        .isNotEmpty()
         .allSatisfy(
-            check ->
-                assertThat(check.lots())
-                    .allSatisfy(part -> assertThat(part.unverifiedHoldPieceIds()).isEmpty()));
+            option -> {
+              assertThat(option.source()).isEqualTo(QuantityOption.StockSource.FREE);
+              assertThat(option.heldStock()).isEmpty();
+            });
   }
 
   @Test
@@ -706,7 +891,7 @@ class OrderIntakeStockPreviewServiceTest {
     ArgumentCaptor<QuantityProposal> stored = ArgumentCaptor.forClass(QuantityProposal.class);
     verify(proposals).save(stored.capture());
     clearInvocations(stockQuery, proposals);
-    return OrderIntakeStockPreviewDto.Evaluation.from(stored.getValue().getResult());
+    return OrderIntakeStockPreviewDto.Evaluation.from(stored.getValue().getResult(), Set.of());
   }
 
   private SalesOrderLine savedLine(
@@ -727,6 +912,16 @@ class OrderIntakeStockPreviewServiceTest {
 
   private OrderIntakeStockPreviewRequest request(
       String quantity, String unit, boolean singleLot, String upPct, String downPct) {
+    return request(quantity, unit, singleLot, upPct, downPct, null);
+  }
+
+  private OrderIntakeStockPreviewRequest request(
+      String quantity,
+      String unit,
+      boolean singleLot,
+      String upPct,
+      String downPct,
+      List<UUID> manualPieceIds) {
     return new OrderIntakeStockPreviewRequest(
         productId,
         colorId,
@@ -737,7 +932,12 @@ class OrderIntakeStockPreviewServiceTest {
         unit,
         singleLot,
         decimal(upPct),
-        decimal(downPct));
+        decimal(downPct),
+        manualPieceIds);
+  }
+
+  private static QuantityProposalDto.Option main(OrderIntakeStockPreviewDto preview) {
+    return preview.evaluation().options().get(preview.evaluation().mainOptionIndex());
   }
 
   private static BigDecimal decimal(String value) {
@@ -774,13 +974,6 @@ class OrderIntakeStockPreviewServiceTest {
       OrderIntakeStockPreviewDto preview, UUID batchId) {
     return preview.lots().stream()
         .filter(lot -> lot.batchId().equals(batchId))
-        .findFirst()
-        .orElseThrow();
-  }
-
-  private static OptionLotCheck partOf(OrderIntakeStockPreviewDto.OptionCheck check, UUID batchId) {
-    return check.lots().stream()
-        .filter(part -> part.batchId().equals(batchId))
         .findFirst()
         .orElseThrow();
   }

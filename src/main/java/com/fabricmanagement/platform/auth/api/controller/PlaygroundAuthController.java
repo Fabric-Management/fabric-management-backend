@@ -2,11 +2,14 @@ package com.fabricmanagement.platform.auth.api.controller;
 
 import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
+import com.fabricmanagement.common.infrastructure.security.JwtTokenExtractor;
 import com.fabricmanagement.common.infrastructure.web.exception.TooManyRequestsException;
+import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.app.PlaygroundService;
 import com.fabricmanagement.platform.auth.dto.PlaygroundImpersonateResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundInitResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundPersonaDto;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +18,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -40,6 +42,7 @@ public class PlaygroundAuthController {
 
   private final PlaygroundService playgroundService;
   private final AuthCookieSupport authCookieSupport;
+  private final JwtService jwtService;
 
   /**
    * IP-based rate limiter for playground initialization. Entries auto-expire after 10 seconds via
@@ -109,14 +112,23 @@ public class PlaygroundAuthController {
 
   @PostMapping("/impersonate/{userId}")
   @Operation(
-      summary = "Switch persona in the current playground session",
+      summary = "Get a token to view the demo as another user",
       description =
-          "Validates the current tenant is in demo mode, verifies the target user belongs to that tenant, and generates a new JWT token for that persona.")
+          "Demo tenants only. The target must be an active user of the caller's tenant."
+              + " Signed-in session: the persona's access token is returned in the body and no"
+              + " cookie is written; the calling browser tab sends it as an Authorization header"
+              + " and asks again when it expires. The owner's own session stays as it is, so"
+              + " other tabs are unaffected. A persona token cannot call this endpoint."
+              + " Anonymous playground: the token is set as the access cookie, as before.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Persona switched successfully"),
+    @ApiResponse(responseCode = "200", description = "Persona token issued"),
     @ApiResponse(
         responseCode = "403",
-        description = "Demo mode is required or user is outside the current tenant",
+        description = "Demo mode is required, or the caller is itself a persona",
+        content = @Content),
+    @ApiResponse(
+        responseCode = "404",
+        description = "The target is not an active user of this tenant",
         content = @Content)
   })
   @PreAuthorize("isAuthenticated()")
@@ -133,19 +145,30 @@ public class PlaygroundAuthController {
       throw new AccessDeniedException("Authenticated user context is required");
     }
 
+    // Only the signed-in owner may hand out persona tokens. A persona token renewing itself, or
+    // minting others, would outlive the owner's decision and the owner's session.
+    String callerToken = JwtTokenExtractor.extract(request);
+    if (callerToken != null && jwtService.isDemoImpersonationToken(callerToken)) {
+      throw new PlatformDomainException(
+          "A persona cannot start an impersonation; use the signed-in account",
+          "IMPERSONATION_FROM_PERSONA",
+          403);
+    }
+
     log.info(
         "Playground impersonation request. guestId: {}, targetUser: {}, tenantId: {}",
         ctx.guestId(),
         userId,
         ctx.tenantId());
 
-    String refreshToken = resolveRefreshTokenCookie(request);
     boolean realSession = !ctx.isPlayground();
     PlaygroundImpersonateResponse impersonateResponse =
         playgroundService.impersonate(ctx.tenantId(), userId, ctx.guestId(), realSession);
 
-    // Set JWT as HttpOnly cookie — frontend uses cookie-based auth exclusively
-    authCookieSupport.addAuthCookies(response, impersonateResponse.token(), refreshToken);
+    if (!realSession) {
+      // Anonymous playground: access-only cookie, there is no refresh token to keep in step.
+      authCookieSupport.addAuthCookies(response, impersonateResponse.token(), null);
+    }
 
     return ResponseEntity.ok(impersonateResponse);
   }
@@ -174,18 +197,6 @@ public class PlaygroundAuthController {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null && auth.getPrincipal() instanceof AuthenticatedUserContext ctx) {
       return ctx;
-    }
-    return null;
-  }
-
-  private String resolveRefreshTokenCookie(HttpServletRequest request) {
-    if (request.getCookies() == null) {
-      return null;
-    }
-    for (Cookie cookie : request.getCookies()) {
-      if (AuthCookieSupport.REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
-        return cookie.getValue();
-      }
     }
     return null;
   }

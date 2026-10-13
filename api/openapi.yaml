@@ -25557,8 +25557,12 @@ paths:
       - Permission Catalogue
   /api/v1/playground/impersonate/{userId}:
     post:
-      description: "Validates the current tenant is in demo mode, verifies the target\
-        \ user belongs to that tenant, and generates a new JWT token for that persona."
+      description: "Demo tenants only. The target must be an active user of the caller's\
+        \ tenant. Signed-in session: the persona's access token is returned in the\
+        \ body and no cookie is written; the calling browser tab sends it as an Authorization\
+        \ header and asks again when it expires. The owner's own session stays as\
+        \ it is, so other tabs are unaffected. A persona token cannot call this endpoint.\
+        \ Anonymous playground: the token is set as the access cookie, as before."
       operationId: impersonate
       parameters:
       - description: Target user ID to impersonate
@@ -25575,7 +25579,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PlaygroundImpersonateResponse"
-          description: Persona switched successfully
+          description: Persona token issued
         "400":
           content:
             application/problem+json:
@@ -25593,13 +25597,10 @@ paths:
           description: Unauthorized
         "403":
           content: {}
-          description: Demo mode is required or user is outside the current tenant
+          description: "Demo mode is required, or the caller is itself a persona"
         "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
+          content: {}
+          description: The target is not an active user of this tenant
         "409":
           content:
             application/problem+json:
@@ -25624,7 +25625,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Switch persona in the current playground session
+      summary: Get a token to view the demo as another user
       tags:
       - Playground Auth
   /api/v1/playground/init:
@@ -45371,6 +45372,10 @@ paths:
       - Order Intake
   /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-proposals:
     post:
+      description: Free stock first; stock other quotes hold only when free stock
+        has no option within the agreed tolerance. Options come in ascending quantity
+        with the main proposal's index. An optional manual pick is evaluated with
+        the same checks.
       operationId: evaluateLineQuantity
       parameters:
       - in: path
@@ -45385,6 +45390,11 @@ paths:
         schema:
           type: string
           format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateLineQuantityRequest"
       responses:
         "200":
           content:
@@ -49826,11 +49836,13 @@ paths:
   /api/v1/sales/order-intake/stock-preview:
     post:
       description: "Evaluates the line exactly as a saved line with the same inputs\
-        \ would be evaluated and reports, beside the options, what other quotes hold\
-        \ on each lot and whether each option is covered by free stock. Guidance for\
-        \ the salesperson only: nothing is reserved or recorded, and the options are\
-        \ not changed by quote holds. A free quantity that cannot be determined is\
-        \ null with its reasons."
+        \ would be evaluated: free stock first, stock other quotes hold only when\
+        \ free stock has no option within the agreed tolerance, options in ascending\
+        \ quantity with the main proposal's index. Each option states what other quotes\
+        \ hold that it would take and whether it can be applied; an optional manual\
+        \ pick is evaluated with the same checks. Guidance for the salesperson only:\
+        \ nothing is reserved or recorded. A free quantity that cannot be determined\
+        \ is null with its reasons."
       operationId: previewOrderIntakeStock
       requestBody:
         content:
@@ -70935,6 +70947,18 @@ components:
       required:
       - note
       - outcome
+    EvaluateLineQuantityRequest:
+      type: object
+      properties:
+        manualPieceIds:
+          type: array
+          description: Pieces the salesperson picked; refused (409) when no longer
+            offerable
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
     EventComparison:
       type: string
       enum:
@@ -74767,10 +74791,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OrderIntakeStockPreviewLot"
-        optionChecks:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderIntakeStockPreviewOptionCheck"
         totals:
           $ref: "#/components/schemas/OrderIntakeStockPreviewTotals"
         unconvertibleIntentCount:
@@ -74785,7 +74805,6 @@ components:
       - canonicalUnit
       - evaluation
       - lots
-      - optionChecks
       - totals
       - unconvertibleIntentCount
       - unit
@@ -74794,6 +74813,7 @@ components:
       properties:
         agedByProductionDate:
           type: boolean
+          description: Every lot with offerable stock has a known production date
         canonicalUnit:
           type: string
         eligiblePieces:
@@ -74802,15 +74822,25 @@ components:
         excludedPieces:
           type: integer
           format: int32
+        mainOptionIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Index of the main proposal in options; it may sit anywhere
+            in the list. Null when no option can be the main one
         options:
           type: array
+          description: "Ascending quantity; same quantity in the tenant-first ranking,\
+            \ then a deterministic order. Keep this order"
           items:
             $ref: "#/components/schemas/QuantityProposalOption"
-        optionsOutsideAgreedTolerance:
-          type: integer
-          format: int32
         requestedQuantity:
           type: number
+        searchComplete:
+          type: boolean
+          description: "False when a search limit was reached: the options found are\
+            \ not claimed to be the nearest or the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -74829,9 +74859,10 @@ components:
       - canonicalUnit
       - eligiblePieces
       - excludedPieces
+      - mainOptionIndex
       - options
-      - optionsOutsideAgreedTolerance
       - requestedQuantity
+      - searchComplete
       - status
       - unit
       - unknownPieces
@@ -74944,6 +74975,12 @@ components:
             $ref: "#/components/schemas/OrderIntakeStockPreviewIntent"
         lotNo:
           type: string
+        pieces:
+          type: array
+          description: "Offerable pieces (recorded measure, confirmed saleability),\
+            \ for a manual pick"
+          items:
+            $ref: "#/components/schemas/OrderIntakeStockPreviewPiece"
         unknown:
           $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
           description: "Measured pieces awaiting suitability evidence (quality, width,\
@@ -74975,57 +75012,29 @@ components:
       - heldPieces
       - intents
       - lotNo
+      - pieces
       - unknown
       - unknownPieces
       - unmeasuredPieces
       - unverifiedHold
       - unverifiedHoldPieces
-    OrderIntakeStockPreviewOptionCheck:
+    OrderIntakeStockPreviewPiece:
       type: object
       properties:
-        coveredByFreeStock:
+        held:
           type: boolean
-          description: True only when no lot part exceeds or may exceed free stock
-            and no part uses a held or unverified-hold piece
-        lots:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderIntakeStockPreviewOptionLotCheck"
-        optionKey:
+        pieceNo:
           type: string
-      required:
-      - coveredByFreeStock
-      - lots
-      - optionKey
-    OrderIntakeStockPreviewOptionLotCheck:
-      type: object
-      properties:
-        batchId:
+        quantity:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
+        stockUnitId:
           type: string
           format: uuid
-        exceedsFree:
-          type:
-          - boolean
-          - "null"
-          description: The part takes more than the lot's free quantity; null when
-            that free quantity cannot be determined
-        heldPieceIds:
-          type: array
-          description: Pieces of the part held by another quote (verified)
-          items:
-            type: string
-            format: uuid
-        unverifiedHoldPieceIds:
-          type: array
-          description: Pieces of the part with a hold record that cannot be verified
-          items:
-            type: string
-            format: uuid
       required:
-      - batchId
-      - exceedsFree
-      - heldPieceIds
-      - unverifiedHoldPieceIds
+      - held
+      - pieceNo
+      - quantity
+      - stockUnitId
     OrderIntakeStockPreviewQuantity:
       type: object
       properties:
@@ -75062,6 +75071,16 @@ components:
           - CM
           - IN
           pattern: CM|IN|cm|in
+        manualPieceIds:
+          type: array
+          description: Pieces the salesperson picked; evaluated as a MANUAL option
+            beside the computed ones. Pieces that are no longer offerable are refused
+            (409)
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
         productId:
           type: string
           format: uuid
@@ -79284,7 +79303,7 @@ components:
       properties:
         agedByProductionDate:
           type: boolean
-          description: True when older production dates took precedence on ties
+          description: Every lot with offerable stock has a known production date
         canonicalUnit:
           type: string
         eligiblePieces:
@@ -79301,20 +79320,29 @@ components:
         id:
           type: string
           format: uuid
+        mainOptionIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Index of the main proposal in options; it may sit anywhere
+            in the list. Null when no option can be the main one
         options:
           type: array
+          description: "Ascending quantity; same quantity in the tenant-first ranking,\
+            \ then a deterministic order. Keep this order"
           items:
             $ref: "#/components/schemas/QuantityProposalOption"
-        optionsOutsideAgreedTolerance:
-          type: integer
-          format: int32
-          description: Options withheld because they exceed the tolerance agreed with
-            the customer
         requestedQuantity:
           type: number
+          description: The customer's original request the options are judged against
         salesOrderLineId:
           type: string
           format: uuid
+        searchComplete:
+          type: boolean
+          description: "False when a search limit was reached: the options found are\
+            \ not claimed to be the nearest or the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -79334,20 +79362,75 @@ components:
       - evidenceFingerprint
       - excludedPieces
       - id
+      - mainOptionIndex
       - options
-      - optionsOutsideAgreedTolerance
       - requestedQuantity
       - salesOrderLineId
+      - searchComplete
       - status
       - unit
       - unknownPieces
       - unknownReasons
+    QuantityProposalHeldStock:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date
+        kind:
+          $ref: "#/components/schemas/StockProposalHeldStockKind"
+        lotNo:
+          type: string
+        marketerName:
+          type:
+          - string
+          - "null"
+        pieceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        quantity:
+          type:
+          - number
+          - "null"
+          description: A lot intent's quantity in its own unit; null for a piece hold
+        quoteNumber:
+          type:
+          - string
+          - "null"
+        unit:
+          type:
+          - string
+          - "null"
+        verified:
+          type: boolean
+      required:
+      - batchId
+      - expiresAt
+      - kind
+      - lotNo
+      - marketerName
+      - pieceIds
+      - quantity
+      - quoteNumber
+      - unit
+      - verified
     QuantityProposalLot:
       type: object
       properties:
         batchId:
           type: string
           format: uuid
+        closesLot:
+          type: boolean
+          description: "Every piece of the lot is taken. Never claimed while held,\
+            \ unknown or otherwise unsuitable pieces stay"
         exhausted:
           type: boolean
         lotNo:
@@ -79355,11 +79438,24 @@ components:
         pieceCount:
           type: integer
           format: int32
+        pieceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        productionDate:
+          type:
+          - string
+          - "null"
+          format: date-time
         quantity:
           type: number
-        remainingEligiblePieces:
+        remainingPieces:
           type: integer
           format: int32
+          description: "Eligible pieces the option leaves in the lot, held or free"
+        remainingQuantity:
+          type: number
         remnantQuantity:
           type:
           - number
@@ -79373,11 +79469,15 @@ components:
           format: int32
       required:
       - batchId
+      - closesLot
       - exhausted
       - lotNo
       - pieceCount
+      - pieceIds
+      - productionDate
       - quantity
-      - remainingEligiblePieces
+      - remainingPieces
+      - remainingQuantity
       - remnantQuantity
       - remnantUnknown
       - singleRemnant
@@ -79385,12 +79485,20 @@ components:
     QuantityProposalOption:
       type: object
       properties:
+        apply:
+          $ref: "#/components/schemas/StockProposalApplyCapability"
         compatibility:
           $ref: "#/components/schemas/QuantityOptionCompatibility"
         difference:
           type: number
+          description: "Quantity minus the original request, in the line unit"
         differencePercent:
           type: number
+        heldStock:
+          type: array
+          description: What other quotes hold that this option would take
+          items:
+            $ref: "#/components/schemas/QuantityProposalHeldStock"
         kind:
           $ref: "#/components/schemas/QuantityOptionKind"
         leavesSingleRemnant:
@@ -79402,27 +79510,77 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/QuantityProposalLot"
+        nearest:
+          type: boolean
+          description: "Nearest to the request on its side (below, or at and above).\
+            \ Only such an option may be called the nearest smaller or larger quantity"
         optionKey:
           type: string
-        outsideAgreedTolerance:
-          type: boolean
+        placement:
+          $ref: "#/components/schemas/StockProposalPlacement"
         quantity:
           type: number
+        reasons:
+          type: array
+          description: "Why the option ranks as it does, in the order of the tenant-first\
+            \ criteria. Words come from these codes; none are derived by the client"
+          items:
+            $ref: "#/components/schemas/QuantityProposalReason"
         remnantUnknown:
           type: boolean
           description: Pieces of unknown state may leave a single remnant (SOI 3.1)
+        source:
+          $ref: "#/components/schemas/StockProposalSource"
+        toleranceStatus:
+          $ref: "#/components/schemas/StockProposalToleranceStatus"
+          description: "Against the tolerance agreed for the line; a side without\
+            \ a tolerance allows no deviation. Options outside it are shown, never\
+            \ withheld"
       required:
+      - apply
       - compatibility
       - difference
       - differencePercent
+      - heldStock
       - kind
       - leavesSingleRemnant
       - lotCount
       - lots
+      - nearest
       - optionKey
-      - outsideAgreedTolerance
+      - placement
       - quantity
+      - reasons
       - remnantUnknown
+      - source
+      - toleranceStatus
+    QuantityProposalReason:
+      type: object
+      properties:
+        code:
+          $ref: "#/components/schemas/StockProposalReasonCode"
+        count:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: A number of lots
+        quantity:
+          type:
+          - number
+          - "null"
+          description: "A quantity in the line unit: the remnant or the difference"
+        since:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: The oldest production date; only for OLDER_STOCK
+      required:
+      - code
+      - count
+      - quantity
+      - since
     QuickCreateCustomerContactRequest:
       type: object
       properties:
@@ -84105,6 +84263,84 @@ components:
           type: string
         timestamp:
           type: string
+    StockProposalAction:
+      type: string
+      enum:
+      - APPLY_STOCK_PROPOSAL
+    StockProposalApplyCapability:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/StockProposalAction"
+        allowed:
+          type: boolean
+        needsApproval:
+          type: boolean
+        needsConfirmation:
+          type: boolean
+          description: "Applying asks the salesperson's single confirmation: outside\
+            \ the tolerance and/or a single piece left. A stock choice, never the\
+            \ customer's acceptance"
+        reason:
+          anyOf:
+          - $ref: "#/components/schemas/StockProposalBlockedReason"
+          - type: "null"
+          description: Why it cannot be applied; null when allowed
+        routesTo:
+          type:
+          - string
+          - "null"
+          description: "The flow that would unblock it. Null: no release or transfer\
+            \ of another quote's hold exists yet, so none is offered"
+      required:
+      - action
+      - allowed
+      - needsApproval
+      - needsConfirmation
+      - reason
+      - routesTo
+    StockProposalBlockedReason:
+      type: string
+      enum:
+      - COMPATIBILITY_CONFIRMATION_REQUIRED
+      - SINGLE_LOT_REQUIRED
+      - HELD_BY_ANOTHER_QUOTE
+      - HOLD_UNVERIFIED
+    StockProposalHeldStockKind:
+      type: string
+      enum:
+      - PIECE_HOLD
+      - LOT_INTENT
+    StockProposalPlacement:
+      type: string
+      enum:
+      - MAIN
+      - BELOW
+      - ABOVE
+      - MANUAL
+    StockProposalReasonCode:
+      type: string
+      enum:
+      - FREE_STOCK_INSUFFICIENT
+      - FREE_STOCK_ONLY
+      - NO_SINGLE_PIECE_LEFT
+      - LEAVES_SINGLE_PIECE
+      - SINGLE_PIECE_MAY_REMAIN
+      - CLOSES_LOTS
+      - OLDER_STOCK
+      - FEWEST_LOTS
+      - EXACT_REQUEST
+      - CLOSEST_TO_REQUEST
+    StockProposalSource:
+      type: string
+      enum:
+      - FREE
+      - HELD
+    StockProposalToleranceStatus:
+      type: string
+      enum:
+      - WITHIN
+      - OUTSIDE
     StockReservationResponse:
       type: object
       properties:

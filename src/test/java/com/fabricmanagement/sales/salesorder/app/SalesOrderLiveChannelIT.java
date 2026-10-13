@@ -16,6 +16,7 @@ import com.fabricmanagement.sales.orderintake.domain.AcceptanceChannel;
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
 import com.fabricmanagement.sales.orderintake.dto.FulfilmentDtos;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeRequests;
 import com.fabricmanagement.sales.orderintake.infra.repository.QuantityProposalRepository;
@@ -287,7 +288,7 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
                 List.of()));
     when(proposalStock.measureFor(any())).thenReturn(Optional.of(PrimaryMeasure.LENGTH));
     QuantityOption above =
-        new QuantityOption(
+        QuantityOptionFixtures.option(
             "ABOVE:0123456789abcdef",
             QuantityOption.OptionKind.ABOVE,
             QuantityOption.Compatibility.SINGLE_LOT,
@@ -297,7 +298,7 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
             new BigDecimal("2"),
             false,
             List.of(
-                new QuantityOption.LotPart(
+                QuantityOptionFixtures.lot(
                     lot,
                     "LOT-1",
                     List.of(piece),
@@ -321,7 +322,7 @@ class SalesOrderLiveChannelIT extends SalesOrderLiveItSupport {
                                     p1,
                                     new BigDecimal("1000"),
                                     "M",
-                                    new QuantityEvaluationResult(
+                                    QuantityOptionFixtures.result(
                                         QuantityEvaluationResult.EvaluationStatus.OPTIONS,
                                         new BigDecimal("1000"),
                                         "M",

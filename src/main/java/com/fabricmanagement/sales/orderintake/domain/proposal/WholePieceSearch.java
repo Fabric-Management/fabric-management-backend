@@ -13,8 +13,9 @@ import java.util.UUID;
  * Exact whole-piece search (SOI IK-07). Quantities are integer units (for example centimetres).
  * Pieces are never cut. A lot from which at least one piece is taken must not be left with exactly
  * one eligible piece unless {@code allowRemnant} is set; lots already holding a single piece may be
- * emptied. Among selections with the same total the one using fewer lots wins; among those, lots
- * earlier in the given order (older stock) are preferred.
+ * emptied. A lot may carry a capacity: no take from it exceeds that quantity (free stock net of
+ * quote intents, STOCK-PROPOSAL-2). Among selections with the same total the one using fewer lots
+ * wins; among those, lots earlier in the given order (older stock) are preferred.
  *
  * <p>The search is a bitset dynamic programme over (lot, pieces taken from the lot, lots used). It
  * refuses problems above {@link #MAX_PIECES_PER_LOT} or {@link #MAX_UNITS} instead of answering
@@ -37,14 +38,31 @@ public final class WholePieceSearch {
     }
   }
 
-  /** A lot and its eligible pieces; lots are passed in preference order (older first). */
-  public record Lot(UUID id, List<Piece> pieces) {
+  /**
+   * A lot and its pool pieces; lots are passed in preference order (older first). {@code capacity}
+   * is the most that may be taken from the lot ({@link #UNLIMITED} when only the pieces bound it).
+   */
+  public record Lot(UUID id, List<Piece> pieces, long capacity) {
+    public static final long UNLIMITED = Long.MAX_VALUE;
+
     public Lot {
       pieces = List.copyOf(pieces);
+      if (capacity < 0) {
+        throw new IllegalArgumentException("A lot capacity cannot be negative");
+      }
     }
 
-    long total() {
+    public Lot(UUID id, List<Piece> pieces) {
+      this(id, pieces, UNLIMITED);
+    }
+
+    public long total() {
       return pieces.stream().mapToLong(Piece::units).sum();
+    }
+
+    /** What may be taken from the lot at most. */
+    long takeable() {
+      return Math.min(total(), capacity);
     }
   }
 
@@ -99,7 +117,8 @@ public final class WholePieceSearch {
                         lot.id(),
                         lot.pieces().stream()
                             .map(piece -> new Piece(piece.id(), piece.units() / scale))
-                            .toList()))
+                            .toList(),
+                        lot.capacity() == Lot.UNLIMITED ? Lot.UNLIMITED : lot.capacity() / scale))
             .toList();
     try {
       Result result = searchNormalized(normalized, target / scale, allowRemnant);
@@ -142,7 +161,8 @@ public final class WholePieceSearch {
     if (target <= 0) {
       throw new IllegalArgumentException("Target must be positive");
     }
-    List<Lot> usable = lots.stream().filter(lot -> !lot.pieces().isEmpty()).toList();
+    List<Lot> usable =
+        lots.stream().filter(lot -> !lot.pieces().isEmpty() && lot.capacity() > 0).toList();
     if (usable.isEmpty()) {
       return new Result(Optional.empty(), Optional.empty(), Optional.empty(), false);
     }
@@ -151,7 +171,7 @@ public final class WholePieceSearch {
         || usable.stream().anyMatch(lot -> lot.pieces().size() > MAX_PIECES_PER_LOT)) {
       return Result.limit();
     }
-    long runTotal = usable.stream().mapToLong(Lot::total).sum();
+    long runTotal = usable.stream().mapToLong(Lot::takeable).sum();
     long cap = Math.min(runTotal, MAX_UNITS);
     boolean truncated = runTotal > MAX_UNITS;
     int size = (int) cap + 1;
@@ -169,6 +189,9 @@ public final class WholePieceSearch {
         if (allowed(n, c, allowRemnant)) {
           union.or(byCount[c]);
         }
+      }
+      if (lot.capacity() < size - 1) {
+        union.clearFrom((int) lot.capacity() + 1);
       }
       allowedUnion.add(union);
     }
@@ -514,6 +537,21 @@ public final class WholePieceSearch {
           return -1;
         }
         word = words[wordIndex];
+      }
+    }
+
+    /** Clears every bit at or above {@code from}. */
+    void clearFrom(int from) {
+      if (from < 0) {
+        from = 0;
+      }
+      if (from >= size) {
+        return;
+      }
+      int wordIndex = from >>> 6;
+      words[wordIndex] &= ~(-1L << (from & 63));
+      for (int k = wordIndex + 1; k < words.length; k++) {
+        words[k] = 0;
       }
     }
 

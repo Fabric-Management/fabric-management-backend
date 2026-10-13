@@ -199,6 +199,13 @@ public class PlaygroundService {
     return impersonate(tenantId, userId, guestId, false);
   }
 
+  /**
+   * A token for viewing the demo as {@code userId}, an active user of the same demo tenant.
+   *
+   * <p>{@code preserveRealSession}: the caller is a signed-in owner. The token is then a normal
+   * lifetime demo-impersonation token that the caller's browser tab holds for itself; the owner's
+   * own session (cookies) is not touched. Otherwise it is an anonymous playground token.
+   */
   @Transactional
   public PlaygroundImpersonateResponse impersonate(
       UUID tenantId, UUID userId, String guestId, boolean preserveRealSession) {
@@ -207,10 +214,17 @@ public class PlaygroundService {
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
+          // An inactive user is no persona: viewing as them must fail, not succeed silently.
           User targetUser =
               userRepository
                   .findByTenantIdAndId(tenantId, userId)
-                  .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+                  .filter(user -> Boolean.TRUE.equals(user.getIsActive()))
+                  .orElseThrow(
+                      () ->
+                          new PlatformDomainException(
+                              "This user cannot be viewed as a demo persona",
+                              "IMPERSONATION_TARGET_UNAVAILABLE",
+                              404));
 
           String contactValue = resolvePlaygroundContact(targetUser);
           String newToken =

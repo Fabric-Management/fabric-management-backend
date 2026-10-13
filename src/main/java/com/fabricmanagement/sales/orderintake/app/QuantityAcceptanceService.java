@@ -118,6 +118,13 @@ public class QuantityAcceptanceService {
           "PROPOSAL_STALE",
           "Pieces of this option are no longer available: " + check.unavailablePieces());
     }
+    // STOCK-PROPOSAL-2: stock another quote holds is offered, never taken without a release.
+    if (option.blockedReason() == QuantityOption.BlockedReason.HELD_BY_ANOTHER_QUOTE
+        || option.blockedReason() == QuantityOption.BlockedReason.HOLD_UNVERIFIED) {
+      throw OrderIntakeException.rule(
+          "OPTION_NOT_APPLICABLE",
+          "This option takes stock another quote holds; it cannot be recorded until released");
+    }
     if (line.isSingleLotRequired() && option.lotCount() > 1) {
       throw OrderIntakeException.rule(
           "SINGLE_LOT_REQUIRED", "The customer requires the distribution from a single lot");

@@ -127,6 +127,27 @@ class OrderIntakeStockPreviewControllerTest {
 
   @Test
   @WithMockUser
+  void anEmptyEntryInTheManualPickIsRefused() throws Exception {
+    allowSalesRead();
+
+    mockMvc
+        .perform(
+            post(PATH)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"productId":"%s","requestedQty":100,"unit":"M","singleLotRequired":false,
+                     "manualPieceIds":[null]}
+                    """
+                        .formatted(PRODUCT_ID)))
+        .andExpect(status().isUnprocessableEntity());
+
+    verify(previewService, never()).preview(any(), any());
+  }
+
+  @Test
+  @WithMockUser
   void aToleranceAboveOneHundredPercentIsRefused() throws Exception {
     allowSalesRead();
 
@@ -197,13 +218,13 @@ class OrderIntakeStockPreviewControllerTest {
             "M",
             "M",
             List.of(),
+            null,
+            true,
             0,
             0,
             0,
             List.of(),
-            false,
-            0),
-        List.of(),
+            false),
         List.of(),
         new OrderIntakeStockPreviewDto.Totals(
             zero,

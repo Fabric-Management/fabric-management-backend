@@ -46,13 +46,21 @@ public class OrderIntakeController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(
       operationId = "evaluateLineQuantity",
-      summary = "Evaluate the requested quantity against whole pieces in stock; reserves nothing")
+      summary = "Evaluate the requested quantity against whole pieces in stock; reserves nothing",
+      description =
+          "Free stock first; stock other quotes hold only when free stock has no option within"
+              + " the agreed tolerance. Options come in ascending quantity with the main"
+              + " proposal's index. An optional manual pick is evaluated with the same checks.")
   public ResponseEntity<ApiResponse<QuantityProposalDto>> evaluateLineQuantity(
-      @PathVariable UUID orderId, @PathVariable UUID lineId) {
+      @PathVariable UUID orderId,
+      @PathVariable UUID lineId,
+      @Valid @RequestBody(required = false) OrderIntakeRequests.EvaluateLineQuantity request) {
+    List<UUID> manual =
+        request == null || request.manualPieceIds() == null ? List.of() : request.manualPieceIds();
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             ApiResponse.success(
-                quantityEvaluation.evaluate(orderId, lineId, OrderIntakeActor.current())));
+                quantityEvaluation.evaluate(orderId, lineId, manual, OrderIntakeActor.current())));
   }
 
   @GetMapping("/lines/{lineId}/quantity-proposals/latest")
