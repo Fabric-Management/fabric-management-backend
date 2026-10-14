@@ -69,6 +69,28 @@ class QuantityEvaluatorWindowPropertyTest {
       assertThat(result.options())
           .as(example.toString())
           .allSatisfy(option -> assertThat(option.leavesRemnant()).isFalse());
+      // One card of each kind beside the opening (Fatih, 2026-10-14): one short, and one above
+      // only outside the tolerance.
+      List<QuantityOption> besides =
+          result.options().stream()
+              .filter(option -> option.placement() != QuantityOption.OptionPlacement.MAIN)
+              .filter(option -> option.source() == QuantityOption.StockSource.FREE)
+              .filter(
+                  option ->
+                      option.compatibility() != QuantityOption.Compatibility.PENDING_CONFIRMATION)
+              .toList();
+      assertThat(besides)
+          .as(example.toString())
+          .filteredOn(option -> option.difference().signum() < 0)
+          .hasSizeLessThanOrEqualTo(1);
+      assertThat(besides)
+          .as(example.toString())
+          .filteredOn(option -> option.difference().signum() >= 0)
+          .hasSizeLessThanOrEqualTo(1)
+          .allSatisfy(
+              option ->
+                  assertThat(option.toleranceStatus())
+                      .isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE));
     }
     // The random cases must exercise the window, not only its absence.
     assertThat(covering).isGreaterThan(50);

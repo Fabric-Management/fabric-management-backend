@@ -412,8 +412,6 @@ class OrderIntakeStockPreviewServiceTest {
                         assertThat(part.batchId()).isEqualTo(lotA);
                         assertThat(part.quantity()).isLessThanOrEqualTo(new BigDecimal("220"));
                       });
-              assertThat(option.reasons().getFirst().code())
-                  .isEqualTo(ProposalReason.Code.FREE_STOCK_ONLY);
             });
   }
 
@@ -545,7 +543,7 @@ class OrderIntakeStockPreviewServiceTest {
   }
 
   @Test
-  void withoutHoldsEveryOptionIsFreeAndApplicable_andSaysNothingAboutHolds() {
+  void withoutHoldsEveryOptionIsFreeAndApplicable_andSaysNothingAboutHeldStock() {
     UUID lotA = UUID.randomUUID();
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
 
@@ -561,8 +559,8 @@ class OrderIntakeStockPreviewServiceTest {
               assertThat(option.reasons())
                   .extracting(QuantityProposalDto.Reason::code)
                   .doesNotContain(
-                      ProposalReason.Code.FREE_STOCK_ONLY,
-                      ProposalReason.Code.FREE_STOCK_INSUFFICIENT);
+                      ProposalReason.Code.FREE_STOCK_INSUFFICIENT,
+                      ProposalReason.Code.FREE_STOCK_NOT_FOUND);
             });
   }
 

@@ -264,7 +264,6 @@ public class OpenApiExportIT {
         .contains(
             "optionKey",
             "placement",
-            "nearest",
             "source",
             "quantity",
             "difference",
@@ -272,7 +271,8 @@ public class OpenApiExportIT {
             "reasons",
             "lots",
             "heldStock",
-            "apply");
+            "apply")
+        .doesNotContain("nearest");
     assertThat(requiredOf(document, "QuantityProposalLot"))
         .contains("closesLot", "remainingPieces", "remainingQuantity", "pieceIds");
     assertThat(requiredOf(document, "StockProposalApplyCapability"))

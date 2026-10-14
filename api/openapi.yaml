@@ -148,8 +148,6 @@ tags:
   name: Supplier Quote
 - description: FX Exposure summary operations
   name: Finance - FX Exposure
-- description: Stock Reservation and Lot Engine API
-  name: IWM Stock Reservation
 - description: Dashboard widget metrikleri
   name: FlowBoard — Dashboard
 - description: Work Order operations
@@ -197,6 +195,8 @@ tags:
   name: Company Type
 - description: User Profile operations
   name: User Profile
+- description: Stock Reservation API
+  name: IWM Stock Reservation
 - description: "Sales-led tenant creation. Creates tenant and organization, admin\
     \ user, subscriptions, and sends welcome email with setup link. Requires platform\
     \ admin in production."
@@ -24579,84 +24579,6 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Create Reservation
-      tags:
-      - IWM Stock Reservation
-  /api/v1/iwm/reservations/suggestions/fifo:
-    get:
-      operationId: getFifoSuggestions
-      parameters:
-      - in: query
-        name: productId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: requiredQty
-        required: true
-        schema:
-          type: number
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LotSuggestion"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Get FIFO Lot Suggestions
       tags:
       - IWM Stock Reservation
   /api/v1/iwm/reservations/{id}/convert:
@@ -73266,22 +73188,6 @@ components:
       - methodNote
       - unit
       - value
-    LotSuggestion:
-      type: object
-      properties:
-        availableQty:
-          type: number
-        batchId:
-          type: string
-          format: uuid
-        locationId:
-          type: string
-          format: uuid
-        lotNumber:
-          type: string
-        productionDate:
-          type: string
-          format: date-time
     MarginWarningDto:
       type: object
       properties:
@@ -74839,9 +74745,9 @@ components:
           type: number
         searchComplete:
           type: boolean
-          description: "True when no search limit was reached: the nearest options\
-            \ and, within the tolerance, the main option are exact. False: the options\
-            \ are the ones found, never claimed to be the nearest or the best"
+          description: "True when no search limit was reached: each option is the\
+            \ best of its kind. False: the options are the ones found, never claimed\
+            \ to be the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -79344,9 +79250,9 @@ components:
           format: uuid
         searchComplete:
           type: boolean
-          description: "True when no search limit was reached: the nearest options\
-            \ and, within the tolerance, the main option are exact. False: the options\
-            \ are the ones found, never claimed to be the nearest or the best"
+          description: "True when no search limit was reached: each option is the\
+            \ best of its kind. False: the options are the ones found, never claimed\
+            \ to be the best"
         status:
           $ref: "#/components/schemas/QuantityEvaluationStatus"
         unit:
@@ -79516,10 +79422,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/QuantityProposalLot"
-        nearest:
-          type: boolean
-          description: "Nearest to the request on its side (below, or at and above).\
-            \ Only such an option may be called the nearest smaller or larger quantity"
         optionKey:
           type: string
         placement:
@@ -79549,7 +79451,6 @@ components:
       - leavesRemnant
       - lotCount
       - lots
-      - nearest
       - optionKey
       - placement
       - quantity
@@ -84327,15 +84228,10 @@ components:
       enum:
       - FREE_STOCK_INSUFFICIENT
       - FREE_STOCK_NOT_FOUND
-      - FREE_STOCK_ONLY
       - NO_REMNANT
       - LEAVES_REMNANT
       - CLOSES_LOTS
       - OLDER_STOCK
-      - FEWEST_LOTS
-      - EXACT_REQUEST
-      - CLOSEST_TO_REQUEST
-      - CLOSEST_FOUND
     StockProposalSource:
       type: string
       enum:

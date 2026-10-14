@@ -35,11 +35,7 @@ class StockReservationServiceTest {
               return value;
             });
     var service =
-        new StockReservationService(
-            repository,
-            mock(StockReservationEngine.class),
-            mock(ApplicationEventPublisher.class),
-            lock);
+        new StockReservationService(repository, mock(ApplicationEventPublisher.class), lock);
 
     service.createReservation(
         line, UUID.randomUUID(), UUID.randomUUID(), "LOT-1", null, BigDecimal.ONE);

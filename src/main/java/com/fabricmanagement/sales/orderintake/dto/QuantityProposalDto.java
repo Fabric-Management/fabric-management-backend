@@ -46,9 +46,8 @@ public record QuantityProposalDto(
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
             description =
-                "True when no search limit was reached: the nearest options and, within the"
-                    + " tolerance, the main option are exact. False: the options are the ones"
-                    + " found, never claimed to be the nearest or the best")
+                "True when no search limit was reached: each option is the best of its kind."
+                    + " False: the options are the ones found, never claimed to be the best")
         boolean searchComplete,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int eligiblePieces,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,
@@ -96,12 +95,6 @@ public record QuantityProposalDto(
   public record Option(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String optionKey,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityOption.OptionPlacement placement,
-      @Schema(
-              requiredMode = Schema.RequiredMode.REQUIRED,
-              description =
-                  "Nearest to the request on its side (below, or at and above). Only such an"
-                      + " option may be called the nearest smaller or larger quantity")
-          boolean nearest,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityOption.OptionKind kind,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
           QuantityOption.Compatibility compatibility,
@@ -143,7 +136,6 @@ public record QuantityProposalDto(
       return new Option(
           option.optionKey(),
           option.placement(),
-          option.nearest(),
           option.kind(),
           option.compatibility(),
           option.source(),

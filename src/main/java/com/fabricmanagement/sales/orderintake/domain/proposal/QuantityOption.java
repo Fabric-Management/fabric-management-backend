@@ -14,10 +14,8 @@ import java.util.UUID;
  * applying an option is a separate command.
  *
  * @param optionKey stable within one evaluation; the same pieces give the same key
- * @param placement the main proposal, a nearer smaller or larger quantity, or the salesperson's own
- *     pick
- * @param nearest the option nearest to the request on its side (below, or at and above); only then
- *     may it be called the nearest smaller or larger option
+ * @param placement the main proposal, an option below or above the request, or the salesperson's
+ *     own pick
  * @param kind the quantity relative to the request, kept for the acceptance flow
  * @param source whether only free stock is used, or stock other quotes hold
  * @param reasons why the option ranks as it does, in the order of the tenant-first criteria
@@ -27,7 +25,6 @@ import java.util.UUID;
 public record QuantityOption(
     String optionKey,
     OptionPlacement placement,
-    boolean nearest,
     OptionKind kind,
     Compatibility compatibility,
     StockSource source,
@@ -85,7 +82,6 @@ public record QuantityOption(
     return new QuantityOption(
         optionKey,
         placement,
-        nearest,
         kind,
         compatibility,
         source,
@@ -101,11 +97,10 @@ public record QuantityOption(
   }
 
   /** The same option in another placement. */
-  public QuantityOption as(OptionPlacement newPlacement, boolean newNearest) {
+  public QuantityOption as(OptionPlacement newPlacement) {
     return new QuantityOption(
         optionKey,
         newPlacement,
-        newNearest,
         kind,
         compatibility,
         source,

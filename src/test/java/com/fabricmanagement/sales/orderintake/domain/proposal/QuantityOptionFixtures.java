@@ -26,7 +26,6 @@ public final class QuantityOptionFixtures {
     return new QuantityOption(
         optionKey,
         QuantityOption.OptionPlacement.MAIN,
-        false,
         kind,
         compatibility,
         QuantityOption.StockSource.FREE,

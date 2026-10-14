@@ -34,10 +34,11 @@ import org.junit.jupiter.api.Test;
  * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A04 on the evaluation level (Fatih, 2026-10-12 and
  * 2026-10-13): no computed option leaves one or two pieces in a lot; the proposal opens at the best
  * free option meeting the request within the tolerance (more lots closed, older stock, fewer lots,
- * closeness), else the nearest above, else the best below, else held stock; the best below, the
- * nearest on both sides and the best below by the ranking alone stay listed; quantity order with
- * the opening index; held stock only when free stock cannot reach the lower tolerance limit; the
- * manual pick. Data is fictional.
+ * closeness), else the nearest above, else the best below, else held stock; beside it one card of
+ * each kind (2026-10-14): the best below, the nearest above outside the tolerance, pending
+ * combinations; no card far below the request only because it closes a lot; quantity order with the
+ * opening index; held stock only when free stock cannot reach the lower tolerance limit; the manual
+ * pick. Data is fictional.
  */
 class QuantityEvaluatorTest {
 
@@ -112,7 +113,6 @@ class QuantityEvaluatorTest {
     assertThat(opening.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
     QuantityOption below = byQuantity(result, "300");
     assertThat(below.placement()).isEqualTo(OptionPlacement.BELOW);
-    assertThat(below.nearest()).isTrue();
   }
 
   @Test
@@ -127,7 +127,7 @@ class QuantityEvaluatorTest {
   }
 
   @Test
-  void aLotYouCannotCombineWithIsNotTheOpening_butClosingItStaysAnAlternative() {
+  void aLotFarBelowTheRequest_isNotACard_evenThoughClosingItWouldEmptyIt() {
     var result =
         evaluate(
             spec("700")
@@ -136,14 +136,13 @@ class QuantityEvaluatorTest {
                     lot(p2, "Y", NEW, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100))
                 .tolerance("5", "5"));
 
-    // X is older and would close, but it cannot be combined with Y and is 400 m short.
+    // X is older and would close, but it cannot be combined with Y and is 400 m short (Fatih,
+    // 2026-10-14): the short card is the best below, Y's 600 m, and X is no card of its own.
     assertThat(main(result).quantity()).isEqualByComparingTo("700");
     assertThat(main(result).batchIds()).containsExactly(p2);
     assertThat(main(result).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
-    QuantityOption x = byQuantity(result, "300");
-    assertThat(x.placement()).isEqualTo(OptionPlacement.BELOW);
-    assertThat(x.lots().getFirst().closesLot()).isTrue();
-    assertThat(x.toleranceStatus()).isEqualTo(ToleranceStatus.OUTSIDE);
+    assertThat(quantities(result)).containsExactly("600", "700");
+    assertThat(byQuantity(result, "600").batchIds()).containsExactly(p2);
   }
 
   @Test
@@ -243,7 +242,6 @@ class QuantityEvaluatorTest {
     assertThat(main(result).compatibility()).isEqualTo(Compatibility.CONFIRMED);
     assertThat(main(result).lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
     assertThat(byQuantity(result, "300").placement()).isEqualTo(OptionPlacement.BELOW);
-    assertThat(byQuantity(result, "300").nearest()).isTrue();
     assertThat(result.mainOptionIndex()).isEqualTo(1);
   }
 
@@ -378,33 +376,6 @@ class QuantityEvaluatorTest {
     assertThat(main.lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
     assertThat(result.searchComplete()).isTrue();
     assertThat(result.status()).isEqualTo(EvaluationStatus.EXACT);
-  }
-
-  @Test
-  void aSearchLimitWordsClosenessAsFound_neverAsTheClosest() {
-    // Thirteen lots in one confirmed group exceed the search; single lots still give 100 m (three
-    // pieces left) and the whole 400 m.
-    List<ProposalLot> many = new ArrayList<>();
-    Set<UUID> group = new java.util.HashSet<>();
-    for (int i = 0; i <= WholePieceSearch.MAX_LOTS; i++) {
-      UUID id = new UUID(5, i);
-      many.add(lot(id, "L" + i, null, 100, 100, 100, 100));
-      group.add(id);
-    }
-    var result =
-        evaluate(
-            spec("150")
-                .lots(many.toArray(ProposalLot[]::new))
-                .confirmed(group)
-                .tolerance("0", "0"));
-
-    assertThat(result.searchComplete()).isFalse();
-    assertThat(result.options()).isNotEmpty();
-    assertThat(result.options())
-        .flatExtracting(QuantityOption::reasons)
-        .extracting(ProposalReason::code)
-        .doesNotContain(ProposalReason.Code.CLOSEST_TO_REQUEST)
-        .contains(ProposalReason.Code.CLOSEST_FOUND);
   }
 
   // ── Free stock first; held stock only when free cannot reach the lower limit

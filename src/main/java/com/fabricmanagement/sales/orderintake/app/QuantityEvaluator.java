@@ -58,11 +58,11 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * <p>Stock others hold is evaluated only when free stock cannot reach the lower tolerance limit.
- * The best option below the request, the nearest options on both sides and the best below the
- * request by the ranking alone are listed beside the opening one; options outside the tolerance are
- * shown, never withheld. Options are returned in ascending quantity with the opening option's
- * index. Both tolerance limits are required: a missing side is missing information, never read as
- * 0%; the caller refuses to evaluate without them.
+ * Beside the opening one, each card the 14 October decision names is listed once: the best below
+ * the request, the nearest above it outside the tolerance, nearer pending combinations and held
+ * stock. Options outside the tolerance are shown, never withheld. Options are returned in ascending
+ * quantity with the opening option's index. Both tolerance limits are required: a missing side is
+ * missing information, never read as 0%; the caller refuses to evaluate without them.
  */
 public final class QuantityEvaluator {
 
@@ -116,11 +116,6 @@ public final class QuantityEvaluator {
     public StockHolds {
       pieceHolds = pieceHolds == null ? Map.of() : Map.copyOf(pieceHolds);
       lotIntents = lotIntents == null ? Map.of() : Map.copyOf(lotIntents);
-    }
-
-    boolean any() {
-      return !pieceHolds.isEmpty()
-          || lotIntents.values().stream().anyMatch(lot -> !lot.intents().isEmpty());
     }
   }
 
@@ -246,20 +241,17 @@ public final class QuantityEvaluator {
   /**
    * What one tier's stock offers across its compatible sets of lots: the best meeting the request
    * within the tolerance ({@code covering}), the nearest at or above it ({@code above}), the best
-   * below it within the tolerance ({@code shortWithin}), the nearest below it ({@code below}), the
-   * best below it by the ranking alone ({@code tenantBelow}: an old lot closed, kept visible as in
-   * the 12 October decision) and nearer pending combinations.
+   * below it within the tolerance ({@code shortWithin}), the nearest below it ({@code below}) and
+   * nearer pending combinations.
    */
   private record Found(
       List<Ranked> covering,
       List<Ranked> above,
       List<Ranked> shortWithin,
       List<Ranked> below,
-      List<Ranked> tenantBelow,
       List<Ranked> pending) {
 
-    static final Found NONE =
-        new Found(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+    static final Found NONE = new Found(List.of(), List.of(), List.of(), List.of(), List.of());
 
     /** Some option meets the request, or falls short of it within the tolerance. */
     boolean reachesLowerLimit() {
@@ -268,13 +260,7 @@ public final class QuantityEvaluator {
 
     /** Only the options that take stock others hold. */
     Found onlyHeld() {
-      return new Found(
-          held(covering),
-          held(above),
-          held(shortWithin),
-          held(below),
-          held(tenantBelow),
-          held(pending));
+      return new Found(held(covering), held(above), held(shortWithin), held(below), held(pending));
     }
 
     private static List<Ranked> held(List<Ranked> candidates) {
@@ -300,16 +286,12 @@ public final class QuantityEvaluator {
       return shortWithin.stream().min(ranking).or(() -> below.stream().min(belowOrder));
     }
 
+    /**
+     * The nearest at or above the request. It is a card of its own only outside the tolerance, that
+     * is when nothing meets the request within it.
+     */
     Optional<Ranked> nearestAbove(Comparator<Ranked> aboveOrder) {
       return above.stream().min(aboveOrder);
-    }
-
-    Optional<Ranked> nearestBelow(Comparator<Ranked> belowOrder) {
-      return below.stream().min(belowOrder);
-    }
-
-    Optional<Ranked> bestBelow(Comparator<Ranked> ranking) {
-      return tenantBelow.stream().min(ranking);
     }
   }
 
@@ -459,12 +441,13 @@ public final class QuantityEvaluator {
 
       List<Ranked> chosen = new ArrayList<>();
       opening.ifPresent(chosen::add);
-      // Beside it: the best below the request, the nearest above and below, and the best below
-      // by the ranking alone (closing an old lot stays visible).
+      // Beside it, one card of each kind (Fatih, 2026-10-14): the best below the request and the
+      // nearest above it outside the tolerance; a second option within the tolerance is not a card.
       freeOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
-      freeOptions.nearestAbove(aboveOrder).ifPresent(chosen::add);
-      freeOptions.nearestBelow(belowOrder).ifPresent(chosen::add);
-      freeOptions.bestBelow(tenantFirst).ifPresent(chosen::add);
+      freeOptions
+          .nearestAbove(aboveOrder)
+          .filter(ranked -> ranked.units() > windowHigh)
+          .ifPresent(chosen::add);
       chosen.addAll(freeOptions.pending());
       heldOpening.ifPresent(chosen::add);
       heldOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
@@ -481,7 +464,7 @@ public final class QuantityEvaluator {
             ranked.pieceKey().equals(openingKey)
                 ? OptionPlacement.MAIN
                 : ranked.units() < target ? OptionPlacement.BELOW : OptionPlacement.ABOVE;
-        listed.add(withOption(ranked, ranked.option().as(placement, false)));
+        listed.add(withOption(ranked, ranked.option().as(placement)));
       }
 
       List<UUID> unavailable = List.of();
@@ -493,8 +476,7 @@ public final class QuantityEvaluator {
       }
 
       listed.sort(listedOrder);
-      List<QuantityOption> options = withNearest(listed);
-      options = withReasons(options);
+      List<QuantityOption> options = withReasons(listed.stream().map(Ranked::option).toList());
       Integer mainIndex = null;
       for (int i = 0; i < options.size(); i++) {
         if (options.get(i).placement() == OptionPlacement.MAIN) {
@@ -573,7 +555,6 @@ public final class QuantityEvaluator {
       List<Ranked> above = new ArrayList<>();
       List<Ranked> shortWithin = new ArrayList<>();
       List<Ranked> below = new ArrayList<>();
-      List<Ranked> tenantBelow = new ArrayList<>();
       List<Ranked> pendingAbove = new ArrayList<>();
       List<Ranked> pendingBelow = new ArrayList<>();
       for (Run run : runs) {
@@ -598,10 +579,6 @@ public final class QuantityEvaluator {
           }
           found(ProposalSearch.largestUpTo(runLots, target - 1))
               .ifPresent(selection -> below.add(ranked(run, selection)));
-          if (target > 1) {
-            found(ProposalSearch.bestWithin(runLots, 1, target - 1, target))
-                .ifPresent(selection -> tenantBelow.add(ranked(run, selection)));
-          }
         } else {
           found(ProposalSearch.smallestFrom(runLots, target))
               .filter(selection -> severalUncoveredLots(selection, runs))
@@ -626,7 +603,7 @@ public final class QuantityEvaluator {
               candidate ->
                   definiteBelow.isEmpty() || candidate.units() > definiteBelow.get().units())
           .ifPresent(pending::add);
-      return new Found(covering, above, shortWithin, below, tenantBelow, pending);
+      return new Found(covering, above, shortWithin, below, pending);
     }
 
     private Optional<WholePieceSearch.Selection> found(ProposalSearch.Result result) {
@@ -804,7 +781,6 @@ public final class QuantityEvaluator {
       return new QuantityOption(
           key,
           OptionPlacement.ABOVE,
-          false,
           kind,
           compatibility,
           touchesVerified || touchesUnverified ? StockSource.HELD : StockSource.FREE,
@@ -1049,8 +1025,7 @@ public final class QuantityEvaluator {
         block = BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED;
       }
       QuantityOption option =
-          option("M:" + pieceKey(takes), takes, compatibility, block)
-              .as(OptionPlacement.MANUAL, false);
+          option("M:" + pieceKey(takes), takes, compatibility, block).as(OptionPlacement.MANUAL);
       return rank(option, block == null, takes);
     }
 
@@ -1075,32 +1050,8 @@ public final class QuantityEvaluator {
     }
 
     /** Marks, per side, the option nearest the request; manual picks are not computed options. */
-    private List<QuantityOption> withNearest(List<Ranked> listed) {
-      Ranked nearestBelow = null;
-      Ranked nearestAbove = null;
-      for (Ranked ranked : listed) {
-        if (ranked.option().placement() == OptionPlacement.MANUAL) {
-          continue;
-        }
-        if (ranked.units() < target) {
-          if (nearestBelow == null || ranked.units() > nearestBelow.units()) {
-            nearestBelow = ranked;
-          }
-        } else if (nearestAbove == null || ranked.units() < nearestAbove.units()) {
-          nearestAbove = ranked;
-        }
-      }
-      List<QuantityOption> options = new ArrayList<>();
-      for (Ranked ranked : listed) {
-        boolean nearest = ranked == nearestBelow || ranked == nearestAbove;
-        options.add(ranked.option().as(ranked.option().placement(), nearest));
-      }
-      return options;
-    }
-
     /** Each option's facts in criterion order; never an age claim without known dates. */
     private List<QuantityOption> withReasons(List<QuantityOption> options) {
-      boolean anyHolds = input.holds().any();
       boolean anyRemnant = options.stream().anyMatch(QuantityOption::leavesRemnant);
       Instant oldest =
           aged
@@ -1110,13 +1061,6 @@ public final class QuantityEvaluator {
                   .min(Comparator.naturalOrder())
                   .orElse(null)
               : null;
-      int fewest = options.stream().mapToInt(QuantityOption::lotCount).min().orElse(0);
-      int most = options.stream().mapToInt(QuantityOption::lotCount).max().orElse(0);
-      BigDecimal closest =
-          options.stream()
-              .map(option -> option.difference().abs())
-              .min(Comparator.naturalOrder())
-              .orElse(null);
       List<QuantityOption> result = new ArrayList<>();
       for (QuantityOption option : options) {
         List<ProposalReason> reasons = new ArrayList<>();
@@ -1127,8 +1071,6 @@ public final class QuantityEvaluator {
                   limitExceeded
                       ? ProposalReason.Code.FREE_STOCK_NOT_FOUND
                       : ProposalReason.Code.FREE_STOCK_INSUFFICIENT));
-        } else if (option.source() == StockSource.FREE && anyHolds) {
-          reasons.add(ProposalReason.of(ProposalReason.Code.FREE_STOCK_ONLY));
         }
         if (option.leavesRemnant()) {
           // Only a manual pick: how many pieces stay behind and how much they hold.
@@ -1152,22 +1094,6 @@ public final class QuantityEvaluator {
         if (oldest != null
             && option.lots().stream().anyMatch(part -> oldest.equals(part.productionDate()))) {
           reasons.add(new ProposalReason(ProposalReason.Code.OLDER_STOCK, null, null, oldest));
-        }
-        if (most > fewest && option.lotCount() == fewest) {
-          reasons.add(
-              new ProposalReason(ProposalReason.Code.FEWEST_LOTS, null, option.lotCount(), null));
-        }
-        if (option.difference().signum() == 0) {
-          reasons.add(ProposalReason.of(ProposalReason.Code.EXACT_REQUEST));
-        } else if (options.size() > 1 && option.difference().abs().compareTo(closest) == 0) {
-          reasons.add(
-              new ProposalReason(
-                  limitExceeded
-                      ? ProposalReason.Code.CLOSEST_FOUND
-                      : ProposalReason.Code.CLOSEST_TO_REQUEST,
-                  option.difference().abs(),
-                  null,
-                  null));
         }
         result.add(option.withReasons(reasons));
       }
