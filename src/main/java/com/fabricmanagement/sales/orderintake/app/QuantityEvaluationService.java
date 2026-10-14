@@ -1,6 +1,10 @@
 package com.fabricmanagement.sales.orderintake.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsPort;
+import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsUnavailableException;
+import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
+import com.fabricmanagement.inventory.lothealth.domain.ProductSpeed;
 import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQueryService;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService;
@@ -58,6 +62,7 @@ public class QuantityEvaluationService {
   private final CustomerToneAcceptanceRepository toneAcceptances;
   private final QuantityProposalRepository proposals;
   private final Clock clock;
+  private final LotHealthSettingsPort lotHealthSettings;
 
   @Transactional
   public QuantityProposalDto evaluate(UUID orderId, UUID lineId, UUID actor) {
@@ -297,7 +302,8 @@ public class QuantityEvaluationService {
                 request.toleranceUpPct(),
                 request.toleranceDownPct(),
                 QuoteHoldEvidence.of(holds),
-                request.manualPieceIds()));
+                request.manualPieceIds()),
+            lotHealthPolicy());
     if (!evaluation.manualUnavailablePieceIds().isEmpty()) {
       throw OrderIntakeException.conflict(
           "MANUAL_PIECES_UNAVAILABLE",
@@ -305,6 +311,22 @@ public class QuantityEvaluationService {
               + evaluation.manualUnavailablePieceIds());
     }
     return new EvaluationRun(evaluation, dimension, canonicalUnit, stock, holds);
+  }
+
+  /**
+   * The tenant's lot-health rule (Fatih, 2026-10-14). Product speed is not measured yet, so every
+   * product sells as before.
+   */
+  private LotHealthPolicy lotHealthPolicy() {
+    UUID tenantId = TenantContext.requireTenantId();
+    try {
+      return lotHealthSettings.forTenant(tenantId).policyFor(ProductSpeed.MOVING);
+    } catch (LotHealthSettingsUnavailableException e) {
+      // Never propose on the standard when the tenant's own threshold may be stricter.
+      throw OrderIntakeException.conflict(
+          "SETTINGS_UNAVAILABLE",
+          "The stock-proposal settings cannot be read now; evaluate again later");
+    }
   }
 
   private QuantityEvaluator.Evaluation unknown(

@@ -57,7 +57,8 @@ public record QuantityOption(
   }
 
   /**
-   * A used lot keeps one or two pieces (Fatih, 2026-10-13). A computed option never does; only a
+   * A used lot keeps fewer pieces than its lot-health minimum (Fatih, 2026-10-13: never one or two;
+   * 2026-10-14: the minimum is a tenant setting). A computed option never does; only a
    * salesperson's own pick can, and then only with acknowledgement.
    */
   public boolean leavesRemnant() {
@@ -164,7 +165,7 @@ public record QuantityOption(
     EXACT,
     ABOVE,
     BELOW,
-    /** The requested quantity, leaving one or two pieces in a used lot (a manual pick only). */
+    /** The requested quantity, leaving a remnant in a used lot (a manual pick only). */
     REQUESTED_WITH_REMNANT
   }
 
@@ -185,7 +186,8 @@ public record QuantityOption(
    * @param remainingQuantity their quantity in the line unit
    * @param unknownPieces pieces of the lot whose suitability is unknown; never counted as pieces
    *     left, as they are not offered piece by piece (Fatih, 2026-10-13)
-   * @param remnant one or two pieces of the pool the option was chosen from stay behind
+   * @param remnant fewer pieces than the lot-health minimum of the pool the option was chosen from
+   *     stay behind
    * @param remnantPieceIds those pieces
    * @param remnantQuantity their quantity in the line unit
    * @param closesLot the option takes every piece of the lot, so the lot is closed; never claimed

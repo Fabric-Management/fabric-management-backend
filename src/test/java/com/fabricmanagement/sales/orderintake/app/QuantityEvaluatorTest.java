@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.orderintake.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
@@ -637,6 +638,61 @@ class QuantityEvaluatorTest {
             .evidenceFingerprint();
 
     assertThat(a).hasSize(64).isNotEqualTo(b).isNotEqualTo(c);
+  }
+
+  // ── The tenant's lot-health minimum (Fatih, 2026-10-14) ───────────────────
+
+  @Test
+  void withATenantMinimumOfFive_aLotKeepsFivePieces_orCloses() {
+    LotHealthPolicy keepFive = new LotHealthPolicy(5, new BigDecimal("0.51"));
+    var spec = spec("400").lots(lot(p1, "P1", OLD, 100, 100, 100, 100, 100, 100, 100, 100));
+
+    // 400 m would keep four pieces: under the minimum. The nearest above closes the lot; the
+    // best below keeps five.
+    QuantityEvaluationResult result = QuantityEvaluator.evaluate(spec.input(), keepFive).result();
+
+    assertThat(quantities(result)).containsExactly("300", "800");
+    assertThat(main(result).quantity()).isEqualByComparingTo("800");
+    assertThat(main(result).lots().getFirst().closesLot()).isTrue();
+    assertThat(byQuantity(result, "300").lots().getFirst().remainingEligiblePieces()).isEqualTo(5);
+    // The standard minimum keeps four: 400 m is the opening.
+    assertThat(main(evaluate(spec)).quantity()).isEqualByComparingTo("400");
+  }
+
+  @Test
+  void withATenantMinimumOfFive_aManualPickKeepingFourLeavesARemnant() {
+    LotHealthPolicy keepFive = new LotHealthPolicy(5, new BigDecimal("0.51"));
+    ProposalLot eight = lot(p1, "P1", OLD, 100, 100, 100, 100, 100, 100, 100, 100);
+    UUID[] four =
+        eight.pieces().subList(0, 4).stream().map(ProposalPiece::stockUnitId).toArray(UUID[]::new);
+
+    QuantityEvaluationResult result =
+        QuantityEvaluator.evaluate(spec("400").lots(eight).manual(four).input(), keepFive).result();
+
+    QuantityOption manual =
+        result.options().stream()
+            .filter(option -> option.placement() == OptionPlacement.MANUAL)
+            .findFirst()
+            .orElseThrow();
+    assertThat(manual.leavesRemnant()).isTrue();
+    assertThat(manual.lots().getFirst().remnantPieceIds()).hasSize(4);
+    assertThat(manual.needsRemnantAcknowledgement()).isTrue();
+  }
+
+  @Test
+  void aChangedLotHealthMinimumMakesTheEarlierProposalStale() {
+    var spec = spec("300").lots(lot(p1, "P1", OLD, 100, 100, 100, 100, 100, 100, 100, 100));
+
+    String standard = QuantityEvaluator.evaluate(spec.input()).evidenceFingerprint();
+    String keepFive =
+        QuantityEvaluator.evaluate(spec.input(), new LotHealthPolicy(5, new BigDecimal("0.51")))
+            .evidenceFingerprint();
+
+    assertThat(keepFive).isNotEqualTo(standard);
+    assertThat(
+            QuantityEvaluator.evaluate(spec.input(), LotHealthPolicy.STANDARD)
+                .evidenceFingerprint())
+        .isEqualTo(standard);
   }
 
   // ── Fixtures ─────────────────────────────────────────────────────────────

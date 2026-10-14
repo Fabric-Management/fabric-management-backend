@@ -13,10 +13,9 @@ import java.util.UUID;
  * Pieces are never cut. A lot may carry a capacity: no take from it exceeds that quantity (free
  * stock net of quote intents, STOCK-PROPOSAL-2). The searches live in {@link ProposalSearch}.
  *
- * <p>A remnant is one or two pieces left in a lot a take uses (Fatih, 2026-10-13): a computed
- * proposal never leaves one; a lot is either closed or keeps at least three pieces. Limits are
- * refused, never answered approximately: above {@link #MAX_PIECES_PER_LOT} pieces in a lot, {@link
- * #MAX_LOTS} lots or {@link #MAX_UNITS} units.
+ * <p>What a lot may keep is the lot-health rule's to say ({@code LotHealthPolicy}); a take only
+ * records how many pool pieces it leaves. Limits are refused, never answered approximately: above
+ * {@link #MAX_PIECES_PER_LOT} pieces in a lot, {@link #MAX_LOTS} lots or {@link #MAX_UNITS} units.
  */
 public final class WholePieceSearch {
 
@@ -63,19 +62,9 @@ public final class WholePieceSearch {
     }
   }
 
-  /** Pieces left in a used lot that make a remnant: one or two (Fatih, 2026-10-13). */
-  public static boolean isRemnant(int remainingPieces) {
-    return remainingPieces == 1 || remainingPieces == 2;
-  }
-
   public record LotTake(UUID lotId, List<UUID> pieceIds, long units, int remainingPieces) {
     public LotTake {
       pieceIds = List.copyOf(pieceIds);
-    }
-
-    /** The take leaves one or two pieces of the lot's pool behind. */
-    public boolean leavesRemnant() {
-      return isRemnant(remainingPieces);
     }
   }
 
@@ -86,10 +75,6 @@ public final class WholePieceSearch {
 
     public int lotCount() {
       return takes.size();
-    }
-
-    public boolean leavesRemnant() {
-      return takes.stream().anyMatch(LotTake::leavesRemnant);
     }
   }
 

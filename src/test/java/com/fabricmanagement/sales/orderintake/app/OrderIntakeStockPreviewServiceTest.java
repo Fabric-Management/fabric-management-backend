@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsUnavailableException;
+import com.fabricmanagement.inventory.lothealth.domain.LotHealthSettings;
 import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQueryService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
@@ -106,7 +108,8 @@ class OrderIntakeStockPreviewServiceTest {
             quoteScopes,
             toneAcceptances,
             proposals,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            tenant -> LotHealthSettings.STANDARD);
     service = new OrderIntakeStockPreviewService(evaluations, stockQuery, quoteScopes);
     order = SalesOrder.builder().tradingPartnerId(customerId).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
@@ -334,6 +337,33 @@ class OrderIntakeStockPreviewServiceTest {
         .isInstanceOf(OrderIntakeException.class)
         .extracting(error -> ((OrderIntakeException) error).getErrorCode())
         .isEqualTo("ORDER_INTAKE_TOLERANCE_REQUIRED");
+    verify(proposals, never()).save(any());
+  }
+
+  @Test
+  void unreadableLotHealthSettings_stopTheProposal_neverFallBackToTheStandard() {
+    // The tenant may keep five pieces; proposing on three would break its own rule (2026-10-14).
+    stock(lot(UUID.randomUUID(), "LOT-A", eligible("100"), eligible("100"), eligible("100")));
+    QuantityEvaluationService unreadable =
+        new QuantityEvaluationService(
+            access,
+            productDefinitions,
+            stockQuery,
+            quoteHolds,
+            quoteScopes,
+            toneAcceptances,
+            proposals,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            tenant -> {
+              throw new LotHealthSettingsUnavailableException(tenant, new RuntimeException("db"));
+            });
+    OrderIntakeStockPreviewService preview =
+        new OrderIntakeStockPreviewService(unreadable, stockQuery, quoteScopes);
+
+    assertThatThrownBy(() -> preview.preview(request("100", "M", false, "5", "5"), actor))
+        .isInstanceOf(OrderIntakeException.class)
+        .extracting(error -> ((OrderIntakeException) error).getErrorCode())
+        .isEqualTo("ORDER_INTAKE_SETTINGS_UNAVAILABLE");
     verify(proposals, never()).save(any());
   }
 

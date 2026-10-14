@@ -103,7 +103,7 @@ class QuantityEvaluatorWindowPropertyTest {
     Comparator<Candidate> ranking =
         Comparator.comparingInt(Candidate::closed)
             .reversed()
-            .thenComparing(Candidate::dates, QuantityEvaluator::compareAges)
+            .thenComparing(Candidate::dates, ProposalRanking::compareAges)
             .thenComparingInt(Candidate::lots);
     Comparator<Candidate> windowOrder =
         ranking

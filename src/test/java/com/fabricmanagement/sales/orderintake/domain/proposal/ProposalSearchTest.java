@@ -16,9 +16,10 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * The proposal searches (STOCK-PROPOSAL-2; Fatih, 2026-10-12 and 2026-10-13): a lot is closed or
- * keeps at least three pieces; more lots closed, older stock and fewer lots come first. Units are
- * centimetres: 100 m = 10_000. Lots are passed oldest first. Data is fictional.
+ * The proposal searches (STOCK-PROPOSAL-2; Fatih, 2026-10-12 to 2026-10-14): a lot is closed or
+ * keeps at least its lot-health minimum, three by default; more lots closed, older stock and fewer
+ * lots come first. Units are centimetres: 100 m = 10_000. Lots are passed oldest first. Data is
+ * fictional.
  */
 class ProposalSearchTest {
 
@@ -69,6 +70,29 @@ class ProposalSearchTest {
     assertThat(below.takes().getFirst().remainingPieces()).isEqualTo(3);
     assertSelectionAddsUp(above, p3);
     assertSelectionAddsUp(below, p3);
+  }
+
+  @Test
+  void aTenantMinimumOfFive_keepsFivePieces_orClosesTheLot() {
+    // 2026-10-14: what a lot keeps is the tenant's lot-health minimum, three by default.
+    Lot eight = lot(100, 100, 100, 100, 100, 100, 100, 100);
+    SearchLot keepFive = new SearchLot(eight, 0, 5);
+
+    Selection three =
+        ProposalSearch.bestWithin(List.of(keepFive), 300 * M, 300 * M, 300 * M)
+            .best()
+            .orElseThrow();
+    Result four = ProposalSearch.bestWithin(List.of(keepFive), 400 * M, 400 * M, 400 * M);
+    Selection whole = ProposalSearch.smallestFrom(List.of(keepFive), 400 * M).best().orElseThrow();
+
+    assertThat(three.takes().getFirst().remainingPieces()).isEqualTo(5);
+    assertThat(four.best()).isEmpty();
+    assertThat(whole.total()).isEqualTo(800 * M);
+    assertThat(whole.takes().getFirst().remainingPieces()).isZero();
+    // The standard minimum still lets four pieces go and keeps four.
+    assertThat(
+            ProposalSearch.bestWithin(List.of(window(eight, 0)), 400 * M, 400 * M, 400 * M).best())
+        .isPresent();
   }
 
   // ── The ranking within a window ──────────────────────────────────────────

@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.orderintake.domain.proposal;
 
+import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
 import com.fabricmanagement.sales.orderintake.domain.proposal.WholePieceSearch.Bits;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,10 +10,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The whole-piece searches behind a stock proposal (STOCK-PROPOSAL-2; Fatih, 2026-10-12 and
- * 2026-10-13). A lot is either closed (every pool piece taken) or keeps at least three pieces: a
- * computed selection never leaves one or two pieces behind. Among selections the tenant comes
- * first: more lots closed, then older stock, then fewer lots.
+ * The whole-piece searches behind a stock proposal (STOCK-PROPOSAL-2; Fatih, 2026-10-12 to
+ * 2026-10-14). A lot is either closed (every pool piece taken) or keeps at least its lot-health
+ * minimum of pieces ({@link LotHealthPolicy}, three by default): a computed selection never leaves
+ * fewer behind. Among selections the tenant comes first: more lots closed, then older stock, then
+ * fewer lots.
  *
  * <ul>
  *   <li>{@link #bestWithin}: the best selection by that ranking whose total lies in a window; among
@@ -24,7 +26,7 @@ import java.util.UUID;
  * </ul>
  *
  * <p>Every ranking criterion depends only on how each lot is used: not at all, closed, or partly
- * (three or more pieces left). The searches walk these lot patterns depth first and check each
+ * (at least the minimum left). The searches walk these lot patterns depth first and check each
  * against the totals its lots reach together (bitset sums). They are exact, because every allowed
  * selection belongs to one pattern. Among selections that rank the same the first found wins; the
  * choice is deterministic. They refuse instead of answering approximately: above {@link
@@ -39,10 +41,21 @@ public final class ProposalSearch {
   private ProposalSearch() {}
 
   /**
-   * A lot with its age. {@code ageRank} orders production dates: lower is older, equal dates share
-   * a rank and an unknown date ranks last.
+   * A lot with its age and the pieces it must keep when it is not closed. {@code ageRank} orders
+   * production dates: lower is older, equal dates share a rank and an unknown date ranks last.
    */
-  public record SearchLot(WholePieceSearch.Lot lot, int ageRank) {}
+  public record SearchLot(WholePieceSearch.Lot lot, int ageRank, int minKeep) {
+    public SearchLot {
+      if (minKeep < 1) {
+        throw new IllegalArgumentException("A lot keeps at least one piece when it is not closed");
+      }
+    }
+
+    /** With the standard lot-health minimum. */
+    public SearchLot(WholePieceSearch.Lot lot, int ageRank) {
+      this(lot, ageRank, LotHealthPolicy.STANDARD.minHealthyPieces());
+    }
+  }
 
   /** The best selection, if any, or a reached limit. */
   public record Result(Optional<WholePieceSearch.Selection> best, boolean limitExceeded) {
@@ -93,7 +106,13 @@ public final class ProposalSearch {
 
   /** A lot with its reachable totals per use, in normalised units. */
   private record Prepared(
-      WholePieceSearch.Lot lot, UUID id, int ageRank, Bits[] byCount, Bits closed, Bits partial) {
+      WholePieceSearch.Lot lot,
+      UUID id,
+      int ageRank,
+      int minKeep,
+      Bits[] byCount,
+      Bits closed,
+      Bits partial) {
 
     int pieces() {
       return lot.pieces().size();
@@ -108,7 +127,7 @@ public final class ProposalSearch {
       if (use == Use.CLOSED) {
         return n;
       }
-      for (int c = 1; c <= n - 3; c++) {
+      for (int c = 1; c <= n - minKeep; c++) {
         if (byCount[c].get(total)) {
           return c;
         }
@@ -245,15 +264,16 @@ public final class ProposalSearch {
     if (total < size && total <= lot.capacity()) {
       closed.set((int) total);
     }
-    // Partly: three or more pieces stay, never one or two.
+    // Partly: at least the lot-health minimum of pieces stays, never fewer.
     Bits partial = new Bits(size);
-    for (int c = 1; c <= n - 3; c++) {
+    for (int c = 1; c <= n - source.minKeep(); c++) {
       partial.or(byCount[c]);
     }
     if (lot.capacity() < size - 1) {
       partial.clearFrom((int) lot.capacity() + 1);
     }
-    return new Prepared(lot, original.id(), source.ageRank(), byCount, closed, partial);
+    return new Prepared(
+        lot, original.id(), source.ageRank(), source.minKeep(), byCount, closed, partial);
   }
 
   /** One depth-first walk over the lot patterns. */
