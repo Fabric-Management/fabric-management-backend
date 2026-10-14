@@ -848,15 +848,6 @@ CREATE POLICY rls_tenant_isolation ON i18n.user_locale_config
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
--- Table: iwm.lot_end_rule
-ALTER TABLE iwm.lot_end_rule ENABLE ROW LEVEL SECURITY;
-ALTER TABLE iwm.lot_end_rule FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS rls_tenant_isolation ON iwm.lot_end_rule;
-CREATE POLICY rls_tenant_isolation ON iwm.lot_end_rule
-    FOR ALL
-    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
-    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
-
 -- Table: iwm.min_stock_rule
 ALTER TABLE iwm.min_stock_rule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE iwm.min_stock_rule FORCE ROW LEVEL SECURITY;

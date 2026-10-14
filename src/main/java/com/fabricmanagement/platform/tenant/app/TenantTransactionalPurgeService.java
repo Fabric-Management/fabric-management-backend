@@ -129,7 +129,6 @@ public class TenantTransactionalPurgeService {
           "iwm.stock_reservation",
           "iwm.stock_adjustment_request",
           "iwm.min_stock_rule",
-          "iwm.lot_end_rule",
           "iwm.return_rate_rule",
           "iwm.warehouse_location",
           "production.batch_finished_width_measurement",

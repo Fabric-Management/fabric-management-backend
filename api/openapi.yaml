@@ -10142,6 +10142,139 @@ paths:
           description: Internal Server Error
       tags:
       - Tenant Settings
+  /api/v1/common/tenant/settings/stock-proposal:
+    get:
+      operationId: getStockProposalSettings
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseStockProposalSettingsView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get the stock-proposal settings
+      tags:
+      - Tenant Settings
+    put:
+      operationId: updateStockProposalSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStockProposalSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseStockProposalSettingsView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Update the stock-proposal settings
+      tags:
+      - Tenant Settings
   /api/v1/common/trading-partners:
     get:
       description: Lists all active trading partners for current tenant
@@ -63692,6 +63825,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseStockProposalSettingsView:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/StockProposalSettingsView"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseStockUnitCut:
       type: object
       properties:
@@ -84232,6 +84383,96 @@ components:
       - LEAVES_REMNANT
       - CLOSES_LOTS
       - OLDER_STOCK
+    StockProposalSettings:
+      type: object
+      properties:
+        lotCloseExtraSlowingPct:
+          type: number
+        lotCloseExtraStalledPct:
+          type: number
+        minHealthyPiecesMoving:
+          type: integer
+          format: int32
+        minHealthyPiecesSlowing:
+          type: integer
+          format: int32
+        minHealthyPiecesStalled:
+          type: integer
+          format: int32
+        shortPiecePct:
+          type: number
+        slowingBelowPct:
+          type: number
+        slowingCoverDays:
+          type: integer
+          format: int32
+        speedWindowDays:
+          type: integer
+          format: int32
+        stalledBelowPct:
+          type: number
+        toleranceDownPct:
+          type: number
+        toleranceUpPct:
+          type: number
+    StockProposalSettingsView:
+      type: object
+      properties:
+        lotCloseExtraSlowingPct:
+          type: number
+          description: "How far, in percent, a lot-closing option may exceed the upper\
+            \ tolerance for a slowing product"
+        lotCloseExtraStalledPct:
+          type: number
+          description: The same for a stalled product
+        minHealthyPiecesMoving:
+          type: integer
+          format: int32
+          description: Normal pieces a lot keeps while its product sells as before
+        minHealthyPiecesSlowing:
+          type: integer
+          format: int32
+          description: Normal pieces a lot keeps while its product sells less
+        minHealthyPiecesStalled:
+          type: integer
+          format: int32
+          description: Normal pieces a lot keeps once its product hardly sells
+        shortPiecePct:
+          type: number
+          description: A piece under this percent of its lot's average piece is short
+        slowingBelowPct:
+          type: number
+          description: "Shipping less than this percent of the period before: slowing"
+        slowingCoverDays:
+          type: integer
+          format: int32
+          description: "Free stock lasting longer than this many days: slowing"
+        speedWindowDays:
+          type: integer
+          format: int32
+          description: Days whose shipments are compared with the days before them
+        stalledBelowPct:
+          type: number
+          description: "Shipping less than this percent of the period before: stalled"
+        toleranceDownPct:
+          type: number
+          description: "Lower tolerance a new order line starts with, in percent"
+        toleranceUpPct:
+          type: number
+          description: "Upper tolerance a new order line starts with, in percent"
+      required:
+      - lotCloseExtraSlowingPct
+      - lotCloseExtraStalledPct
+      - minHealthyPiecesMoving
+      - minHealthyPiecesSlowing
+      - minHealthyPiecesStalled
+      - shortPiecePct
+      - slowingBelowPct
+      - slowingCoverDays
+      - speedWindowDays
+      - stalledBelowPct
+      - toleranceDownPct
+      - toleranceUpPct
     StockProposalSource:
       type: string
       enum:
@@ -85359,6 +85600,8 @@ components:
         sessionTimeoutMinutes:
           type: integer
           format: int32
+        stockProposal:
+          $ref: "#/components/schemas/StockProposalSettings"
         timezone:
           type: string
     TenantSettingsDto:
@@ -86413,6 +86656,87 @@ components:
         validUntil:
           type: string
           format: date
+    UpdateStockProposalSettingsRequest:
+      type: object
+      properties:
+        lotCloseExtraSlowingPct:
+          type: number
+          example: 10
+          maximum: 100
+          minimum: 0
+        lotCloseExtraStalledPct:
+          type: number
+          example: 20
+          maximum: 100
+          minimum: 0
+        minHealthyPiecesMoving:
+          type: integer
+          format: int32
+          example: 3
+          maximum: 50
+          minimum: 1
+        minHealthyPiecesSlowing:
+          type: integer
+          format: int32
+          example: 5
+          maximum: 50
+          minimum: 1
+        minHealthyPiecesStalled:
+          type: integer
+          format: int32
+          example: 8
+          maximum: 50
+          minimum: 1
+        shortPiecePct:
+          type: number
+          example: 51
+          maximum: 99
+          minimum: 1
+        slowingBelowPct:
+          type: number
+          example: 80
+          maximum: 100
+          minimum: 1
+        slowingCoverDays:
+          type: integer
+          format: int32
+          example: 180
+          maximum: 3650
+          minimum: 1
+        speedWindowDays:
+          type: integer
+          format: int32
+          example: 90
+          maximum: 365
+          minimum: 30
+        stalledBelowPct:
+          type: number
+          example: 40
+          maximum: 99
+          minimum: 0
+        toleranceDownPct:
+          type: number
+          example: 5
+          maximum: 100
+          minimum: 0
+        toleranceUpPct:
+          type: number
+          example: 5
+          maximum: 100
+          minimum: 0
+      required:
+      - lotCloseExtraSlowingPct
+      - lotCloseExtraStalledPct
+      - minHealthyPiecesMoving
+      - minHealthyPiecesSlowing
+      - minHealthyPiecesStalled
+      - shortPiecePct
+      - slowingBelowPct
+      - slowingCoverDays
+      - speedWindowDays
+      - stalledBelowPct
+      - toleranceDownPct
+      - toleranceUpPct
     UpdateSubcontractOrderRequest:
       type: object
       properties:
