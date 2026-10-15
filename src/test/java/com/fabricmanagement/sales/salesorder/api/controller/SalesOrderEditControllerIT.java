@@ -593,6 +593,7 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
         "SELECT count(*) FROM sales_ord.sales_order WHERE tenant_id = ?", Integer.class, tenantId);
   }
 
+  /** A create request with one line; both tolerance limits are required (Fatih, 2026-10-13). */
   private Map<String, Object> createRequest(Map<String, Object> profile) {
     Map<String, Object> line =
         pairs(
@@ -602,6 +603,10 @@ class SalesOrderEditControllerIT extends SalesOrderEditItSupport {
             100,
             "unit",
             "M",
+            "toleranceUpPct",
+            0,
+            "toleranceDownPct",
+            0,
             "requirementProfile",
             profile);
     return pairs(
