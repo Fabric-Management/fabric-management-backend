@@ -15,8 +15,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Fingerprint of every fact the options depend on (STOCK-PROPOSAL-2): pieces, lots, compatibility
- * evidence, what quotes hold and the lot-health rule. A change makes an earlier proposal stale.
+ * Fingerprint of every fact the options depend on (STOCK-PROPOSAL-2): pieces, lots and their
+ * average piece, compatibility evidence, what quotes hold and the lot-health rule. A change makes
+ * an earlier proposal stale.
  */
 final class EvidenceFingerprint {
 
@@ -34,6 +35,11 @@ final class EvidenceFingerprint {
               .append(lot.widthEvidence())
               .append('#')
               .append(lot.productionDate())
+              .append('#')
+              .append(
+                  lot.averagePiece() == null
+                      ? "-"
+                      : lot.averagePiece().stripTrailingZeros().toPlainString())
               .append(';');
           lot.pieces().stream()
               .sorted(Comparator.comparing(ProposalPiece::stockUnitId))

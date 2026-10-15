@@ -38,9 +38,9 @@ final class StockPools {
   }
 
   /**
-   * The pieces each lot offers to a tier. Free: eligible pieces without a hold, bounded by the
-   * lot's free quantity; a lot whose free quantity cannot be stated offers nothing free. Held:
-   * every eligible piece.
+   * The pieces each lot offers to a tier, each marked short or normal for its lot. Free: eligible
+   * pieces without a hold, bounded by the lot's free quantity; a lot whose free quantity cannot be
+   * stated offers nothing free. Held: every eligible piece.
    */
   static Map<UUID, WholePieceSearch.Lot> pools(EvaluationContext context, Tier tier) {
     Map<UUID, WholePieceSearch.Lot> pools = new LinkedHashMap<>();
@@ -73,7 +73,9 @@ final class StockPools {
         .map(
             piece ->
                 new WholePieceSearch.Piece(
-                    piece.stockUnitId(), QuantityEvaluator.toUnits(piece.canonicalMeasure())))
+                    piece.stockUnitId(),
+                    QuantityEvaluator.toUnits(piece.canonicalMeasure()),
+                    context.isShort(piece)))
         .filter(piece -> piece.units() > 0)
         .toList();
   }

@@ -12,9 +12,12 @@ import java.util.UUID;
 /**
  * The whole-piece searches behind a stock proposal (STOCK-PROPOSAL-2; Fatih, 2026-10-12 to
  * 2026-10-14). A lot is either closed (every pool piece taken) or keeps at least its lot-health
- * minimum of pieces ({@link LotHealthPolicy}, three by default): a computed selection never leaves
- * fewer behind. Among selections the tenant comes first: more lots closed, then older stock, then
- * fewer lots.
+ * minimum of normal pieces ({@link LotHealthPolicy}, three by default); short pieces do not count,
+ * and a lot already under the minimum is closed or left alone. A computed selection never leaves
+ * fewer behind. Among selections the tenant comes first (Fatih, 2026-10-14): a remnant lot closed,
+ * more lots closed, completing from the lot with fewer pieces (measured by the deepest lot taken
+ * from partly), older stock measured by the youngest lot used (an added lot never makes a selection
+ * deeper or older), then fewer lots.
  *
  * <ul>
  *   <li>{@link #bestWithin}: the best selection by that ranking whose total lies in a window; among
@@ -26,11 +29,11 @@ import java.util.UUID;
  * </ul>
  *
  * <p>Every ranking criterion depends only on how each lot is used: not at all, closed, or partly
- * (at least the minimum left). The searches walk these lot patterns depth first and check each
- * against the totals its lots reach together (bitset sums). They are exact, because every allowed
- * selection belongs to one pattern. Among selections that rank the same the first found wins; the
- * choice is deterministic. They refuse instead of answering approximately: above {@link
- * WholePieceSearch#MAX_LOTS}, {@link WholePieceSearch#MAX_PIECES_PER_LOT} or {@link
+ * (at least the minimum of normal pieces left). The searches walk these lot patterns depth first
+ * and check each against the totals its lots reach together (bitset sums). They are exact, because
+ * every allowed selection belongs to one pattern. Among selections that rank the same the first
+ * found wins; the choice is deterministic. They refuse instead of answering approximately: above
+ * {@link WholePieceSearch#MAX_LOTS}, {@link WholePieceSearch#MAX_PIECES_PER_LOT} or {@link
  * WholePieceSearch#MAX_UNITS}, or when the pattern or sum budget runs out.
  */
 public final class ProposalSearch {
@@ -41,14 +44,20 @@ public final class ProposalSearch {
   private ProposalSearch() {}
 
   /**
-   * A lot with its age and the pieces it must keep when it is not closed. {@code ageRank} orders
-   * production dates: lower is older, equal dates share a rank and an unknown date ranks last.
+   * A lot with its age and the normal pieces it must keep when it is not closed. {@code ageRank}
+   * orders production dates: lower is older, equal dates share a rank and an unknown date ranks
+   * last.
    */
   public record SearchLot(WholePieceSearch.Lot lot, int ageRank, int minKeep) {
     public SearchLot {
       if (minKeep < 1) {
         throw new IllegalArgumentException("A lot keeps at least one piece when it is not closed");
       }
+    }
+
+    /** Already under the minimum of normal pieces: closed or left alone, never taken from. */
+    public boolean remnant() {
+      return lot.normalPieces() < minKeep;
     }
 
     /** With the standard lot-health minimum. */
@@ -104,13 +113,18 @@ public final class ProposalSearch {
     PARTIAL
   }
 
-  /** A lot with its reachable totals per use, in normalised units. */
+  /**
+   * A lot with its reachable totals per use, in normalised units. {@code normalOnly} are the sums
+   * of exactly k normal pieces; {@code withShort} the same with any of the short pieces.
+   */
   private record Prepared(
       WholePieceSearch.Lot lot,
       UUID id,
       int ageRank,
       int minKeep,
-      Bits[] byCount,
+      boolean remnant,
+      Bits[] normalOnly,
+      Bits[] withShort,
       Bits closed,
       Bits partial) {
 
@@ -118,26 +132,45 @@ public final class ProposalSearch {
       return lot.pieces().size();
     }
 
+    int normals() {
+      return lot.normalPieces();
+    }
+
     Bits totals(Use use) {
       return use == Use.CLOSED ? closed : partial;
     }
 
-    int piecesTaken(Use use, int total) {
-      int n = pieces();
+    /** How many normal pieces a take of {@code total} needs; the fewest, so more stay. */
+    int normalsTaken(Use use, int total) {
       if (use == Use.CLOSED) {
-        return n;
+        return normals();
       }
-      for (int c = 1; c <= n - minKeep; c++) {
-        if (byCount[c].get(total)) {
-          return c;
+      for (int k = 0; k <= normals() - minKeep; k++) {
+        if (withShort[k].get(total)) {
+          return k;
         }
       }
       throw new IllegalStateException("Proposal reconstruction found no piece count");
     }
   }
 
-  /** What the ranking compares; which parts lead depends on the goal. */
-  private record Key(int total, int closed, int[] ranks, int lots, long distance, boolean below) {
+  /**
+   * What the ranking compares (Fatih, 2026-10-14); which parts lead depends on the goal. {@code
+   * partialSizes} are the pool sizes of the lots taken from partly, largest first; {@code
+   * youngestFirst} the age ranks of the lots used, youngest first. Both compare in order, lower
+   * first, and a list that is a prefix of the other ties: an added lot never counts for or against
+   * on its own, so a selection is as deep as its deepest partial lot and as old as its youngest
+   * lot.
+   */
+  private record Key(
+      int total,
+      int remnantClosed,
+      int closed,
+      int[] partialSizes,
+      int[] youngestFirst,
+      int lots,
+      long distance,
+      boolean below) {
 
     int compareTo(Key other, Goal goal) {
       if (goal == Goal.AT_LEAST && total != other.total) {
@@ -146,13 +179,19 @@ public final class ProposalSearch {
       if (goal == Goal.AT_MOST && total != other.total) {
         return Integer.compare(other.total, total);
       }
+      if (remnantClosed != other.remnantClosed) {
+        return Integer.compare(other.remnantClosed, remnantClosed);
+      }
       if (closed != other.closed) {
         return Integer.compare(other.closed, closed);
       }
-      for (int i = 0; i < Math.min(ranks.length, other.ranks.length); i++) {
-        if (ranks[i] != other.ranks[i]) {
-          return Integer.compare(ranks[i], other.ranks[i]);
-        }
+      int compared = comparePrefix(partialSizes, other.partialSizes);
+      if (compared != 0) {
+        return compared;
+      }
+      compared = comparePrefix(youngestFirst, other.youngestFirst);
+      if (compared != 0) {
+        return compared;
       }
       if (lots != other.lots) {
         return Integer.compare(lots, other.lots);
@@ -161,6 +200,16 @@ public final class ProposalSearch {
         return Long.compare(distance, other.distance);
       }
       return Boolean.compare(below, other.below);
+    }
+
+    /** In order, lower first; a prefix ties. */
+    static int comparePrefix(int[] left, int[] right) {
+      for (int i = 0; i < Math.min(left.length, right.length); i++) {
+        if (left[i] != right[i]) {
+          return Integer.compare(left[i], right[i]);
+        }
+      }
+      return 0;
     }
   }
 
@@ -239,7 +288,7 @@ public final class ProposalSearch {
     Walk walk = new Walk(prepared, goal, low, high, target, sums);
     Bits start = new Bits(size);
     start.set(0);
-    walk.walk(0, start, 0, 0);
+    walk.walk(0, start, 0, 0, 0);
     if (walk.best == null) {
       return Optional.empty();
     }
@@ -252,28 +301,41 @@ public final class ProposalSearch {
         new WholePieceSearch.Lot(
             original.id(),
             original.pieces().stream()
-                .map(piece -> new WholePieceSearch.Piece(piece.id(), piece.units() / scale))
+                .map(
+                    piece ->
+                        new WholePieceSearch.Piece(
+                            piece.id(), piece.units() / scale, piece.shortPiece()))
                 .toList(),
             original.capacity() == WholePieceSearch.Lot.UNLIMITED
                 ? WholePieceSearch.Lot.UNLIMITED
                 : original.capacity() / scale);
-    int n = lot.pieces().size();
-    Bits[] byCount = WholePieceSearch.countSums(lot, size);
+    Bits[] normalOnly = WholePieceSearch.normalCountSums(lot, size, false);
+    Bits[] withShort = WholePieceSearch.normalCountSums(lot, size, true);
     Bits closed = new Bits(size);
     long total = lot.total();
     if (total < size && total <= lot.capacity()) {
       closed.set((int) total);
     }
-    // Partly: at least the lot-health minimum of pieces stays, never fewer.
+    // Partly: at least the lot-health minimum of normal pieces stays, never fewer; any short
+    // pieces may go with them. A lot already under the minimum is never taken from.
     Bits partial = new Bits(size);
-    for (int c = 1; c <= n - source.minKeep(); c++) {
-      partial.or(byCount[c]);
+    for (int k = 0; k <= lot.normalPieces() - source.minKeep(); k++) {
+      partial.or(withShort[k]);
     }
+    partial.clear(0);
     if (lot.capacity() < size - 1) {
       partial.clearFrom((int) lot.capacity() + 1);
     }
     return new Prepared(
-        lot, original.id(), source.ageRank(), source.minKeep(), byCount, closed, partial);
+        lot,
+        original.id(),
+        source.ageRank(),
+        source.minKeep(),
+        source.remnant(),
+        normalOnly,
+        withShort,
+        closed,
+        partial);
   }
 
   /** One depth-first walk over the lot patterns. */
@@ -285,8 +347,8 @@ public final class ProposalSearch {
     private final long target;
     private final long[] sums;
     private final int[] closableFrom;
+    private final int[] remnantClosableFrom;
     private final Use[] uses;
-    private final int[] ranks;
     private long patterns = PATTERN_BUDGET;
     private Key best;
     private Use[] bestUses;
@@ -299,28 +361,36 @@ public final class ProposalSearch {
       this.target = target;
       this.sums = sums;
       this.uses = new Use[lots.size()];
-      this.ranks = new int[lots.size()];
       this.closableFrom = new int[lots.size() + 1];
+      this.remnantClosableFrom = new int[lots.size() + 1];
       for (int i = lots.size() - 1; i >= 0; i--) {
-        closableFrom[i] = closableFrom[i + 1] + (lots.get(i).closed().isEmpty() ? 0 : 1);
+        boolean closable = !lots.get(i).closed().isEmpty();
+        closableFrom[i] = closableFrom[i + 1] + (closable ? 1 : 0);
+        remnantClosableFrom[i] =
+            remnantClosableFrom[i + 1] + (closable && lots.get(i).remnant() ? 1 : 0);
       }
     }
 
-    void walk(int index, Bits reach, int closed, int used) {
+    void walk(int index, Bits reach, int remnantClosed, int closed, int used) {
       if (--patterns < 0) {
         throw new WholePieceSearch.SearchBudgetExceeded();
       }
       if (reach.isEmpty()) {
         return;
       }
-      // In a window the closed lots lead the ranking: a pattern that cannot reach the best's
-      // closed lots cannot beat it.
-      if (goal == Goal.WINDOW && best != null && closed + closableFrom[index] < best.closed()) {
-        return;
+      // In a window the closed lots lead the ranking, remnant lots first: a pattern that cannot
+      // reach the best's closed lots cannot beat it.
+      if (goal == Goal.WINDOW && best != null) {
+        int remnantAtMost = remnantClosed + remnantClosableFrom[index];
+        if (remnantAtMost < best.remnantClosed()
+            || (remnantAtMost == best.remnantClosed()
+                && closed + closableFrom[index] < best.closed())) {
+          return;
+        }
       }
       if (index == lots.size()) {
         if (used > 0) {
-          consider(reach, closed, used);
+          consider(reach, remnantClosed, closed, used);
         }
         return;
       }
@@ -333,15 +403,20 @@ public final class ProposalSearch {
         Bits next = new Bits(reach.size());
         WholePieceSearch.sumset(next, reach, totals, sums);
         uses[index] = use;
-        ranks[used] = lot.ageRank();
-        walk(index + 1, next, closed + (use == Use.CLOSED ? 1 : 0), used + 1);
+        boolean closes = use == Use.CLOSED;
+        walk(
+            index + 1,
+            next,
+            remnantClosed + (closes && lot.remnant() ? 1 : 0),
+            closed + (closes ? 1 : 0),
+            used + 1);
       }
       uses[index] = null;
-      walk(index + 1, reach, closed, used);
+      walk(index + 1, reach, remnantClosed, closed, used);
     }
 
     /** A complete pattern: the total its goal asks for, if the pattern reaches one. */
-    private void consider(Bits reach, int closed, int used) {
+    private void consider(Bits reach, int remnantClosed, int closed, int used) {
       int total =
           switch (goal) {
             case WINDOW -> nearestInWindow(reach);
@@ -354,12 +429,44 @@ public final class ProposalSearch {
       if (total < 0) {
         return;
       }
-      int[] sorted = Arrays.copyOf(ranks, used);
-      Arrays.sort(sorted);
-      Key key = new Key(total, closed, sorted, used, Math.abs(total - target), total < target);
+      int[] partialSizes = new int[used - closed];
+      int[] youngestFirst = new int[used];
+      int partials = 0;
+      int ranked = 0;
+      for (int i = 0; i < lots.size(); i++) {
+        if (uses[i] == null) {
+          continue;
+        }
+        youngestFirst[ranked++] = lots.get(i).ageRank();
+        if (uses[i] == Use.PARTIAL) {
+          partialSizes[partials++] = lots.get(i).pieces();
+        }
+      }
+      Arrays.sort(partialSizes);
+      reverse(partialSizes);
+      Arrays.sort(youngestFirst);
+      reverse(youngestFirst);
+      Key key =
+          new Key(
+              total,
+              remnantClosed,
+              closed,
+              partialSizes,
+              youngestFirst,
+              used,
+              Math.abs(total - target),
+              total < target);
       if (best == null || key.compareTo(best, goal) < 0) {
         best = key;
         bestUses = uses.clone();
+      }
+    }
+
+    private static void reverse(int[] values) {
+      for (int i = 0, j = values.length - 1; i < j; i++, j--) {
+        int swap = values[i];
+        values[i] = values[j];
+        values[j] = swap;
       }
     }
 
@@ -414,10 +521,12 @@ public final class ProposalSearch {
       if (chosen < 0) {
         throw new IllegalStateException("Proposal reconstruction lost its path");
       }
-      int count = lot.piecesTaken(use, chosen);
-      List<UUID> pieceIds = WholePieceSearch.pickPieces(lot.lot(), count, chosen);
+      int normals = lot.normalsTaken(use, chosen);
+      List<UUID> pieceIds =
+          WholePieceSearch.pickPieces(lot.lot(), lot.normalOnly(), normals, chosen);
       takes.add(
-          new WholePieceSearch.LotTake(lot.id(), pieceIds, chosen * scale, lot.pieces() - count));
+          new WholePieceSearch.LotTake(
+              lot.id(), pieceIds, chosen * scale, lot.pieces() - pieceIds.size()));
       remaining -= chosen;
     }
     if (remaining != 0) {

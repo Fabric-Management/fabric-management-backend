@@ -186,8 +186,8 @@ public record QuantityOption(
    * @param remainingQuantity their quantity in the line unit
    * @param unknownPieces pieces of the lot whose suitability is unknown; never counted as pieces
    *     left, as they are not offered piece by piece (Fatih, 2026-10-13)
-   * @param remnant fewer pieces than the lot-health minimum of the pool the option was chosen from
-   *     stay behind
+   * @param remnant some pieces of the pool the option was chosen from stay behind, but fewer normal
+   *     ones than the lot-health minimum (short pieces do not count; Fatih, 2026-10-14)
    * @param remnantPieceIds those pieces
    * @param remnantQuantity their quantity in the line unit
    * @param closesLot the option takes every piece of the lot, so the lot is closed; never claimed

@@ -25,10 +25,12 @@ import java.util.function.Function;
  * reads what quotes hold.
  *
  * <p>Compatibility and the single-lot requirement are prerequisites, and no computed option leaves
- * a lot with fewer pieces than its lot-health minimum (Fatih, 2026-10-13 and 2026-10-14): a lot is
- * closed or keeps at least that many, three by default. Among candidates the tenant comes first
- * ({@link ProposalRanking}): more lots closed, then older stock, then fewer lots, then closeness.
- * The proposal opens at (Fatih, 2026-10-13):
+ * a lot with fewer normal pieces than its lot-health minimum (Fatih, 2026-10-13 and 2026-10-14): a
+ * lot is closed or keeps at least that many, three by default; a piece under 51% of the lot's
+ * average piece is short and does not count, and short pieces go into an order first. Among
+ * candidates the tenant comes first ({@link ProposalRanking}): a remnant lot closed, more lots
+ * closed, completing from the lot with fewer pieces, older stock, fewer lots, then closeness. The
+ * proposal opens at (Fatih, 2026-10-13):
  *
  * <ol>
  *   <li>the best free option meeting the request within the tolerance (the request up to the upper
@@ -42,9 +44,11 @@ import java.util.function.Function;
  * <p>Stock others hold is evaluated only when free stock cannot reach the lower tolerance limit.
  * Beside the opening one, each card the 14 October decision names is listed once: the best below
  * the request, the nearest above it outside the tolerance, nearer pending combinations and held
- * stock. Options outside the tolerance are shown, never withheld. Options are returned in ascending
- * quantity with the opening option's index. Both tolerance limits are required: a missing side is
- * missing information, never read as 0%; the caller refuses to evaluate without them.
+ * stock. Options outside the tolerance are shown, never withheld. Options are returned in the
+ * decided card order (Fatih, 2026-10-14): the salesperson's changed pieces, the opening, above
+ * outside the tolerance, below, pending, held stock; with the opening option's index. Both
+ * tolerance limits are required: a missing side is missing information, never read as 0%; the
+ * caller refuses to evaluate without them.
  *
  * <p>This class is the entry point and the input; the work is split by concern: {@link
  * ProposalEvaluation} searches and lists, {@link OptionBuilder} builds options, {@link
@@ -159,7 +163,7 @@ public final class QuantityEvaluator {
 
   /**
    * Evaluates with the tenant's lot-health rule (Fatih, 2026-10-14): a computed option closes a lot
-   * or leaves it at least {@link LotHealthPolicy#minHealthyPieces()} pieces.
+   * or leaves it at least {@link LotHealthPolicy#minHealthyPieces()} normal pieces.
    */
   public static Evaluation evaluate(Input input, LotHealthPolicy lotHealth) {
     Objects.requireNonNull(lotHealth, "lotHealth");

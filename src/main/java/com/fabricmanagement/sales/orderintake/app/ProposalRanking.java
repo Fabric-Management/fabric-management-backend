@@ -3,58 +3,101 @@ package com.fabricmanagement.sales.orderintake.app;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockSource;
 import com.fabricmanagement.sales.orderintake.domain.proposal.WholePieceSearch;
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * The tenant-first ranking of options (STOCK-PROPOSAL-2; Fatih, 2026-10-12 and 2026-10-13):
- * prerequisites met, free stock, no remnant (only a manual pick can leave one), more lots taken
- * whole, older stock, fewer lots, closer to the request, covering the request, then the pieces
- * themselves. In one place, so the order is read and changed in one place.
+ * The tenant-first ranking of options (STOCK-PROPOSAL-2; Fatih, 2026-10-12 to 2026-10-14):
+ * prerequisites met, free stock, no remnant (only a manual pick can leave one), a remnant lot
+ * closed, more lots closed, completing from the lot with fewer pieces, older stock measured by the
+ * youngest lot used, fewer lots, closer to the request, covering the request, then the pieces
+ * themselves. In one place, so the order is read and changed in one place; the search in {@code
+ * ProposalSearch} ranks its patterns the same way.
  */
 final class ProposalRanking {
 
   private ProposalRanking() {}
 
-  /** An option with what the ranking compares. */
+  /**
+   * An option with what the ranking compares. {@code partialSizes} are the pool sizes of the lots
+   * taken from partly, largest first; {@code youngestFirst} the age ranks of the lots used,
+   * youngest first. Both compare in order, lower first, and a list that is a prefix of the other
+   * ties: an added lot never counts for or against on its own, so an option is as deep as its
+   * deepest partial lot and as old as its youngest lot.
+   */
   record Ranked(
       QuantityOption option,
       boolean definite,
       StockPools.Tier tier,
       int remnantPenalty,
+      int remnantClosed,
       int closedLots,
-      List<Instant> dates,
+      List<Integer> partialSizes,
+      List<Integer> youngestFirst,
       long units,
       String pieceKey) {
 
     /** The same ranking facts with another option (a placement or reasons added). */
     Ranked withOption(QuantityOption newOption) {
       return new Ranked(
-          newOption, definite, tier, remnantPenalty, closedLots, dates, units, pieceKey);
+          newOption,
+          definite,
+          tier,
+          remnantPenalty,
+          remnantClosed,
+          closedLots,
+          partialSizes,
+          youngestFirst,
+          units,
+          pieceKey);
     }
   }
 
-  /** What the ranking compares for an option built from lot takes. */
+  /**
+   * What the ranking compares for an option built from lot takes. {@code pools} are the lots the
+   * takes were chosen from: a lot is a remnant lot when its pool holds fewer normal pieces than the
+   * lot-health minimum.
+   */
   static Ranked rank(
-      QuantityOption option, boolean definite, List<WholePieceSearch.LotTake> takes) {
+      EvaluationContext context,
+      Map<UUID, WholePieceSearch.Lot> pools,
+      QuantityOption option,
+      boolean definite,
+      List<WholePieceSearch.LotTake> takes) {
     // Only a manual pick can leave a remnant; computed selections never do.
     int penalty = option.leavesRemnant() ? 1 : 0;
-    int closed = (int) takes.stream().filter(take -> take.remainingPieces() == 0).count();
-    List<Instant> dates =
-        option.lots().stream()
-            .map(QuantityOption.LotPart::productionDate)
-            .sorted(Comparator.nullsLast(Comparator.naturalOrder()))
-            .toList();
+    int minKeep = context.lotHealth().minHealthyPieces();
+    int remnantClosed = 0;
+    int closed = 0;
+    List<Integer> partialSizes = new ArrayList<>();
+    List<Integer> youngestFirst = new ArrayList<>();
+    for (WholePieceSearch.LotTake take : takes) {
+      WholePieceSearch.Lot pool = pools.get(take.lotId());
+      youngestFirst.add(context.ageRanks().get(take.lotId()));
+      if (take.remainingPieces() == 0) {
+        closed++;
+        if (pool.normalPieces() < minKeep) {
+          remnantClosed++;
+        }
+      } else {
+        partialSizes.add(pool.pieces().size());
+      }
+    }
+    partialSizes.sort(Comparator.reverseOrder());
+    youngestFirst.sort(Comparator.reverseOrder());
     return new Ranked(
         option,
         definite,
         option.source() == StockSource.FREE ? StockPools.Tier.FREE : StockPools.Tier.HELD,
         penalty,
+        remnantClosed,
         closed,
-        dates,
+        List.copyOf(partialSizes),
+        List.copyOf(youngestFirst),
         takes.stream().mapToLong(WholePieceSearch.LotTake::units).sum(),
         pieceKey(takes));
   }
@@ -64,12 +107,42 @@ final class ProposalRanking {
     return Comparator.comparing((Ranked ranked) -> !ranked.definite())
         .thenComparing(Ranked::tier)
         .thenComparingInt(Ranked::remnantPenalty)
+        .thenComparing(Comparator.comparingInt(Ranked::remnantClosed).reversed())
         .thenComparing(Comparator.comparingInt(Ranked::closedLots).reversed())
-        .thenComparing(Ranked::dates, ProposalRanking::compareAges)
+        .thenComparing(Ranked::partialSizes, ProposalRanking::comparePrefix)
+        .thenComparing(Ranked::youngestFirst, ProposalRanking::comparePrefix)
         .thenComparingInt(ranked -> ranked.option().lotCount())
         .thenComparingLong(ranked -> Math.abs(ranked.units() - target))
         .thenComparing(ranked -> ranked.units() < target)
         .thenComparing(Ranked::pieceKey);
+  }
+
+  /**
+   * The order the cards are shown in (Fatih, 2026-10-14): the salesperson's changed pieces, the
+   * opening, then the nearest above outside the tolerance, the best below, pending combinations and
+   * stock others hold; on the same place ascending quantity, then the ranking. Browsing goes from
+   * one card to the next, not from a smaller quantity to a larger one.
+   */
+  static Comparator<Ranked> cardOrder(Comparator<Ranked> tenantFirst) {
+    return Comparator.comparingInt(ProposalRanking::cardPlace)
+        .thenComparingLong(Ranked::units)
+        .thenComparing(tenantFirst);
+  }
+
+  private static int cardPlace(Ranked ranked) {
+    return switch (ranked.option().placement()) {
+      case MANUAL -> 0;
+      case MAIN -> 1;
+      case ABOVE, BELOW -> {
+        if (ranked.tier() == StockPools.Tier.HELD) {
+          yield 5;
+        }
+        if (!ranked.definite()) {
+          yield 4;
+        }
+        yield ranked.option().placement() == QuantityOption.OptionPlacement.ABOVE ? 2 : 3;
+      }
+    };
   }
 
   /** Ascending quantity; the same quantity by the ranking. Also the nearest at or above first. */
@@ -82,11 +155,10 @@ final class ProposalRanking {
     return Comparator.comparingLong(Ranked::units).reversed().thenComparing(tenantFirst);
   }
 
-  /** Older first: production dates compared in order, an unknown date as the youngest. */
-  static int compareAges(List<Instant> left, List<Instant> right) {
-    Comparator<Instant> date = Comparator.nullsLast(Comparator.naturalOrder());
+  /** In order, lower first; a list that is a prefix of the other ties. */
+  static int comparePrefix(List<Integer> left, List<Integer> right) {
     for (int i = 0; i < Math.min(left.size(), right.size()); i++) {
-      int compared = date.compare(left.get(i), right.get(i));
+      int compared = Integer.compare(left.get(i), right.get(i));
       if (compared != 0) {
         return compared;
       }

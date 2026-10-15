@@ -49,8 +49,8 @@ public class OrderIntakeController {
       summary = "Evaluate the requested quantity against whole pieces in stock; reserves nothing",
       description =
           "Free stock first; stock other quotes hold only when free stock has no option within"
-              + " the agreed tolerance. Options come in ascending quantity with the main"
-              + " proposal's index. An optional manual pick is evaluated with the same checks.")
+              + " the agreed tolerance. Options come in the decided card order (changed pieces,"
+              + " main proposal, above, below, pending, held) with the main proposal's index. An optional manual pick is evaluated with the same checks.")
   public ResponseEntity<ApiResponse<QuantityProposalDto>> evaluateLineQuantity(
       @PathVariable UUID orderId,
       @PathVariable UUID lineId,

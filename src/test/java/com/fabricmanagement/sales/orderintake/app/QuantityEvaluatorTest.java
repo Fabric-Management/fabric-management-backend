@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,14 +31,15 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
- * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A04 on the evaluation level (Fatih, 2026-10-12 and
- * 2026-10-13): no computed option leaves one or two pieces in a lot; the proposal opens at the best
- * free option meeting the request within the tolerance (more lots closed, older stock, fewer lots,
- * closeness), else the nearest above, else the best below, else held stock; beside it one card of
- * each kind (2026-10-14): the best below, the nearest above outside the tolerance, pending
- * combinations; no card far below the request only because it closes a lot; quantity order with the
- * opening index; held stock only when free stock cannot reach the lower tolerance limit; the manual
- * pick. Data is fictional.
+ * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A04 on the evaluation level (Fatih, 2026-10-12 to
+ * 2026-10-14): no computed option leaves a lot fewer normal pieces than the minimum, short pieces
+ * not counting and going first; the proposal opens at the best free option meeting the request
+ * within the tolerance (a remnant lot closed, more lots closed, the smaller lot completed from,
+ * older stock, fewer lots, closeness), else the nearest above, else the best below, else held
+ * stock; beside it one card of each kind: the best below, the nearest above outside the tolerance,
+ * pending combinations; no card far below the request only because it closes a lot; quantity order
+ * with the opening index; held stock only when free stock cannot reach the lower tolerance limit;
+ * the manual pick. Data is fictional.
  */
 class QuantityEvaluatorTest {
 
@@ -142,7 +142,7 @@ class QuantityEvaluatorTest {
     assertThat(main(result).quantity()).isEqualByComparingTo("700");
     assertThat(main(result).batchIds()).containsExactly(p2);
     assertThat(main(result).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
-    assertThat(quantities(result)).containsExactly("600", "700");
+    assertThat(quantities(result)).containsExactly("700", "600");
     assertThat(byQuantity(result, "600").batchIds()).containsExactly(p2);
   }
 
@@ -238,28 +238,45 @@ class QuantityEvaluatorTest {
                 .tolerance("20", "20"));
 
     // 400 and 500 m would leave two or one piece in a lot; they are not offered.
-    assertThat(quantities(result)).containsExactly("300", "600");
+    assertThat(quantities(result)).containsExactly("600", "300");
     assertThat(main(result).quantity()).isEqualByComparingTo("600");
     assertThat(main(result).compatibility()).isEqualTo(Compatibility.CONFIRMED);
     assertThat(main(result).lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
     assertThat(byQuantity(result, "300").placement()).isEqualTo(OptionPlacement.BELOW);
-    assertThat(result.mainOptionIndex()).isEqualTo(1);
+    assertThat(result.mainOptionIndex()).isZero();
   }
 
-  // ── Quantity order and the main index ────────────────────────────────────
+  // ── Card order and the main index (Fatih, 2026-10-14) ─────────────────────
 
   @Test
-  void optionsAreInAscendingQuantity_andTheMainMaySitInTheMiddle() {
-    var result = evaluate(spec("200").lots(lot(p1, "P1", null, 120, 110, 90, 60)));
+  void theOpeningComesFirst_thenTheOtherCardsInTheDecidedOrder_notByQuantity() {
+    var result =
+        evaluate(
+            spec("450")
+                .lots(lot(p1, "P1", null, 100, 100, 100, 100, 100, 100))
+                .tolerance("5", "5"));
 
-    List<BigDecimal> ordered = result.options().stream().map(QuantityOption::quantity).toList();
-    List<BigDecimal> sorted = new ArrayList<>(ordered);
-    Collections.sort(sorted);
-    assertThat(ordered).isEqualTo(sorted);
-    assertThat(result.mainOptionIndex()).isNotNull();
-    assertThat(result.options().get(result.mainOptionIndex()).placement())
-        .isEqualTo(OptionPlacement.MAIN);
-    assertThat(result.options()).filteredOn(o -> o.placement() == OptionPlacement.MAIN).hasSize(1);
+    // The opening closes the lot at 600 m; the best below keeps three pieces at 300 m.
+    assertThat(result.mainOptionIndex()).isZero();
+    assertThat(quantities(result)).containsExactly("600", "300");
+    assertThat(result.options())
+        .extracting(QuantityOption::placement)
+        .containsExactly(OptionPlacement.MAIN, OptionPlacement.BELOW);
+  }
+
+  @Test
+  void changedPiecesComeFirst_andTheOpeningRightAfter() {
+    ProposalLot six = lot(p1, "P1", null, 100, 100, 100, 100, 100, 100);
+    UUID[] two =
+        six.pieces().subList(0, 2).stream().map(ProposalPiece::stockUnitId).toArray(UUID[]::new);
+
+    var result = evaluate(spec("450").lots(six).tolerance("5", "5").manual(two));
+
+    assertThat(result.options())
+        .extracting(QuantityOption::placement)
+        .containsExactly(OptionPlacement.MANUAL, OptionPlacement.MAIN, OptionPlacement.BELOW);
+    assertThat(quantities(result)).containsExactly("200", "600", "300");
+    assertThat(result.mainOptionIndex()).isEqualTo(1);
   }
 
   @Test
@@ -651,7 +668,7 @@ class QuantityEvaluatorTest {
     // best below keeps five.
     QuantityEvaluationResult result = QuantityEvaluator.evaluate(spec.input(), keepFive).result();
 
-    assertThat(quantities(result)).containsExactly("300", "800");
+    assertThat(quantities(result)).containsExactly("800", "300");
     assertThat(main(result).quantity()).isEqualByComparingTo("800");
     assertThat(main(result).lots().getFirst().closesLot()).isTrue();
     assertThat(byQuantity(result, "300").lots().getFirst().remainingEligiblePieces()).isEqualTo(5);
@@ -677,6 +694,110 @@ class QuantityEvaluatorTest {
     assertThat(manual.leavesRemnant()).isTrue();
     assertThat(manual.lots().getFirst().remnantPieceIds()).hasSize(4);
     assertThat(manual.needsRemnantAcknowledgement()).isTrue();
+  }
+
+  // ── Short pieces (Fatih, 2026-10-14) ─────────────────────────────────────
+
+  @Test
+  void fatihsExample_closingTheRemnantLotOpens_beforeTheExactQuantity() {
+    // 700 m with 5%: LOT-A 40 + 30 + 55 m of a lot whose pieces averaged 100 m as produced, so
+    // 40 and 30 m are short and 55 m is its only normal piece; LOT-B 20 × 100 m. LOT-B alone gives
+    // 700 m exactly; closing LOT-A with six pieces of LOT-B gives 725 m and opens. The exact
+    // 700 m is a second option within the tolerance, not a card.
+    UUID lotA = new UUID(0, 31);
+    UUID lotB = new UUID(0, 32);
+    double[] twenty = new double[20];
+    java.util.Arrays.fill(twenty, 100);
+    var result =
+        evaluate(
+            spec("700")
+                .lots(
+                    lot(lotA, "LOT-A", NEW, new BigDecimal("100"), 40, 30, 55),
+                    lot(lotB, "LOT-B", OLD, twenty))
+                .confirmed(Set.of(lotA, lotB))
+                .tolerance("5", "5"));
+
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("725");
+    assertThat(part(opening, lotA).closesLot()).isTrue();
+    assertThat(part(opening, lotB).remainingEligiblePieces()).isEqualTo(14);
+    assertThat(quantities(result)).containsExactly("725", "625");
+    assertThat(byQuantity(result, "625").placement()).isEqualTo(OptionPlacement.BELOW);
+  }
+
+  @Test
+  void aShortPieceGoesFirst_andNeverCountsAsKept() {
+    // 100 + 100 + 100 + 100 + 40 m; the pieces at hand average 88 m, so 40 m is short.
+    ProposalLot lot = lot(p1, "P1", OLD, 100, 100, 100, 100, 40);
+    UUID shortPiece = lot.pieces().get(4).stockUnitId();
+
+    var oneForty = evaluate(spec("140").lots(lot));
+    var twoHundred = evaluate(spec("200").lots(lot).tolerance("0", "0"));
+
+    assertThat(main(oneForty).quantity()).isEqualByComparingTo("140");
+    assertThat(main(oneForty).lots().getFirst().pieceIds()).contains(shortPiece);
+    assertThat(main(oneForty).lots().getFirst().remnant()).isFalse();
+    // 200 m would leave 100 + 100 + 40: two normal pieces, under the minimum. The lot closes.
+    assertThat(main(twoHundred).quantity()).isEqualByComparingTo("440");
+    assertThat(quantities(twoHundred)).containsExactly("440", "140");
+  }
+
+  @Test
+  void aManualPickLeavingOnlyShortPieces_leavesARemnant() {
+    ProposalLot lot = lot(p1, "P1", OLD, new BigDecimal("100"), 100, 100, 100, 40);
+    UUID[] normal =
+        lot.pieces().subList(0, 3).stream().map(ProposalPiece::stockUnitId).toArray(UUID[]::new);
+
+    var result = evaluate(spec("300").lots(lot).manual(normal));
+
+    QuantityOption manual =
+        result.options().stream()
+            .filter(option -> option.placement() == OptionPlacement.MANUAL)
+            .findFirst()
+            .orElseThrow();
+    assertThat(manual.leavesRemnant()).isTrue();
+    assertThat(manual.lots().getFirst().remnantPieceIds())
+        .containsExactly(lot.pieces().get(3).stockUnitId());
+    assertThat(manual.lots().getFirst().remnantQuantity()).isEqualByComparingTo("40");
+    // The computed option takes the short piece along and closes the lot.
+    assertThat(main(result).quantity()).isEqualByComparingTo("340");
+  }
+
+  @Test
+  void theAveragePieceAsProducedDecidesWhatIsShort_andIsPartOfTheEvidence() {
+    // At hand 4 × 100 + 2 × 60 m. Over the pieces at hand (87 m) no piece is short: 200 m takes
+    // two 100 m pieces and keeps four. As produced the lot averaged 150 m, so the 60 m pieces are
+    // short: two 100 m pieces would leave two normal ones, and 220 m takes the short pieces first.
+    var atHand = spec("200").lots(lot(p1, "P1", OLD, 100, 100, 100, 100, 60, 60));
+    var asProduced =
+        spec("200").lots(lot(p1, "P1", OLD, new BigDecimal("150"), 100, 100, 100, 100, 60, 60));
+
+    assertThat(main(evaluate(atHand)).quantity()).isEqualByComparingTo("200");
+    assertThat(main(evaluate(asProduced)).quantity()).isEqualByComparingTo("220");
+    assertThat(main(evaluate(asProduced)).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
+    assertThat(QuantityEvaluator.evaluate(asProduced.input()).evidenceFingerprint())
+        .isNotEqualTo(QuantityEvaluator.evaluate(atHand.input()).evidenceFingerprint());
+  }
+
+  @Test
+  void anAddedLotNeverMakesAnOptionOlder_the665Case() {
+    // 700 m with 5%. The newer lot alone gives 700 m. A 35 m short piece of the older lot with
+    // 700 m of the newer gives 735 m, and 100 m of it with 600 m gives 700 m: each adds a lot,
+    // which is not older stock, and loses on fewer lots. The older lot is too deep to close
+    // within the tolerance.
+    UUID older = new UUID(0, 41);
+    UUID newer = new UUID(0, 42);
+    var result =
+        evaluate(
+            spec("700")
+                .lots(
+                    lot(older, "OLDER", OLD, 35, 100, 100, 100, 100, 100, 100, 100, 100),
+                    lot(newer, "NEWER", NEW, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100))
+                .confirmed(Set.of(older, newer))
+                .tolerance("5", "5"));
+
+    assertThat(main(result).quantity()).isEqualByComparingTo("700");
+    assertThat(main(result).batchIds()).containsExactly(newer);
   }
 
   @Test
@@ -847,6 +968,20 @@ class QuantityEvaluatorTest {
         "M",
         WidthEvidence.NOT_REQUIRED,
         eligible(id, metres));
+  }
+
+  /** A lot that knows its average piece as produced. */
+  private static ProposalLot lot(
+      UUID id, String lotNo, Instant produced, BigDecimal averagePiece, double... metres) {
+    return new ProposalLot(
+        id,
+        lotNo,
+        produced,
+        PrimaryMeasure.LENGTH,
+        "M",
+        WidthEvidence.NOT_REQUIRED,
+        eligible(id, metres),
+        averagePiece);
   }
 
   /** A lot of named pieces and further eligible ones. */

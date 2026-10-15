@@ -45427,10 +45427,11 @@ paths:
       - Order Intake
   /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-proposals:
     post:
-      description: Free stock first; stock other quotes hold only when free stock
-        has no option within the agreed tolerance. Options come in ascending quantity
-        with the main proposal's index. An optional manual pick is evaluated with
-        the same checks.
+      description: "Free stock first; stock other quotes hold only when free stock\
+        \ has no option within the agreed tolerance. Options come in the decided card\
+        \ order (changed pieces, main proposal, above, below, pending, held) with\
+        \ the main proposal's index. An optional manual pick is evaluated with the\
+        \ same checks."
       operationId: evaluateLineQuantity
       parameters:
       - in: path
@@ -49892,12 +49893,13 @@ paths:
     post:
       description: "Evaluates the line exactly as a saved line with the same inputs\
         \ would be evaluated: free stock first, stock other quotes hold only when\
-        \ free stock has no option within the agreed tolerance, options in ascending\
-        \ quantity with the main proposal's index. Each option states what other quotes\
-        \ hold that it would take and whether it can be applied; an optional manual\
-        \ pick is evaluated with the same checks. Guidance for the salesperson only:\
-        \ nothing is reserved or recorded. A free quantity that cannot be determined\
-        \ is null with its reasons."
+        \ free stock has no option within the agreed tolerance, options in the decided\
+        \ card order (changed pieces, main proposal, above, below, pending, held)\
+        \ with the main proposal's index. Each option states what other quotes hold\
+        \ that it would take and whether it can be applied; an optional manual pick\
+        \ is evaluated with the same checks. Guidance for the salesperson only: nothing\
+        \ is reserved or recorded. A free quantity that cannot be determined is null\
+        \ with its reasons."
       operationId: previewOrderIntakeStock
       requestBody:
         content:
@@ -79519,8 +79521,8 @@ components:
           type: number
         remnant:
           type: boolean
-          description: One or two pieces of the pool stay in the lot (a manual pick
-            only)
+          description: "Pieces stay in the lot, but fewer normal ones than the lot-health\
+            \ minimum (a manual pick only)"
         remnantQuantity:
           type:
           - number

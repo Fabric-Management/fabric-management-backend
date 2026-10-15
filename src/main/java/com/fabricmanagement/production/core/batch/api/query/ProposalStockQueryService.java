@@ -24,6 +24,7 @@ import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnit
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitCutRepository;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
@@ -317,7 +318,34 @@ public class ProposalStockQueryService {
             measure,
             resolution.get().primaryUnit(),
             lotWidth,
-            pieces));
+            pieces,
+            averagePieceAsProduced(units, measure)));
+  }
+
+  /**
+   * The lot's average piece as produced (Fatih, 2026-10-14): the pieces' quantities when they were
+   * made, over every piece of the lot, shipped ones included, so the average does not fall as
+   * normal pieces are sold. Null when no piece states one; the evaluation then averages the pieces
+   * at hand.
+   */
+  private BigDecimal averagePieceAsProduced(List<StockUnit> units, PrimaryMeasure measure) {
+    List<BigDecimal> made =
+        units.stream()
+            .map(
+                unit ->
+                    measure == PrimaryMeasure.LENGTH
+                        ? measureService.toCanonical(
+                            unit.getLength(), unit.getLengthUnit(), measure)
+                        : measureService.toCanonical(
+                            unit.getInitialWeight(), unit.getUnit(), measure))
+            .flatMap(Optional::stream)
+            .filter(value -> value.signum() > 0)
+            .toList();
+    if (made.isEmpty()) {
+      return null;
+    }
+    BigDecimal total = made.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    return total.divide(BigDecimal.valueOf(made.size()), MathContext.DECIMAL64);
   }
 
   private ProposalPiece toPiece(
@@ -466,6 +494,12 @@ public class ProposalStockQueryService {
 
   public record ProposalStock(List<ProposalLot> lots, List<Set<UUID>> confirmedCompatibleGroups) {}
 
+  /**
+   * A candidate lot and its pieces at hand.
+   *
+   * @param averagePiece the lot's average piece as produced, in the canonical unit; null when
+   *     unknown, and then the pieces at hand give the average
+   */
   public record ProposalLot(
       UUID batchId,
       String lotNo,
@@ -473,7 +507,21 @@ public class ProposalStockQueryService {
       PrimaryMeasure measure,
       String canonicalUnit,
       WidthEvidence widthEvidence,
-      List<ProposalPiece> pieces) {}
+      List<ProposalPiece> pieces,
+      BigDecimal averagePiece) {
+
+    /** A lot whose average piece as produced is unknown. */
+    public ProposalLot(
+        UUID batchId,
+        String lotNo,
+        Instant productionDate,
+        PrimaryMeasure measure,
+        String canonicalUnit,
+        WidthEvidence widthEvidence,
+        List<ProposalPiece> pieces) {
+      this(batchId, lotNo, productionDate, measure, canonicalUnit, widthEvidence, pieces, null);
+    }
+  }
 
   public record ProposalPiece(
       UUID stockUnitId,

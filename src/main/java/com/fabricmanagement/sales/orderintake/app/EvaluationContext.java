@@ -15,9 +15,13 @@ import java.util.UUID;
 
 /**
  * The facts one evaluation works from (STOCK-PROPOSAL-2): the input, the lots in age order, every
- * piece and lot by id, the agreed tolerance as a window of search units, the lots' age ranks and
- * what each lot gives free. Built once; read by the search, the option builder, the held-stock view
- * and the reasons.
+ * piece and lot by id, the agreed tolerance as a window of search units, the lots' age ranks, each
+ * lot's average piece and what each lot gives free. Built once; read by the search, the option
+ * builder, the held-stock view and the reasons.
+ *
+ * @param averagePieces each lot's average piece in the canonical unit (Fatih, 2026-10-14): as
+ *     produced when the lot knows it, else over the pieces at hand; absent when no piece has a
+ *     measure, and then no piece of the lot is short
  */
 record EvaluationContext(
     QuantityEvaluator.Input input,
@@ -31,7 +35,8 @@ record EvaluationContext(
     Map<UUID, ProposalPiece> piecesById,
     Map<UUID, UUID> lotOfPiece,
     Map<UUID, StockPools.LotFree> free,
-    Map<UUID, Integer> ageRanks) {
+    Map<UUID, Integer> ageRanks,
+    Map<UUID, BigDecimal> averagePieces) {
 
   static final BigDecimal HUNDRED = new BigDecimal("100");
 
@@ -45,6 +50,7 @@ record EvaluationContext(
     Map<UUID, ProposalPiece> piecesById = new LinkedHashMap<>();
     Map<UUID, UUID> lotOfPiece = new LinkedHashMap<>();
     Map<UUID, StockPools.LotFree> free = new LinkedHashMap<>();
+    Map<UUID, BigDecimal> averagePieces = new LinkedHashMap<>();
     for (ProposalLot lot : lots) {
       lotsById.put(lot.batchId(), lot);
       for (ProposalPiece piece : lot.pieces()) {
@@ -52,6 +58,17 @@ record EvaluationContext(
         lotOfPiece.put(piece.stockUnitId(), lot.batchId());
       }
       free.put(lot.batchId(), StockPools.lotFree(input, lot));
+      BigDecimal average =
+          lot.averagePiece() != null
+              ? lot.averagePiece()
+              : LotHealthPolicy.averagePiece(
+                  lot.pieces().stream()
+                      .map(ProposalPiece::canonicalMeasure)
+                      .filter(Objects::nonNull)
+                      .toList());
+      if (average != null) {
+        averagePieces.put(lot.batchId(), average);
+      }
     }
     // The agreed tolerance as a window of search units around the target.
     BigDecimal units = BigDecimal.valueOf(target);
@@ -94,7 +111,16 @@ record EvaluationContext(
         piecesById,
         lotOfPiece,
         free,
-        ageRanks);
+        ageRanks,
+        averagePieces);
+  }
+
+  /** The piece is short for its lot: under the short-piece share of the lot's average piece. */
+  boolean isShort(ProposalPiece piece) {
+    BigDecimal average = averagePieces.get(lotOfPiece.get(piece.stockUnitId()));
+    return average != null
+        && piece.canonicalMeasure() != null
+        && lotHealth.isShort(piece.canonicalMeasure(), average);
   }
 
   /** A canonical quantity in the line unit. */

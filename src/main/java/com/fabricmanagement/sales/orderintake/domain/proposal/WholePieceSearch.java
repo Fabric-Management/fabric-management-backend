@@ -13,9 +13,12 @@ import java.util.UUID;
  * Pieces are never cut. A lot may carry a capacity: no take from it exceeds that quantity (free
  * stock net of quote intents, STOCK-PROPOSAL-2). The searches live in {@link ProposalSearch}.
  *
- * <p>What a lot may keep is the lot-health rule's to say ({@code LotHealthPolicy}); a take only
- * records how many pool pieces it leaves. Limits are refused, never answered approximately: above
- * {@link #MAX_PIECES_PER_LOT} pieces in a lot, {@link #MAX_LOTS} lots or {@link #MAX_UNITS} units.
+ * <p>A piece is normal or short; the caller says which ({@code LotHealthPolicy}, Fatih,
+ * 2026-10-14). The sums of a lot are kept by the number of normal pieces taken, with any of its
+ * short pieces: what a lot may keep is counted in normal pieces, and short pieces go first. A take
+ * only records how many pool pieces it leaves. Limits are refused, never answered approximately:
+ * above {@link #MAX_PIECES_PER_LOT} pieces in a lot, {@link #MAX_LOTS} lots or {@link #MAX_UNITS}
+ * units.
  */
 public final class WholePieceSearch {
 
@@ -26,11 +29,17 @@ public final class WholePieceSearch {
 
   private WholePieceSearch() {}
 
-  public record Piece(UUID id, long units) {
+  /** A piece; {@code shortPiece} when it is under the short-piece share of its lot's average. */
+  public record Piece(UUID id, long units, boolean shortPiece) {
     public Piece {
       if (id == null || units <= 0) {
         throw new IllegalArgumentException("A piece needs an id and a positive quantity");
       }
+    }
+
+    /** A normal piece. */
+    public Piece(UUID id, long units) {
+      this(id, units, false);
     }
   }
 
@@ -54,6 +63,11 @@ public final class WholePieceSearch {
 
     public long total() {
       return pieces.stream().mapToLong(Piece::units).sum();
+    }
+
+    /** How many of the pieces are normal, not short. */
+    public int normalPieces() {
+      return (int) pieces.stream().filter(piece -> !piece.shortPiece()).count();
     }
 
     /** What may be taken from the lot at most. */
@@ -89,15 +103,28 @@ public final class WholePieceSearch {
 
   static final class SearchBudgetExceeded extends RuntimeException {}
 
-  static Bits[] countSums(Lot lot, int size) {
-    int n = lot.pieces().size();
+  /**
+   * The sums of exactly {@code k} of the lot's normal pieces, for every k, when {@code withShort}
+   * is false; with any of its short pieces added when it is true.
+   */
+  static Bits[] normalCountSums(Lot lot, int size, boolean withShort) {
+    List<Piece> normal = lot.pieces().stream().filter(piece -> !piece.shortPiece()).toList();
+    int n = normal.size();
     Bits[] byCount = new Bits[n + 1];
     for (int c = 0; c <= n; c++) {
       byCount[c] = new Bits(size);
     }
     byCount[0].set(0);
+    if (withShort) {
+      // Any subset of the short pieces, before a normal piece is counted.
+      for (Piece piece : lot.pieces()) {
+        if (piece.shortPiece()) {
+          byCount[0].orShifted(byCount[0].copy(), piece.units());
+        }
+      }
+    }
     int processed = 0;
-    for (Piece piece : lot.pieces()) {
+    for (Piece piece : normal) {
       for (int c = processed; c >= 0; c--) {
         byCount[c + 1].orShifted(byCount[c], piece.units());
       }
@@ -117,10 +144,56 @@ public final class WholePieceSearch {
     }
   }
 
-  /** Depth-first choice of exactly {@code count} pieces summing to {@code sum}, bounded. */
-  static List<UUID> pickPieces(Lot lot, int count, long sum) {
+  /**
+   * The pieces of a take of exactly {@code normalCount} normal pieces summing to {@code sum} with
+   * some of the short pieces: short pieces first (Fatih, 2026-10-14), each taken when the rest of
+   * the sum stays reachable, smallest first so as many as possible go; then a bounded depth-first
+   * choice of the normal pieces. {@code normalSums} are the sums of exactly k normal pieces, by k.
+   * The sum must be reachable, as the search found it.
+   */
+  static List<UUID> pickPieces(Lot lot, Bits[] normalSums, int normalCount, long sum) {
+    List<Piece> shortPieces =
+        lot.pieces().stream()
+            .filter(Piece::shortPiece)
+            .sorted(Comparator.comparingLong(Piece::units).thenComparing(Piece::id))
+            .toList();
+    Bits normal = normalSums[normalCount];
+    // Any subset of the short pieces from index i on.
+    Bits[] shortSuffix = new Bits[shortPieces.size() + 1];
+    shortSuffix[shortPieces.size()] = new Bits(normal.size());
+    shortSuffix[shortPieces.size()].set(0);
+    for (int i = shortPieces.size() - 1; i >= 0; i--) {
+      shortSuffix[i] = shortSuffix[i + 1].copy();
+      shortSuffix[i].orShifted(shortSuffix[i + 1], shortPieces.get(i).units());
+    }
+    List<UUID> chosen = new ArrayList<>();
+    long remaining = sum;
+    for (int i = 0; i < shortPieces.size(); i++) {
+      long units = shortPieces.get(i).units();
+      if (units <= remaining && reachable(normal, shortSuffix[i + 1], remaining - units)) {
+        chosen.add(shortPieces.get(i).id());
+        remaining -= units;
+      }
+    }
+    chosen.addAll(pickNormal(lot, normalCount, remaining));
+    return chosen.stream().sorted().toList();
+  }
+
+  /** {@code need} is some sum of {@code normal} plus some sum of {@code shortLeft}. */
+  private static boolean reachable(Bits normal, Bits shortLeft, long need) {
+    for (int s = shortLeft.nextSetBit(0); s >= 0 && s <= need; s = shortLeft.nextSetBit(s + 1)) {
+      if (normal.get((int) (need - s))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Depth-first choice of exactly {@code count} normal pieces summing to {@code sum}, bounded. */
+  private static List<UUID> pickNormal(Lot lot, int count, long sum) {
     List<Piece> sorted =
         lot.pieces().stream()
+            .filter(piece -> !piece.shortPiece())
             .sorted(Comparator.comparingLong(Piece::units).reversed().thenComparing(Piece::id))
             .toList();
     int n = sorted.size();
@@ -135,7 +208,7 @@ public final class WholePieceSearch {
     if (!dfs(values, suffix, 0, count, sum, chosen, failed, budget)) {
       throw new SearchBudgetExceeded();
     }
-    return chosen.stream().map(index -> sorted.get(index).id()).sorted().toList();
+    return chosen.stream().map(index -> sorted.get(index).id()).toList();
   }
 
   private static boolean dfs(
@@ -198,6 +271,12 @@ public final class WholePieceSearch {
 
     boolean get(int index) {
       return index >= 0 && index < size && (words[index >>> 6] & (1L << (index & 63))) != 0;
+    }
+
+    void clear(int index) {
+      if (index >= 0 && index < size) {
+        words[index >>> 6] &= ~(1L << (index & 63));
+      }
     }
 
     boolean isEmpty() {

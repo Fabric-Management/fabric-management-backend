@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsUnavailableException;
 import com.fabricmanagement.inventory.lothealth.domain.LotHealthSettings;
+import com.fabricmanagement.inventory.lothealth.domain.ProductSpeed;
 import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQueryService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
@@ -109,7 +110,8 @@ class OrderIntakeStockPreviewServiceTest {
             toneAcceptances,
             proposals,
             Clock.fixed(NOW, ZoneOffset.UTC),
-            tenant -> LotHealthSettings.STANDARD);
+            tenant -> LotHealthSettings.STANDARD,
+            (tenant, product, colour) -> ProductSpeed.MOVING);
     service = new OrderIntakeStockPreviewService(evaluations, stockQuery, quoteScopes);
     order = SalesOrder.builder().tradingPartnerId(customerId).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
@@ -356,7 +358,8 @@ class OrderIntakeStockPreviewServiceTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             tenant -> {
               throw new LotHealthSettingsUnavailableException(tenant, new RuntimeException("db"));
-            });
+            },
+            (tenant, product, colour) -> ProductSpeed.MOVING);
     OrderIntakeStockPreviewService preview =
         new OrderIntakeStockPreviewService(unreadable, stockQuery, quoteScopes);
 

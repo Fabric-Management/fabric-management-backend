@@ -31,9 +31,12 @@ public record ProposalReason(Code code, BigDecimal quantity, Integer count, Inst
      * so held stock is shown; one may exist.
      */
     FREE_STOCK_NOT_FOUND,
-    /** A listed option (a manual pick) leaves one or two pieces in a lot; this one does not. */
+    /** A listed option (a manual pick) leaves a remnant in a lot; this one does not. */
     NO_REMNANT,
-    /** {@code count} pieces (one or two) of {@code quantity} stay in a lot; a manual pick only. */
+    /**
+     * {@code count} pieces of {@code quantity} stay in a lot, fewer normal ones than the lot-health
+     * minimum; a manual pick only.
+     */
     LEAVES_REMNANT,
     /** {@code count} lots are taken whole. */
     CLOSES_LOTS,

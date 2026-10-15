@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * A recorded quantity proposal for one line (SOI D2, STOCK-PROPOSAL-2). Options are whole-piece
- * selections in ascending quantity; the request itself is never changed by a proposal.
+ * selections in the decided card order; the request itself is never changed by a proposal.
  */
 @Schema(name = "QuantityProposal")
 @JsonInclude(JsonInclude.Include.ALWAYS)
@@ -203,7 +203,9 @@ public record QuantityProposalDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unknownPieces,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
-              description = "One or two pieces of the pool stay in the lot (a manual pick only)")
+              description =
+                  "Pieces stay in the lot, but fewer normal ones than the lot-health minimum"
+                      + " (a manual pick only)")
           boolean remnant,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,

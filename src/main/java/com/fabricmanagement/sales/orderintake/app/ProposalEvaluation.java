@@ -108,7 +108,7 @@ final class ProposalEvaluation {
   /** The tenant-first ranking. */
   private final Comparator<Ranked> tenantFirst;
 
-  /** Ascending quantity; same quantity by the tenant-first ranking. */
+  /** The decided card order: changed pieces, opening, above, below, pending, held. */
   private final Comparator<Ranked> listedOrder;
 
   /** The nearest at or above the request first, then the ranking. */
@@ -125,7 +125,7 @@ final class ProposalEvaluation {
     this.windowLow = context.windowLow();
     this.windowHigh = context.windowHigh();
     this.tenantFirst = ProposalRanking.tenantFirst(target);
-    this.listedOrder = ProposalRanking.ascending(tenantFirst);
+    this.listedOrder = ProposalRanking.cardOrder(tenantFirst);
     this.aboveOrder = ProposalRanking.ascending(tenantFirst);
     this.belowOrder = ProposalRanking.descending(tenantFirst);
   }
@@ -252,7 +252,7 @@ final class ProposalEvaluation {
    * or above it, the best below it within the tolerance and the nearest below it. A pending
    * combination is kept only when it uses several lots no definite group covers and is nearer to
    * the request than the definite options on its side (SOI S05). No computed selection leaves a lot
-   * with fewer pieces than its lot-health minimum.
+   * with fewer normal pieces than its lot-health minimum.
    */
   private Found candidates(Tier tier, List<Run> runs) {
     Map<UUID, WholePieceSearch.Lot> pools = StockPools.pools(context, tier);
@@ -278,22 +278,22 @@ final class ProposalEvaluation {
       }
       if (run.definite()) {
         found(ProposalSearch.bestWithin(runLots, target, windowHigh, target))
-            .ifPresent(selection -> covering.add(ranked(run, selection)));
+            .ifPresent(selection -> covering.add(ranked(run, pools, selection)));
         found(ProposalSearch.smallestFrom(runLots, target))
-            .ifPresent(selection -> above.add(ranked(run, selection)));
+            .ifPresent(selection -> above.add(ranked(run, pools, selection)));
         if (windowLow < target) {
           found(ProposalSearch.bestWithin(runLots, windowLow, target - 1, target))
-              .ifPresent(selection -> shortWithin.add(ranked(run, selection)));
+              .ifPresent(selection -> shortWithin.add(ranked(run, pools, selection)));
         }
         found(ProposalSearch.largestUpTo(runLots, target - 1))
-            .ifPresent(selection -> below.add(ranked(run, selection)));
+            .ifPresent(selection -> below.add(ranked(run, pools, selection)));
       } else {
         found(ProposalSearch.smallestFrom(runLots, target))
             .filter(selection -> severalUncoveredLots(selection, runs))
-            .ifPresent(selection -> pendingAbove.add(ranked(run, selection)));
+            .ifPresent(selection -> pendingAbove.add(ranked(run, pools, selection)));
         found(ProposalSearch.largestUpTo(runLots, target - 1))
             .filter(selection -> severalUncoveredLots(selection, runs))
-            .ifPresent(selection -> pendingBelow.add(ranked(run, selection)));
+            .ifPresent(selection -> pendingBelow.add(ranked(run, pools, selection)));
       }
     }
     List<Ranked> pending = new ArrayList<>();
@@ -325,15 +325,17 @@ final class ProposalEvaluation {
         && runs.stream().filter(Run::definite).noneMatch(run -> run.lots().containsAll(used));
   }
 
-  private Ranked ranked(Run run, WholePieceSearch.Selection selection) {
+  private Ranked ranked(
+      Run run, Map<UUID, WholePieceSearch.Lot> pools, WholePieceSearch.Selection selection) {
     QuantityOption option =
         OptionBuilder.option(
             context,
+            pools,
             "S:" + ProposalRanking.pieceKey(selection.takes()),
             selection.takes(),
             run.compatibility(),
             run.definite() ? null : BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED);
-    return ProposalRanking.rank(option, run.definite(), selection.takes());
+    return ProposalRanking.rank(context, pools, option, run.definite(), selection.takes());
   }
 
   // ---------------------------------------------------------------- manual pick
@@ -354,6 +356,7 @@ final class ProposalEvaluation {
   /**
    * The salesperson's pick with the same checks: the single-lot requirement, lot compatibility,
    * holds and the remnant rule over the pool it was taken from (free when it fits free stock).
+   * Short pieces it leaves behind do not count as kept.
    */
   private Ranked manual() {
     Map<UUID, List<UUID>> byLot = new LinkedHashMap<>();
@@ -408,8 +411,8 @@ final class ProposalEvaluation {
     }
     QuantityOption option =
         OptionBuilder.option(
-                context, "M:" + ProposalRanking.pieceKey(takes), takes, compatibility, block)
+                context, pools, "M:" + ProposalRanking.pieceKey(takes), takes, compatibility, block)
             .as(OptionPlacement.MANUAL);
-    return ProposalRanking.rank(option, block == null, takes);
+    return ProposalRanking.rank(context, pools, option, block == null, takes);
   }
 }

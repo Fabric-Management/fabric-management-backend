@@ -17,9 +17,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The proposal searches (STOCK-PROPOSAL-2; Fatih, 2026-10-12 to 2026-10-14): a lot is closed or
- * keeps at least its lot-health minimum, three by default; more lots closed, older stock and fewer
- * lots come first. Units are centimetres: 100 m = 10_000. Lots are passed oldest first. Data is
- * fictional.
+ * keeps at least its lot-health minimum of normal pieces, three by default; short pieces do not
+ * count and go first. A remnant lot closed, more lots closed, the smaller lot completed from, older
+ * stock by the youngest lot used and fewer lots come first. Units are centimetres: 100 m = 10_000.
+ * Lots are passed oldest first; the caller marks short pieces. Data is fictional.
  */
 class ProposalSearchTest {
 
@@ -95,7 +96,153 @@ class ProposalSearchTest {
         .isPresent();
   }
 
-  // ── The ranking within a window ──────────────────────────────────────────
+  // ── Short pieces (Fatih, 2026-10-14) ─────────────────────────────────────
+
+  @Test
+  void aShortPieceDoesNotCountAsKept_soTwoNormalPiecesAndAShortOneCannotStay() {
+    // 100 + 100 + 100 + 100 + 40 m, the 40 m piece under 51% of the average. 200 m would leave
+    // 100 + 100 + 40: two normal pieces, under the minimum. 140 m leaves three normal pieces.
+    Lot lot = lot(normal(100), normal(100), normal(100), normal(100), shortPiece(40));
+
+    Result twoHundred =
+        ProposalSearch.bestWithin(List.of(window(lot, 0)), 200 * M, 200 * M, 200 * M);
+    Selection above =
+        ProposalSearch.smallestFrom(List.of(window(lot, 0)), 200 * M).best().orElseThrow();
+    Selection oneForty =
+        ProposalSearch.bestWithin(List.of(window(lot, 0)), 140 * M, 140 * M, 140 * M)
+            .best()
+            .orElseThrow();
+
+    assertThat(twoHundred.best()).isEmpty();
+    assertThat(above.total()).isEqualTo(440 * M);
+    assertThat(above.takes().getFirst().remainingPieces()).isZero();
+    assertThat(oneForty.takes().getFirst().remainingPieces()).isEqualTo(3);
+    assertSelectionAddsUp(oneForty, lot);
+  }
+
+  @Test
+  void shortPiecesGoIntoTheOrderFirst_whenTheQuantityAllows() {
+    Lot lot =
+        lot(normal(100), normal(100), normal(100), normal(100), shortPiece(60), shortPiece(40));
+    Set<UUID> shortIds =
+        lot.pieces().stream().filter(Piece::shortPiece).map(Piece::id).collect(Collectors.toSet());
+
+    Selection hundred =
+        ProposalSearch.bestWithin(List.of(window(lot, 0)), 100 * M, 100 * M, 100 * M)
+            .best()
+            .orElseThrow();
+    Selection twoHundred =
+        ProposalSearch.bestWithin(List.of(window(lot, 0)), 200 * M, 200 * M, 200 * M)
+            .best()
+            .orElseThrow();
+
+    // 100 m is the two short pieces, not a normal one; 200 m is one normal piece and both short
+    // ones, never two normal pieces.
+    assertThat(hundred.takes().getFirst().pieceIds()).containsExactlyInAnyOrderElementsOf(shortIds);
+    assertThat(twoHundred.takes().getFirst().pieceIds()).containsAll(shortIds).hasSize(3);
+    assertThat(twoHundred.takes().getFirst().remainingPieces()).isEqualTo(3);
+    assertSelectionAddsUp(twoHundred, lot);
+  }
+
+  @Test
+  void aLotAlreadyUnderTheMinimum_isClosedOrLeftAlone() {
+    // 40 + 30 + 55 m left of a lot whose pieces averaged 100 m: one normal piece, a remnant.
+    Lot remnant = lot(shortPiece(40), shortPiece(30), normal(55));
+
+    Result part = ProposalSearch.bestWithin(List.of(window(remnant, 0)), 40 * M, 70 * M, 55 * M);
+    Selection whole =
+        ProposalSearch.smallestFrom(List.of(window(remnant, 0)), 50 * M).best().orElseThrow();
+
+    assertThat(part.best()).isEmpty();
+    assertThat(whole.total()).isEqualTo(125 * M);
+    assertThat(whole.takes().getFirst().remainingPieces()).isZero();
+  }
+
+  // ── The ranking within a window (Fatih, 2026-10-14) ──────────────────────
+
+  @Test
+  void fatihsExample_closingTheRemnantLotComesBeforeTheExactQuantity() {
+    // 700 m with 5%: LOT-A 40 + 30 + 55 m (pieces averaged 100 m), LOT-B 20 × 100 m. LOT-B alone
+    // gives 700 m exactly; closing LOT-A and six pieces of LOT-B gives 725 m, and opens.
+    Lot lotA = lot(shortPiece(40), shortPiece(30), normal(55));
+    long[] twenty = new long[20];
+    java.util.Arrays.fill(twenty, 100);
+    Lot lotB = lot(twenty);
+
+    Selection best =
+        ProposalSearch.bestWithin(
+                List.of(window(lotB, 0), window(lotA, 1)), 700 * M, 735 * M, 700 * M)
+            .best()
+            .orElseThrow();
+
+    assertThat(best.total()).isEqualTo(725 * M);
+    assertThat(best.takes()).extracting(LotTake::lotId).containsExactly(lotB.id(), lotA.id());
+    assertThat(best.takes().get(1).remainingPieces()).isZero();
+    assertThat(best.takes().get(0).remainingPieces()).isEqualTo(14);
+  }
+
+  @Test
+  void aRemnantLotClosed_comesBeforeAHealthyLotClosed_andBeforeOlderStock() {
+    Lot healthy = lot(100, 100, 100);
+    Lot remnant = lot(shortPiece(40), shortPiece(30), normal(55));
+    Lot deep = lot(175, 175, 175, 175, 175);
+    List<SearchLot> lots = List.of(window(healthy, 0), window(remnant, 1), window(deep, 2));
+
+    Selection best =
+        ProposalSearch.bestWithin(lots, 300 * M, 300 * M, 300 * M).best().orElseThrow();
+
+    // 300 m closes the oldest, healthy lot in one piece of work; closing the remnant lot and
+    // completing 175 m from the deep lot still comes first.
+    assertThat(best.takes()).extracting(LotTake::lotId).containsExactly(remnant.id(), deep.id());
+    assertThat(best.takes().getFirst().remainingPieces()).isZero();
+    assertThat(best.takes().get(1).remainingPieces()).isEqualTo(4);
+  }
+
+  @Test
+  void completingFromTheLotWithFewerPieces_comesBeforeOlderStock() {
+    long[] twentyFour = new long[24];
+    java.util.Arrays.fill(twentyFour, 100);
+    Lot big = lot(twentyFour);
+    Lot small = lot(100, 100, 100, 100, 100, 100);
+
+    Selection best =
+        ProposalSearch.bestWithin(
+                List.of(window(big, 0), window(small, 1)), 300 * M, 300 * M, 300 * M)
+            .best()
+            .orElseThrow();
+
+    assertThat(best.takes()).extracting(LotTake::lotId).containsExactly(small.id());
+    assertThat(best.takes().getFirst().remainingPieces()).isEqualTo(3);
+  }
+
+  @Test
+  void anAddedLotNeverMakesASelectionOlder_the665Case() {
+    // 700 m with 5% (665–735 m). The newer lot alone gives 700 m. A short piece of the older lot
+    // with 700 m of the newer gives 735 m: it adds a lot, which makes the selection neither
+    // shallower nor older, and it loses on fewer lots. The older lot is too deep to close within
+    // the tolerance; closing a lot would rightly come first.
+    Lot older =
+        lot(
+            shortPiece(35),
+            normal(100),
+            normal(100),
+            normal(100),
+            normal(100),
+            normal(100),
+            normal(100),
+            normal(100),
+            normal(100));
+    Lot newer = lot(100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+
+    Selection best =
+        ProposalSearch.bestWithin(
+                List.of(window(older, 0), window(newer, 1)), 665 * M, 735 * M, 700 * M)
+            .best()
+            .orElseThrow();
+
+    assertThat(best.total()).isEqualTo(700 * M);
+    assertThat(best.takes()).extracting(LotTake::lotId).containsExactly(newer.id());
+  }
 
   @Test
   void theClosingReviewsCounterexample_closesBAndC() {
@@ -229,6 +376,18 @@ class ProposalSearchTest {
 
   private static Lot lot(long... metres) {
     return new Lot(UUID.randomUUID(), pieces(metres));
+  }
+
+  private static Lot lot(Piece... pieces) {
+    return new Lot(UUID.randomUUID(), List.of(pieces));
+  }
+
+  private static Piece normal(long metres) {
+    return new Piece(UUID.randomUUID(), metres * M);
+  }
+
+  private static Piece shortPiece(long metres) {
+    return new Piece(UUID.randomUUID(), metres * M, true);
   }
 
   private static List<Piece> pieces(long... metres) {
