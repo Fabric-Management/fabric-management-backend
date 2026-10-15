@@ -31,19 +31,19 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
- * STOCK-PROPOSAL-2 and SOI S04, S05, S09, A04 on the evaluation level (Fatih, 2026-10-12 to
- * 2026-10-14): no computed option leaves a lot fewer normal pieces than the minimum, short pieces
- * not counting and going first; the proposal opens at the best free option meeting the request
- * within the tolerance (a remnant lot closed, more lots closed, the smaller lot completed from,
- * older stock, fewer lots, closeness), else the nearest above, else the best below, else held
- * stock; beside it one card of each kind: the best below, the nearest above outside the tolerance,
- * pending combinations; no card far below the request only because it closes a lot; quantity order
- * with the opening index; held stock only when free stock cannot reach the lower tolerance limit;
- * the manual pick. Data is fictional.
+ * STOCK-PROPOSAL-2 and SOI S04, S09 on the evaluation level (Fatih, 2026-10-12 to 2026-10-15): no
+ * computed option leaves a lot fewer normal pieces than the minimum, short pieces not counting and
+ * going first; several dye lots allowed means any lots combine, one required means each lot alone;
+ * the cards are the best meeting the request within the tolerance (a remnant lot closed, more lots
+ * closed, the smaller lot completed from, older stock, fewer lots, closeness), the most within the
+ * upper limit, the best short within the lower limit, and only when none of these exists the
+ * nearest above and below outside it; held stock only when free stock cannot reach the lower
+ * tolerance limit; the changed pieces first. Data is fictional.
  */
 class QuantityEvaluatorTest {
 
   private static final Instant OLD = Instant.parse("2025-03-01T00:00:00Z");
+  private static final Instant MID = Instant.parse("2025-09-01T00:00:00Z");
   private static final Instant NEW = Instant.parse("2026-06-01T00:00:00Z");
 
   private final UUID p1 = new UUID(0, 1);
@@ -128,7 +128,7 @@ class QuantityEvaluatorTest {
   }
 
   @Test
-  void aLotFarBelowTheRequest_isNotACard_evenThoughClosingItWouldEmptyIt() {
+  void severalDyeLotsAllowed_closingTheSmallLotGoesIntoTheOpening_withoutAConfirmation() {
     var result =
         evaluate(
             spec("700")
@@ -137,13 +137,77 @@ class QuantityEvaluatorTest {
                     lot(p2, "Y", NEW, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100))
                 .tolerance("5", "5"));
 
-    // X is older and would close, but it cannot be combined with Y and is 400 m short (Fatih,
-    // 2026-10-14): the short card is the best below, Y's 600 m, and X is no card of its own.
-    assertThat(main(result).quantity()).isEqualByComparingTo("700");
+    // Several dye lots allowed means the customer accepts them (Fatih, 2026-10-15): X closes
+    // with four pieces of Y, before seven pieces of Y alone. Nothing else lies within 5%.
+    QuantityOption opening = main(result);
+    assertThat(opening.quantity()).isEqualByComparingTo("700");
+    assertThat(opening.batchIds()).containsExactlyInAnyOrder(p1, p2);
+    assertThat(part(opening, p1).closesLot()).isTrue();
+    assertThat(opening.compatibility()).isEqualTo(Compatibility.MULTIPLE_LOTS_ACCEPTED);
+    assertThat(opening.blockedReason()).isNull();
+    assertThat(quantities(result)).containsExactly("700");
+  }
+
+  @Test
+  void oneDyeLotRequired_eachLotStandsAlone() {
+    var result =
+        evaluate(
+            spec("700")
+                .lots(
+                    lot(p1, "X", OLD, 100, 100, 100),
+                    lot(p2, "Y", NEW, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100))
+                .singleLot()
+                .tolerance("5", "5"));
+
     assertThat(main(result).batchIds()).containsExactly(p2);
-    assertThat(main(result).lots().getFirst().remainingEligiblePieces()).isEqualTo(3);
-    assertThat(quantities(result)).containsExactly("700", "600");
-    assertThat(byQuantity(result, "600").batchIds()).containsExactly(p2);
+    assertThat(main(result).compatibility()).isEqualTo(Compatibility.SINGLE_LOT);
+    assertThat(quantities(result)).containsExactly("700");
+  }
+
+  @Test
+  void theScreenOf15October_meetsByClosingALot_shortByClosingTwo() {
+    // 700 m, +10% / -5%: LOT-23087 95 + 95 + 100 m, LOT-24011 3 × 125 m, LOT-24012 9 × 125 m.
+    UUID lot23087 = new UUID(0, 23087);
+    UUID lot24011 = new UUID(0, 24011);
+    UUID lot24012 = new UUID(0, 24012);
+    double[] nine = new double[9];
+    java.util.Arrays.fill(nine, 125);
+    var result =
+        evaluate(
+            spec("700")
+                .lots(
+                    lot(lot23087, "LOT-23087", OLD, 95, 95, 100),
+                    lot(lot24011, "LOT-24011", MID, 125, 125, 125),
+                    lot(lot24012, "LOT-24012", NEW, nine))
+                .tolerance("10", "5"));
+
+    // Meets the request (Fatih, 2026-10-15: healthy stock first among those): 750 m closing
+    // LOT-24011 with three pieces of LOT-24012, before six pieces of LOT-24012 alone. Nothing
+    // meets it with LOT-23087 (665 or 790 m). Short within 5%: 665 m closing LOT-23087 and
+    // LOT-24011.
+    assertThat(quantities(result)).containsExactly("750", "665");
+    QuantityOption opening = main(result);
+    assertThat(part(opening, lot24011).closesLot()).isTrue();
+    assertThat(part(opening, lot24012).remainingEligiblePieces()).isEqualTo(6);
+    QuantityOption shortCard = byQuantity(result, "665");
+    assertThat(shortCard.placement()).isEqualTo(OptionPlacement.BELOW);
+    assertThat(shortCard.lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
+    assertThat(shortCard.batchIds()).containsExactlyInAnyOrder(lot23087, lot24011);
+    assertThat(result.options()).allSatisfy(option -> assertThat(option.blockedReason()).isNull());
+  }
+
+  @Test
+  void theMostWithinTheUpperLimitIsTheSecondCard_toSellMore() {
+    // 500 m, +20% / -0%: ten pieces of 100 m. Meets: 500 m. The most within 600 m: 600 m.
+    var result =
+        evaluate(
+            spec("500")
+                .lots(lot(p1, "P1", OLD, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100))
+                .tolerance("20", "0"));
+
+    assertThat(quantities(result)).containsExactly("500", "600");
+    assertThat(byQuantity(result, "600").placement()).isEqualTo(OptionPlacement.ABOVE);
+    assertThat(byQuantity(result, "600").toleranceStatus()).isEqualTo(ToleranceStatus.WITHIN);
   }
 
   @Test
@@ -229,7 +293,7 @@ class QuantityEvaluatorTest {
   }
 
   @Test
-  void s04_closingBothConfirmedLotsOpens_aSingleLotIsTheNearestBelow() {
+  void s04_closingBothLotsOpens_andNothingOutsideTheToleranceIsShownBesideIt() {
     var result =
         evaluate(
             spec("500")
@@ -237,12 +301,11 @@ class QuantityEvaluatorTest {
                 .confirmed(Set.of(p1, p2))
                 .tolerance("20", "20"));
 
-    // 400 and 500 m would leave two or one piece in a lot; they are not offered.
-    assertThat(quantities(result)).containsExactly("600", "300");
-    assertThat(main(result).quantity()).isEqualByComparingTo("600");
-    assertThat(main(result).compatibility()).isEqualTo(Compatibility.CONFIRMED);
+    // 400 and 500 m would leave two or one piece in a lot; they are not offered. With 600 m
+    // within the tolerance, nothing outside it is shown (Fatih, 2026-10-15).
+    assertThat(quantities(result)).containsExactly("600");
+    assertThat(main(result).compatibility()).isEqualTo(Compatibility.MULTIPLE_LOTS_ACCEPTED);
     assertThat(main(result).lots()).allSatisfy(part -> assertThat(part.closesLot()).isTrue());
-    assertThat(byQuantity(result, "300").placement()).isEqualTo(OptionPlacement.BELOW);
     assertThat(result.mainOptionIndex()).isZero();
   }
 
@@ -498,22 +561,20 @@ class QuantityEvaluatorTest {
   // ── Compatibility is a prerequisite ──────────────────────────────────────
 
   @Test
-  void s05_unconfirmedCombinationsArePendingAndBlocked_andNeverTheMain() {
+  void severalDyeLotsAllowed_noCombinationWaitsForAConfirmation() {
     var result =
         evaluate(
             spec("500")
                 .lots(lot(p1, "P1", null, 100, 100, 100), lot(p2, "P2", null, 100, 100, 100)));
 
-    assertThat(main(result).compatibility()).isEqualTo(Compatibility.SINGLE_LOT);
-    assertThat(main(result).quantity()).isEqualByComparingTo("300");
+    // Nothing within 0%: the nearest above (both lots closed) opens, then the nearest below.
+    assertThat(quantities(result)).containsExactly("600", "300");
+    assertThat(main(result).compatibility()).isEqualTo(Compatibility.MULTIPLE_LOTS_ACCEPTED);
     assertThat(result.options())
-        .filteredOn(option -> option.compatibility() == Compatibility.PENDING_CONFIRMATION)
-        .isNotEmpty()
         .allSatisfy(
             option -> {
-              assertThat(option.blockedReason())
-                  .isEqualTo(BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED);
-              assertThat(option.lotCount()).isGreaterThan(1);
+              assertThat(option.compatibility()).isNotEqualTo(Compatibility.PENDING_CONFIRMATION);
+              assertThat(option.blockedReason()).isNull();
             });
   }
 
@@ -721,8 +782,8 @@ class QuantityEvaluatorTest {
     assertThat(opening.quantity()).isEqualByComparingTo("725");
     assertThat(part(opening, lotA).closesLot()).isTrue();
     assertThat(part(opening, lotB).remainingEligiblePieces()).isEqualTo(14);
-    assertThat(quantities(result)).containsExactly("725", "625");
-    assertThat(byQuantity(result, "625").placement()).isEqualTo(OptionPlacement.BELOW);
+    // Nothing lies short within 5% (625 m is below 665 m), so nothing else is shown.
+    assertThat(quantities(result)).containsExactly("725");
   }
 
   @Test

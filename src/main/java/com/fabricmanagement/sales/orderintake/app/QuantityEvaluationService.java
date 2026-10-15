@@ -170,7 +170,8 @@ public class QuantityEvaluationService {
             measure.get(),
             stock.lots(),
             stock.confirmedCompatibleGroups(),
-            toneGroups(tenantId, order, line)));
+            toneGroups(tenantId, order, line),
+            !line.isSingleLotRequired()));
   }
 
   /** Converts a canonical stock quantity into the line unit; empty when no exact conversion. */
@@ -195,11 +196,16 @@ public class QuantityEvaluationService {
   }
 
   /** Piece-level stock of one distribution, as the proposal and the acceptance checks see it. */
+  /**
+   * The line's current stock. {@code multipleLotsAllowed}: the line allows several dye lots, so the
+   * customer accepts them (Fatih, 2026-10-15).
+   */
   public record LineStock(
       PrimaryMeasure measure,
       List<ProposalStockQueryService.ProposalLot> lots,
       List<Set<UUID>> confirmedGroups,
-      List<Set<UUID>> toneGroups) {}
+      List<Set<UUID>> toneGroups,
+      boolean multipleLotsAllowed) {}
 
   private QuantityEvaluator.Evaluation evaluation(
       SalesOrder order, SalesOrderLine line, List<UUID> manualPieceIds) {

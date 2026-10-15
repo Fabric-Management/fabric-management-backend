@@ -50,7 +50,9 @@ public class OrderIntakeController {
       description =
           "Free stock first; stock other quotes hold only when free stock has no option within"
               + " the agreed tolerance. Options come in the decided card order (changed pieces,"
-              + " main proposal, above, below, pending, held) with the main proposal's index. An optional manual pick is evaluated with the same checks.")
+              + " meets the request, the most within it, short within it; outside the tolerance"
+              + " only when nothing lies within; held) with the main proposal's index. An"
+              + " optional manual pick is evaluated with the same checks.")
   public ResponseEntity<ApiResponse<QuantityProposalDto>> evaluateLineQuantity(
       @PathVariable UUID orderId,
       @PathVariable UUID lineId,

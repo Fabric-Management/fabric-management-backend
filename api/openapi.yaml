@@ -45429,9 +45429,10 @@ paths:
     post:
       description: "Free stock first; stock other quotes hold only when free stock\
         \ has no option within the agreed tolerance. Options come in the decided card\
-        \ order (changed pieces, main proposal, above, below, pending, held) with\
-        \ the main proposal's index. An optional manual pick is evaluated with the\
-        \ same checks."
+        \ order (changed pieces, meets the request, the most within it, short within\
+        \ it; outside the tolerance only when nothing lies within; held) with the\
+        \ main proposal's index. An optional manual pick is evaluated with the same\
+        \ checks."
       operationId: evaluateLineQuantity
       parameters:
       - in: path
@@ -49894,10 +49895,11 @@ paths:
       description: "Evaluates the line exactly as a saved line with the same inputs\
         \ would be evaluated: free stock first, stock other quotes hold only when\
         \ free stock has no option within the agreed tolerance, options in the decided\
-        \ card order (changed pieces, main proposal, above, below, pending, held)\
-        \ with the main proposal's index. Each option states what other quotes hold\
-        \ that it would take and whether it can be applied; an optional manual pick\
-        \ is evaluated with the same checks. Guidance for the salesperson only: nothing\
+        \ card order (changed pieces, meets the request, the most within it, short\
+        \ within it; outside the tolerance only when nothing lies within; held) with\
+        \ the main proposal's index. Each option states what other quotes hold that\
+        \ it would take and whether it can be applied; an optional manual pick is\
+        \ evaluated with the same checks. Guidance for the salesperson only: nothing\
         \ is reserved or recorded. A free quantity that cannot be determined is null\
         \ with its reasons."
       operationId: previewOrderIntakeStock
@@ -79350,6 +79352,7 @@ components:
       type: string
       enum:
       - SINGLE_LOT
+      - MULTIPLE_LOTS_ACCEPTED
       - CONFIRMED
       - TONE_ACCEPTED
       - PENDING_CONFIRMATION

@@ -24,29 +24,27 @@ import java.util.function.Function;
  * STOCK-PROPOSAL-2). Pure: no persistence, no clock, no security. The caller converts units and
  * reads what quotes hold.
  *
- * <p>Compatibility and the single-lot requirement are prerequisites, and no computed option leaves
- * a lot with fewer normal pieces than its lot-health minimum (Fatih, 2026-10-13 and 2026-10-14): a
- * lot is closed or keeps at least that many, three by default; a piece under 51% of the lot's
- * average piece is short and does not count, and short pieces go into an order first. Among
- * candidates the tenant comes first ({@link ProposalRanking}): a remnant lot closed, more lots
- * closed, completing from the lot with fewer pieces, older stock, fewer lots, then closeness. The
- * proposal opens at (Fatih, 2026-10-13):
+ * <p>No computed option leaves a lot with fewer normal pieces than its lot-health minimum (Fatih,
+ * 2026-10-13 and 2026-10-14): a lot is closed or keeps at least that many, three by default; a
+ * piece under 51% of the lot's average piece is short and does not count, and short pieces go into
+ * an order first. When the line allows several dye lots the customer accepts them and any lots
+ * combine; when it requires one, each lot stands alone (Fatih, 2026-10-15). Among candidates the
+ * tenant comes first ({@link ProposalRanking}): a remnant lot closed, more lots closed, completing
+ * from the lot with fewer pieces, older stock, fewer lots, then closeness.
+ *
+ * <p>The cards, in this order (Fatih, 2026-10-15), each searched exactly over every combination:
  *
  * <ol>
- *   <li>the best free option meeting the request within the tolerance (the request up to the upper
- *       limit), searched exactly over every combination;
- *   <li>otherwise the nearest free option above the request, outside the tolerance;
- *   <li>otherwise the best free option below the request: within the tolerance by the ranking, else
- *       the nearest below;
- *   <li>otherwise held stock, which is never applicable.
+ *   <li>the best meeting the request within the tolerance (the request up to the upper limit): the
+ *       opening;
+ *   <li>the most within the upper limit, when it is more: to sell more;
+ *   <li>the best short of the request within the lower limit;
+ *   <li>only when none of these exists: the nearest above the upper limit, then the nearest below
+ *       the lower limit; the first of them opens;
+ *   <li>stock others hold, only when free stock cannot reach the lower limit; never applicable.
  * </ol>
  *
- * <p>Stock others hold is evaluated only when free stock cannot reach the lower tolerance limit.
- * Beside the opening one, each card the 14 October decision names is listed once: the best below
- * the request, the nearest above it outside the tolerance, nearer pending combinations and held
- * stock. Options outside the tolerance are shown, never withheld. Options are returned in the
- * decided card order (Fatih, 2026-10-14): the salesperson's changed pieces, the opening, above
- * outside the tolerance, below, pending, held stock; with the opening option's index. Both
+ * <p>The salesperson's changed pieces come first, with the opening option's index after them. Both
  * tolerance limits are required: a missing side is missing information, never read as 0%; the
  * caller refuses to evaluate without them.
  *

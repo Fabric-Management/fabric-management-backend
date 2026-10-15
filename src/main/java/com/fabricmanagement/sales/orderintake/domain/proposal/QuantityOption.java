@@ -173,6 +173,11 @@ public record QuantityOption(
   @Schema(name = "QuantityOptionCompatibility", enumAsRef = true)
   public enum Compatibility {
     SINGLE_LOT,
+    /**
+     * Several lots on a line that allows several dye lots: the customer accepts them (Fatih,
+     * 2026-10-15). No technical confirmation or tone acceptance is asked for.
+     */
+    MULTIPLE_LOTS_ACCEPTED,
     CONFIRMED,
     TONE_ACCEPTED,
     /** Not a definite option until technical confirmation or a concrete tone acceptance. */

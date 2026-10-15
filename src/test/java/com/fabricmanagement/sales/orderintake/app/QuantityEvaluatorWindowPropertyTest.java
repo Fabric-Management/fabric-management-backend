@@ -23,9 +23,9 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
- * STOCK-PROPOSAL-2 A3 (Fatih, 2026-10-13 and 2026-10-14): on small random stock, the option the
- * proposal opens at is the one trying every subset finds. The rules are restated here on their own,
- * without the evaluator's classes:
+ * STOCK-PROPOSAL-2 A3 (Fatih, 2026-10-13 to 2026-10-15): on small random stock, the cards are the
+ * ones trying every subset finds. The rules are restated here on their own, without the evaluator's
+ * classes:
  *
  * <ul>
  *   <li>A piece under 51% of its lot's average piece is short. A used lot is closed or keeps at
@@ -34,8 +34,11 @@ import org.junit.jupiter.api.Test;
  *       shallower, the youngest lot used older, fewer lots; in a window then nearer the request,
  *       covering it on a tie. A list compared in order ties when it is a prefix of the other, so an
  *       added lot never counts on its own.
- *   <li>The opening is the best meeting the request within the tolerance, else the nearest above,
- *       else the best below within the tolerance, else the nearest below.
+ *   <li>Several dye lots allowed: any lots combine. One required: each lot alone.
+ *   <li>Cards (2026-10-15): the best meeting the request within the tolerance; the most within the
+ *       upper limit when it is more; the best short within the lower limit. Only when none of these
+ *       exists: the nearest above the upper limit, then the nearest below the lower limit. The
+ *       first card is the opening.
  *   <li>Within a lot, as few normal pieces as the quantity allows: short pieces go first.
  * </ul>
  *
@@ -64,58 +67,40 @@ class QuantityEvaluatorWindowPropertyTest {
       int lots) {}
 
   @Test
-  void theProposalOpensWhereTryingEverySubsetSaysItShould() {
-    Random random = new Random(20261014L);
+  void theCardsAreWhereTryingEverySubsetSaysTheyShouldBe() {
+    Random random = new Random(20261015L);
     int covering = 0;
     int withShort = 0;
     for (int round = 0; round < 600; round++) {
       Case example = randomCase(random, round);
       QuantityEvaluationResult result = QuantityEvaluator.evaluate(example.input()).result();
       List<Candidate> all = everySubset(example);
-      Candidate expected = expectedOpening(all, example);
       if (example.lots().stream().anyMatch(lot -> normalPieces(lot) < lot.pieces().size())) {
         withShort++;
       }
 
       assertThat(result.searchComplete()).as(example.toString()).isTrue();
-      if (expected == null) {
+      List<Candidate> expectedCards = expectedCards(all, example);
+      if (expectedCards.isEmpty()) {
         assertThat(result.mainOptionIndex()).as(example.toString()).isNull();
         continue;
       }
+      Candidate expected = expectedCards.getFirst();
       if (expected.quantity() >= example.target() && within(expected.quantity(), example)) {
         covering++;
       }
-      assertThat(result.mainOptionIndex()).as(example.toString()).isNotNull();
+      assertThat(result.mainOptionIndex()).as(example.toString()).isZero();
       QuantityOption opening = result.options().get(result.mainOptionIndex());
       assertThat(candidateOf(opening, example))
           .as("%s: opening %s", example, opening.quantity())
           .isEqualTo(expected);
+      assertThat(result.options().stream().map(option -> candidateOf(option, example)).toList())
+          .as("%s: cards", example)
+          .isEqualTo(expectedCards);
       assertThat(result.options())
           .as(example.toString())
           .allSatisfy(option -> assertThat(option.leavesRemnant()).isFalse());
-      assertShortPiecesWentFirst(opening, example);
-      // One card of each kind beside the opening (Fatih, 2026-10-14): one short, and one above
-      // only outside the tolerance.
-      List<QuantityOption> besides =
-          result.options().stream()
-              .filter(option -> option.placement() != QuantityOption.OptionPlacement.MAIN)
-              .filter(option -> option.source() == QuantityOption.StockSource.FREE)
-              .filter(
-                  option ->
-                      option.compatibility() != QuantityOption.Compatibility.PENDING_CONFIRMATION)
-              .toList();
-      assertThat(besides)
-          .as(example.toString())
-          .filteredOn(option -> option.difference().signum() < 0)
-          .hasSizeLessThanOrEqualTo(1);
-      assertThat(besides)
-          .as(example.toString())
-          .filteredOn(option -> option.difference().signum() >= 0)
-          .hasSizeLessThanOrEqualTo(1)
-          .allSatisfy(
-              option ->
-                  assertThat(option.toleranceStatus())
-                      .isEqualTo(QuantityOption.ToleranceStatus.OUTSIDE));
+      result.options().forEach(option -> assertShortPiecesWentFirst(option, example));
     }
     // The random cases must exercise the window and the short-piece rule, not only their absence.
     assertThat(covering).isGreaterThan(50);
@@ -124,7 +109,7 @@ class QuantityEvaluatorWindowPropertyTest {
 
   // ── The expected opening ─────────────────────────────────────────────────
 
-  private static Candidate expectedOpening(List<Candidate> all, Case example) {
+  private static List<Candidate> expectedCards(List<Candidate> all, Case example) {
     long target = example.target();
     Comparator<Candidate> ranking =
         Comparator.comparingInt(Candidate::remnantClosed)
@@ -137,34 +122,35 @@ class QuantityEvaluatorWindowPropertyTest {
         ranking
             .thenComparingLong(candidate -> Math.abs(candidate.quantity() - target))
             .thenComparing(candidate -> candidate.quantity() < target);
-    Candidate coveringBest =
+    Comparator<Candidate> mostFirst =
+        Comparator.comparingLong(Candidate::quantity).reversed().thenComparing(ranking);
+    List<Candidate> cards = new ArrayList<>();
+    Candidate meets =
         all.stream()
             .filter(c -> c.quantity() >= target && within(c.quantity(), example))
             .min(windowOrder)
             .orElse(null);
-    if (coveringBest != null) {
-      return coveringBest;
+    if (meets != null) {
+      cards.add(meets);
+      all.stream()
+          .filter(c -> c.quantity() >= target && within(c.quantity(), example))
+          .min(mostFirst)
+          .filter(most -> most.quantity() > meets.quantity())
+          .ifPresent(cards::add);
     }
-    Candidate above =
-        all.stream()
-            .filter(c -> c.quantity() >= target)
-            .min(Comparator.comparingLong(Candidate::quantity).thenComparing(ranking))
-            .orElse(null);
-    if (above != null) {
-      return above;
+    all.stream()
+        .filter(c -> c.quantity() < target && within(c.quantity(), example))
+        .min(windowOrder)
+        .ifPresent(cards::add);
+    if (!cards.isEmpty()) {
+      return cards;
     }
-    Candidate shortWithin =
-        all.stream()
-            .filter(c -> c.quantity() < target && within(c.quantity(), example))
-            .min(windowOrder)
-            .orElse(null);
-    if (shortWithin != null) {
-      return shortWithin;
-    }
-    return all.stream()
-        .filter(c -> c.quantity() < target)
-        .min(Comparator.comparingLong(Candidate::quantity).reversed().thenComparing(ranking))
-        .orElse(null);
+    all.stream()
+        .filter(c -> c.quantity() > target)
+        .min(Comparator.comparingLong(Candidate::quantity).thenComparing(ranking))
+        .ifPresent(cards::add);
+    all.stream().filter(c -> c.quantity() < target).min(mostFirst).ifPresent(cards::add);
+    return cards;
   }
 
   /** In order, lower first; a list that is a prefix of the other ties. */
@@ -184,9 +170,10 @@ class QuantityEvaluatorWindowPropertyTest {
    */
   private static List<Candidate> everySubset(Case example) {
     List<List<ProposalLot>> runs = new ArrayList<>();
-    example.lots().forEach(lot -> runs.add(List.of(lot)));
-    if (example.grouped() && example.lots().size() > 1) {
+    if (example.severalLots()) {
       runs.add(example.lots());
+    } else {
+      example.lots().forEach(lot -> runs.add(List.of(lot)));
     }
     List<Candidate> all = new ArrayList<>();
     for (List<ProposalLot> run : runs) {
@@ -354,15 +341,9 @@ class QuantityEvaluatorWindowPropertyTest {
   // ── Random stock ─────────────────────────────────────────────────────────
 
   private record Case(
-      long target, String up, String down, List<ProposalLot> lots, boolean grouped) {
+      long target, String up, String down, List<ProposalLot> lots, boolean severalLots) {
 
     QuantityEvaluator.Input input() {
-      List<Set<UUID>> groups = new ArrayList<>();
-      if (grouped && lots.size() > 1) {
-        Set<UUID> all = new HashSet<>();
-        lots.forEach(lot -> all.add(lot.batchId()));
-        groups.add(all);
-      }
       BigDecimal requested = BigDecimal.valueOf(target);
       return new QuantityEvaluator.Input(
           requested,
@@ -371,9 +352,9 @@ class QuantityEvaluatorWindowPropertyTest {
           requested,
           Function.identity(),
           lots,
-          groups,
           List.of(),
-          false,
+          List.of(),
+          !severalLots,
           new BigDecimal(up),
           new BigDecimal(down),
           QuantityEvaluator.StockHolds.NONE,
@@ -402,7 +383,7 @@ class QuantityEvaluatorWindowPropertyTest {
     @Override
     public String toString() {
       StringBuilder text = new StringBuilder("target " + target + " +" + up + "/-" + down);
-      text.append(grouped ? " grouped" : " single lots");
+      text.append(severalLots ? " several lots" : " single lot");
       for (ProposalLot lot : lots) {
         text.append(" | ").append(lot.lotNo()).append(' ').append(lot.productionDate());
         lot.pieces().forEach(piece -> text.append(' ').append(piece.canonicalMeasure()));

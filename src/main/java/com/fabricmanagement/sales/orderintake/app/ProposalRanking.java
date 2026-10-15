@@ -16,7 +16,8 @@ import java.util.stream.Collectors;
  * closed, more lots closed, completing from the lot with fewer pieces, older stock measured by the
  * youngest lot used, fewer lots, closer to the request, covering the request, then the pieces
  * themselves. In one place, so the order is read and changed in one place; the search in {@code
- * ProposalSearch} ranks its patterns the same way.
+ * ProposalSearch} ranks its patterns the same way. Which cards are shown, and in what order, is
+ * {@link ProposalEvaluation}'s.
  */
 final class ProposalRanking {
 
@@ -115,44 +116,6 @@ final class ProposalRanking {
         .thenComparingLong(ranked -> Math.abs(ranked.units() - target))
         .thenComparing(ranked -> ranked.units() < target)
         .thenComparing(Ranked::pieceKey);
-  }
-
-  /**
-   * The order the cards are shown in (Fatih, 2026-10-14): the salesperson's changed pieces, the
-   * opening, then the nearest above outside the tolerance, the best below, pending combinations and
-   * stock others hold; on the same place ascending quantity, then the ranking. Browsing goes from
-   * one card to the next, not from a smaller quantity to a larger one.
-   */
-  static Comparator<Ranked> cardOrder(Comparator<Ranked> tenantFirst) {
-    return Comparator.comparingInt(ProposalRanking::cardPlace)
-        .thenComparingLong(Ranked::units)
-        .thenComparing(tenantFirst);
-  }
-
-  private static int cardPlace(Ranked ranked) {
-    return switch (ranked.option().placement()) {
-      case MANUAL -> 0;
-      case MAIN -> 1;
-      case ABOVE, BELOW -> {
-        if (ranked.tier() == StockPools.Tier.HELD) {
-          yield 5;
-        }
-        if (!ranked.definite()) {
-          yield 4;
-        }
-        yield ranked.option().placement() == QuantityOption.OptionPlacement.ABOVE ? 2 : 3;
-      }
-    };
-  }
-
-  /** Ascending quantity; the same quantity by the ranking. Also the nearest at or above first. */
-  static Comparator<Ranked> ascending(Comparator<Ranked> tenantFirst) {
-    return Comparator.comparingLong(Ranked::units).thenComparing(tenantFirst);
-  }
-
-  /** The nearest below the request first, then the ranking. */
-  static Comparator<Ranked> descending(Comparator<Ranked> tenantFirst) {
-    return Comparator.comparingLong(Ranked::units).reversed().thenComparing(tenantFirst);
   }
 
   /** In order, lower first; a list that is a prefix of the other ties. */

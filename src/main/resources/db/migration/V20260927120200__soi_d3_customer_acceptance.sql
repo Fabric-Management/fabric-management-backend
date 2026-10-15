@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS sales_ord.quantity_acceptance (
     option_kind VARCHAR(30) NOT NULL CHECK (option_kind IN
         ('EXACT', 'ABOVE', 'BELOW', 'REQUESTED_WITH_REMNANT')),
     compatibility VARCHAR(30) NOT NULL CHECK (compatibility IN
-        ('SINGLE_LOT', 'CONFIRMED', 'TONE_ACCEPTED', 'PENDING_CONFIRMATION')),
+        ('SINGLE_LOT', 'MULTIPLE_LOTS_ACCEPTED', 'CONFIRMED', 'TONE_ACCEPTED',
+         'PENDING_CONFIRMATION')),
     accepted_qty NUMERIC(15, 3) NOT NULL CHECK (accepted_qty > 0),
     canonical_qty NUMERIC(19, 6) NOT NULL CHECK (canonical_qty > 0),
     unit VARCHAR(20) NOT NULL,

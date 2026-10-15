@@ -25,75 +25,49 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * One evaluation (STOCK-PROPOSAL-2): searches each compatible set of lots, picks where the proposal
- * opens and the cards beside it, adds the salesperson's own pick and orders the list. The rules are
- * in {@link QuantityEvaluator}'s description; the ranking in {@link ProposalRanking}.
+ * One evaluation (STOCK-PROPOSAL-2): searches the lots the line may use, picks the cards and their
+ * order, adds the salesperson's changed pieces and states the result. The rules are in {@link
+ * QuantityEvaluator}'s description; the ranking in {@link ProposalRanking}.
+ *
+ * <p>The cards (Fatih, 2026-10-15), each healthy stock ranked first among the selections it allows:
+ *
+ * <ol>
+ *   <li>meets the request within the tolerance (the request up to the upper limit): the opening;
+ *   <li>the most within the upper limit, when it is more than the first: selling more;
+ *   <li>short of the request within the lower limit;
+ *   <li>only when none of these exists: the nearest above the upper limit, then the nearest below
+ *       the lower limit;
+ *   <li>stock others hold, only when free stock cannot reach the lower limit.
+ * </ol>
+ *
+ * <p>The salesperson's changed pieces come first. The first card is the opening.
  */
 final class ProposalEvaluation {
 
-  private record Run(List<UUID> lots, Compatibility compatibility, int order) {
-    boolean definite() {
-      return compatibility != Compatibility.PENDING_CONFIRMATION;
-    }
-  }
-
   /**
-   * What one tier's stock offers across its compatible sets of lots: the best meeting the request
-   * within the tolerance ({@code covering}), the nearest at or above it ({@code above}), the best
-   * below it within the tolerance ({@code shortWithin}), the nearest below it ({@code below}) and
-   * nearer pending combinations.
+   * The lots one search may combine: each lot alone when the customer requires a single dye lot,
+   * otherwise every lot together (Fatih, 2026-10-15: several dye lots allowed means the customer
+   * accepts them).
    */
-  private record Found(
-      List<Ranked> covering,
-      List<Ranked> above,
-      List<Ranked> shortWithin,
-      List<Ranked> below,
-      List<Ranked> pending) {
+  private record Run(List<UUID> lots) {}
 
-    static final Found NONE = new Found(List.of(), List.of(), List.of(), List.of(), List.of());
+  /** The cards one tier of stock offers, in their order, the opening first. */
+  private record Cards(List<Ranked> cards, boolean reachesLowerLimit) {
+    static final Cards NONE = new Cards(List.of(), false);
 
-    /** Some option meets the request, or falls short of it within the tolerance. */
-    boolean reachesLowerLimit() {
-      return !covering.isEmpty() || !above.isEmpty() || !shortWithin.isEmpty();
+    Optional<Ranked> opening() {
+      return cards.stream().findFirst();
     }
 
-    /** Only the options that take stock others hold. */
-    Found onlyHeld() {
-      return new Found(held(covering), held(above), held(shortWithin), held(below), held(pending));
-    }
-
-    private static List<Ranked> held(List<Ranked> candidates) {
-      return candidates.stream()
-          .filter(ranked -> ranked.option().source() == StockSource.HELD)
-          .toList();
-    }
-
-    /**
-     * Where the proposal opens (Fatih, 2026-10-13): the best meeting the request within the
-     * tolerance, otherwise the nearest above it, otherwise the best below it.
-     */
-    Optional<Ranked> opening(
-        Comparator<Ranked> ranking, Comparator<Ranked> aboveOrder, Comparator<Ranked> belowOrder) {
-      return covering.stream()
-          .min(ranking)
-          .or(() -> above.stream().min(aboveOrder))
-          .or(() -> shortSide(ranking, belowOrder));
-    }
-
-    /** The best below the request: within the tolerance by the ranking, else the nearest below. */
-    Optional<Ranked> shortSide(Comparator<Ranked> ranking, Comparator<Ranked> belowOrder) {
-      return shortWithin.stream().min(ranking).or(() -> below.stream().min(belowOrder));
-    }
-
-    /**
-     * The nearest at or above the request. It is a card of its own only outside the tolerance, that
-     * is when nothing meets the request within it.
-     */
-    Optional<Ranked> nearestAbove(Comparator<Ranked> aboveOrder) {
-      return above.stream().min(aboveOrder);
+    /** Only the cards that take stock others hold. */
+    Cards onlyHeld() {
+      return new Cards(
+          cards.stream().filter(ranked -> ranked.option().source() == StockSource.HELD).toList(),
+          reachesLowerLimit);
     }
   }
 
@@ -105,17 +79,8 @@ final class ProposalEvaluation {
   private final long windowHigh;
   private boolean limitExceeded;
 
-  /** The tenant-first ranking. */
+  /** The tenant-first ranking: healthy stock first, then closeness. */
   private final Comparator<Ranked> tenantFirst;
-
-  /** The decided card order: changed pieces, opening, above, below, pending, held. */
-  private final Comparator<Ranked> listedOrder;
-
-  /** The nearest at or above the request first, then the ranking. */
-  private final Comparator<Ranked> aboveOrder;
-
-  /** The nearest below the request first, then the ranking. */
-  private final Comparator<Ranked> belowOrder;
 
   ProposalEvaluation(EvaluationContext context, Counts counts, String fingerprint) {
     this.context = context;
@@ -125,63 +90,47 @@ final class ProposalEvaluation {
     this.windowLow = context.windowLow();
     this.windowHigh = context.windowHigh();
     this.tenantFirst = ProposalRanking.tenantFirst(target);
-    this.listedOrder = ProposalRanking.cardOrder(tenantFirst);
-    this.aboveOrder = ProposalRanking.ascending(tenantFirst);
-    this.belowOrder = ProposalRanking.descending(tenantFirst);
   }
 
   Evaluation run() {
     List<Run> runs = runs();
-    Found freeOptions = candidates(Tier.FREE, runs);
+    Cards free = cards(Tier.FREE, runs);
     // Held stock only when free stock cannot reach the lower tolerance limit (Fatih,
     // 2026-10-13); then it is an option to weigh, never to apply.
-    Found heldOptions =
-        freeOptions.reachesLowerLimit() ? Found.NONE : candidates(Tier.HELD, runs).onlyHeld();
-
-    Optional<Ranked> freeOpening = freeOptions.opening(tenantFirst, aboveOrder, belowOrder);
-    Optional<Ranked> heldOpening = heldOptions.opening(tenantFirst, aboveOrder, belowOrder);
-    Optional<Ranked> opening = freeOpening.or(() -> heldOpening);
+    Cards held = free.reachesLowerLimit() ? Cards.NONE : cards(Tier.HELD, runs).onlyHeld();
+    Optional<Ranked> opening = free.opening().or(held::opening);
 
     List<Ranked> chosen = new ArrayList<>();
-    opening.ifPresent(chosen::add);
-    // Beside it, one card of each kind (Fatih, 2026-10-14): the best below the request and the
-    // nearest above it outside the tolerance; a second option within the tolerance is not a card.
-    freeOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
-    freeOptions
-        .nearestAbove(aboveOrder)
-        .filter(ranked -> ranked.units() > windowHigh)
-        .ifPresent(chosen::add);
-    chosen.addAll(freeOptions.pending());
-    heldOpening.ifPresent(chosen::add);
-    heldOptions.shortSide(tenantFirst, belowOrder).ifPresent(chosen::add);
-
-    // The same pieces are listed once; the opening placement wins.
-    Map<String, Ranked> unique = new LinkedHashMap<>();
-    for (Ranked ranked : chosen) {
-      unique.putIfAbsent(ranked.pieceKey(), ranked);
-    }
-    List<Ranked> listed = new ArrayList<>();
-    String openingKey = opening.map(Ranked::pieceKey).orElse(null);
-    for (Ranked ranked : unique.values()) {
-      OptionPlacement placement =
-          ranked.pieceKey().equals(openingKey)
-              ? OptionPlacement.MAIN
-              : ranked.units() < target ? OptionPlacement.BELOW : OptionPlacement.ABOVE;
-      listed.add(ranked.withOption(ranked.option().as(placement)));
-    }
-
     List<UUID> unavailable = List.of();
     if (!context.input().manualPieceIds().isEmpty()) {
       unavailable = unavailableManualPieces();
       if (unavailable.isEmpty()) {
-        listed.add(manual());
+        chosen.add(manual());
       }
     }
+    chosen.addAll(free.cards());
+    chosen.addAll(held.cards());
 
-    listed.sort(listedOrder);
-    List<QuantityOption> options =
-        ProposalReasons.withReasons(
-            context, limitExceeded, listed.stream().map(Ranked::option).toList());
+    // The same pieces are listed once; the earlier card wins.
+    Map<String, Ranked> unique = new LinkedHashMap<>();
+    for (Ranked ranked : chosen) {
+      unique.putIfAbsent(ranked.pieceKey(), ranked);
+    }
+    String openingKey = opening.map(Ranked::pieceKey).orElse(null);
+    List<QuantityOption> listed = new ArrayList<>();
+    for (Ranked ranked : unique.values()) {
+      QuantityOption option = ranked.option();
+      if (option.placement() != OptionPlacement.MANUAL) {
+        option =
+            option.as(
+                ranked.pieceKey().equals(openingKey)
+                    ? OptionPlacement.MAIN
+                    : ranked.units() < target ? OptionPlacement.BELOW : OptionPlacement.ABOVE);
+      }
+      listed.add(option);
+    }
+
+    List<QuantityOption> options = ProposalReasons.withReasons(context, limitExceeded, listed);
     Integer mainIndex = null;
     for (int i = 0; i < options.size(); i++) {
       if (options.get(i).placement() == OptionPlacement.MAIN) {
@@ -219,126 +168,131 @@ final class ProposalEvaluation {
         unavailable);
   }
 
-  // ---------------------------------------------------------------- candidates
+  // ---------------------------------------------------------------- cards
 
   private List<Run> runs() {
-    List<Run> runs = new ArrayList<>();
     List<UUID> ordered = context.lots().stream().map(ProposalLot::batchId).toList();
-    for (UUID lot : ordered) {
-      runs.add(new Run(List.of(lot), Compatibility.SINGLE_LOT, runs.size()));
+    if (!context.input().singleLotRequired()) {
+      return List.of(new Run(ordered));
     }
-    if (context.input().singleLotRequired() || ordered.size() < 2) {
-      return runs;
-    }
-    for (Set<UUID> group : context.input().confirmedGroups()) {
-      List<UUID> members = ordered.stream().filter(group::contains).toList();
-      if (members.size() >= 2) {
-        runs.add(new Run(members, Compatibility.CONFIRMED, runs.size()));
-      }
-    }
-    for (Set<UUID> group : context.input().toneAcceptedGroups()) {
-      List<UUID> members = ordered.stream().filter(group::contains).toList();
-      if (members.size() >= 2) {
-        runs.add(new Run(members, Compatibility.TONE_ACCEPTED, runs.size()));
-      }
-    }
-    runs.add(new Run(ordered, Compatibility.PENDING_CONFIRMATION, runs.size()));
-    return runs;
+    return ordered.stream().map(lot -> new Run(List.of(lot))).toList();
   }
 
   /**
-   * What one tier's stock offers, per compatible set of lots. Definite runs (single lot, confirmed
-   * group, tone acceptance) give: the best meeting the request within the tolerance, the nearest at
-   * or above it, the best below it within the tolerance and the nearest below it. A pending
-   * combination is kept only when it uses several lots no definite group covers and is nearer to
-   * the request than the definite options on its side (SOI S05). No computed selection leaves a lot
-   * with fewer normal pieces than its lot-health minimum.
+   * The cards one tier of stock offers (Fatih, 2026-10-15): meets the request, the most within the
+   * upper limit, short within the lower limit; only when none exists, the nearest above and below
+   * outside the tolerance. Each search ranks healthy stock first; no computed selection leaves a
+   * lot fewer normal pieces than its lot-health minimum.
    */
-  private Found candidates(Tier tier, List<Run> runs) {
+  private Cards cards(Tier tier, List<Run> runs) {
     Map<UUID, WholePieceSearch.Lot> pools = StockPools.pools(context, tier);
-    int minKeep = context.lotHealth().minHealthyPieces();
-    List<Ranked> covering = new ArrayList<>();
-    List<Ranked> above = new ArrayList<>();
-    List<Ranked> shortWithin = new ArrayList<>();
-    List<Ranked> below = new ArrayList<>();
-    List<Ranked> pendingAbove = new ArrayList<>();
-    List<Ranked> pendingBelow = new ArrayList<>();
+    List<List<ProposalSearch.SearchLot>> searchable = new ArrayList<>();
     for (Run run : runs) {
-      List<ProposalSearch.SearchLot> runLots =
-          run.lots().stream()
-              .map(pools::get)
-              .filter(Objects::nonNull)
-              .filter(lot -> !lot.pieces().isEmpty())
-              .map(
-                  lot ->
-                      new ProposalSearch.SearchLot(lot, context.ageRanks().get(lot.id()), minKeep))
-              .toList();
-      if (runLots.isEmpty()) {
-        continue;
-      }
-      if (run.definite()) {
-        found(ProposalSearch.bestWithin(runLots, target, windowHigh, target))
-            .ifPresent(selection -> covering.add(ranked(run, pools, selection)));
-        found(ProposalSearch.smallestFrom(runLots, target))
-            .ifPresent(selection -> above.add(ranked(run, pools, selection)));
-        if (windowLow < target) {
-          found(ProposalSearch.bestWithin(runLots, windowLow, target - 1, target))
-              .ifPresent(selection -> shortWithin.add(ranked(run, pools, selection)));
-        }
-        found(ProposalSearch.largestUpTo(runLots, target - 1))
-            .ifPresent(selection -> below.add(ranked(run, pools, selection)));
-      } else {
-        found(ProposalSearch.smallestFrom(runLots, target))
-            .filter(selection -> severalUncoveredLots(selection, runs))
-            .ifPresent(selection -> pendingAbove.add(ranked(run, pools, selection)));
-        found(ProposalSearch.largestUpTo(runLots, target - 1))
-            .filter(selection -> severalUncoveredLots(selection, runs))
-            .ifPresent(selection -> pendingBelow.add(ranked(run, pools, selection)));
+      List<ProposalSearch.SearchLot> lots = searchLots(run, pools);
+      if (!lots.isEmpty()) {
+        searchable.add(lots);
       }
     }
-    List<Ranked> pending = new ArrayList<>();
-    Optional<Ranked> definiteAbove = above.stream().min(aboveOrder);
-    pendingAbove.stream()
-        .min(aboveOrder)
-        .filter(
-            candidate -> definiteAbove.isEmpty() || candidate.units() < definiteAbove.get().units())
-        .ifPresent(pending::add);
-    Optional<Ranked> definiteBelow = below.stream().min(belowOrder);
-    pendingBelow.stream()
-        .min(belowOrder)
-        .filter(
-            candidate -> definiteBelow.isEmpty() || candidate.units() > definiteBelow.get().units())
-        .ifPresent(pending::add);
-    return new Found(covering, above, shortWithin, below, pending);
+    Comparator<Ranked> mostFirst =
+        Comparator.comparingLong(Ranked::units).reversed().thenComparing(tenantFirst);
+    Comparator<Ranked> nearestAbove =
+        Comparator.comparingLong(Ranked::units).thenComparing(tenantFirst);
+
+    Optional<Ranked> meets =
+        best(
+            searchable,
+            pools,
+            lots -> ProposalSearch.bestWithin(lots, target, windowHigh, target),
+            tenantFirst);
+    Optional<Ranked> most =
+        meets.flatMap(
+            first ->
+                best(
+                        searchable,
+                        pools,
+                        lots -> ProposalSearch.largestUpTo(lots, windowHigh),
+                        mostFirst)
+                    .filter(candidate -> candidate.units() > first.units()));
+    Optional<Ranked> shortWithin =
+        windowLow < target
+            ? best(
+                searchable,
+                pools,
+                lots -> ProposalSearch.bestWithin(lots, windowLow, target - 1, target),
+                tenantFirst)
+            : Optional.empty();
+
+    List<Ranked> cards = new ArrayList<>();
+    meets.ifPresent(cards::add);
+    most.ifPresent(cards::add);
+    shortWithin.ifPresent(cards::add);
+    if (!cards.isEmpty()) {
+      return new Cards(cards, true);
+    }
+    Optional<Ranked> above =
+        best(
+            searchable,
+            pools,
+            lots -> ProposalSearch.smallestFrom(lots, windowHigh + 1),
+            nearestAbove);
+    Optional<Ranked> below =
+        windowLow > 1
+            ? best(
+                searchable,
+                pools,
+                lots -> ProposalSearch.largestUpTo(lots, windowLow - 1),
+                mostFirst)
+            : Optional.empty();
+    above.ifPresent(cards::add);
+    below.ifPresent(cards::add);
+    return new Cards(cards, above.isPresent());
   }
 
-  private Optional<WholePieceSearch.Selection> found(ProposalSearch.Result result) {
-    limitExceeded |= result.limitExceeded();
-    return result.best();
+  private List<ProposalSearch.SearchLot> searchLots(
+      Run run, Map<UUID, WholePieceSearch.Lot> pools) {
+    int minKeep = context.lotHealth().minHealthyPieces();
+    return run.lots().stream()
+        .map(pools::get)
+        .filter(Objects::nonNull)
+        .filter(lot -> !lot.pieces().isEmpty())
+        .map(lot -> new ProposalSearch.SearchLot(lot, context.ageRanks().get(lot.id()), minKeep))
+        .toList();
   }
 
-  private static boolean severalUncoveredLots(
-      WholePieceSearch.Selection selection, List<Run> runs) {
-    Set<UUID> used =
-        selection.takes().stream().map(WholePieceSearch.LotTake::lotId).collect(Collectors.toSet());
-    return used.size() >= 2
-        && runs.stream().filter(Run::definite).noneMatch(run -> run.lots().containsAll(used));
+  /** The best of one search over every run, by {@code order}. */
+  private Optional<Ranked> best(
+      List<List<ProposalSearch.SearchLot>> searchable,
+      Map<UUID, WholePieceSearch.Lot> pools,
+      Function<List<ProposalSearch.SearchLot>, ProposalSearch.Result> search,
+      Comparator<Ranked> order) {
+    List<Ranked> found = new ArrayList<>();
+    for (List<ProposalSearch.SearchLot> lots : searchable) {
+      ProposalSearch.Result result = search.apply(lots);
+      limitExceeded |= result.limitExceeded();
+      result.best().ifPresent(selection -> found.add(ranked(pools, selection)));
+    }
+    return found.stream().min(order);
   }
 
   private Ranked ranked(
-      Run run, Map<UUID, WholePieceSearch.Lot> pools, WholePieceSearch.Selection selection) {
+      Map<UUID, WholePieceSearch.Lot> pools, WholePieceSearch.Selection selection) {
     QuantityOption option =
         OptionBuilder.option(
             context,
             pools,
             "S:" + ProposalRanking.pieceKey(selection.takes()),
             selection.takes(),
-            run.compatibility(),
-            run.definite() ? null : BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED);
-    return ProposalRanking.rank(context, pools, option, run.definite(), selection.takes());
+            compatibilityOf(selection.lotCount()),
+            null);
+    return ProposalRanking.rank(context, pools, option, true, selection.takes());
   }
 
-  // ---------------------------------------------------------------- manual pick
+  /** One lot, or several the line accepts (Fatih, 2026-10-15). */
+  private static Compatibility compatibilityOf(int lots) {
+    return lots <= 1 ? Compatibility.SINGLE_LOT : Compatibility.MULTIPLE_LOTS_ACCEPTED;
+  }
+
+  // ---------------------------------------------------------------- changed pieces
 
   private List<UUID> unavailableManualPieces() {
     return context.input().manualPieceIds().stream()
@@ -354,9 +308,9 @@ final class ProposalEvaluation {
   }
 
   /**
-   * The salesperson's pick with the same checks: the single-lot requirement, lot compatibility,
-   * holds and the remnant rule over the pool it was taken from (free when it fits free stock).
-   * Short pieces it leaves behind do not count as kept.
+   * The salesperson's changed pieces with the same checks: the single-lot requirement, holds and
+   * the remnant rule over the pool they were taken from (free when they fit free stock). Short
+   * pieces left behind do not count as kept.
    */
   private Ranked manual() {
     Map<UUID, List<UUID>> byLot = new LinkedHashMap<>();
@@ -390,28 +344,17 @@ final class ProposalEvaluation {
           new WholePieceSearch.LotTake(
               lot.batchId(), picked.stream().sorted().toList(), context.units(picked), left));
     }
-    Set<UUID> usedLots = byLot.keySet();
-    Compatibility compatibility;
-    if (usedLots.size() == 1) {
-      compatibility = Compatibility.SINGLE_LOT;
-    } else if (context.input().confirmedGroups().stream()
-        .anyMatch(group -> group.containsAll(usedLots))) {
-      compatibility = Compatibility.CONFIRMED;
-    } else if (context.input().toneAcceptedGroups().stream()
-        .anyMatch(group -> group.containsAll(usedLots))) {
-      compatibility = Compatibility.TONE_ACCEPTED;
-    } else {
-      compatibility = Compatibility.PENDING_CONFIRMATION;
-    }
-    BlockedReason block = null;
-    if (context.input().singleLotRequired() && usedLots.size() > 1) {
-      block = BlockedReason.SINGLE_LOT_REQUIRED;
-    } else if (compatibility == Compatibility.PENDING_CONFIRMATION) {
-      block = BlockedReason.COMPATIBILITY_CONFIRMATION_REQUIRED;
-    }
+    boolean several = byLot.size() > 1;
+    BlockedReason block =
+        context.input().singleLotRequired() && several ? BlockedReason.SINGLE_LOT_REQUIRED : null;
     QuantityOption option =
         OptionBuilder.option(
-                context, pools, "M:" + ProposalRanking.pieceKey(takes), takes, compatibility, block)
+                context,
+                pools,
+                "M:" + ProposalRanking.pieceKey(takes),
+                takes,
+                compatibilityOf(byLot.size()),
+                block)
             .as(OptionPlacement.MANUAL);
     return ProposalRanking.rank(context, pools, option, block == null, takes);
   }
