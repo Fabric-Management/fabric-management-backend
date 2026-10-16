@@ -2539,6 +2539,38 @@ COMMENT ON TABLE common_user.user_nav_preferences IS 'Per-user nav preferences: 
 
 -- Rollback (commented): DROP TABLE IF EXISTS common_user.user_nav_preferences CASCADE;
 
+-- -----------------------------------------------------------------------------
+-- User interface preferences (one row per user, tenant and key).
+-- Used for: ordered identifiers a screen owns, e.g. the order of a page's sections (JSONB);
+-- the upsert relies on UNIQUE (tenant_id, user_id, preference_key).
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS common_user.user_ui_preference (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) NOT NULL,
+    user_id UUID NOT NULL,
+    preference_key VARCHAR(100) NOT NULL,
+    preference_values JSONB NOT NULL DEFAULT '[]'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_user_ui_preference_tenant_user_key UNIQUE (tenant_id, user_id, preference_key),
+    CONSTRAINT ck_user_ui_preference_values_array CHECK (jsonb_typeof(preference_values) = 'array'),
+    CONSTRAINT fk_user_ui_preference_tenant FOREIGN KEY (tenant_id) REFERENCES common_tenant.common_tenant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_user_ui_preference_user FOREIGN KEY (user_id) REFERENCES common_user.common_user(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_ui_preference_tenant ON common_user.user_ui_preference(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_ui_preference_tenant_user ON common_user.user_ui_preference(tenant_id, user_id);
+
+COMMENT ON TABLE common_user.user_ui_preference IS 'Per-user interface preferences: ordered identifiers (JSONB array) under a screen-owned key. One row per (tenant, user, key).';
+
+-- Rollback (commented): DROP TABLE IF EXISTS common_user.user_ui_preference CASCADE;
+
 
 -- ===================== FROM: V20250314200000__batch_source_type.sql =====================
 ALTER TABLE production.production_execution_batch

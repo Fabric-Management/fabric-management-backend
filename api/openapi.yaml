@@ -104,6 +104,8 @@ tags:
   name: Audit
 - description: WhatsApp Business API webhook endpoints
   name: WhatsApp Webhooks
+- description: User interface preference operations
+  name: User UI Preferences
 - description: User performance leaderboard
   name: FlowBoard — Performance
 - description: Edit bases and merged saves of draft orders
@@ -14102,6 +14104,168 @@ paths:
           description: Internal Server Error
       tags:
       - User Profile
+  /api/v1/common/users/{id}/ui-preferences/{key}:
+    get:
+      description: "Returns the values stored under the key, or an empty list when\
+        \ none were saved. Returns 403 for another user and 400 for an invalid key."
+      operationId: getUiPreference
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseUiPreferenceResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get an interface preference of the current user
+      tags:
+      - User UI Preferences
+    put:
+      description: "Replaces the values stored under the key, creating the preference\
+        \ when needed. Returns 403 for another user, 404 for a user absent from the\
+        \ tenant, and 400 for an invalid key or values."
+      operationId: putUiPreference
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UiPreferenceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseUiPreferenceResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Save an interface preference of the current user
+      tags:
+      - User UI Preferences
   /api/v1/common/users/{userId}/addresses:
     get:
       operationId: getUserAddresses
@@ -64117,6 +64281,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseUiPreferenceResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/UiPreferenceResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseUnrealizedFxPositionDto:
       type: object
       properties:
@@ -85866,6 +86048,36 @@ components:
           type: string
         turnsPerMetre:
           $ref: "#/components/schemas/SubValueNumericBounds"
+    UiPreferenceRequest:
+      type: object
+      description: Interface preference values to store under a key
+      properties:
+        values:
+          type: array
+          description: "Ordered identifiers chosen by the screen that owns the key,\
+            \ at most 50, each 1-100 characters and unique. An empty list clears the\
+            \ preference."
+          items:
+            type: string
+          maxItems: 50
+          minItems: 0
+      required:
+      - values
+    UiPreferenceResponse:
+      type: object
+      description: Interface preference stored under a key
+      properties:
+        key:
+          type: string
+          description: The preference key
+        values:
+          type: array
+          description: Ordered identifiers; empty when the preference was never saved
+          items:
+            type: string
+      required:
+      - key
+      - values
     UnmodelledSpecConstraint:
       type: object
       additionalProperties: false
