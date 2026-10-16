@@ -102,6 +102,8 @@ tags:
   name: FlowBoard — Task
 - description: Audit operations
   name: Audit
+- description: "Companies that receive goods for a customer, linked with a role"
+  name: Partner Links
 - description: WhatsApp Business API webhook endpoints
   name: WhatsApp Webhooks
 - description: User interface preference operations
@@ -288,305 +290,6 @@ tags:
 - description: Password operations
   name: Password
 paths:
-  /api/v1/common/tenant/settings/branding:
-    get:
-      operationId: readTenantBranding
-      responses:
-        "200":
-          content:
-            "*/*":
-              schema:
-                $ref: "#/components/schemas/ApiResponseTenantBrandingDto"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Read branding of the authenticated tenant
-      tags:
-        - Tenant Branding
-  /api/v1/common/tenant/settings/branding/assets/{id}:
-    get:
-      operationId: readTenantBrandAssetContent
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: appearance
-          required: false
-          schema:
-            $ref: "#/components/schemas/BrandAppearance"
-            default: ORIGINAL
-      responses:
-        "200":
-          content:
-            image/svg+xml:
-              schema:
-                type: string
-                format: binary
-          description: Static SVG; monochrome artwork is recoloured for the requested appearance
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Read a validated SVG belonging to the current tenant
-      tags:
-        - Tenant Branding
-  /api/v1/common/tenant/settings/branding/{kind}:
-    delete:
-      operationId: removeTenantBrandAsset
-      parameters:
-        - in: path
-          name: kind
-          required: true
-          schema:
-            $ref: "#/components/schemas/BrandAssetKind"
-      responses:
-        "200":
-          content:
-            "*/*":
-              schema:
-                $ref: "#/components/schemas/ApiResponseVoid"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Remove a tenant brand asset (administrators only)
-      tags:
-        - Tenant Branding
-    post:
-      operationId: uploadTenantBrandAsset
-      parameters:
-        - in: path
-          name: kind
-          required: true
-          schema:
-            $ref: "#/components/schemas/BrandAssetKind"
-        - in: query
-          name: colourMode
-          required: false
-          schema:
-            $ref: "#/components/schemas/BrandColourMode"
-            default: ORIGINAL
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: Static SVG with viewBox; text must be converted to outlines. Maximum 524288 bytes.
-              required:
-                - file
-      responses:
-        "200":
-          content:
-            "*/*":
-              schema:
-                $ref: "#/components/schemas/ApiResponseTenantBrandAssetDto"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Upload or replace a tenant SVG (512 KB maximum; administrators only)
-      tags:
-        - Tenant Branding
   /api/v1/admin/onboarding/tenant:
     post:
       description: "Creates a new tenant and organization, admin user, selected OS\
@@ -10443,6 +10146,307 @@ paths:
           description: Internal Server Error
       tags:
       - Tenant Settings
+  /api/v1/common/tenant/settings/branding:
+    get:
+      operationId: readTenantBranding
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTenantBrandingDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read branding of the authenticated tenant
+      tags:
+      - Tenant Branding
+  /api/v1/common/tenant/settings/branding/assets/{id}:
+    get:
+      operationId: readTenantBrandAssetContent
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: appearance
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandAppearance"
+          default: ORIGINAL
+      responses:
+        "200":
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+          description: Static SVG; monochrome artwork is recoloured for the requested
+            appearance
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read a validated SVG belonging to the current tenant
+      tags:
+      - Tenant Branding
+  /api/v1/common/tenant/settings/branding/{kind}:
+    delete:
+      operationId: removeTenantBrandAsset
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/BrandAssetKind"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove a tenant brand asset (administrators only)
+      tags:
+      - Tenant Branding
+    post:
+      operationId: uploadTenantBrandAsset
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/BrandAssetKind"
+      - in: query
+        name: colourMode
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandColourMode"
+          default: ORIGINAL
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Static SVG with viewBox; text must be converted to
+                    outlines. Maximum 524288 bytes.
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTenantBrandAssetDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Upload or replace a tenant SVG (512 KB maximum; administrators only)
+      tags:
+      - Tenant Branding
   /api/v1/common/tenant/settings/stock-proposal:
     get:
       operationId: getStockProposalSettings
@@ -11067,6 +11071,7 @@ paths:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -11132,6 +11137,317 @@ paths:
       summary: List by type
       tags:
       - Trading Partners
+  /api/v1/common/trading-partners/{customerId}/partner-links:
+    get:
+      operationId: listLinks
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListPartnerLinkDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List the companies linked to a customer
+      tags:
+      - Partner Links
+    post:
+      description: Links a tenant partner to the customer in a role. Rejects a link
+        to the customer itself (400) and a repeat of an active link (409).
+      operationId: linkExisting
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePartnerLinkRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePartnerLinkDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Link an existing partner to a customer
+      tags:
+      - Partner Links
+  /api/v1/common/trading-partners/{customerId}/partner-links/quick:
+    post:
+      description: "Answers 201 when the company was linked. When similar tenant partners\
+        \ exist and createAnyway is not true, answers 200 with created=false and the\
+        \ candidates; nothing is written."
+      operationId: quickCreateAndLink
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuickCreatePartnerLinkRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQuickCreatePartnerLinkResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Find or create a delivery partner and link it to a customer
+      tags:
+      - Partner Links
+  /api/v1/common/trading-partners/{customerId}/partner-links/{linkId}:
+    delete:
+      operationId: unlink
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Link ID
+        in: path
+        name: linkId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove a link (soft delete)
+      tags:
+      - Partner Links
   /api/v1/common/trading-partners/{id}:
     delete:
       description: Soft-deletes a partner relationship
@@ -58358,118 +58674,6 @@ paths:
       - Hr Policy Pack
 components:
   schemas:
-    TenantBrandAssetDto:
-      type: object
-      description: A tenant-owned, validated SVG. URLs require the current tenant session.
-      properties:
-        colourMode:
-          $ref: "#/components/schemas/BrandColourMode"
-        fileName:
-          type: string
-          maxLength: 255
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: "#/components/schemas/BrandAssetKind"
-        url:
-          type: string
-        version:
-          type: integer
-          format: int64
-      required:
-        - colourMode
-        - fileName
-        - id
-        - kind
-        - url
-        - version
-    TenantBrandingDto:
-      type: object
-      description: Current tenant branding; absent slots are null. Mutation permission is backend-owned.
-      properties:
-        canManage:
-          type: boolean
-        icon:
-          anyOf:
-            - $ref: "#/components/schemas/TenantBrandAssetDto"
-            - type: "null"
-        iconDark:
-          anyOf:
-            - $ref: "#/components/schemas/TenantBrandAssetDto"
-            - type: "null"
-        iconUrl:
-          type:
-            - string
-            - "null"
-        logo:
-          anyOf:
-            - $ref: "#/components/schemas/TenantBrandAssetDto"
-            - type: "null"
-        logoDark:
-          anyOf:
-            - $ref: "#/components/schemas/TenantBrandAssetDto"
-            - type: "null"
-        logoUrl:
-          type:
-            - string
-            - "null"
-      required:
-        - canManage
-    ApiResponseTenantBrandAssetDto:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/TenantBrandAssetDto"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    ApiResponseTenantBrandingDto:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/TenantBrandingDto"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    BrandAppearance:
-      type: string
-      enum:
-        - ORIGINAL
-        - LIGHT
-        - DARK
-    BrandAssetKind:
-      type: string
-      enum:
-        - LOGO
-        - ICON
-        - LOGO_DARK
-        - ICON_DARK
-    BrandColourMode:
-      type: string
-      enum:
-        - ORIGINAL
-        - MONOCHROME
     ActiveSessionDto:
       type: object
       properties:
@@ -61191,6 +61395,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListPartnerLinkDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerLinkDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListPartnerUserDto:
       type: object
       properties:
@@ -63468,6 +63692,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePartnerLinkDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PartnerLinkDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePartnerUserDto:
       type: object
       properties:
@@ -63905,6 +64147,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/QuantityProposal"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseQuickCreatePartnerLinkResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QuickCreatePartnerLinkResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -64571,6 +64831,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/TaskResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTenantBrandAssetDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TenantBrandAssetDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTenantBrandingDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TenantBrandingDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -66149,6 +66445,24 @@ components:
         wipLimitDefault:
           type: integer
           format: int32
+    BrandAppearance:
+      type: string
+      enum:
+      - ORIGINAL
+      - LIGHT
+      - DARK
+    BrandAssetKind:
+      type: string
+      enum:
+      - LOGO
+      - ICON
+      - LOGO_DARK
+      - ICON_DARK
+    BrandColourMode:
+      type: string
+      enum:
+      - ORIGINAL
+      - MONOCHROME
     CashFlowBucketDto:
       type: object
       description: A single week's cash-flow projection bucket
@@ -68519,6 +68833,28 @@ components:
       required:
       - name
       - role
+    CreatePartnerLinkRequest:
+      type: object
+      properties:
+        linkedPartnerId:
+          type: string
+          format: uuid
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+      required:
+      - linkedPartnerId
+      - role
     CreatePaymentRequest:
       type: object
       properties:
@@ -69453,6 +69789,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -77551,6 +77888,98 @@ components:
           - OTHER
         whatsappEnabled:
           type: boolean
+    PartnerLinkDto:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        customerPartnerId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        linkedPartnerCountry:
+          type:
+          - string
+          - "null"
+        linkedPartnerId:
+          type: string
+          format: uuid
+        linkedPartnerName:
+          type: string
+        linkedPartnerType:
+          type: string
+          enum:
+          - SUPPLIER
+          - CUSTOMER
+          - SUBCONTRACTOR
+          - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
+          - BOTH
+          - SISTER_COMPANY
+          - SUBSIDIARY
+          - PARENT_COMPANY
+        note:
+          type:
+          - string
+          - "null"
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+      required:
+      - createdAt
+      - customerPartnerId
+      - id
+      - linkedPartnerId
+      - linkedPartnerName
+      - linkedPartnerType
+      - role
+    PartnerMatchDto:
+      type: object
+      properties:
+        country:
+          type:
+          - string
+          - "null"
+        displayName:
+          type: string
+        matchedOn:
+          type: string
+          enum:
+          - TAX_ID
+          - NAME
+        partnerId:
+          type: string
+          format: uuid
+        partnerType:
+          type: string
+          enum:
+          - SUPPLIER
+          - CUSTOMER
+          - SUBCONTRACTOR
+          - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
+          - BOTH
+          - SISTER_COMPANY
+          - SUBSIDIARY
+          - PARENT_COMPANY
+        taxId:
+          type:
+          - string
+          - "null"
+      required:
+      - displayName
+      - matchedOn
+      - partnerId
+      - partnerType
     PartnerUserDto:
       type: object
       properties:
@@ -80289,6 +80718,70 @@ components:
       required:
       - companyName
       - contacts
+    QuickCreatePartnerLinkRequest:
+      type: object
+      properties:
+        city:
+          type: string
+          maxLength: 120
+          minLength: 0
+        companyName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        country:
+          type: string
+          maxLength: 3
+          minLength: 3
+        createAnyway:
+          type: boolean
+          description: Create (or reuse by tax id) even though similar partners were
+            offered
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+        taxId:
+          type: string
+          maxLength: 50
+          minLength: 0
+      required:
+      - companyName
+      - country
+      - role
+    QuickCreatePartnerLinkResponse:
+      type: object
+      properties:
+        created:
+          type: boolean
+        link:
+          anyOf:
+          - $ref: "#/components/schemas/PartnerLinkDto"
+          - type: "null"
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerMatchDto"
+        partner:
+          anyOf:
+          - $ref: "#/components/schemas/TradingPartnerDto"
+          - type: "null"
+      required:
+      - created
+      - matches
     QuoteApprovalTokenDto:
       type: object
       properties:
@@ -86029,6 +86522,66 @@ components:
           - CRITICAL
         title:
           type: string
+    TenantBrandAssetDto:
+      type: object
+      description: "A tenant-owned, validated SVG. URLs require the current tenant\
+        \ session."
+      properties:
+        colourMode:
+          $ref: "#/components/schemas/BrandColourMode"
+        fileName:
+          type: string
+          maxLength: 255
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/BrandAssetKind"
+        url:
+          type: string
+        version:
+          type: integer
+          format: int64
+      required:
+      - colourMode
+      - fileName
+      - id
+      - kind
+      - url
+      - version
+    TenantBrandingDto:
+      type: object
+      description: Current tenant branding; absent slots are null. Mutation permission
+        is backend-owned.
+      properties:
+        canManage:
+          type: boolean
+        icon:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        iconDark:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        iconUrl:
+          type:
+          - string
+          - "null"
+        logo:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        logoDark:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        logoUrl:
+          type:
+          - string
+          - "null"
+      required:
+      - canManage
     TenantDto:
       type: object
       properties:
@@ -86408,6 +86961,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -87577,6 +88131,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY

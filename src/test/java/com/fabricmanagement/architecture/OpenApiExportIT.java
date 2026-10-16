@@ -112,7 +112,11 @@ public class OpenApiExportIT {
               "OrderIntakeStockPreviewQuantity"),
           // STOCK-PROPOSAL-2: an applicable option has no blocked reason.
           new NullableReference(
-              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"));
+              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"),
+          // CONSIGNEE-1 S1: a quick-create that needs a decision wrote nothing, so it has no
+          // partner and no link yet.
+          new NullableReference("QuickCreatePartnerLinkResponse", "partner", "TradingPartnerDto"),
+          new NullableReference("QuickCreatePartnerLinkResponse", "link", "PartnerLinkDto"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =

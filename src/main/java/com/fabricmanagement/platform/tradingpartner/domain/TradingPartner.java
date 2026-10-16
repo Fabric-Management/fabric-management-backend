@@ -243,6 +243,9 @@ public class TradingPartner extends BaseEntity {
    *   <li>SERVICE_PROVIDER + any → BOTH
    *   <li>Same type → no change
    *   <li>Already BOTH → no change
+   *   <li>Adding DELIVERY_PARTNER to any other type → no change (it is the weakest relationship)
+   *   <li>DELIVERY_PARTNER + any trading type → that type (the delivery-only type is replaced,
+   *       never mixed into BOTH)
    * </ul>
    *
    * @param newType The additional relationship type
@@ -251,6 +254,14 @@ public class TradingPartner extends BaseEntity {
   public boolean upgradeToMultiType(PartnerType newType) {
     if (this.partnerType == newType || this.partnerType == PartnerType.BOTH) {
       return false;
+    }
+    if (newType == PartnerType.DELIVERY_PARTNER) {
+      return false;
+    }
+    if (this.partnerType == PartnerType.DELIVERY_PARTNER) {
+      // The first trading relationship replaces the delivery-only one (CONSIGNEE-1 C3).
+      this.partnerType = newType;
+      return true;
     }
     if (newType == PartnerType.BOTH) {
       this.partnerType = PartnerType.BOTH;

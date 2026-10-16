@@ -362,6 +362,15 @@ CREATE POLICY rls_tenant_isolation ON common_user.user_ui_preference
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
+-- Table: common_company.partner_link
+ALTER TABLE common_company.partner_link ENABLE ROW LEVEL SECURITY;
+ALTER TABLE common_company.partner_link FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON common_company.partner_link;
+CREATE POLICY rls_tenant_isolation ON common_company.partner_link
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- Table: costing.cost_calculation
 ALTER TABLE costing.cost_calculation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE costing.cost_calculation FORCE ROW LEVEL SECURITY;
