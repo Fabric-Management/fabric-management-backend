@@ -693,6 +693,7 @@ public class TenantTransactionalPurgeService {
     deleteSeedUserOwnedRows(jdbc, tenantId, rows, "common_auth.common_trusted_device", "user_id");
     deleteSeedUserOwnedRows(jdbc, tenantId, rows, "common_auth.common_auth_user", "user_id");
     deleteSeedUserOwnedRows(jdbc, tenantId, rows, "common_user.user_nav_preferences", "user_id");
+    deleteSeedUserOwnedRows(jdbc, tenantId, rows, "common_user.user_ui_preference", "user_id");
     deleteSeedUserOwnedRows(jdbc, tenantId, rows, "i18n.user_locale_config", "user_id");
     deleteSeedUserOwnedRows(
         jdbc, tenantId, rows, "notification.user_notification_preference", "user_id");

@@ -202,6 +202,9 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
     tables.put(
         "common_user.user_nav_preferences",
         "Seed-user nav preferences are deleted by demo_seed CTE.");
+    tables.put(
+        "common_user.user_ui_preference",
+        "Seed-user interface preferences are deleted by demo_seed CTE.");
     tables.put("human.human_employee", "Seed-user employees are deleted by demo_seed CTE.");
     tables.put("human.human_holiday_calendar", "Tenant HR calendar configuration is retained.");
     tables.put("human.human_hr_country_pack_mapping", "Tenant HR pack mapping is retained.");
