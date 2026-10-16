@@ -252,7 +252,9 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
    * Records the quantity tolerance agreed for this distribution, or clears it when both limits are
    * null. The recorder and time are kept with it; where it was agreed is the order's agreement
    * source. Re-recording the same limits keeps the original recorder and time, so an unrelated edit
-   * does not rewrite provenance.
+   * does not rewrite provenance. One limit alone is refused: both are agreed together and 0 is a
+   * value (Fatih, 2026-10-13). Only lines the system opens without the salesperson (a customer
+   * request) are left without a tolerance; they get no stock proposal until it is entered.
    */
   public void recordTolerance(
       BigDecimal upPct, BigDecimal downPct, UUID actor, java.time.Instant at) {
@@ -262,6 +264,10 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
       toleranceRecordedBy = null;
       toleranceRecordedAt = null;
       return;
+    }
+    if (upPct == null || downPct == null) {
+      throw new OrderDomainException(
+          "Enter both the upper and the lower tolerance; write 0 when no deviation is accepted");
     }
     validateTolerance(upPct, downPct);
     if (sameAmount(upPct, toleranceUpPct) && sameAmount(downPct, toleranceDownPct)) {

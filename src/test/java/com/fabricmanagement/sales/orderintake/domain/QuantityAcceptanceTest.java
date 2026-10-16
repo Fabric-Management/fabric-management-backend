@@ -157,19 +157,9 @@ class QuantityAcceptanceTest {
 
   @Test
   @DisplayName(
-      "3.1: pieces of unknown state make the remnant verdict unknown; it must still be acknowledged")
-  void unknownPiecesMakeTheRemnantUnknown() {
-    QuantityOption.LotPart oneLeftOneUnknown =
-        QuantityOptionFixtures.lot(
-            UUID.randomUUID(),
-            "P1",
-            List.of(UUID.randomUUID()),
-            new BigDecimal("212"),
-            1,
-            1,
-            false,
-            null,
-            null);
+      "Pieces of unknown state are not counted as pieces left (Fatih, 2026-10-13); a remnant is"
+          + " one or two pool pieces and must be acknowledged")
+  void unknownPiecesAreNotCounted_aRemnantIsOneOrTwoPieces() {
     QuantityOption.LotPart emptiedButUnknown =
         QuantityOptionFixtures.lot(
             UUID.randomUUID(),
@@ -188,17 +178,13 @@ class QuantityAcceptanceTest {
             List.of(UUID.randomUUID()),
             new BigDecimal("212"),
             2,
-            1,
-            false,
-            null,
-            null);
+            0,
+            true,
+            UUID.randomUUID(),
+            new BigDecimal("60"));
 
-    assertThat(oneLeftOneUnknown.remnantUnknown()).isTrue();
-    assertThat(emptiedButUnknown.remnantUnknown()).isTrue();
     assertThat(emptiedButUnknown.exhausted()).isFalse();
-    assertThat(twoLeft.remnantUnknown()).isFalse();
-
-    QuantityOption option =
+    QuantityOption unknownOnly =
         QuantityOptionFixtures.option(
             "EXACT:0123456789abcdef",
             QuantityOption.OptionKind.EXACT,
@@ -208,8 +194,22 @@ class QuantityAcceptanceTest {
             BigDecimal.ZERO,
             BigDecimal.ZERO,
             false,
-            List.of(oneLeftOneUnknown));
-    assertThat(option.leavesSingleRemnant()).isFalse();
+            List.of(emptiedButUnknown));
+    assertThat(unknownOnly.leavesRemnant()).isFalse();
+    assertThat(unknownOnly.needsRemnantAcknowledgement()).isFalse();
+
+    QuantityOption option =
+        QuantityOptionFixtures.option(
+            "REQUESTED_WITH_REMNANT:0123456789abcdef",
+            QuantityOption.OptionKind.REQUESTED_WITH_REMNANT,
+            QuantityOption.Compatibility.SINGLE_LOT,
+            new BigDecimal("212"),
+            new BigDecimal("212"),
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            false,
+            List.of(twoLeft));
+    assertThat(option.leavesRemnant()).isTrue();
     assertThat(option.needsRemnantAcknowledgement()).isTrue();
     QuantityAcceptance.CustomerEvidence evidence =
         new QuantityAcceptance.CustomerEvidence(

@@ -26,7 +26,6 @@ public final class QuantityOptionFixtures {
     return new QuantityOption(
         optionKey,
         QuantityOption.OptionPlacement.MAIN,
-        false,
         kind,
         compatibility,
         QuantityOption.StockSource.FREE,
@@ -52,7 +51,7 @@ public final class QuantityOptionFixtures {
       BigDecimal quantity,
       int remainingEligiblePieces,
       int unknownPieces,
-      boolean singleRemnant,
+      boolean remnant,
       UUID remnantPieceId,
       BigDecimal remnantQuantity) {
     return new QuantityOption.LotPart(
@@ -64,8 +63,8 @@ public final class QuantityOptionFixtures {
         remainingEligiblePieces,
         remnantQuantity == null ? BigDecimal.ZERO : remnantQuantity,
         unknownPieces,
-        singleRemnant,
-        remnantPieceId,
+        remnant,
+        remnantPieceId == null ? List.of() : List.of(remnantPieceId),
         remnantQuantity,
         remainingEligiblePieces == 0 && unknownPieces == 0);
   }

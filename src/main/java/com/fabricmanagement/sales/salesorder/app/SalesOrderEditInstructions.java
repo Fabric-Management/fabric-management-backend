@@ -208,6 +208,14 @@ public final class SalesOrderEditInstructions {
               null,
               clientLineId);
         }
+        if (!fields.containsKey(OrderEditKey.LINE_TOLERANCE)) {
+          throw invalidAt(
+              path + ".fields.tolerance",
+              TOLERANCE_REQUIRED,
+              OrderEditKey.LINE_TOLERANCE.wireName(),
+              null,
+              clientLineId);
+        }
       }
       case UPDATE -> {
         if (lineId == null) {
@@ -374,6 +382,10 @@ public final class SalesOrderEditInstructions {
         : wire;
   }
 
+  /** Both tolerance limits are required; 0 is a value (Fatih, 2026-10-13). */
+  static final String TOLERANCE_REQUIRED =
+      "Enter both the upper and the lower tolerance; write 0 when no deviation is accepted";
+
   /** A part a composite lacks: its path below the value ({@code .term}) and the message. */
   private record MissingPart(String part, String message) {}
 
@@ -396,6 +408,10 @@ public final class SalesOrderEditInstructions {
           new MissingPart(".value", "Finished width and its unit are given together");
       case SalesOrderLineWidthValue width when blank(width.unit()) ->
           new MissingPart(".unit", "Finished width and its unit are given together");
+      case SalesOrderLineToleranceValue tolerance when tolerance.upPct() == null ->
+          new MissingPart(".upPct", TOLERANCE_REQUIRED);
+      case SalesOrderLineToleranceValue tolerance when tolerance.downPct() == null ->
+          new MissingPart(".downPct", TOLERANCE_REQUIRED);
       default -> null;
     };
   }

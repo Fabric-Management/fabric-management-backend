@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.events.TenantSettingsUpdatedEv
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
+import com.fabricmanagement.platform.tenant.domain.TenantSettingsUnreadableException;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.domain.event.TenantCreatedEvent;
@@ -302,28 +303,51 @@ public class TenantSystemService {
    * <p>Returns default settings when the tenant record is not found or settings are null. This
    * ensures the GET endpoint never fails with 4xx/5xx for a missing or incomplete record.
    *
+   * <p>A read or parse failure also returns the defaults; a rule that must not run on defaults uses
+   * {@link #requireSettings(UUID)} instead.
+   *
    * @param tenantId Tenant UUID
    * @return TenantSettings (never null)
    */
   public TenantSettings getSettings(UUID tenantId) {
     try {
-      String settingsJson =
-          systemExecutor.executeQueryForObject(
-              "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
-              (rs, i) -> rs.getString("settings"),
-              tenantId);
-      if (settingsJson == null || settingsJson.isBlank()) {
-        log.warn("Tenant not found or settings null for: {}. Returning defaults.", tenantId);
-        return TenantSettings.defaults();
-      }
-      return objectMapper.readValue(settingsJson, TenantSettings.class);
-    } catch (Exception e) {
+      return requireSettings(tenantId);
+    } catch (TenantSettingsUnreadableException e) {
       log.error(
           "Unexpected error loading settings for tenant {}: {}. Returning defaults.",
           tenantId,
           e.getMessage(),
           e);
       return TenantSettings.defaults();
+    }
+  }
+
+  /**
+   * Settings for a tenant, telling "never set" from "cannot be read" (Fatih, 2026-10-14). A tenant
+   * without stored settings gets the defaults; a failed read or parse throws, so a rule built on
+   * the settings stops rather than silently running on defaults.
+   *
+   * @throws TenantSettingsUnreadableException when the settings cannot be read or parsed
+   */
+  public TenantSettings requireSettings(UUID tenantId) {
+    String settingsJson;
+    try {
+      settingsJson =
+          systemExecutor.executeQueryForObject(
+              "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
+              (rs, i) -> rs.getString("settings"),
+              tenantId);
+    } catch (Exception e) {
+      throw new TenantSettingsUnreadableException(tenantId, e);
+    }
+    if (settingsJson == null || settingsJson.isBlank()) {
+      log.warn("Tenant not found or settings null for: {}. Returning defaults.", tenantId);
+      return TenantSettings.defaults();
+    }
+    try {
+      return objectMapper.readValue(settingsJson, TenantSettings.class);
+    } catch (Exception e) {
+      throw new TenantSettingsUnreadableException(tenantId, e);
     }
   }
 

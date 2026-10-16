@@ -207,6 +207,38 @@ class ProposalStockQueryServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "The lot's average piece is as produced: shipped pieces count, unmeasured ones do not")
+  void averagePieceAsProduced() {
+    Batch lot = lot(COLOR, null);
+    StockUnit atHand = piece(lot, "100");
+    StockUnit shortAtHand = piece(lot, "40");
+    StockUnit shipped =
+        piece(lot, "100", StockUnitStatus.DEPLETED, QualityDisposition.RELEASED, false);
+    StockUnit unmeasured = piece(lot, null);
+    stock(lot, atHand, shortAtHand, shipped, unmeasured);
+
+    ProposalLot found = onlyLot(query(null, null));
+
+    // 100 + 40 + 100 over three pieces: the shipped piece keeps the average where production put
+    // it, so the 40 m piece stays short after the normal ones are sold.
+    assertThat(found.averagePiece()).isEqualByComparingTo("80");
+    assertThat(found.pieces())
+        .extracting(ProposalPiece::stockUnitId)
+        .doesNotContain(shipped.getId());
+  }
+
+  @Test
+  @DisplayName(
+      "Without a measured piece the lot has no average; the evaluation uses what is at hand")
+  void noAverageWithoutMeasures() {
+    Batch lot = lot(COLOR, null);
+    stock(lot, piece(lot, null));
+
+    assertThat(onlyLot(query(null, null)).averagePiece()).isNull();
+  }
+
+  @Test
   @DisplayName("Lots of another colour are not candidates")
   void colourMustMatch() {
     Batch other = lot(UUID.randomUUID(), null);

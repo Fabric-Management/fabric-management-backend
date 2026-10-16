@@ -1,25 +1,24 @@
 package com.fabricmanagement.sales.orderintake.domain.proposal;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Exact whole-piece search (SOI IK-07). Quantities are integer units (for example centimetres).
- * Pieces are never cut. A lot from which at least one piece is taken must not be left with exactly
- * one eligible piece unless {@code allowRemnant} is set; lots already holding a single piece may be
- * emptied. A lot may carry a capacity: no take from it exceeds that quantity (free stock net of
- * quote intents, STOCK-PROPOSAL-2). Among selections with the same total the one using fewer lots
- * wins; among those, lots earlier in the given order (older stock) are preferred.
+ * Whole-piece primitives (SOI IK-07): pieces, lots and their takes in integer units (for example
+ * millimetres), the per-lot bitset sums and the bounded choice of pieces for a reachable sum.
+ * Pieces are never cut. A lot may carry a capacity: no take from it exceeds that quantity (free
+ * stock net of quote intents, STOCK-PROPOSAL-2). The searches live in {@link ProposalSearch}.
  *
- * <p>The search is a bitset dynamic programme over (lot, pieces taken from the lot, lots used). It
- * refuses problems above {@link #MAX_PIECES_PER_LOT} or {@link #MAX_UNITS} instead of answering
- * approximately.
+ * <p>A piece is normal or short; the caller says which ({@code LotHealthPolicy}, Fatih,
+ * 2026-10-14). The sums of a lot are kept by the number of normal pieces taken, with any of its
+ * short pieces: what a lot may keep is counted in normal pieces, and short pieces go first. A take
+ * only records how many pool pieces it leaves. Limits are refused, never answered approximately:
+ * above {@link #MAX_PIECES_PER_LOT} pieces in a lot, {@link #MAX_LOTS} lots or {@link #MAX_UNITS}
+ * units.
  */
 public final class WholePieceSearch {
 
@@ -30,11 +29,17 @@ public final class WholePieceSearch {
 
   private WholePieceSearch() {}
 
-  public record Piece(UUID id, long units) {
+  /** A piece; {@code shortPiece} when it is under the short-piece share of its lot's average. */
+  public record Piece(UUID id, long units, boolean shortPiece) {
     public Piece {
       if (id == null || units <= 0) {
         throw new IllegalArgumentException("A piece needs an id and a positive quantity");
       }
+    }
+
+    /** A normal piece. */
+    public Piece(UUID id, long units) {
+      this(id, units, false);
     }
   }
 
@@ -60,6 +65,11 @@ public final class WholePieceSearch {
       return pieces.stream().mapToLong(Piece::units).sum();
     }
 
+    /** How many of the pieces are normal, not short. */
+    public int normalPieces() {
+      return (int) pieces.stream().filter(piece -> !piece.shortPiece()).count();
+    }
+
     /** What may be taken from the lot at most. */
     long takeable() {
       return Math.min(total(), capacity);
@@ -69,10 +79,6 @@ public final class WholePieceSearch {
   public record LotTake(UUID lotId, List<UUID> pieceIds, long units, int remainingPieces) {
     public LotTake {
       pieceIds = List.copyOf(pieceIds);
-    }
-
-    public boolean leavesSingleRemnant() {
-      return remainingPieces == 1;
     }
   }
 
@@ -84,55 +90,9 @@ public final class WholePieceSearch {
     public int lotCount() {
       return takes.size();
     }
-
-    public boolean leavesSingleRemnant() {
-      return takes.stream().anyMatch(LotTake::leavesSingleRemnant);
-    }
   }
 
-  /**
-   * Exact is the requested total itself; above and below are the nearest totals strictly larger and
-   * strictly smaller than the request.
-   */
-  public record Result(
-      Optional<Selection> exact,
-      Optional<Selection> above,
-      Optional<Selection> below,
-      boolean limitExceeded) {
-
-    static Result limit() {
-      return new Result(Optional.empty(), Optional.empty(), Optional.empty(), true);
-    }
-  }
-
-  public static Result search(List<Lot> lots, long target, boolean allowRemnant) {
-    long divisor = target;
-    for (Lot lot : lots) for (Piece piece : lot.pieces()) divisor = gcd(divisor, piece.units());
-    final long scale = Math.max(1, divisor);
-    List<Lot> normalized =
-        lots.stream()
-            .map(
-                lot ->
-                    new Lot(
-                        lot.id(),
-                        lot.pieces().stream()
-                            .map(piece -> new Piece(piece.id(), piece.units() / scale))
-                            .toList(),
-                        lot.capacity() == Lot.UNLIMITED ? Lot.UNLIMITED : lot.capacity() / scale))
-            .toList();
-    try {
-      Result result = searchNormalized(normalized, target / scale, allowRemnant);
-      return new Result(
-          result.exact().map(value -> restore(value, scale)),
-          result.above().map(value -> restore(value, scale)),
-          result.below().map(value -> restore(value, scale)),
-          result.limitExceeded());
-    } catch (SearchBudgetExceeded e) {
-      return Result.limit();
-    }
-  }
-
-  private static long gcd(long a, long b) {
+  static long gcd(long a, long b) {
     while (b != 0) {
       long remainder = a % b;
       a = b;
@@ -141,137 +101,30 @@ public final class WholePieceSearch {
     return a;
   }
 
-  private static Selection restore(Selection value, long scale) {
-    return new Selection(
-        value.total() * scale,
-        value.takes().stream()
-            .map(
-                take ->
-                    new LotTake(
-                        take.lotId(),
-                        take.pieceIds(),
-                        take.units() * scale,
-                        take.remainingPieces()))
-            .toList());
-  }
+  static final class SearchBudgetExceeded extends RuntimeException {}
 
-  private static final class SearchBudgetExceeded extends RuntimeException {}
-
-  private static Result searchNormalized(List<Lot> lots, long target, boolean allowRemnant) {
-    if (target <= 0) {
-      throw new IllegalArgumentException("Target must be positive");
-    }
-    List<Lot> usable =
-        lots.stream().filter(lot -> !lot.pieces().isEmpty() && lot.capacity() > 0).toList();
-    if (usable.isEmpty()) {
-      return new Result(Optional.empty(), Optional.empty(), Optional.empty(), false);
-    }
-    if (usable.size() > MAX_LOTS
-        || target > MAX_UNITS
-        || usable.stream().anyMatch(lot -> lot.pieces().size() > MAX_PIECES_PER_LOT)) {
-      return Result.limit();
-    }
-    long runTotal = usable.stream().mapToLong(Lot::takeable).sum();
-    long cap = Math.min(runTotal, MAX_UNITS);
-    boolean truncated = runTotal > MAX_UNITS;
-    int size = (int) cap + 1;
-    int lotCount = usable.size();
-
-    // Per lot: sums reachable by taking exactly c pieces, and the union over allowed c >= 1.
-    List<Bits[]> perCount = new ArrayList<>(lotCount);
-    List<Bits> allowedUnion = new ArrayList<>(lotCount);
-    for (Lot lot : usable) {
-      Bits[] byCount = countSums(lot, size);
-      perCount.add(byCount);
-      Bits union = new Bits(size);
-      int n = lot.pieces().size();
-      for (int c = 1; c <= n; c++) {
-        if (allowed(n, c, allowRemnant)) {
-          union.or(byCount[c]);
-        }
-      }
-      if (lot.capacity() < size - 1) {
-        union.clearFrom((int) lot.capacity() + 1);
-      }
-      allowedUnion.add(union);
-    }
-
-    long[] convolutionBudget = {50_000_000L};
-    // Global: stages[i][l] = totals reachable with lots 0..i-1 using exactly l lots.
-    Bits[][] stages = new Bits[lotCount + 1][];
-    stages[0] = emptyStage(lotCount, size);
-    stages[0][0].set(0);
-    for (int i = 0; i < lotCount; i++) {
-      Bits[] previous = stages[i];
-      Bits[] next = emptyStage(lotCount, size);
-      Bits union = allowedUnion.get(i);
-      for (int l = 0; l <= lotCount; l++) {
-        next[l].or(previous[l]);
-        if (l > 0 && !previous[l - 1].isEmpty() && !union.isEmpty()) {
-          sumset(next[l], previous[l - 1], union, convolutionBudget);
-        }
-      }
-      stages[i + 1] = next;
-    }
-
-    Bits[] last = stages[lotCount];
-    Optional<Selection> exact = Optional.empty();
-    int exactLots = fewestLots(last, (int) target);
-    if (target <= cap && exactLots > 0) {
-      exact =
-          Optional.of(
-              reconstruct(
-                  usable, perCount, allowedUnion, stages, (int) target, exactLots, allowRemnant));
-    }
-    Optional<Selection> above = Optional.empty();
-    int aboveTotal =
-        target + 1 > cap ? -1 : firstReachable(last, (int) (target + 1), size - 1, true);
-    if (aboveTotal > target) {
-      above =
-          Optional.of(
-              reconstruct(
-                  usable,
-                  perCount,
-                  allowedUnion,
-                  stages,
-                  aboveTotal,
-                  fewestLots(last, aboveTotal),
-                  allowRemnant));
-    }
-    Optional<Selection> below = Optional.empty();
-    int belowTotal = firstReachable(last, 1, (int) Math.min(target - 1, cap), false);
-    if (belowTotal > 0) {
-      below =
-          Optional.of(
-              reconstruct(
-                  usable,
-                  perCount,
-                  allowedUnion,
-                  stages,
-                  belowTotal,
-                  fewestLots(last, belowTotal),
-                  allowRemnant));
-    }
-    boolean limitExceeded = truncated && above.isEmpty();
-    return new Result(exact, above, below, limitExceeded);
-  }
-
-  static boolean allowed(int piecesInLot, int taken, boolean allowRemnant) {
-    if (taken < 1 || taken > piecesInLot) {
-      return false;
-    }
-    return allowRemnant || piecesInLot - taken != 1;
-  }
-
-  private static Bits[] countSums(Lot lot, int size) {
-    int n = lot.pieces().size();
+  /**
+   * The sums of exactly {@code k} of the lot's normal pieces, for every k, when {@code withShort}
+   * is false; with any of its short pieces added when it is true.
+   */
+  static Bits[] normalCountSums(Lot lot, int size, boolean withShort) {
+    List<Piece> normal = lot.pieces().stream().filter(piece -> !piece.shortPiece()).toList();
+    int n = normal.size();
     Bits[] byCount = new Bits[n + 1];
     for (int c = 0; c <= n; c++) {
       byCount[c] = new Bits(size);
     }
     byCount[0].set(0);
+    if (withShort) {
+      // Any subset of the short pieces, before a normal piece is counted.
+      for (Piece piece : lot.pieces()) {
+        if (piece.shortPiece()) {
+          byCount[0].orShifted(byCount[0].copy(), piece.units());
+        }
+      }
+    }
     int processed = 0;
-    for (Piece piece : lot.pieces()) {
+    for (Piece piece : normal) {
       for (int c = processed; c >= 0; c--) {
         byCount[c + 1].orShifted(byCount[c], piece.units());
       }
@@ -280,16 +133,8 @@ public final class WholePieceSearch {
     return byCount;
   }
 
-  private static Bits[] emptyStage(int lotCount, int size) {
-    Bits[] stage = new Bits[lotCount + 1];
-    for (int l = 0; l <= lotCount; l++) {
-      stage[l] = new Bits(size);
-    }
-    return stage;
-  }
-
   /** target |= a (+) b, limited to the bitset size; iterates the sparser operand. */
-  private static void sumset(Bits target, Bits a, Bits b, long[] budget) {
+  static void sumset(Bits target, Bits a, Bits b, long[] budget) {
     Bits sparse = a.cardinality() <= b.cardinality() ? a : b;
     Bits dense = sparse == a ? b : a;
     for (int s = sparse.nextSetBit(0); s >= 0; s = sparse.nextSetBit(s + 1)) {
@@ -299,106 +144,56 @@ public final class WholePieceSearch {
     }
   }
 
-  /** The smallest number of lots (>= 1) with which {@code total} is reachable, or -1. */
-  private static int fewestLots(Bits[] last, int total) {
-    for (int l = 1; l < last.length; l++) {
-      if (last[l].get(total)) {
-        return l;
+  /**
+   * The pieces of a take of exactly {@code normalCount} normal pieces summing to {@code sum} with
+   * some of the short pieces: short pieces first (Fatih, 2026-10-14), each taken when the rest of
+   * the sum stays reachable, smallest first so as many as possible go; then a bounded depth-first
+   * choice of the normal pieces. {@code normalSums} are the sums of exactly k normal pieces, by k.
+   * The sum must be reachable, as the search found it.
+   */
+  static List<UUID> pickPieces(Lot lot, Bits[] normalSums, int normalCount, long sum) {
+    List<Piece> shortPieces =
+        lot.pieces().stream()
+            .filter(Piece::shortPiece)
+            .sorted(Comparator.comparingLong(Piece::units).thenComparing(Piece::id))
+            .toList();
+    Bits normal = normalSums[normalCount];
+    // Any subset of the short pieces from index i on.
+    Bits[] shortSuffix = new Bits[shortPieces.size() + 1];
+    shortSuffix[shortPieces.size()] = new Bits(normal.size());
+    shortSuffix[shortPieces.size()].set(0);
+    for (int i = shortPieces.size() - 1; i >= 0; i--) {
+      shortSuffix[i] = shortSuffix[i + 1].copy();
+      shortSuffix[i].orShifted(shortSuffix[i + 1], shortPieces.get(i).units());
+    }
+    List<UUID> chosen = new ArrayList<>();
+    long remaining = sum;
+    for (int i = 0; i < shortPieces.size(); i++) {
+      long units = shortPieces.get(i).units();
+      if (units <= remaining && reachable(normal, shortSuffix[i + 1], remaining - units)) {
+        chosen.add(shortPieces.get(i).id());
+        remaining -= units;
       }
     }
-    return -1;
+    chosen.addAll(pickNormal(lot, normalCount, remaining));
+    return chosen.stream().sorted().toList();
   }
 
-  /** First reachable total scanning upward from {@code from} or downward from {@code to}. */
-  private static int firstReachable(Bits[] last, int from, int to, boolean upward) {
-    if (from > to) {
-      return -1;
-    }
-    if (upward) {
-      for (int total = from; total <= to; total++) {
-        if (reachableWithAnyLot(last, total)) {
-          return total;
-        }
-      }
-    } else {
-      for (int total = to; total >= from; total--) {
-        if (reachableWithAnyLot(last, total)) {
-          return total;
-        }
-      }
-    }
-    return -1;
-  }
-
-  private static boolean reachableWithAnyLot(Bits[] last, int total) {
-    for (int l = 1; l < last.length; l++) {
-      if (last[l].get(total)) {
+  /** {@code need} is some sum of {@code normal} plus some sum of {@code shortLeft}. */
+  private static boolean reachable(Bits normal, Bits shortLeft, long need) {
+    for (int s = shortLeft.nextSetBit(0); s >= 0 && s <= need; s = shortLeft.nextSetBit(s + 1)) {
+      if (normal.get((int) (need - s))) {
         return true;
       }
     }
     return false;
   }
 
-  /**
-   * Walks back from the youngest lot, skipping a lot whenever the total is reachable without it, so
-   * older lots are used first.
-   */
-  private static Selection reconstruct(
-      List<Lot> lots,
-      List<Bits[]> perCount,
-      List<Bits> allowedUnion,
-      Bits[][] stages,
-      int total,
-      int lotsUsed,
-      boolean allowRemnant) {
-    List<LotTake> takes = new ArrayList<>();
-    int remaining = total;
-    int lotsLeft = lotsUsed;
-    for (int i = lots.size() - 1; i >= 0; i--) {
-      Bits[] before = stages[i];
-      if (before[lotsLeft].get(remaining)) {
-        continue;
-      }
-      Bits union = allowedUnion.get(i);
-      int chosenSum = -1;
-      for (int s = union.nextSetBit(1); s >= 0 && s <= remaining; s = union.nextSetBit(s + 1)) {
-        if (lotsLeft >= 1 && before[lotsLeft - 1].get(remaining - s)) {
-          chosenSum = s;
-          break;
-        }
-      }
-      if (chosenSum < 0) {
-        throw new IllegalStateException("Whole-piece reconstruction lost its path");
-      }
-      Lot lot = lots.get(i);
-      Bits[] byCount = perCount.get(i);
-      int n = lot.pieces().size();
-      int chosenCount = -1;
-      for (int c = 1; c <= n; c++) {
-        if (allowed(n, c, allowRemnant) && byCount[c].get(chosenSum)) {
-          chosenCount = c;
-          break;
-        }
-      }
-      if (chosenCount < 0) {
-        throw new IllegalStateException("Whole-piece reconstruction found no piece count");
-      }
-      List<UUID> pieceIds = pickPieces(lot, chosenCount, chosenSum);
-      takes.add(new LotTake(lot.id(), pieceIds, chosenSum, n - chosenCount));
-      remaining -= chosenSum;
-      lotsLeft--;
-    }
-    if (remaining != 0 || lotsLeft != 0) {
-      throw new IllegalStateException("Whole-piece reconstruction did not close");
-    }
-    Collections.reverse(takes);
-    return new Selection(total, takes);
-  }
-
-  /** Depth-first choice of exactly {@code count} pieces summing to {@code sum}, bounded. */
-  static List<UUID> pickPieces(Lot lot, int count, long sum) {
+  /** Depth-first choice of exactly {@code count} normal pieces summing to {@code sum}, bounded. */
+  private static List<UUID> pickNormal(Lot lot, int count, long sum) {
     List<Piece> sorted =
         lot.pieces().stream()
+            .filter(piece -> !piece.shortPiece())
             .sorted(Comparator.comparingLong(Piece::units).reversed().thenComparing(Piece::id))
             .toList();
     int n = sorted.size();
@@ -413,7 +208,7 @@ public final class WholePieceSearch {
     if (!dfs(values, suffix, 0, count, sum, chosen, failed, budget)) {
       throw new SearchBudgetExceeded();
     }
-    return chosen.stream().map(index -> sorted.get(index).id()).sorted().toList();
+    return chosen.stream().map(index -> sorted.get(index).id()).toList();
   }
 
   private static boolean dfs(
@@ -478,6 +273,12 @@ public final class WholePieceSearch {
       return index >= 0 && index < size && (words[index >>> 6] & (1L << (index & 63))) != 0;
     }
 
+    void clear(int index) {
+      if (index >= 0 && index < size) {
+        words[index >>> 6] &= ~(1L << (index & 63));
+      }
+    }
+
     boolean isEmpty() {
       for (long word : words) {
         if (word != 0) {
@@ -493,6 +294,16 @@ public final class WholePieceSearch {
         count += Long.bitCount(word);
       }
       return count;
+    }
+
+    Bits copy() {
+      Bits copy = new Bits(size);
+      System.arraycopy(words, 0, copy.words, 0, words.length);
+      return copy;
+    }
+
+    int size() {
+      return size;
     }
 
     void or(Bits other) {
@@ -534,6 +345,27 @@ public final class WholePieceSearch {
           return index < size ? index : -1;
         }
         if (++wordIndex == words.length) {
+          return -1;
+        }
+        word = words[wordIndex];
+      }
+    }
+
+    /** The highest set bit at or below {@code from}, or -1. */
+    int previousSetBit(int from) {
+      if (from < 0) {
+        return -1;
+      }
+      if (from >= size) {
+        from = size - 1;
+      }
+      int wordIndex = from >>> 6;
+      long word = words[wordIndex] & (-1L >>> (63 - (from & 63)));
+      while (true) {
+        if (word != 0) {
+          return (wordIndex << 6) + 63 - Long.numberOfLeadingZeros(word);
+        }
+        if (--wordIndex < 0) {
           return -1;
         }
         word = words[wordIndex];

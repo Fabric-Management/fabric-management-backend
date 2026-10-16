@@ -143,25 +143,14 @@ class ConfirmationGateTest {
   }
 
   @Test
-  @DisplayName("IK-13: a conditional multi-lot acceptance does not lift the block")
-  void compatibilityRequired() {
+  @DisplayName(
+      "Several dye lots allowed: the multi-lot plan confirms without a technical confirmation"
+          + " (Fatih, 2026-10-15)")
+  void severalDyeLotsAllowed_theMultiLotPlanConfirms() {
     active(acceptance(List.of(lotA, lotB), List.of(pieceA, pieceB)));
     stock(
         List.of(lot(lotA, pieceA, PieceState.ELIGIBLE), lot(lotB, pieceB, PieceState.ELIGIBLE)),
         List.of());
-
-    assertThat(gate.blocks(order, List.of(line)))
-        .extracting(ConfirmationGate.Block::code)
-        .containsExactly("COMPATIBILITY_REQUIRED");
-  }
-
-  @Test
-  @DisplayName("A04: a technical confirmation of the lots lets the multi-lot plan confirm")
-  void confirmedGroupAllocates() {
-    active(acceptance(List.of(lotA, lotB), List.of(pieceA, pieceB)));
-    stock(
-        List.of(lot(lotA, pieceA, PieceState.ELIGIBLE), lot(lotB, pieceB, PieceState.ELIGIBLE)),
-        List.of(Set.of(lotA, lotB)));
     when(allocation.allocate(any())).thenReturn(PieceAllocationPort.AllocationOutcome.success(2));
 
     assertThat(gate.blocks(order, List.of(line))).isEmpty();
@@ -210,7 +199,11 @@ class ConfirmationGateTest {
         .thenReturn(
             Optional.of(
                 new QuantityEvaluationService.LineStock(
-                    PrimaryMeasure.LENGTH, lots, confirmed, List.of())));
+                    PrimaryMeasure.LENGTH,
+                    lots,
+                    confirmed,
+                    List.of(),
+                    !line.isSingleLotRequired())));
   }
 
   @Test
@@ -290,7 +283,7 @@ class ConfirmationGateTest {
             UUID.randomUUID(),
             option,
             lots.size() > 1
-                ? QuantityOption.Compatibility.PENDING_CONFIRMATION
+                ? QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED
                 : QuantityOption.Compatibility.SINGLE_LOT,
             new BigDecimal("514"),
             "M",

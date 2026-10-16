@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -281,8 +280,10 @@ class QuantityAcceptanceServiceTest {
   }
 
   @Test
-  @DisplayName("IK-13: a multi-lot answer without compatibility is conditional and asks production")
-  void conditionalAcceptanceOpensACompatibilityRequest() {
+  @DisplayName(
+      "Several dye lots allowed: a multi-lot answer is definite and asks production nothing"
+          + " (Fatih, 2026-10-15)")
+  void severalDyeLotsAllowed_aMultiLotAnswerIsDefinite() {
     QuantityOption twoLots =
         option(
             QuantityOption.OptionKind.ABOVE, "514", List.of(lotA, lotB), List.of(pieceA, pieceB));
@@ -294,36 +295,10 @@ class QuantityAcceptanceServiceTest {
     QuantityAcceptanceDto dto =
         service.record(order.getId(), line.getId(), request(proposal, twoLots, null, null), ACTOR);
 
-    assertThat(dto.conditional()).isTrue();
-    assertThat(dto.compatibility()).isEqualTo(QuantityOption.Compatibility.PENDING_CONFIRMATION);
-    verify(compatibilityRequests)
-        .request(
-            eq(TENANT),
-            eq(Set.of(lotA, lotB)),
-            eq(line.getProductId()),
-            eq(order.getTradingPartnerId()),
-            eq(QuantityAcceptanceService.COMPATIBILITY_SOURCE),
-            eq(line.getId()),
-            anyString(),
-            eq(ACTOR));
-  }
-
-  @Test
-  @DisplayName("A04: a confirmed compatibility group makes the same answer definite")
-  void confirmedGroupIsNotConditional() {
-    QuantityOption twoLots =
-        option(
-            QuantityOption.OptionKind.ABOVE, "514", List.of(lotA, lotB), List.of(pieceA, pieceB));
-    QuantityProposal proposal = latest(twoLots);
-    stock(
-        List.of(lot(lotA, pieceA, PieceState.ELIGIBLE), lot(lotB, pieceB, PieceState.ELIGIBLE)),
-        List.of(Set.of(lotA, lotB)));
-
-    QuantityAcceptanceDto dto =
-        service.record(order.getId(), line.getId(), request(proposal, twoLots, null, null), ACTOR);
-
     assertThat(dto.conditional()).isFalse();
-    assertThat(dto.compatibility()).isEqualTo(QuantityOption.Compatibility.CONFIRMED);
+    assertThat(dto.compatibility()).isEqualTo(QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED);
+    verify(compatibilityRequests, never())
+        .request(any(), any(), any(), any(), any(), any(), anyString(), any());
   }
 
   @Test
@@ -641,7 +616,11 @@ class QuantityAcceptanceServiceTest {
         .thenReturn(
             Optional.of(
                 new QuantityEvaluationService.LineStock(
-                    PrimaryMeasure.LENGTH, lots, confirmed, List.of())));
+                    PrimaryMeasure.LENGTH,
+                    lots,
+                    confirmed,
+                    List.of(),
+                    !line.isSingleLotRequired())));
   }
 
   private ProposalLot lot(UUID lotId, UUID pieceId, PieceState state) {
@@ -683,7 +662,7 @@ class QuantityAcceptanceServiceTest {
         kind + ":0123456789abcdef",
         kind,
         lots.size() > 1
-            ? QuantityOption.Compatibility.PENDING_CONFIRMATION
+            ? QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED
             : QuantityOption.Compatibility.SINGLE_LOT,
         new BigDecimal(quantity),
         new BigDecimal(quantity),

@@ -1,6 +1,10 @@
 package com.fabricmanagement.sales.orderintake.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsPort;
+import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsUnavailableException;
+import com.fabricmanagement.inventory.lothealth.app.port.ProductSpeedPort;
+import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
 import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQueryService;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService;
@@ -58,6 +62,8 @@ public class QuantityEvaluationService {
   private final CustomerToneAcceptanceRepository toneAcceptances;
   private final QuantityProposalRepository proposals;
   private final Clock clock;
+  private final LotHealthSettingsPort lotHealthSettings;
+  private final ProductSpeedPort productSpeed;
 
   @Transactional
   public QuantityProposalDto evaluate(UUID orderId, UUID lineId, UUID actor) {
@@ -164,7 +170,8 @@ public class QuantityEvaluationService {
             measure.get(),
             stock.lots(),
             stock.confirmedCompatibleGroups(),
-            toneGroups(tenantId, order, line)));
+            toneGroups(tenantId, order, line),
+            !line.isSingleLotRequired()));
   }
 
   /** Converts a canonical stock quantity into the line unit; empty when no exact conversion. */
@@ -189,11 +196,16 @@ public class QuantityEvaluationService {
   }
 
   /** Piece-level stock of one distribution, as the proposal and the acceptance checks see it. */
+  /**
+   * The line's current stock. {@code multipleLotsAllowed}: the line allows several dye lots, so the
+   * customer accepts them (Fatih, 2026-10-15).
+   */
   public record LineStock(
       PrimaryMeasure measure,
       List<ProposalStockQueryService.ProposalLot> lots,
       List<Set<UUID>> confirmedGroups,
-      List<Set<UUID>> toneGroups) {}
+      List<Set<UUID>> toneGroups,
+      boolean multipleLotsAllowed) {}
 
   private QuantityEvaluator.Evaluation evaluation(
       SalesOrder order, SalesOrderLine line, List<UUID> manualPieceIds) {
@@ -227,6 +239,13 @@ public class QuantityEvaluationService {
    * transaction proxy.
    */
   public EvaluationRun run(EvaluationRequest request) {
+    // Both limits are required (Fatih, 2026-10-13): a missing side is missing information, never
+    // 0%. No proposal is computed, so no earlier one is presented as current.
+    if (request.toleranceUpPct() == null || request.toleranceDownPct() == null) {
+      throw OrderIntakeException.rule(
+          "TOLERANCE_REQUIRED",
+          "Enter both the upper and the lower tolerance; write 0% when no deviation is accepted");
+    }
     UUID tenantId = TenantContext.requireTenantId();
     ProductSalesDefinitionDto product =
         productDefinitions
@@ -290,7 +309,8 @@ public class QuantityEvaluationService {
                 request.toleranceUpPct(),
                 request.toleranceDownPct(),
                 QuoteHoldEvidence.of(holds),
-                request.manualPieceIds()));
+                request.manualPieceIds()),
+            lotHealthPolicy(tenantId, request.productId(), request.colorId()));
     if (!evaluation.manualUnavailablePieceIds().isEmpty()) {
       throw OrderIntakeException.conflict(
           "MANUAL_PIECES_UNAVAILABLE",
@@ -298,6 +318,23 @@ public class QuantityEvaluationService {
               + evaluation.manualUnavailablePieceIds());
     }
     return new EvaluationRun(evaluation, dimension, canonicalUnit, stock, holds);
+  }
+
+  /**
+   * The tenant's lot-health rule for the product at its speed (Fatih, 2026-10-14): the slower it
+   * sells, the more normal pieces a lot keeps.
+   */
+  private LotHealthPolicy lotHealthPolicy(UUID tenantId, UUID productId, UUID colorId) {
+    try {
+      return lotHealthSettings
+          .forTenant(tenantId)
+          .policyFor(productSpeed.speedOf(tenantId, productId, colorId));
+    } catch (LotHealthSettingsUnavailableException e) {
+      // Never propose on the standard when the tenant's own threshold may be stricter.
+      throw OrderIntakeException.conflict(
+          "SETTINGS_UNAVAILABLE",
+          "The stock-proposal settings cannot be read now; evaluate again later");
+    }
   }
 
   private QuantityEvaluator.Evaluation unknown(

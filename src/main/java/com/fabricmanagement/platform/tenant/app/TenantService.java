@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.events.TenantSettingsUpdatedEvent;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.tenant.domain.StockProposalSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.tenant.mapper.TenantRowMapper;
@@ -79,6 +80,9 @@ public class TenantService {
   /**
    * Update settings for the current tenant.
    *
+   * <p>The stock-proposal group has its own endpoint and is not part of this request: the stored
+   * group is kept in the same statement, so neither update overwrites the other.
+   *
    * @param settings New settings to apply
    * @return Updated TenantSettings
    */
@@ -95,7 +99,10 @@ public class TenantService {
         systemExecutor.executeInTransaction(
             jdbc ->
                 jdbc.update(
-                    "UPDATE common_tenant.common_tenant SET settings = ?::jsonb, updated_at = now(), version = version + 1 WHERE id = ?",
+                    "UPDATE common_tenant.common_tenant"
+                        + " SET settings = ?::jsonb"
+                        + " || jsonb_build_object('stockProposal', settings -> 'stockProposal'),"
+                        + " updated_at = now(), version = version + 1 WHERE id = ?",
                     settingsJson,
                     tenantId));
 
@@ -109,5 +116,42 @@ public class TenantService {
 
     log.info("Tenant settings updated for current tenant: id={}", tenantId);
     return settings;
+  }
+
+  /** The current tenant's stock-proposal settings, or the decided defaults. */
+  public StockProposalSettings getMyStockProposalSettings() {
+    return getMySettings().stockProposalOrDefaults();
+  }
+
+  /**
+   * Replace the current tenant's stock-proposal settings (Fatih, 2026-10-14). Only this group is
+   * written; the other settings stay as stored.
+   */
+  public StockProposalSettings updateMyStockProposalSettings(StockProposalSettings stockProposal) {
+    UUID tenantId = TenantContext.requireTenantId();
+    String groupJson;
+    try {
+      groupJson = objectMapper.writeValueAsString(stockProposal);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to serialize stock-proposal settings", e);
+    }
+
+    int updated =
+        systemExecutor.executeInTransaction(
+            jdbc ->
+                jdbc.update(
+                    "UPDATE common_tenant.common_tenant"
+                        + " SET settings = jsonb_set(COALESCE(settings, '{}'::jsonb),"
+                        + " '{stockProposal}', ?::jsonb, true),"
+                        + " updated_at = now(), version = version + 1 WHERE id = ?",
+                    groupJson,
+                    tenantId));
+
+    if (updated == 0) {
+      throw new IllegalStateException("Current tenant not found: " + tenantId);
+    }
+
+    log.info("Stock-proposal settings updated for current tenant: id={}", tenantId);
+    return stockProposal;
   }
 }

@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.domain;
 
 import com.fabricmanagement.common.domain.CurrencyConstants;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -93,6 +94,16 @@ public class TenantSettings implements Serializable {
   private BigDecimal costVarianceThreshold;
 
   // ========================================
+  // STOCK PROPOSAL
+  // ========================================
+
+  /**
+   * Tolerance defaults, lot-health thresholds and product-speed thresholds (Fatih, 2026-10-14).
+   * Null = never set; read through {@link #stockProposalOrDefaults()}.
+   */
+  private StockProposalSettings stockProposal;
+
+  // ========================================
   // SECURITY
   // ========================================
 
@@ -116,5 +127,11 @@ public class TenantSettings implements Serializable {
    */
   public static TenantSettings defaults() {
     return TenantSettings.builder().build();
+  }
+
+  /** The stock-proposal settings, or the decided defaults when they were never set. */
+  @JsonIgnore
+  public StockProposalSettings stockProposalOrDefaults() {
+    return stockProposal != null ? stockProposal : StockProposalSettings.defaults();
   }
 }

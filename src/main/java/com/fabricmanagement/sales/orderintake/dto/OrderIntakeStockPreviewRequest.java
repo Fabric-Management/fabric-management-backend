@@ -13,9 +13,10 @@ import java.util.UUID;
 /**
  * An order line that is not saved yet, as the order form holds it (STOCK-PREVIEW-1). The
  * constraints and messages are those of a saved line ({@code SalesOrderLineRequest}), so a preview
- * accepts what a line accepts. Tolerances are on the percent scale the line stores (5 means 5%).
- * {@code manualPieceIds} is the salesperson's own pick ("change pieces"), evaluated as a MANUAL
- * option with the same checks (STOCK-PROPOSAL-2).
+ * accepts what a line accepts. Tolerances are on the percent scale the line stores (5 means 5%);
+ * both are required and 0 is an explicit value (Fatih, 2026-10-13). {@code manualPieceIds} is the
+ * salesperson's own pick ("change pieces"), evaluated as a MANUAL option with the same checks
+ * (STOCK-PROPOSAL-2).
  */
 @Schema(name = "OrderIntakeStockPreviewRequest")
 public record OrderIntakeStockPreviewRequest(
@@ -44,14 +45,20 @@ public record OrderIntakeStockPreviewRequest(
         @NotNull(message = "Single-lot requirement is required")
         Boolean singleLotRequired,
     @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
             description =
-                "Quantity tolerance above the requested quantity agreed for this line (%)")
+                "Quantity tolerance above the requested quantity agreed for this line (%); 0 when"
+                    + " no deviation is accepted")
+        @NotNull(message = TOLERANCE_REQUIRED)
         @DecimalMin(value = "0", message = "A tolerance cannot be negative")
         @DecimalMax(value = "100", message = "A tolerance cannot exceed 100 percent")
         BigDecimal toleranceUpPct,
     @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
             description =
-                "Quantity tolerance below the requested quantity agreed for this line (%)")
+                "Quantity tolerance below the requested quantity agreed for this line (%); 0 when"
+                    + " no deviation is accepted")
+        @NotNull(message = TOLERANCE_REQUIRED)
         @DecimalMin(value = "0", message = "A tolerance cannot be negative")
         @DecimalMax(value = "100", message = "A tolerance cannot exceed 100 percent")
         BigDecimal toleranceDownPct,
@@ -60,4 +67,9 @@ public record OrderIntakeStockPreviewRequest(
                 "Pieces the salesperson picked; evaluated as a MANUAL option beside the computed"
                     + " ones. Pieces that are no longer offerable are refused (409)")
         @Size(max = 500, message = "At most 500 pieces can be picked")
-        List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds) {}
+        List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds) {
+
+  /** The message of a missing tolerance side; the same as a saved line's. */
+  public static final String TOLERANCE_REQUIRED =
+      "Enter both the upper and the lower tolerance; write 0 when no deviation is accepted";
+}

@@ -14,10 +14,8 @@ import java.util.UUID;
  * applying an option is a separate command.
  *
  * @param optionKey stable within one evaluation; the same pieces give the same key
- * @param placement the main proposal, a nearer smaller or larger quantity, or the salesperson's own
- *     pick
- * @param nearest the option nearest to the request on its side (below, or at and above); only then
- *     may it be called the nearest smaller or larger option
+ * @param placement the main proposal, an option below or above the request, or the salesperson's
+ *     own pick
  * @param kind the quantity relative to the request, kept for the acceptance flow
  * @param source whether only free stock is used, or stock other quotes hold
  * @param reasons why the option ranks as it does, in the order of the tenant-first criteria
@@ -27,7 +25,6 @@ import java.util.UUID;
 public record QuantityOption(
     String optionKey,
     OptionPlacement placement,
-    boolean nearest,
     OptionKind kind,
     Compatibility compatibility,
     StockSource source,
@@ -59,18 +56,18 @@ public record QuantityOption(
     return lots.size();
   }
 
-  public boolean leavesSingleRemnant() {
-    return lots.stream().anyMatch(LotPart::singleRemnant);
+  /**
+   * A used lot keeps fewer pieces than its lot-health minimum (Fatih, 2026-10-13: never one or two;
+   * 2026-10-14: the minimum is a tenant setting). A computed option never does; only a
+   * salesperson's own pick can, and then only with acknowledgement.
+   */
+  public boolean leavesRemnant() {
+    return lots.stream().anyMatch(LotPart::remnant);
   }
 
-  /** Some used lot may be left with a single piece: pieces of unknown state decide (SOI §3.1). */
-  public boolean remnantUnknown() {
-    return lots.stream().anyMatch(LotPart::remnantUnknown);
-  }
-
-  /** The remnant warning must be acknowledged when a single remnant is certain or unknown. */
+  /** The remnant warning must be acknowledged before the option is applied. */
   public boolean needsRemnantAcknowledgement() {
-    return leavesSingleRemnant() || remnantUnknown();
+    return leavesRemnant();
   }
 
   public List<UUID> pieceIds() {
@@ -86,7 +83,6 @@ public record QuantityOption(
     return new QuantityOption(
         optionKey,
         placement,
-        nearest,
         kind,
         compatibility,
         source,
@@ -102,11 +98,10 @@ public record QuantityOption(
   }
 
   /** The same option in another placement. */
-  public QuantityOption as(OptionPlacement newPlacement, boolean newNearest) {
+  public QuantityOption as(OptionPlacement newPlacement) {
     return new QuantityOption(
         optionKey,
         newPlacement,
-        newNearest,
         kind,
         compatibility,
         source,
@@ -124,7 +119,10 @@ public record QuantityOption(
   /** What the option is to the salesperson. */
   @Schema(name = "StockProposalPlacement", enumAsRef = true)
   public enum OptionPlacement {
-    /** The first candidate of the tenant-first ranking; not necessarily the nearest quantity. */
+    /**
+     * The option the proposal opens at: the best that meets the request within the tolerance,
+     * otherwise the nearest above it, otherwise the best below it, otherwise held stock.
+     */
     MAIN,
     /** A computed alternative below the request. */
     BELOW,
@@ -138,7 +136,7 @@ public record QuantityOption(
   @Schema(name = "StockProposalSource", enumAsRef = true)
   public enum StockSource {
     FREE,
-    /** Stock other quotes hold; offered only when free stock has no option within tolerance. */
+    /** Stock others hold; offered only when free stock cannot reach the lower tolerance limit. */
     HELD
   }
 
@@ -167,7 +165,7 @@ public record QuantityOption(
     EXACT,
     ABOVE,
     BELOW,
-    /** The requested quantity, reachable only by leaving a single piece in a used lot (SOI A01). */
+    /** The requested quantity, leaving a remnant in a used lot (a manual pick only). */
     REQUESTED_WITH_REMNANT
   }
 
@@ -175,6 +173,11 @@ public record QuantityOption(
   @Schema(name = "QuantityOptionCompatibility", enumAsRef = true)
   public enum Compatibility {
     SINGLE_LOT,
+    /**
+     * Several lots on a line that allows several dye lots: the customer accepts them (Fatih,
+     * 2026-10-15). No technical confirmation or tone acceptance is asked for.
+     */
+    MULTIPLE_LOTS_ACCEPTED,
     CONFIRMED,
     TONE_ACCEPTED,
     /** Not a definite option until technical confirmation or a concrete tone acceptance. */
@@ -186,8 +189,12 @@ public record QuantityOption(
    *
    * @param remainingEligiblePieces eligible pieces of the lot the option leaves, held or free
    * @param remainingQuantity their quantity in the line unit
-   * @param unknownPieces pieces of the lot whose suitability is unknown
-   * @param singleRemnant exactly one piece of the pool the option was chosen from stays behind
+   * @param unknownPieces pieces of the lot whose suitability is unknown; never counted as pieces
+   *     left, as they are not offered piece by piece (Fatih, 2026-10-13)
+   * @param remnant some pieces of the pool the option was chosen from stay behind, but fewer normal
+   *     ones than the lot-health minimum (short pieces do not count; Fatih, 2026-10-14)
+   * @param remnantPieceIds those pieces
+   * @param remnantQuantity their quantity in the line unit
    * @param closesLot the option takes every piece of the lot, so the lot is closed; never claimed
    *     while held, unknown or otherwise unsuitable pieces stay
    */
@@ -200,26 +207,19 @@ public record QuantityOption(
       int remainingEligiblePieces,
       BigDecimal remainingQuantity,
       int unknownPieces,
-      boolean singleRemnant,
-      UUID remnantPieceId,
+      boolean remnant,
+      List<UUID> remnantPieceIds,
       BigDecimal remnantQuantity,
       boolean closesLot) {
 
     public LotPart {
       pieceIds = List.copyOf(pieceIds);
+      remnantPieceIds = remnantPieceIds == null ? List.of() : List.copyOf(remnantPieceIds);
     }
 
     /** The lot is emptied of eligible pieces and holds no piece of unknown state. */
     public boolean exhausted() {
       return remainingEligiblePieces == 0 && unknownPieces == 0;
-    }
-
-    /**
-     * At most one eligible piece stays and the lot holds pieces of unknown state: whether a single
-     * piece is left cannot be said (SOI §3.1 SINGLE_REMNANT_UNKNOWN).
-     */
-    public boolean remnantUnknown() {
-      return !singleRemnant && unknownPieces > 0 && remainingEligiblePieces <= 1;
     }
   }
 

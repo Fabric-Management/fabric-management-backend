@@ -7,13 +7,11 @@ import com.fabricmanagement.inventory.reservation.domain.StockReservation;
 import com.fabricmanagement.inventory.reservation.domain.event.ReservationConvertedEvent;
 import com.fabricmanagement.inventory.reservation.domain.event.ReservationCreatedEvent;
 import com.fabricmanagement.inventory.reservation.domain.event.ReservationReleasedEvent;
-import com.fabricmanagement.inventory.reservation.dto.LotSuggestion;
 import com.fabricmanagement.inventory.reservation.dto.StockReservationResponse;
 import com.fabricmanagement.inventory.reservation.infra.repository.StockReservationRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,15 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class StockReservationService {
 
   private final StockReservationRepository repository;
-  private final StockReservationEngine engine;
   private final ApplicationEventPublisher eventPublisher;
   private final SalesOrderLineFulfilmentLock fulfilmentLock;
-
-  @Transactional(readOnly = true)
-  public List<LotSuggestion> getFifoSuggestions(UUID productId, BigDecimal requiredQty) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return engine.suggestLotsFifo(tenantId, productId, requiredQty);
-  }
 
   @Transactional
   public StockReservationResponse createReservation(

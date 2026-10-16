@@ -233,8 +233,17 @@ public class OpenApiExportIT {
     assertThat(schemaProperty(document, "ApiResponseOrderIntakeStockPreview", "data"))
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreview");
 
+    // Both tolerance limits are required; 0 is a value (Fatih, 2026-10-13).
     assertThat(requiredOf(document, "OrderIntakeStockPreviewRequest"))
-        .containsExactlyInAnyOrder("productId", "requestedQty", "unit", "singleLotRequired");
+        .containsExactlyInAnyOrder(
+            "productId",
+            "requestedQty",
+            "unit",
+            "singleLotRequired",
+            "toleranceUpPct",
+            "toleranceDownPct");
+    assertThat(requiredOf(document, "SalesOrderLineRequest"))
+        .contains("toleranceUpPct", "toleranceDownPct");
     assertThat(schemaProperty(document, "OrderIntakeStockPreviewRequest", "manualPieceIds"))
         .containsEntry("type", "array");
     assertPercentageBounds(document, "OrderIntakeStockPreviewRequest", "toleranceUpPct");
@@ -255,7 +264,6 @@ public class OpenApiExportIT {
         .contains(
             "optionKey",
             "placement",
-            "nearest",
             "source",
             "quantity",
             "difference",
@@ -263,7 +271,8 @@ public class OpenApiExportIT {
             "reasons",
             "lots",
             "heldStock",
-            "apply");
+            "apply")
+        .doesNotContain("nearest");
     assertThat(requiredOf(document, "QuantityProposalLot"))
         .contains("closesLot", "remainingPieces", "remainingQuantity", "pieceIds");
     assertThat(requiredOf(document, "StockProposalApplyCapability"))

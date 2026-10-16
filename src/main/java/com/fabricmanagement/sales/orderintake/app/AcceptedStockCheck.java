@@ -68,10 +68,17 @@ final class AcceptedStockCheck {
         canonicalQuantity, List.copyOf(unavailable), compatibility(stock, lots), List.copyOf(refs));
   }
 
+  /**
+   * Several lots on a line that allows several dye lots are accepted by the customer (Fatih,
+   * 2026-10-15); only a line that requires one lot still looks for a confirmation.
+   */
   static QuantityOption.Compatibility compatibility(
       QuantityEvaluationService.LineStock stock, Set<UUID> lots) {
     if (lots.size() <= 1) {
       return QuantityOption.Compatibility.SINGLE_LOT;
+    }
+    if (stock.multipleLotsAllowed()) {
+      return QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED;
     }
     if (stock.confirmedGroups().stream().anyMatch(group -> group.containsAll(lots))) {
       return QuantityOption.Compatibility.CONFIRMED;

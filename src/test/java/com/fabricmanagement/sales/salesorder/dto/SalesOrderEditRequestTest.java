@@ -579,6 +579,53 @@ class SalesOrderEditRequestTest {
     }
 
     @Test
+    @DisplayName("K1 (2026-10-13): tolerance CLEAR is refused; both limits are always given")
+    void toleranceCannotBeCleared() throws Exception {
+      DomainException failure =
+          assertUnprocessable(
+              body(
+                  "'lines':[{'operation':'UPDATE','lineId':'$l1','fields':{"
+                      + "'tolerance':{'operation':'CLEAR'}}}]"),
+              "REQUIRED_FIELD_CANNOT_BE_CLEARED");
+      assertThat(failure.getDetails())
+          .containsEntry("key", "line.tolerance")
+          .containsEntry("lineId", L1);
+    }
+
+    @Test
+    @DisplayName("K1: one tolerance limit alone names the missing one; 0 is a value")
+    void oneToleranceLimitAloneIsRefused() throws Exception {
+      DomainException failure =
+          assertUnprocessable(
+              body(
+                  "'lines':[{'operation':'UPDATE','lineId':'$l1','fields':{"
+                      + "'tolerance':{'operation':'SET','value':{'upPct':0}}}}]"),
+              "VALIDATION_ERROR");
+      assertThat(failure.getFieldErrors())
+          .containsOnlyKeys("lines[0].fields.tolerance.value.downPct");
+
+      Parsed zero =
+          parse(
+              body(
+                  "'lines':[{'operation':'UPDATE','lineId':'$l1','fields':{"
+                      + "'tolerance':{'operation':'SET','value':{'upPct':0,'downPct':0}}}}]"));
+      assertThat(zero.lines().getFirst().fields()).containsKey(OrderEditKey.LINE_TOLERANCE);
+    }
+
+    @Test
+    @DisplayName("K1: a new line names both tolerance limits")
+    void aNewLineNeedsItsTolerance() throws Exception {
+      DomainException failure =
+          assertUnprocessable(
+              body(
+                  "'lines':[{'operation':'ADD','clientLineId':'$c1','productId':'$p3',"
+                      + "'fields':{'quantity':{'operation':'SET','value':"
+                      + "{'requestedQty':200,'unit':'M'}}}}]"),
+              "VALIDATION_ERROR");
+      assertThat(failure.getFieldErrors()).containsOnlyKeys("lines[0].fields.tolerance");
+    }
+
+    @Test
     @DisplayName("S12.7: specification CLEAR is REQUIRED_FIELD_CANNOT_BE_CLEARED")
     void specificationCannotBeCleared() throws Exception {
       DomainException failure =
@@ -1003,7 +1050,7 @@ class SalesOrderEditRequestTest {
                                       + ",'tolerance':{'operation':'SET','value':"
                                       + "{'upPct':0,'downPct':0}}")))
                       .fingerprint(),
-                  parse(body(update.formatted(desc + ",'tolerance':{'operation':'CLEAR'}")))
+                  parse(body(update.formatted(desc + ",'pricing':{'operation':'CLEAR'}")))
                       .fingerprint(),
                   parse(body("'header':{'notes':{'operation':'CLEAR'}}")).fingerprint(),
                   parse(body("'header':{'notes':{'operation':'SET','value':'x'}}")).fingerprint(),
@@ -1045,7 +1092,8 @@ class SalesOrderEditRequestTest {
     return "{'operation':'ADD','clientLineId':'"
         + clientLineId
         + "','productId':'$p3','fields':{'quantity':{'operation':'SET','value':"
-        + "{'requestedQty':200,'unit':'M'}}}}";
+        + "{'requestedQty':200,'unit':'M'}},'tolerance':{'operation':'SET','value':"
+        + "{'upPct':5,'downPct':5}}}}";
   }
 
   /** Real JSON: double quotes and the fixed ids. */

@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -11,6 +12,8 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.tenant.domain.TenantSettings;
+import com.fabricmanagement.platform.tenant.domain.TenantSettingsUnreadableException;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
@@ -51,6 +54,43 @@ class TenantSystemServiceTest {
   @AfterEach
   void tearDown() {
     TenantContext.clear();
+  }
+
+  // ── Settings: "never set" reads as defaults, "cannot be read" stops (2026-10-14) ──
+
+  @Test
+  void settingsNeverSet_readAsDefaults_fromBothReaders() {
+    UUID tenantId = UUID.randomUUID();
+    when(systemExecutor.executeQueryForObject(
+            anyString(), ArgumentMatchers.<RowMapper<String>>any(), any(Object[].class)))
+        .thenReturn(null);
+
+    assertThat(tenantSystemService.requireSettings(tenantId)).isEqualTo(TenantSettings.defaults());
+    assertThat(tenantSystemService.getSettings(tenantId)).isEqualTo(TenantSettings.defaults());
+  }
+
+  @Test
+  void settingsThatCannotBeParsed_throwFromRequire_andDefaultFromGet() {
+    UUID tenantId = UUID.randomUUID();
+    when(systemExecutor.executeQueryForObject(
+            anyString(), ArgumentMatchers.<RowMapper<String>>any(), any(Object[].class)))
+        .thenReturn("{not json");
+
+    assertThatThrownBy(() -> tenantSystemService.requireSettings(tenantId))
+        .isInstanceOf(TenantSettingsUnreadableException.class);
+    assertThat(tenantSystemService.getSettings(tenantId)).isEqualTo(TenantSettings.defaults());
+  }
+
+  @Test
+  void settingsThatCannotBeRead_throwFromRequire() {
+    UUID tenantId = UUID.randomUUID();
+    when(systemExecutor.executeQueryForObject(
+            anyString(), ArgumentMatchers.<RowMapper<String>>any(), any(Object[].class)))
+        .thenThrow(new IllegalStateException("connection lost"));
+
+    assertThatThrownBy(() -> tenantSystemService.requireSettings(tenantId))
+        .isInstanceOf(TenantSettingsUnreadableException.class)
+        .hasMessageContaining(tenantId.toString());
   }
 
   @Test
