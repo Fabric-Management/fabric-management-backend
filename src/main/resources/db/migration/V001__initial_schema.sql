@@ -251,6 +251,11 @@ CREATE TABLE common_communication.common_address (
     contact_person VARCHAR(100),
     address_type VARCHAR(50) NOT NULL,
     label VARCHAR(100),
+    -- CONSIGNEE-1 C5: confirmed for delivery by a holder of sales:verify-delivery. Rows that
+    -- predate the rule are verified.
+    verification_status VARCHAR(20) NOT NULL DEFAULT 'VERIFIED',
+    verified_by UUID,
+    verified_at TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -259,6 +264,7 @@ CREATE TABLE common_communication.common_address (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uk_address_uid UNIQUE (uid),
+    CONSTRAINT chk_address_verification CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED')),
     CONSTRAINT chk_address_type CHECK (address_type IN (
         'HOME', 'BILLING', 'MAILING', 'TEMPORARY', 'ALTERNATE',
         'OFFICE', 'HEADQUARTERS', 'BRANCH', 'WAREHOUSE', 'FACTORY', 'SHIPPING',
@@ -1469,6 +1475,11 @@ CREATE TABLE IF NOT EXISTS common_company.common_trading_partner (
     relationship_meta JSONB,
     legacy_company_id UUID,
     organization_id UUID,
+    -- CONSIGNEE-1 C5: confirmed as a party to deliver to by a holder of sales:verify-delivery.
+    -- Rows that predate the rule are verified.
+    verification_status VARCHAR(20) NOT NULL DEFAULT 'VERIFIED',
+    verified_by UUID,
+    verified_at TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1476,6 +1487,7 @@ CREATE TABLE IF NOT EXISTS common_company.common_trading_partner (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT chk_tp_verification CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED')),
     CONSTRAINT fk_tp_tenant FOREIGN KEY (tenant_id) REFERENCES common_tenant.common_tenant(id) ON DELETE RESTRICT,
     CONSTRAINT fk_tp_registry FOREIGN KEY (registry_id) REFERENCES common_company.trading_partner_registry(id) ON DELETE RESTRICT,
     CONSTRAINT fk_tp_organization FOREIGN KEY (organization_id) REFERENCES common_company.common_organization(id) ON DELETE SET NULL,

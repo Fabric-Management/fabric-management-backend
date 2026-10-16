@@ -1,7 +1,11 @@
 package com.fabricmanagement.platform.communication.domain;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.*;
 
 /**
@@ -196,6 +200,26 @@ public class Address extends BaseEntity {
       sb.append(", ").append(country);
     }
     return sb.toString();
+  }
+
+  /**
+   * Whether a delivery verifier confirmed this address card for delivery (CONSIGNEE-1 C5). Created
+   * or edited by a user without {@code sales:verify-delivery} it is unverified. Not {@link
+   * #isVerified()}, which only says a map service recognised the address. Rows that predate the
+   * rule are verified.
+   */
+  @Embedded @Builder.Default private Verification verification = Verification.predating();
+
+  public DeliveryVerificationStatus getVerificationStatus() {
+    return verification.getStatus();
+  }
+
+  public UUID getVerifiedBy() {
+    return verification.getVerifiedBy();
+  }
+
+  public Instant getVerifiedAt() {
+    return verification.getVerifiedAt();
   }
 
   /** Check if address has geolocation data */

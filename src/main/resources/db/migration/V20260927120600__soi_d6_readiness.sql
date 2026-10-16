@@ -466,6 +466,15 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_delivery (
     transport_preference VARCHAR(100),
     -- OD-8: ships only when every quantity allocated to it is ready.
     ship_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    -- CONSIGNEE-1 C7: a note may stand in for the address ("the Merter workshop - Ahmet to confirm").
+    note VARCHAR(500),
+    -- CONSIGNEE-1 C5: confirmed by a holder of sales:verify-delivery; anything not known to be
+    -- verified is not. C10: whether the address card it was copied from was verified at copy time.
+    verification_status VARCHAR(20) NOT NULL DEFAULT 'UNVERIFIED'
+        CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED')),
+    verified_by UUID,
+    verified_at TIMESTAMPTZ,
+    ship_to_verified_at_copy BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT uq_order_delivery_tenant_id UNIQUE (tenant_id, id),
     CONSTRAINT uq_order_delivery_sequence UNIQUE (tenant_id, sales_order_id, sequence_no),
     CONSTRAINT fk_order_delivery_order FOREIGN KEY (tenant_id, sales_order_id)

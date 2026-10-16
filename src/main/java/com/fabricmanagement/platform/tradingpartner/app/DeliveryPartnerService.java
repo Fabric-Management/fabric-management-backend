@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerMatchReason;
@@ -50,6 +51,7 @@ public class DeliveryPartnerService {
   private final TradingPartnerRegistryService registryService;
   private final OrganizationFacade organizationFacade;
   private final DomainEventPublisher eventPublisher;
+  private final DeliveryVerificationPolicy verificationPolicy;
 
   /**
    * Active tenant partners that look like the company in the request.
@@ -108,7 +110,11 @@ public class DeliveryPartnerService {
     }
 
     TradingPartner partner =
-        TradingPartner.create(registry, PartnerType.DELIVERY_PARTNER, companyName);
+        TradingPartner.create(
+            registry,
+            PartnerType.DELIVERY_PARTNER,
+            companyName,
+            verificationPolicy.forCurrentActor());
     partner.setRelationshipMeta(relationshipMeta(request));
     TradingPartner saved = partnerRepository.save(partner);
 

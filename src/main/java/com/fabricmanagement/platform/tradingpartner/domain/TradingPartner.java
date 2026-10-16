@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tradingpartner.domain;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
@@ -173,6 +174,13 @@ public class TradingPartner extends BaseEntity {
   @Column(name = "customer_relationship_established_at")
   private Instant customerRelationshipEstablishedAt;
 
+  /**
+   * Whether the tenant's verifiers have confirmed this company as a party to deliver to
+   * (CONSIGNEE-1 C5). Created by a user without {@code sales:verify-delivery} it starts unverified.
+   * Rows that predate the rule, and partners made by the system, are verified.
+   */
+  @Embedded @Builder.Default private Verification verification = Verification.predating();
+
   @Embedded private OfflineMetadata offlineMetadata;
 
   @Override
@@ -216,6 +224,20 @@ public class TradingPartner extends BaseEntity {
         .status(PartnerStatus.ACTIVE)
         .relationshipMeta(new HashMap<>())
         .build();
+  }
+
+  /**
+   * Create a new trading partner relationship that starts in the given verification state (the one
+   * the creating user's permissions give it).
+   */
+  public static TradingPartner create(
+      TradingPartnerRegistry registry,
+      PartnerType partnerType,
+      String customName,
+      Verification verification) {
+    TradingPartner partner = create(registry, partnerType, customName);
+    partner.verification = verification;
+    return partner;
   }
 
   /**

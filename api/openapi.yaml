@@ -52440,6 +52440,91 @@ paths:
       summary: Replace how much of each line this delivery carries
       tags:
       - Sales Order Deliveries
+  /api/v1/sales/orders/{orderId}/deliveries/{deliveryId}/verify:
+    post:
+      operationId: verifyOrderDelivery
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: deliveryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOrderDeliveryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderDeliveriesView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Confirm a delivery's consignee and place; the partner and address\
+        \ card it uses are confirmed with it. May carry a corrected consignee, address\
+        \ or note."
+      tags:
+      - Sales Order Deliveries
   /api/v1/sales/orders/{orderId}/delivery-commitments:
     get:
       operationId: getDeliveryCommitments
@@ -59051,6 +59136,23 @@ components:
         updatedAt:
           type: string
           format: date-time
+        verificationStatus:
+          type: string
+          description: "Whether a delivery verifier confirmed this address card. Not\
+            \ placeId, which only says a map service recognised it."
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     AddressInput:
       type: object
       description: An address as used on the order (a copy). Any part may be missing
@@ -75362,6 +75464,13 @@ components:
       properties:
         consignee:
           $ref: "#/components/schemas/PartyInput"
+        note:
+          type: string
+          description: Said in words where the address is not known yet. A delivery
+            with only a note stays unverified until it has an address (or the term
+            is EXW).
+          maxLength: 500
+          minLength: 0
         requestedDate:
           $ref: "#/components/schemas/RequestedDateInput"
         requestedDateSource:
@@ -75378,6 +75487,20 @@ components:
           description: ORDER_DEFAULT (default) follows the order's term
         transportPreference:
           type: string
+    OrderDeliveryCorrection:
+      type: object
+      description: "What a verifier may change while verifying: the consignee, the\
+        \ address and the note. All three are replaced by what is sent, so send the\
+        \ current value of a part that stays as it is."
+      properties:
+        consignee:
+          $ref: "#/components/schemas/PartyInput"
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        shipTo:
+          $ref: "#/components/schemas/AddressInput"
     OrderDeliveryOutlook:
       type: object
       properties:
@@ -75422,6 +75545,8 @@ components:
         id:
           type: string
           format: uuid
+        note:
+          type: string
         ownRequestedDate:
           $ref: "#/components/schemas/RequestedDateView"
         ownTerm:
@@ -75442,10 +75567,29 @@ components:
           type: boolean
         shipTo:
           $ref: "#/components/schemas/AddressView"
+        shipToVerifiedAtCopy:
+          type: boolean
+          description: The address card the address was copied from was verified when
+            it was copied
         termSource:
           $ref: "#/components/schemas/DefaultSource"
         transportPreference:
           type: string
+        verificationStatus:
+          type: string
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     OrderFlowEventView:
       type: object
       properties:
@@ -76632,6 +76776,22 @@ components:
           type: string
         streetAddress:
           type: string
+        verificationStatus:
+          type: string
+          description: Whether a delivery verifier confirmed this address card
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     OrganizationAddressDto:
       type: object
       properties:
@@ -78413,6 +78573,7 @@ components:
       - sales:grant-approval-authority
       - sales:read
       - sales:ship
+      - sales:verify-delivery
       - sales:write
       - settings:read
       - yarn:read
@@ -86988,6 +87149,23 @@ components:
           type: string
         uid:
           type: string
+        verificationStatus:
+          type: string
+          description: Whether a delivery verifier confirmed this company as a party
+            to deliver to. Not the registry identity check (verifiedStatus).
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
         verifiedStatus:
           type: string
     TransferBatchRequest:
@@ -88755,6 +88933,17 @@ components:
       required:
       - code
       - mfaToken
+    VerifyOrderDeliveryRequest:
+      type: object
+      properties:
+        correction:
+          $ref: "#/components/schemas/OrderDeliveryCorrection"
+          description: Omit to verify the delivery as saved
+        expectedVersion:
+          type: integer
+          format: int64
+      required:
+      - expectedVersion
     WarehouseLocationDto:
       type: object
       properties:

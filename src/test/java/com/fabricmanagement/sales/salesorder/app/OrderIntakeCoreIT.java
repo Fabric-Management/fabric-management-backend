@@ -231,7 +231,7 @@ class OrderIntakeCoreIT {
   // ─── helpers ───────────────────────────────────────────────────────────────
 
   private static DeliveryContentInput emptyDelivery() {
-    return new DeliveryContentInput(null, null, null, null, null, null, null, false);
+    return new DeliveryContentInput(null, null, null, null, null, null, null, false, null);
   }
 
   private SalesOrderDto create(UUID key, String reference) {

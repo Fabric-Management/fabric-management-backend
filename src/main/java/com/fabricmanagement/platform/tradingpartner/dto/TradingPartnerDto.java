@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tradingpartner.dto;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
@@ -45,6 +46,18 @@ public class TradingPartnerDto {
   private UUID linkedTenantId;
   private String verifiedStatus;
 
+  @Schema(
+      description =
+          "Whether a delivery verifier confirmed this company as a party to deliver to. Not the"
+              + " registry identity check (verifiedStatus).")
+  private DeliveryVerificationStatus verificationStatus;
+
+  @Schema(nullable = true)
+  private UUID verifiedBy;
+
+  @Schema(nullable = true)
+  private Instant verifiedAt;
+
   // Partner Organization
   private UUID organizationId;
   private String preferredCurrency;
@@ -87,6 +100,9 @@ public class TradingPartnerDto {
         .onPlatform(tp.isOnPlatform())
         .linkedTenantId(tp.getLinkedTenantId())
         .verifiedStatus(registry != null ? registry.getVerifiedStatus().name() : null)
+        .verificationStatus(tp.getVerification().getStatus())
+        .verifiedBy(tp.getVerification().getVerifiedBy())
+        .verifiedAt(tp.getVerification().getVerifiedAt())
         .organizationId(tp.getOrganizationId())
         .pendingAccountingReview(tp.isPendingAccountingReview())
         .acquiredById(tp.getAcquiredById())

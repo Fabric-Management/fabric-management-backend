@@ -3,12 +3,15 @@ package com.fabricmanagement.platform.tradingpartner.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
@@ -52,12 +55,14 @@ class TradingPartnerServiceTest {
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private OrganizationFacade organizationFacade;
   @Mock private PartnerContactService partnerContactService;
+  @Mock private DeliveryVerificationPolicy verificationPolicy;
 
   @InjectMocks private TradingPartnerService service;
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
+    lenient().when(verificationPolicy.forCurrentActor()).thenReturn(Verification.unverified());
   }
 
   @AfterEach

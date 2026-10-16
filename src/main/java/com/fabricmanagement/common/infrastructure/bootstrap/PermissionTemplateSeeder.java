@@ -147,6 +147,7 @@ public class PermissionTemplateSeeder {
             // even though PermissionEvaluator short-circuits ADMIN before consulting rows.
             new GrantRule("ADMIN", PermissionKey.SALES_APPROVE, DataScope.GLOBAL),
             new GrantRule("ADMIN", PermissionKey.SALES_ASSIGN_OWNER, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.GLOBAL),
             new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
             new GrantRule("ADMIN", PermissionKey.QUALITY_READ, DataScope.GLOBAL),
@@ -170,6 +171,7 @@ public class PermissionTemplateSeeder {
             new GrantRule("SUPERVISOR", PermissionKey.SALES_SHIP, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.SALES_APPROVE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SALES_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.SALES_DELETE, DataScope.DEPARTMENT),
@@ -177,6 +179,7 @@ public class PermissionTemplateSeeder {
             new GrantRule("MANAGER", PermissionKey.SALES_CANCEL, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.SALES_ASSIGN_OWNER, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.ORGANIZATION),
             new GrantRule("WORKER", PermissionKey.FINANCE_READ, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FINANCE_READ, DataScope.DEPARTMENT),
             new GrantRule("WORKER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
@@ -283,6 +286,7 @@ public class PermissionTemplateSeeder {
             new GrantRule("SUPERVISOR", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.COLORS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.LOGISTICS_CANCEL, DataScope.ORGANIZATION),
+            new GrantRule("MANAGER", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.ORGANIZATION),
             // Order work: a warehouse member takes ship-readiness work routed to the team;
             // supervisors and managers (re)assign it with a reason.
             new GrantRule("WORKER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
@@ -308,6 +312,8 @@ public class PermissionTemplateSeeder {
             new GrantRule("MANAGER", PermissionKey.PRODUCTION_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.PRODUCTION_CLAIM, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.PRODUCTION_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.ORGANIZATION),
             new GrantRule("WORKER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
             new GrantRule("SUPERVISOR", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.PRODUCTS_READ, DataScope.ORGANIZATION),
@@ -330,7 +336,9 @@ public class PermissionTemplateSeeder {
             new GrantRule("MANAGER", PermissionKey.LOGISTICS_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.LOGISTICS_WRITE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.LOGISTICS_CLAIM, DataScope.DEPARTMENT),
-            new GrantRule("MANAGER", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT)));
+            new GrantRule("MANAGER", PermissionKey.LOGISTICS_ASSIGN, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.ORGANIZATION)));
 
     // 6. FINANCE
     seedDepartment(
