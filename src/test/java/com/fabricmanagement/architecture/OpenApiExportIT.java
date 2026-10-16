@@ -69,6 +69,10 @@ public class OpenApiExportIT {
    */
   private static final List<NullableReference> NULLABLE_REFERENCES =
       List.of(
+          new NullableReference("TenantBrandingDto", "logo", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "icon", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "logoDark", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "iconDark", "TenantBrandAssetDto"),
           new NullableReference("DecisionCapability", "reason", "DecisionBlockedReason"),
           new NullableReference("DecisionCapability", "routesTo", "DecisionRouteTarget"),
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
