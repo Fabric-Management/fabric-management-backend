@@ -44,6 +44,10 @@ public class OrderWorkAssignment extends BaseEntity {
   @Column(name = "assigned_at")
   private Instant assignedAt;
 
+  /** Set when the work has nothing left to do; most kinds are never closed this way. */
+  @Column(name = "closed_at")
+  private Instant closedAt;
+
   public static OrderWorkAssignment route(
       UUID salesOrderId, OrderWorkKind kind, String departmentCode, Instant now) {
     if (salesOrderId == null || kind == null || departmentCode == null || now == null) {
@@ -61,6 +65,28 @@ public class OrderWorkAssignment extends BaseEntity {
     return assigneeId != null;
   }
 
+  /** Whether there is still something to do; work is open until it is closed. */
+  public boolean isOpen() {
+    return closedAt == null;
+  }
+
+  /** Closes work that has nothing left to do; who held it stays on record. */
+  public void close(Instant now) {
+    if (now == null) {
+      throw new IllegalArgumentException("Time is required");
+    }
+    this.closedAt = now;
+  }
+
+  /** Opens closed work again as new: it goes back to the team's queue, a holder keeps it. */
+  public void reopen(String department, Instant now) {
+    if (!isAssigned()) {
+      this.departmentCode = department;
+    }
+    this.routedAt = now;
+    this.closedAt = null;
+  }
+
   public boolean isAssignedTo(UUID userId) {
     return assigneeId != null && assigneeId.equals(userId);
   }
@@ -72,6 +98,7 @@ public class OrderWorkAssignment extends BaseEntity {
     }
     this.departmentCode = department;
     this.routedAt = now;
+    this.closedAt = null;
   }
 
   /** Only one person can take unassigned work; a second claim is a conflict. */

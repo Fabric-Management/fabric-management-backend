@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(159)
+        .hasSize(160)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(159);
+    assertThat(expected).hasSize(160);
   }
 
   @Test
@@ -76,6 +76,13 @@ class SalesEndpointAuthorizationArchTest {
           .as("%s still needs sales:write", change)
           .isEqualTo("@auth.can(authentication, 'sales', 'write')");
     }
+  }
+
+  @Test
+  void theShipToSuggestionNeedsSalesReadOnly() throws Exception {
+    // CONSIGNEE-1 C11: whoever composes an order reads the suggestion; it changes nothing.
+    assertThat(preAuthorize("ShipToSuggestionController", "getShipToSuggestion"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -368,6 +375,7 @@ class SalesEndpointAuthorizationArchTest {
         "deleteOrderDelivery",
         "setOrderDeliveryAllocations",
         "verifyOrderDelivery");
+    add(result, "ShipToSuggestionController", Category.TRANSACTIONAL_READ, "getShipToSuggestion");
     add(result, "SalesQualityGradeController", Category.REFERENCE_READ, "listSalesGrades");
     add(result, "SalesLotController", Category.REFERENCE_READ, "listSalesLots");
     add(

@@ -9,6 +9,7 @@ import com.fabricmanagement.sales.salesorder.domain.AddressSnapshot;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTermSetting;
 import com.fabricmanagement.sales.salesorder.domain.OrderDelivery;
 import com.fabricmanagement.sales.salesorder.domain.OrderLineAllocation;
+import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
 import com.fabricmanagement.sales.salesorder.domain.PartyMode;
 import com.fabricmanagement.sales.salesorder.domain.PartyReference;
 import com.fabricmanagement.sales.salesorder.domain.RequestedDate;
@@ -57,6 +58,7 @@ public class OrderDeliveryService {
   private final SalesOrderLineRepository lines;
   private final SalesOrderRevision revision;
   private final DeliveryVerificationPolicy verificationPolicy;
+  private final OrderWorkService work;
 
   @Transactional(readOnly = true)
   public DeliveriesView list(UUID orderId, UUID actor) {
@@ -72,6 +74,7 @@ public class OrderDeliveryService {
         OrderDelivery.create(order.getId(), next, content(order, request.content()));
     deliveries.save(created);
     restate(order, created, actor);
+    syncVerificationWork(order, actor);
     return changed(order);
   }
 
@@ -82,6 +85,7 @@ public class OrderDeliveryService {
     OrderDelivery delivery = delivery(order, deliveryId);
     delivery.revise(content(order, request.content()));
     restate(order, delivery, actor);
+    syncVerificationWork(order, actor);
     return changed(order);
   }
 
@@ -122,6 +126,7 @@ public class OrderDeliveryService {
     if (card != null) {
       access.verifyCard(card, actor);
     }
+    syncVerificationWork(order, actor);
     if (correction != null) {
       revision.linesChanged(order);
     }
@@ -135,6 +140,7 @@ public class OrderDeliveryService {
     OrderDelivery delivery = delivery(order, deliveryId);
     allocations.deleteByDelivery(TenantContext.requireTenantId(), delivery.getId());
     deliveries.delete(delivery);
+    syncVerificationWork(order, actor);
     return changed(order);
   }
 
@@ -230,6 +236,21 @@ public class OrderDeliveryService {
     delivery.recordVerification(
         confirmed ? Verification.verifiedBy(actor, Instant.now()) : Verification.unverified(),
         cardVerified);
+  }
+
+  /**
+   * One piece of verification work per order: open while any delivery waits for verification,
+   * closed when none does. Saving, verifying and removing a delivery all end here, so the work
+   * follows the deliveries however the last change came about.
+   */
+  private void syncVerificationWork(SalesOrder order, UUID actor) {
+    boolean waiting =
+        deliveriesOf(order).stream().anyMatch(value -> !value.getVerification().isVerified());
+    if (waiting) {
+      work.open(order.getId(), OrderWorkKind.DELIVERY_VERIFICATION, actor);
+    } else {
+      work.close(order.getId(), OrderWorkKind.DELIVERY_VERIFICATION, actor);
+    }
   }
 
   private static UUID sourceCardOf(OrderDelivery delivery) {

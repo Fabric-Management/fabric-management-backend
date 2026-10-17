@@ -54109,6 +54109,78 @@ paths:
       summary: Resolve a triage case by assigning its primary representative
       tags:
       - Sales Ownership Triage
+  /api/v1/sales/partners/{partnerId}/ship-to-suggestion:
+    get:
+      operationId: getShipToSuggestion
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseShipToSuggestion"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The consignee's address card to preselect: most used verified, else\
+        \ shipping, else primary"
+      tags:
+      - Sales Order Deliveries
   /api/v1/sales/products:
     get:
       operationId: listCatalog
@@ -64717,6 +64789,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SendQuoteResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseShipToSuggestion:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ShipToSuggestion"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -76660,6 +76750,7 @@ components:
       - CLAIMED
       - ASSIGNED
       - RELEASED
+      - CLOSED
     OrderWorkEventView:
       type: object
       properties:
@@ -76703,6 +76794,7 @@ components:
       - PLANNING
       - SHIP_READINESS
       - ARRIVAL_ESTIMATE
+      - DELIVERY_VERIFICATION
     OrderWorkView:
       type: object
       properties:
@@ -85252,6 +85344,24 @@ components:
           - SHADE_APPROVAL
       required:
       - valueType
+    ShipToSuggestion:
+      type: object
+      properties:
+        addressId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The address card to preselect; empty for NONE
+        source:
+          $ref: "#/components/schemas/ShipToSuggestionSource"
+    ShipToSuggestionSource:
+      type: string
+      enum:
+      - MOST_USED
+      - SHIPPING
+      - PRIMARY
+      - NONE
     ShipmentDto:
       type: object
       properties:

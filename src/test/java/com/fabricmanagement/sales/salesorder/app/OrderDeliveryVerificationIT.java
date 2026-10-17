@@ -35,8 +35,10 @@ import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.AddressInput;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.DeliveryTermInput;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.PartyInput;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
+import com.fabricmanagement.sales.salesorder.infra.repository.OrderDeliveryRepository;
 import com.fabricmanagement.testsupport.PostgresImage;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -97,6 +99,7 @@ class OrderDeliveryVerificationIT {
   @Autowired private AddressRepository addresses;
   @Autowired private SalesOrderService orderService;
   @Autowired private OrderDeliveryService deliveries;
+  @Autowired private OrderDeliveryRepository deliveryRepository;
   @Autowired private JdbcTemplate jdbc;
 
   /** Access scopes are covered elsewhere; a verifier needs none of them. */
@@ -305,6 +308,111 @@ class OrderDeliveryVerificationIT {
     assertThat(deliveryStatus(second.id())).isEqualTo("UNVERIFIED");
   }
 
+  // ─── the verification work (C8) ───────────────────────────────────────────
+
+  @Test
+  void theVerificationWorkOpensOncePerOrderAndClosesWhenTheLastDeliveryIsVerified() {
+    UUID orderId = newOrder("PO-W1");
+
+    DeliveriesView first = save(orderId, content(customerInput(), typedAddress(), null));
+    DeliveriesView both = save(orderId, content(customerInput(), typedAddress(), "Dock 4"));
+
+    assertThat(workRows(orderId)).as("one piece of work, not one per delivery").isEqualTo(1);
+    assertThat(workDepartment(orderId)).isEqualTo("PLANNING");
+    assertThat(workClosed(orderId)).isFalse();
+    assertThat(workEvents(orderId)).containsExactly("ROUTED");
+
+    verifyDelivery(orderId, first.deliveries().get(0).id());
+    assertThat(workClosed(orderId)).as("the second delivery still waits").isFalse();
+
+    verifyDelivery(orderId, both.deliveries().get(1).id());
+    assertThat(workClosed(orderId)).isTrue();
+    assertThat(workEvents(orderId)).containsExactly("ROUTED", "CLOSED");
+  }
+
+  @Test
+  void editingAVerifiedDeliveryOpensTheSameWorkAgain() {
+    UUID orderId = newOrder("PO-W2");
+    DeliveriesView saved = save(orderId, content(customerInput(), typedAddress(), null));
+    UUID deliveryId = saved.deliveries().get(0).id();
+    verifyDelivery(orderId, deliveryId);
+    assertThat(workClosed(orderId)).isTrue();
+
+    saveAs(
+        orderId,
+        deliveryId,
+        versionInDatabase(orderId),
+        content(customerInput(), typedAddress(), "Ring the bell"));
+
+    assertThat(workRows(orderId)).isEqualTo(1);
+    assertThat(workClosed(orderId)).isFalse();
+    assertThat(workEvents(orderId)).containsExactly("ROUTED", "CLOSED", "ROUTED");
+  }
+
+  @Test
+  void whatAVerifierSavesCompleteOpensNoWorkAtAll() {
+    doReturn(true).when(verificationPolicy).actorMayVerify();
+    UUID orderId = newOrder("PO-W3");
+
+    save(orderId, content(customerInput(), typedAddress(), null));
+
+    assertThat(workRows(orderId)).isZero();
+  }
+
+  @Test
+  void removingTheOnlyWaitingDeliveryClosesTheWork() {
+    UUID orderId = newOrder("PO-W4");
+    DeliveriesView saved = save(orderId, content(customerInput(), typedAddress(), null));
+
+    inTenant(
+        tenantId,
+        () ->
+            deliveries.delete(
+                orderId, saved.deliveries().get(0).id(), versionInDatabase(orderId), user));
+
+    assertThat(workClosed(orderId)).isTrue();
+  }
+
+  // ─── the address cards a consignee was shipped to (C11) ───────────────────
+
+  @Test
+  void theMostUsedCardComesFirstAndALaterUseBreaksATie() {
+    UUID partner = inTenant(tenantId, () -> newPartner(Verification.unverified()));
+    UUID popular = inTenant(tenantId, () -> newCard(Verification.unverified()));
+    UUID recent = inTenant(tenantId, () -> newCard(Verification.unverified()));
+    UUID unused = inTenant(tenantId, () -> newCard(Verification.unverified()));
+
+    shipTo(partner, popular);
+    shipTo(partner, popular);
+    shipTo(partner, recent);
+    assertThat(cardsUsedFor(partner)).containsExactly(popular, recent).doesNotContain(unused);
+
+    shipTo(partner, recent);
+    assertThat(cardsUsedFor(partner))
+        .as("equally used: the one used last first")
+        .containsExactly(recent, popular);
+  }
+
+  @Test
+  void aDeliveryToTheCustomerItselfCountsForTheCustomerAndNotForOthers() {
+    UUID card = inTenant(tenantId, () -> newCard(Verification.unverified()));
+    UUID other = inTenant(tenantId, () -> newPartner(Verification.unverified()));
+
+    save(newOrder("PO-S1"), content(customerInput(), addressFromCard(card), null));
+
+    assertThat(cardsUsedFor(customerId)).containsExactly(card);
+    assertThat(cardsUsedFor(other)).isEmpty();
+  }
+
+  @Test
+  void deliveriesWithATypedAddressLeaveNoCardToSuggest() {
+    UUID partner = inTenant(tenantId, () -> newPartner(Verification.unverified()));
+
+    save(newOrder("PO-S2"), content(partnerInput(partner), typedAddress(), null));
+
+    assertThat(cardsUsedFor(partner)).isEmpty();
+  }
+
   // ─── rows that predate the rule ───────────────────────────────────────────
 
   @Test
@@ -405,6 +513,60 @@ class OrderDeliveryVerificationIT {
         tenantId,
         () ->
             deliveries.update(orderId, deliveryId, new SaveDeliveryRequest(version, input), user));
+  }
+
+  private void shipTo(UUID partner, UUID card) {
+    save(
+        newOrder("PO-" + UUID.randomUUID()),
+        content(partnerInput(partner), addressFromCard(card), null));
+  }
+
+  private List<UUID> cardsUsedFor(UUID partner) {
+    return inTenant(tenantId, () -> deliveryRepository.shippedToCards(tenantId, partner));
+  }
+
+  private void verifyDelivery(UUID orderId, UUID deliveryId) {
+    inTenant(
+        tenantId,
+        () ->
+            deliveries.verify(
+                orderId,
+                deliveryId,
+                new VerifyDeliveryRequest(versionInDatabase(orderId), null),
+                verifier));
+  }
+
+  private int workRows(UUID orderId) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM sales_ord.order_work_assignment"
+            + " WHERE sales_order_id = ? AND work_kind = 'DELIVERY_VERIFICATION'",
+        Integer.class,
+        orderId);
+  }
+
+  private String workDepartment(UUID orderId) {
+    return jdbc.queryForObject(
+        "SELECT department_code FROM sales_ord.order_work_assignment"
+            + " WHERE sales_order_id = ? AND work_kind = 'DELIVERY_VERIFICATION'",
+        String.class,
+        orderId);
+  }
+
+  private boolean workClosed(UUID orderId) {
+    return jdbc.queryForObject(
+        "SELECT closed_at IS NOT NULL FROM sales_ord.order_work_assignment"
+            + " WHERE sales_order_id = ? AND work_kind = 'DELIVERY_VERIFICATION'",
+        Boolean.class,
+        orderId);
+  }
+
+  private List<String> workEvents(UUID orderId) {
+    return jdbc.queryForList(
+        "SELECT event_type FROM sales_ord.order_work_assignment_event"
+            + " WHERE sales_order_id = ? AND work_kind = 'DELIVERY_VERIFICATION'"
+            + " ORDER BY occurred_at, created_at",
+        String.class,
+        orderId);
   }
 
   private String deliveryStatus(UUID deliveryId) {

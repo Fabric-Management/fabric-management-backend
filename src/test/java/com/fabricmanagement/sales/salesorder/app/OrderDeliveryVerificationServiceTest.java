@@ -66,6 +66,7 @@ class OrderDeliveryVerificationServiceTest {
   @Mock private SalesOrderLineRepository lines;
   @Mock private SalesOrderRevision revision;
   @Mock private DeliveryVerificationPolicy policy;
+  @Mock private OrderWorkService work;
   @InjectMocks private OrderDeliveryService service;
 
   private SalesOrder order;
