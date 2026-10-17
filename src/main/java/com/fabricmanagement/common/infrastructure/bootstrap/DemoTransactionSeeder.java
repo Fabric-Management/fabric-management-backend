@@ -51,6 +51,7 @@ public class DemoTransactionSeeder {
   private final ProcurementDemoSeeder procurementDemoSeeder;
   private final SalesQuoteDemoSeeder salesQuoteDemoSeeder;
   private final PlaygroundSeedScopePort playgroundSeedScope;
+  private final PartnerNetworkDemoSeeder partnerNetworkDemoSeeder;
 
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
@@ -94,6 +95,7 @@ public class DemoTransactionSeeder {
         log.info("Demo transactions already exist for tenant: {}. Skipping.", tenantId);
         seedProcurementDemo(tenantId);
         seedSalesQuoteDemo(tenantId);
+        seedPartnerNetworkDemo(tenantId);
         return;
       }
 
@@ -128,6 +130,7 @@ public class DemoTransactionSeeder {
 
       seedProcurementDemo(tenantId);
       seedSalesQuoteDemo(tenantId);
+      seedPartnerNetworkDemo(tenantId);
 
       // 3. Production demo (best-effort, isolated): sales order → work order → batch.
       // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
@@ -290,6 +293,43 @@ public class DemoTransactionSeeder {
                     + " unaffected.",
                 tenantId,
                 salesQuoteEx);
+          }
+        });
+  }
+
+  /**
+   * The people, address cards and linked companies of the demo customers and suppliers
+   * (PLAYGROUND-PARTIES-1). Runs after every demo that creates a partner, the colour/stock demo
+   * included, so it follows {@link #seedSalesQuoteDemo}: deferred to after the caller's commit when
+   * a transaction is active (callbacks run in registration order), at once otherwise. The seeder
+   * opens its own transaction, since one joined from an after-commit callback is never committed.
+   */
+  private void seedPartnerNetworkDemo(UUID tenantId) {
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              runPartnerNetworkDemo(tenantId);
+            }
+          });
+      return;
+    }
+    runPartnerNetworkDemo(tenantId);
+  }
+
+  private void runPartnerNetworkDemo(UUID tenantId) {
+    TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          try {
+            partnerNetworkDemoSeeder.seedFor(tenantId);
+          } catch (Exception networkEx) {
+            log.warn(
+                "Partner network demo seeding failed for tenant {} - continuing; other demos"
+                    + " unaffected.",
+                tenantId,
+                networkEx);
           }
         });
   }
