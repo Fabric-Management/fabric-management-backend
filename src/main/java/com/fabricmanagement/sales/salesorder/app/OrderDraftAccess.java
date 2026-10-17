@@ -3,7 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.platform.communication.app.AddressService;
+import com.fabricmanagement.platform.communication.api.facade.AddressFacade;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.PartyMode;
@@ -28,7 +28,7 @@ class OrderDraftAccess {
   private final SalesOrderRepository orders;
   private final SalesOrderAccessPolicy accessPolicy;
   private final TradingPartnerService partners;
-  private final AddressService addresses;
+  private final AddressFacade addresses;
   private final SalesOrderRevision revision;
 
   SalesOrder readable(UUID orderId, UUID actor) {
@@ -101,7 +101,7 @@ class OrderDraftAccess {
   /** Whether the address card is confirmed; false for a card this tenant does not have. */
   boolean cardVerified(UUID addressId) {
     return addresses
-        .verificationOf(addressId)
+        .deliveryVerificationOf(addressId)
         .map(DeliveryVerificationStatus::isVerified)
         .orElse(false);
   }
@@ -116,8 +116,8 @@ class OrderDraftAccess {
 
   /** Confirms the address card a delivery was copied from; a card that is gone is left alone. */
   void verifyCard(UUID addressId, UUID verifier) {
-    if (addresses.verificationOf(addressId).isPresent()) {
-      addresses.verify(addressId, verifier);
+    if (addresses.deliveryVerificationOf(addressId).isPresent()) {
+      addresses.verifyForDelivery(addressId, verifier);
     }
   }
 
