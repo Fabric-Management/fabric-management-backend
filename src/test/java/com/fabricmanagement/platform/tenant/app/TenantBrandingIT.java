@@ -90,6 +90,27 @@ class TenantBrandingIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void preparingAndAbandoningAPreviewNeverReplacesTheTenantArtwork() {
+    TenantContext.executeInTenantContext(
+        tenantA,
+        () -> {
+          var before = service.upload(BrandAssetKind.LOGO, BrandColourMode.ORIGINAL, file());
+          byte[] preview = service.preview(file(), BrandColourMode.MONOCHROME);
+          assertThat(new String(preview, StandardCharsets.UTF_8)).contains("path");
+          var after = service.read(true).logo();
+          assertThat(after.id()).isEqualTo(before.id());
+          assertThat(after.version()).isEqualTo(before.version());
+          return null;
+        });
+    TenantContext.executeInTenantContext(
+        tenantB,
+        () -> {
+          assertThat(service.read(false).logo()).isNull();
+          return null;
+        });
+  }
+
+  @Test
   void declaredMimeTypeDoesNotMakeAnUnsafeFileValid() {
     TenantContext.executeInTenantContext(
         tenantA,

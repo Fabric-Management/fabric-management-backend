@@ -28,6 +28,8 @@ class TenantBrandingControllerTest {
         .isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> controller.remove(BrandAssetKind.ICON, user))
         .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> controller.preview(file, BrandColourMode.ORIGINAL, user))
+        .isInstanceOf(AccessDeniedException.class);
     verifyNoInteractions(service);
   }
 
@@ -37,8 +39,10 @@ class TenantBrandingControllerTest {
     controller.upload(BrandAssetKind.LOGO, BrandColourMode.MONOCHROME, file, user);
     controller.remove(BrandAssetKind.ICON, user);
     controller.read(user);
+    controller.preview(file, BrandColourMode.MONOCHROME, user);
     verify(service).upload(BrandAssetKind.LOGO, BrandColourMode.MONOCHROME, file);
     verify(service).remove(BrandAssetKind.ICON);
+    verify(service).preview(file, BrandColourMode.MONOCHROME);
     verify(service).read(true);
   }
 }

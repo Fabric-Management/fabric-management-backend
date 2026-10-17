@@ -169,3 +169,7 @@ tests_run.txt
 
 # Commit message scratch files (delivered by Claude, used via git commit -F)
 COMMIT_MSG*.txt
+
+# Python SVG conversion worker and test caches
+__pycache__/
+*.py[cod]

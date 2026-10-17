@@ -10289,6 +10289,96 @@ paths:
       summary: Read a validated SVG belonging to the current tenant
       tags:
       - Tenant Branding
+  /api/v1/common/tenant/settings/branding/preview:
+    post:
+      description: Validates static SVG; outlines local text only when the exact font
+        face and glyphs are available. Missing fonts return TENANT_BRANDING_FONT_UNAVAILABLE
+        without replacing artwork. The caller must obtain visual approval before uploading
+        the returned SVG.
+      operationId: previewTenantBrandAsset
+      parameters:
+      - in: query
+        name: colourMode
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandColourMode"
+          default: ORIGINAL
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SVG with viewBox, optionally containing local text;\
+                    \ maximum 524288 bytes"
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+          description: "Validated outlined SVG, ready for preview and subsequent confirmed\
+            \ upload"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Prepare a tenant SVG preview without saving (administrators only)
+      tags:
+      - Tenant Branding
   /api/v1/common/tenant/settings/branding/{kind}:
     delete:
       operationId: removeTenantBrandAsset

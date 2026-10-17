@@ -23,6 +23,12 @@ public class TenantBrandingService {
   private final TenantBrandAssetRepository repository;
   private final TenantBrandAssetLockRepository locks;
   private final BrandSvgSanitizerService sanitizer;
+  private final BrandSvgPreparationService preparation;
+
+  /** Preparing a preview does not write a tenant asset. */
+  public byte[] preview(MultipartFile file, BrandColourMode mode) {
+    return preparation.prepare(file, mode);
+  }
 
   @Transactional(readOnly = true)
   public TenantBrandingDto read(boolean canManage) {

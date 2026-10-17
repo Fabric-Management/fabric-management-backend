@@ -29,7 +29,7 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:21-jre-alpine
 
 # Install essential tools
-RUN apk add --no-cache curl bash && \
+RUN apk add --no-cache curl bash python3 inkscape fontconfig font-dejavu && \
     rm -rf /var/cache/apk/*
 
 # Create non-root user for security

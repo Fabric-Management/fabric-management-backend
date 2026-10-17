@@ -103,11 +103,48 @@ public class BrandSvgSanitizerService {
           "maskUnits",
           "maskContentUnits",
           "href");
+  private static final Set<String> TEXT_PROPERTIES =
+      Set.of(
+          "font-family",
+          "font-size",
+          "font-weight",
+          "font-style",
+          "font-stretch",
+          "font-variant",
+          "text-anchor",
+          "letter-spacing",
+          "word-spacing",
+          "line-height",
+          "writing-mode",
+          "direction",
+          "dominant-baseline",
+          "baseline-shift",
+          "text-align");
   private static final Pattern LOCAL_URL = Pattern.compile("url\\(#[A-Za-z_][A-Za-z0-9_.-]*\\)");
   private static final Pattern CSS_RULE = Pattern.compile("\\G\\s*([^{}]+)\\{([^{}]*)}");
   private static final Pattern SELECTOR = Pattern.compile("[.#]?[A-Za-z_][A-Za-z0-9_-]*");
 
   public String sanitize(byte[] bytes) {
+    return sanitize(bytes, false, false);
+  }
+
+  /** Strict static SVG plus local text; never persisted or rendered by the browser. */
+  public String prepareText(byte[] bytes) {
+    return sanitize(bytes, true, false);
+  }
+
+  /** Inkscape may retain inert typography properties on paths after outlining. */
+  public String sanitizeOutlined(byte[] bytes) {
+    return sanitize(bytes, false, true);
+  }
+
+  public boolean containsText(String svg) {
+    var document = parse(svg);
+    return document.getElementsByTagNameNS(SVG, "text").getLength() > 0
+        || document.getElementsByTagNameNS(SVG, "tspan").getLength() > 0;
+  }
+
+  private String sanitize(byte[] bytes, boolean text, boolean outlined) {
     if (bytes == null || bytes.length == 0 || bytes.length > TenantBrandAsset.MAX_BYTES) {
       throw TenantBrandingDomainException.invalid("Choose an SVG of at most 512 KB");
     }
@@ -128,8 +165,8 @@ public class BrandSvgSanitizerService {
     } catch (NumberFormatException e) {
       throw TenantBrandingDomainException.invalid("Export the SVG with a valid viewBox");
     }
-    List<CssRule> rules = extractStyles(document);
-    clean(root, rules, 0, new int[] {0});
+    List<CssRule> rules = extractStyles(document, text || outlined);
+    clean(root, rules, 0, new int[] {0}, text, outlined);
     root.setAttribute("xmlns", SVG);
     root.setAttribute("width", viewBox[2]);
     root.setAttribute("height", viewBox[3]);
@@ -193,11 +230,18 @@ public class BrandSvgSanitizerService {
     return colour;
   }
 
-  private void clean(Element element, List<CssRule> rules, int depth, int[] count) {
+  private void clean(
+      Element element,
+      List<CssRule> rules,
+      int depth,
+      int[] count,
+      boolean text,
+      boolean outlined) {
     if (depth > 32
         || ++count[0] > 2048
         || !SVG.equals(element.getNamespaceURI())
-        || !ELEMENTS.contains(element.getLocalName())) {
+        || !(ELEMENTS.contains(element.getLocalName())
+            || text && Set.of("text", "tspan").contains(element.getLocalName()))) {
       throw TenantBrandingDomainException.invalid(
           "Use static SVG paths and shapes; convert text to outlines");
     }
@@ -206,7 +250,7 @@ public class BrandSvgSanitizerService {
         .filter(rule -> rule.matches(element))
         .sorted(java.util.Comparator.comparingInt(CssRule::specificity))
         .forEach(rule -> styles.putAll(rule.styles()));
-    styles.putAll(declarations(element.getAttribute("style")));
+    styles.putAll(declarations(element.getAttribute("style"), text || outlined));
     var attributes = element.getAttributes();
     for (int i = attributes.getLength() - 1; i >= 0; i--) {
       Node attribute = attributes.item(i);
@@ -215,19 +259,38 @@ public class BrandSvgSanitizerService {
       if (name.toLowerCase(java.util.Locale.ROOT).startsWith("on")) {
         throw TenantBrandingDomainException.invalid("SVG event handlers are not accepted");
       }
-      if (!PRESENTATION.contains(name) && !ATTRIBUTES.contains(name)) {
+      if (text
+          && (Set.of("textLength", "lengthAdjust").contains(name)
+              || name.startsWith("font-") && !TEXT_PROPERTIES.contains(name))) {
+        throw new TenantBrandingDomainException(
+            "This SVG typography cannot be preserved by conversion",
+            "TENANT_BRANDING_TEXT_UNSUPPORTED",
+            422);
+      }
+      if ((text || outlined) && "-inkscape-font-specification".equals(name)) {
+        element.removeAttributeNode((org.w3c.dom.Attr) attribute);
+      } else if (outlined && TEXT_PROPERTIES.contains(name)) {
+        element.removeAttributeNode((org.w3c.dom.Attr) attribute);
+      } else if (!PRESENTATION.contains(name)
+          && !ATTRIBUTES.contains(name)
+          && !(text
+              && (TEXT_PROPERTIES.contains(name)
+                  || Set.of("dx", "dy", "rotate", "xml:space").contains(name)))) {
         element.removeAttributeNode((org.w3c.dom.Attr) attribute);
       } else {
         safeValue(name, value);
         element.setAttribute(name, value);
       }
     }
-    styles.forEach(element::setAttribute);
+    styles.forEach(
+        (name, value) -> {
+          if (!outlined || !TEXT_PROPERTIES.contains(name)) element.setAttribute(name, value);
+        });
     for (Node child = element.getFirstChild(); child != null; ) {
       Node next = child.getNextSibling();
       if (child instanceof Element nested) {
         if ("metadata".equals(nested.getLocalName())) element.removeChild(child);
-        else clean(nested, rules, depth + 1, count);
+        else clean(nested, rules, depth + 1, count, text, outlined);
       } else if (child.getNodeType() != Node.TEXT_NODE) {
         element.removeChild(child);
       }
@@ -235,7 +298,7 @@ public class BrandSvgSanitizerService {
     }
   }
 
-  private List<CssRule> extractStyles(Document document) {
+  private List<CssRule> extractStyles(Document document, boolean fontStyles) {
     List<CssRule> result = new ArrayList<>();
     var nodes = document.getElementsByTagNameNS(SVG, "style");
     while (nodes.getLength() > 0) {
@@ -244,7 +307,7 @@ public class BrandSvgSanitizerService {
       var matcher = CSS_RULE.matcher(css);
       int end = 0;
       while (matcher.find()) {
-        Map<String, String> styles = declarations(matcher.group(2));
+        Map<String, String> styles = declarations(matcher.group(2), fontStyles);
         for (String selector : matcher.group(1).split(",")) {
           selector = selector.trim();
           if (!SELECTOR.matcher(selector).matches()) {
@@ -263,7 +326,7 @@ public class BrandSvgSanitizerService {
     return result;
   }
 
-  private Map<String, String> declarations(String text) {
+  private Map<String, String> declarations(String text, boolean fontStyles) {
     Map<String, String> result = new LinkedHashMap<>();
     for (String declaration : text.split(";")) {
       if (declaration.isBlank()) continue;
@@ -271,7 +334,8 @@ public class BrandSvgSanitizerService {
       if (colon < 0) throw TenantBrandingDomainException.invalid("Invalid SVG style");
       String name = declaration.substring(0, colon).trim();
       String value = declaration.substring(colon + 1).trim();
-      if (!PRESENTATION.contains(name)) {
+      if (fontStyles && "-inkscape-font-specification".equals(name)) continue;
+      if (!PRESENTATION.contains(name) && !(fontStyles && TEXT_PROPERTIES.contains(name))) {
         throw TenantBrandingDomainException.invalid("Unsupported SVG style: " + name);
       }
       safeValue(name, value);

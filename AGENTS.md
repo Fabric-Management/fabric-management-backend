@@ -480,3 +480,18 @@ Yukarıdaki kuralların büyük kısmı **ArchUnit testleriyle** otomatik olarak
 Format: `type(scope): description`
 - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `chore`
 - Scopes: module name (`fiberos`, `yarnos`), `common`, `ci`, `db`
+
+
+## Tenant artwork text preparation — 2026-10-17 (prepared, operator verification pending)
+
+`platform/tenant` owns the administrator-only `/branding/preview` binary SVG preparation endpoint.
+It is a named binary-response exception like the existing asset-content endpoint: `no-store`, static
+SVG bytes, no public URL and no persistence. `BrandSvgPreparationService` orchestrates a closed
+static/text preflight, the domain `BrandSvgOutlinePort`, and vector-only post-validation. The local
+infra client runs the packaged Python/Inkscape/Fontconfig worker with bounded concurrency, time,
+output and temporary files. Missing exact font family/face/glyphs must fail closed; no substitution,
+font upload or implicit installation is allowed. Ordinary upload still accepts only validated vectors;
+the frontend obtains approval of the prepared preview before uploading those bytes. Install licensed
+fonts and runtime tools as documented in `docs/TENANT-BRANDING-TEXT.md`. No schema migration is needed.
+The additive OpenAPI snapshot and frontend generated types are prepared; operator re-export and tests
+are required before commit. Never run those validations or commit/push on the operator's behalf.
