@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(158)
+        .hasSize(160)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(158);
+    assertThat(expected).hasSize(160);
   }
 
   @Test
@@ -58,6 +58,31 @@ class SalesEndpointAuthorizationArchTest {
         .isEqualTo("@auth.can(authentication, 'sales', 'assign-owner')");
     assertThat(preAuthorize("CustomerAccountTeamController", "listCandidates"))
         .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+  }
+
+  @Test
+  void verifyingADeliveryNeedsItsOwnPermissionNotSalesWrite() throws Exception {
+    // CONSIGNEE-1 C6: confirming delivery details is not implied by sales:write, and a verifier
+    // in planning or logistics needs no sales scope at all.
+    assertThat(preAuthorize("OrderDeliveryController", "verifyOrderDelivery"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'verify-delivery')");
+    for (String change :
+        List.of(
+            "createOrderDelivery",
+            "updateOrderDelivery",
+            "deleteOrderDelivery",
+            "setOrderDeliveryAllocations")) {
+      assertThat(preAuthorize("OrderDeliveryController", change))
+          .as("%s still needs sales:write", change)
+          .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+    }
+  }
+
+  @Test
+  void theShipToSuggestionNeedsSalesReadOnly() throws Exception {
+    // CONSIGNEE-1 C11: whoever composes an order reads the suggestion; it changes nothing.
+    assertThat(preAuthorize("ShipToSuggestionController", "getShipToSuggestion"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -348,7 +373,9 @@ class SalesEndpointAuthorizationArchTest {
         "createOrderDelivery",
         "updateOrderDelivery",
         "deleteOrderDelivery",
-        "setOrderDeliveryAllocations");
+        "setOrderDeliveryAllocations",
+        "verifyOrderDelivery");
+    add(result, "ShipToSuggestionController", Category.TRANSACTIONAL_READ, "getShipToSuggestion");
     add(result, "SalesQualityGradeController", Category.REFERENCE_READ, "listSalesGrades");
     add(result, "SalesLotController", Category.REFERENCE_READ, "listSalesLots");
     add(

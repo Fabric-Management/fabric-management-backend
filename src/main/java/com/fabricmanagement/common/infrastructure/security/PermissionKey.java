@@ -108,6 +108,11 @@ public enum PermissionKey {
           + " Explicit tenant authorisation only, for sales managers."),
   SALES_READ("sales:read", EnforcedBy.ANNOTATION, ""),
   SALES_SHIP("sales:ship", EnforcedBy.ANNOTATION, ""),
+  SALES_VERIFY_DELIVERY(
+      "sales:verify-delivery",
+      EnforcedBy.ANNOTATION,
+      "Confirm an order delivery's consignee and address (CONSIGNEE-1 C6). Not implied by"
+          + " sales:write; planning, logistics and sales managers hold it by tenant role setup."),
   SALES_WRITE("sales:write", EnforcedBy.ANNOTATION, ""),
   SETTINGS_READ("settings:read", EnforcedBy.ANNOTATION, ""),
   YARN_READ("yarn:read", EnforcedBy.ANNOTATION, ""),

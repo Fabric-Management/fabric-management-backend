@@ -167,7 +167,14 @@ class CustomerApprovalFlowIT {
     PermissionResult salesTeam =
         new PermissionResult(
             Map.of(
-                "sales", Map.of("read", DataScope.ORGANIZATION, "write", DataScope.ORGANIZATION)),
+                "sales",
+                Map.of(
+                    "read",
+                    DataScope.ORGANIZATION,
+                    "write",
+                    DataScope.ORGANIZATION,
+                    "verify-delivery",
+                    DataScope.ORGANIZATION)),
             false);
     when(permissionEvaluator.evaluate(any(), any(), any(), any())).thenReturn(salesTeam);
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any())).thenReturn(salesTeam);
@@ -921,12 +928,16 @@ class CustomerApprovalFlowIT {
             exception -> assertThat(exception.getErrorCode()).isEqualTo(code));
   }
 
-  /** Sales sends the planned order; returns the link the customer received. */
+  /**
+   * Sales sends the planned order; returns the link the customer received. Sending asks the user
+   * whether they may verify delivery details (CONSIGNEE-1 C9), so the seller is authenticated.
+   */
   private String send() {
     TenantContext.setCurrentTenantId(tenantId);
     TenantContext.setCurrentUserId(sales);
     try {
-      CustomerApprovalDtos.State state = customerApprovals.sendForApproval(orderId, null, sales);
+      CustomerApprovalDtos.State state =
+          asSales(() -> customerApprovals.sendForApproval(orderId, null, sales));
       assertThat(state.approvals())
           .singleElement()
           .satisfies(

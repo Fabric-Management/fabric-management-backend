@@ -89,6 +89,13 @@ public class OrderWorkService {
               PermissionKey.LOGISTICS_WRITE,
               PermissionKey.LOGISTICS_CLAIM,
               PermissionKey.LOGISTICS_ASSIGN);
+      // Verifying has one permission; nobody claims or is assigned this work, it is a queue.
+      case DELIVERY_VERIFICATION ->
+          new WorkPermissions(
+              PermissionKey.SALES_VERIFY_DELIVERY,
+              PermissionKey.SALES_VERIFY_DELIVERY,
+              PermissionKey.SALES_VERIFY_DELIVERY,
+              PermissionKey.SALES_VERIFY_DELIVERY);
     };
   }
 
@@ -270,6 +277,46 @@ public class OrderWorkService {
     events.save(
         OrderWorkAssignmentEvent.of(work, OrderWorkEventType.ROUTED, null, null, actorId, now));
     return work;
+  }
+
+  /**
+   * Opens work that has something to do: it goes into the team's queue unless it is already open,
+   * so a caller may open it on every save that leaves work behind without piling up history.
+   */
+  @Transactional
+  public OrderWorkAssignment open(UUID orderId, OrderWorkKind kind, UUID actorId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Instant now = clock.instant();
+    OrderWorkAssignment work = assignments.lockByOrderAndKind(tenantId, orderId, kind).orElse(null);
+    if (work == null) {
+      work =
+          assignments.save(OrderWorkAssignment.route(orderId, kind, kind.defaultDepartment(), now));
+    } else if (work.isOpen()) {
+      return work;
+    } else {
+      work.reopen(kind.defaultDepartment(), now);
+      work = assignments.save(work);
+    }
+    events.save(
+        OrderWorkAssignmentEvent.of(work, OrderWorkEventType.ROUTED, null, null, actorId, now));
+    return work;
+  }
+
+  /** Closes work with nothing left to do; work that is absent or already closed stays as it is. */
+  @Transactional
+  public void close(UUID orderId, OrderWorkKind kind, UUID actorId) {
+    assignments
+        .lockByOrderAndKind(TenantContext.requireTenantId(), orderId, kind)
+        .filter(OrderWorkAssignment::isOpen)
+        .ifPresent(
+            work -> {
+              Instant now = clock.instant();
+              work.close(now);
+              assignments.save(work);
+              events.save(
+                  OrderWorkAssignmentEvent.of(
+                      work, OrderWorkEventType.CLOSED, null, null, actorId, now));
+            });
   }
 
   /** The flow took the work away (withdrawn, returned): its person is released with the reason. */

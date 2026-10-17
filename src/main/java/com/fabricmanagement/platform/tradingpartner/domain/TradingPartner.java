@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tradingpartner.domain;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
@@ -173,6 +174,13 @@ public class TradingPartner extends BaseEntity {
   @Column(name = "customer_relationship_established_at")
   private Instant customerRelationshipEstablishedAt;
 
+  /**
+   * Whether the tenant's verifiers have confirmed this company as a party to deliver to
+   * (CONSIGNEE-1 C5). Created by a user without {@code sales:verify-delivery} it starts unverified.
+   * Rows that predate the rule, and partners made by the system, are verified.
+   */
+  @Embedded @Builder.Default private Verification verification = Verification.predating();
+
   @Embedded private OfflineMetadata offlineMetadata;
 
   @Override
@@ -219,6 +227,20 @@ public class TradingPartner extends BaseEntity {
   }
 
   /**
+   * Create a new trading partner relationship that starts in the given verification state (the one
+   * the creating user's permissions give it).
+   */
+  public static TradingPartner create(
+      TradingPartnerRegistry registry,
+      PartnerType partnerType,
+      String customName,
+      Verification verification) {
+    TradingPartner partner = create(registry, partnerType, customName);
+    partner.verification = verification;
+    return partner;
+  }
+
+  /**
    * Get display name for UI.
    *
    * <p>Returns custom name if set, otherwise falls back to registry official name.
@@ -243,6 +265,9 @@ public class TradingPartner extends BaseEntity {
    *   <li>SERVICE_PROVIDER + any → BOTH
    *   <li>Same type → no change
    *   <li>Already BOTH → no change
+   *   <li>Adding DELIVERY_PARTNER to any other type → no change (it is the weakest relationship)
+   *   <li>DELIVERY_PARTNER + any trading type → that type (the delivery-only type is replaced,
+   *       never mixed into BOTH)
    * </ul>
    *
    * @param newType The additional relationship type
@@ -251,6 +276,14 @@ public class TradingPartner extends BaseEntity {
   public boolean upgradeToMultiType(PartnerType newType) {
     if (this.partnerType == newType || this.partnerType == PartnerType.BOTH) {
       return false;
+    }
+    if (newType == PartnerType.DELIVERY_PARTNER) {
+      return false;
+    }
+    if (this.partnerType == PartnerType.DELIVERY_PARTNER) {
+      // The first trading relationship replaces the delivery-only one (CONSIGNEE-1 C3).
+      this.partnerType = newType;
+      return true;
     }
     if (newType == PartnerType.BOTH) {
       this.partnerType = PartnerType.BOTH;

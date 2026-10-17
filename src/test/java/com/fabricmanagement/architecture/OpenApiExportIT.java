@@ -69,6 +69,10 @@ public class OpenApiExportIT {
    */
   private static final List<NullableReference> NULLABLE_REFERENCES =
       List.of(
+          new NullableReference("TenantBrandingDto", "logo", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "icon", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "logoDark", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "iconDark", "TenantBrandAssetDto"),
           new NullableReference("DecisionCapability", "reason", "DecisionBlockedReason"),
           new NullableReference("DecisionCapability", "routesTo", "DecisionRouteTarget"),
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
@@ -108,7 +112,11 @@ public class OpenApiExportIT {
               "OrderIntakeStockPreviewQuantity"),
           // STOCK-PROPOSAL-2: an applicable option has no blocked reason.
           new NullableReference(
-              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"));
+              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"),
+          // CONSIGNEE-1 S1: a quick-create that needs a decision wrote nothing, so it has no
+          // partner and no link yet.
+          new NullableReference("QuickCreatePartnerLinkResponse", "partner", "TradingPartnerDto"),
+          new NullableReference("QuickCreatePartnerLinkResponse", "link", "PartnerLinkDto"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =

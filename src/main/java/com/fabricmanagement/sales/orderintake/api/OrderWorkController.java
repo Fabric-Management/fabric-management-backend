@@ -99,9 +99,12 @@ public class OrderWorkController {
         ApiResponse.success(work.candidates(orderId, logistics(kind), OrderIntakeActor.current())));
   }
 
-  /** Planning work is not handled here; it is reported like a missing resource. */
+  /**
+   * Planning and delivery-verification work are not handled here (the first has its own endpoints,
+   * the second is a queue nobody takes); they are reported like a missing resource.
+   */
   private static OrderWorkKind logistics(OrderWorkKind kind) {
-    if (kind == OrderWorkKind.PLANNING) {
+    if (kind == OrderWorkKind.PLANNING || kind == OrderWorkKind.DELIVERY_VERIFICATION) {
       throw new NotFoundException("No such order work");
     }
     return kind;
