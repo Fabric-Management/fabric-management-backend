@@ -21,8 +21,13 @@ class PartnerNetworkDemoDataTest {
     List<ContactSpec> all = new ArrayList<>();
     for (CustomerSpec customer : PartnerNetworkDemoData.CUSTOMERS) {
       all.addAll(customer.contacts());
-      customer.linked().forEach(linked -> all.addAll(linked.contacts()));
     }
+    // A shared company has several customer links but owns one contact list, as in the seeder.
+    // Deduplicate company specifications, never people: duplicate contacts must still fail below.
+    PartnerNetworkDemoData.CUSTOMERS.stream()
+        .flatMap(customer -> customer.linked().stream())
+        .distinct()
+        .forEach(linked -> all.addAll(linked.contacts()));
     PartnerNetworkDemoData.SUPPLIERS.forEach(supplier -> all.add(supplier.contact()));
     return all;
   }
@@ -41,6 +46,19 @@ class PartnerNetworkDemoDataTest {
       assertThat(emails.add(contact.email())).as(contact.email()).isTrue();
       assertThat(contact.phone()).isNotBlank().hasSizeLessThanOrEqualTo(30);
       assertThat(contact.name()).isNotBlank().hasSizeLessThanOrEqualTo(120);
+    }
+  }
+
+  @Test
+  void aSharedForwarderKeepsBothCustomerLinksButContributesItsPeopleOnce() {
+    assertThat(
+            PartnerNetworkDemoData.CUSTOMERS.stream()
+                .flatMap(customer -> customer.linked().stream())
+                .filter(linked -> linked == PartnerNetworkDemoData.CHANNEL_FREIGHT))
+        .hasSize(2);
+    for (ContactSpec contact : PartnerNetworkDemoData.CHANNEL_FREIGHT.contacts()) {
+      assertThat(allContacts().stream().filter(person -> person.email().equals(contact.email())))
+          .containsExactly(contact);
     }
   }
 
