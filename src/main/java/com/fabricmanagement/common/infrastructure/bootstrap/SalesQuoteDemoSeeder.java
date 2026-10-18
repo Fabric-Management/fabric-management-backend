@@ -278,6 +278,7 @@ public class SalesQuoteDemoSeeder {
   private final RoleService roleService;
   private final DepartmentRepository departmentRepository;
   private final OrganizationService organizationService;
+  private final FabricStockDemoSeeder fabricStockDemoSeeder;
   private final Clock clock;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -288,6 +289,7 @@ public class SalesQuoteDemoSeeder {
       TenantContext.setCurrentUserId(SystemUser.ID);
 
       if (!tradingPartnerService.searchByName(tenantId, CUSTOMER_ALBION).isEmpty()) {
+        fabricStockDemoSeeder.seedFor(tenantId);
         log.info("Sales quote demo data already exists for tenant: {}. Skipping.", tenantId);
         return;
       }
@@ -469,6 +471,7 @@ public class SalesQuoteDemoSeeder {
       addFreeEntryLine(
           draftQuote.getId(), gabardine.getId(), fabricGrades.first().getId(), navy.getId());
 
+      fabricStockDemoSeeder.seedFor(tenantId);
       log.info("Successfully provisioned sales quote demo data for tenant: {}", tenantId);
     } finally {
       // Failures propagate to DemoTransactionSeeder's try/catch so THIS transaction (REQUIRES_NEW)
