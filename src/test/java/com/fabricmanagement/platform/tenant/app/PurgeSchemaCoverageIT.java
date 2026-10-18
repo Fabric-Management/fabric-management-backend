@@ -179,6 +179,10 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "Partner certifications are deleted by dedicated trading-partner cleanup.");
     tables.put("common_policy.common_policy", "Tenant policy configuration is retained.");
     tables.put(
+        "common_tenant.tenant_brand_asset",
+        "Tenant branding slots are configuration, retained across demo reset and go-real; "
+            + "tenant hard-delete removes them via ON DELETE CASCADE on tenant_id.");
+    tables.put(
         "sales.ownership_policy",
         "Sales ownership configuration is retained across demo reset; only tenant hard-delete "
             + "removes it.");
