@@ -35,6 +35,23 @@ class BrandSvgPreparationServiceTest {
   }
 
   @Test
+  void inkscapeCanvasStateDoesNotPreventTextFromReachingTheFontCheck() {
+    when(outliner.outline(anyString()))
+        .thenThrow(
+            new TenantBrandingDomainException(
+                "Missing font", "TENANT_BRANDING_FONT_UNAVAILABLE", 422));
+    String exported =
+        TEXT.replace(
+                "<svg ",
+                "<svg xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' ")
+            .replace("<text ", "<sodipodi:namedview/><text ");
+    assertThatThrownBy(() -> service.prepare(file(exported), BrandColourMode.ORIGINAL))
+        .isInstanceOf(TenantBrandingDomainException.class)
+        .hasMessage("Missing font");
+    verify(outliner).outline(argThat(svg -> !svg.contains("namedview")));
+  }
+
+  @Test
   void vectorArtworkDoesNotRequireAnInstalledConverter() {
     String svg = OPEN + "<path fill='#fff' d='M0 0L10 10Z'/></svg>";
     service.prepare(file(svg), BrandColourMode.ORIGINAL);

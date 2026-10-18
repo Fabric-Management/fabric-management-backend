@@ -30,6 +30,22 @@ class BrandSvgSanitizerServiceTest {
   }
 
   @Test
+  void dropsInkscapeCanvasStateWithoutChangingTheArtwork() {
+    String svg =
+        sanitize(
+            OPEN.replace(
+                    "<svg ",
+                    "<svg xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' "
+                        + "xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' ")
+                + "<sodipodi:namedview pagecolor='#fff' inkscape:window-x='1680'>"
+                + "<inkscape:page width='100' height='100'/></sodipodi:namedview>"
+                + "<path fill='#fff' d='M0 0 L10 10'/></svg>");
+    assertThat(svg)
+        .contains("<path", "fill=\"#fff\"", "d=\"M0 0 L10 10\"")
+        .doesNotContain("namedview", "window-x", "inkscape:page", "pagecolor");
+  }
+
+  @Test
   void singleColourArtwork_adaptsItsFillAndStroke_withoutFillingHollowPaths() {
     String svg =
         sanitize(
@@ -78,6 +94,8 @@ class BrandSvgSanitizerServiceTest {
   @ValueSource(
       strings = {
         "<script>alert(1)</script>",
+        "<namedview/>",
+        "<namedview xmlns='urn:untrusted'><path/></namedview>",
         "<foreignObject><div>HTML</div></foreignObject>",
         "<image href='data:image/png;base64,AAAA'/>",
         "<path onload='alert(1)' d='M0 0'/>",

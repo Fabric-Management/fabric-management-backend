@@ -32,6 +32,7 @@ import org.xml.sax.helpers.DefaultHandler;
 @Service
 public class BrandSvgSanitizerService {
   private static final String SVG = "http://www.w3.org/2000/svg";
+  private static final String SODIPODI = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd";
   private static final Set<String> ELEMENTS =
       Set.of(
           "svg",
@@ -289,8 +290,15 @@ public class BrandSvgSanitizerService {
     for (Node child = element.getFirstChild(); child != null; ) {
       Node next = child.getNextSibling();
       if (child instanceof Element nested) {
-        if ("metadata".equals(nested.getLocalName())) element.removeChild(child);
-        else clean(nested, rules, depth + 1, count, text, outlined);
+        // Inkscape's canvas/window state is not artwork; discard only this known editor node.
+        // Other foreign elements still pass through the strict namespace/element validation.
+        if ("metadata".equals(nested.getLocalName())
+            || SODIPODI.equals(nested.getNamespaceURI())
+                && "namedview".equals(nested.getLocalName())) {
+          element.removeChild(child);
+        } else {
+          clean(nested, rules, depth + 1, count, text, outlined);
+        }
       } else if (child.getNodeType() != Node.TEXT_NODE) {
         element.removeChild(child);
       }
