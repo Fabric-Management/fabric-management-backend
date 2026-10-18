@@ -78,6 +78,33 @@ class UpdateStockProposalSettingsRequestTest {
         .contains("toleranceDownPct", "toleranceUpPct");
   }
 
+  @Test
+  void fabricThresholdAcceptsFourThroughFiftyAndDefaultsOldJson() throws Exception {
+    var mapper =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .configure(
+                com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+                false);
+    var valid = request(3, 5, 8, "80", "40", "10", "20");
+    var tree = mapper.valueToTree(valid);
+    ((com.fasterxml.jackson.databind.node.ObjectNode) tree).remove("fabricRollMinHealthyPieces");
+    assertThat(
+            mapper
+                .treeToValue(tree, UpdateStockProposalSettingsRequest.class)
+                .fabricRollMinHealthyPieces())
+        .isEqualTo(4);
+    for (int threshold : new int[] {3, 4, 50, 51}) {
+      ((com.fasterxml.jackson.databind.node.ObjectNode) tree)
+          .put("fabricRollMinHealthyPieces", threshold);
+      var parsed = mapper.treeToValue(tree, UpdateStockProposalSettingsRequest.class);
+      var violations =
+          validator.validate(parsed).stream().map(v -> v.getPropertyPath().toString()).toList();
+      if (threshold == 3 || threshold == 51)
+        assertThat(violations).contains("fabricRollMinHealthyPieces");
+      else assertThat(violations).isEmpty();
+    }
+  }
+
   private static UpdateStockProposalSettingsRequest request(
       int moving,
       int slowing,

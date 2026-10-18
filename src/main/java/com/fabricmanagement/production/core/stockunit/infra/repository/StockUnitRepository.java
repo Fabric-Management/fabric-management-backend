@@ -57,6 +57,12 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
   Set<UUID> findBatchIdsWithActiveStockUnits(
       @Param("tenantId") UUID tenantId, @Param("batchIds") Collection<UUID> batchIds);
 
+  @Query(
+      "select distinct s.batchId from StockUnit s where s.tenantId = :tenantId "
+          + "and s.batchId in :batchIds and s.isActive = false")
+  Set<UUID> findBatchIdsWithInactiveStockUnits(
+      @Param("tenantId") UUID tenantId, @Param("batchIds") Collection<UUID> batchIds);
+
   Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrue(
       UUID tenantId, UUID batchId, Pageable pageable);
 

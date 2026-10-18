@@ -63,7 +63,51 @@ public record UpdateStockProposalSettingsRequest(
         @NotNull
         @DecimalMin(value = "0")
         @DecimalMax(value = "100")
-        BigDecimal lotCloseExtraStalledPct) {
+        BigDecimal lotCloseExtraStalledPct,
+    @Schema(
+            requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+            defaultValue = "4",
+            example = "4",
+            minimum = "4",
+            maximum = "50")
+        @NotNull
+        @Min(4)
+        @Max(50)
+        Integer fabricRollMinHealthyPieces) {
+
+  public UpdateStockProposalSettingsRequest {
+    fabricRollMinHealthyPieces =
+        fabricRollMinHealthyPieces == null ? 4 : fabricRollMinHealthyPieces;
+  }
+
+  public UpdateStockProposalSettingsRequest(
+      BigDecimal toleranceDownPct,
+      BigDecimal toleranceUpPct,
+      Integer minHealthyPiecesMoving,
+      Integer minHealthyPiecesSlowing,
+      Integer minHealthyPiecesStalled,
+      BigDecimal shortPiecePct,
+      Integer speedWindowDays,
+      BigDecimal slowingBelowPct,
+      BigDecimal stalledBelowPct,
+      Integer slowingCoverDays,
+      BigDecimal lotCloseExtraSlowingPct,
+      BigDecimal lotCloseExtraStalledPct) {
+    this(
+        toleranceDownPct,
+        toleranceUpPct,
+        minHealthyPiecesMoving,
+        minHealthyPiecesSlowing,
+        minHealthyPiecesStalled,
+        shortPiecePct,
+        speedWindowDays,
+        slowingBelowPct,
+        stalledBelowPct,
+        slowingCoverDays,
+        lotCloseExtraSlowingPct,
+        lotCloseExtraStalledPct,
+        StockProposalSettings.DEFAULT_FABRIC_ROLL_MIN_PIECES);
+  }
 
   @AssertTrue(message = "Minimum pieces rise with slower sales: moving <= slowing <= stalled")
   @Schema(hidden = true)
@@ -109,6 +153,7 @@ public record UpdateStockProposalSettingsRequest(
         stalledBelowPct,
         slowingCoverDays,
         lotCloseExtraSlowingPct,
-        lotCloseExtraStalledPct);
+        lotCloseExtraStalledPct,
+        fabricRollMinHealthyPieces);
   }
 }

@@ -70,7 +70,7 @@ final class AcceptedStockCheck {
 
   /**
    * Several lots on a line that allows several dye lots are accepted by the customer (Fatih,
-   * 2026-10-15); only a line that requires one lot still looks for a confirmation.
+   * 2026-10-15); a single-lot requirement cannot be bypassed by technical or tone confirmation.
    */
   static QuantityOption.Compatibility compatibility(
       QuantityEvaluationService.LineStock stock, Set<UUID> lots) {
@@ -79,12 +79,6 @@ final class AcceptedStockCheck {
     }
     if (stock.multipleLotsAllowed()) {
       return QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED;
-    }
-    if (stock.confirmedGroups().stream().anyMatch(group -> group.containsAll(lots))) {
-      return QuantityOption.Compatibility.CONFIRMED;
-    }
-    if (stock.toneGroups().stream().anyMatch(group -> group.containsAll(lots))) {
-      return QuantityOption.Compatibility.TONE_ACCEPTED;
     }
     return QuantityOption.Compatibility.PENDING_CONFIRMATION;
   }

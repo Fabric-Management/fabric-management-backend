@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.core.batch.api.query;
 
+import com.fabricmanagement.inventory.lothealth.domain.PieceAverageBasis;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.domain.Batch;
@@ -108,6 +109,8 @@ public class ProposalStockQueryService {
                 Collectors.toMap(
                     QualityGradeQueryService.QualityGradeReference::id, Function.identity()));
 
+    Set<UUID> incompleteLots =
+        stockUnitRepository.findBatchIdsWithInactiveStockUnits(query.tenantId(), batchIds);
     List<ProposalLot> lots =
         batches.stream()
             .map(
@@ -119,7 +122,8 @@ public class ProposalStockQueryService {
                         unitsByBatch.getOrDefault(batch.getId(), List.of()),
                         latestCut,
                         grades,
-                        lotsWithAnonymousReservation.contains(batch.getId())))
+                        lotsWithAnonymousReservation.contains(batch.getId()),
+                        !incompleteLots.contains(batch.getId())))
             .flatMap(Optional::stream)
             .toList();
     return new ProposalStock(lots, compatibleGroups(query, lots));
@@ -189,7 +193,8 @@ public class ProposalStockQueryService {
                 WidthEvidence.NOT_REQUIRED,
                 cut,
                 grades,
-                reservedLots.contains(batch.getId()));
+                reservedLots.contains(batch.getId()),
+                false);
         if (piece.state() == PieceState.UNKNOWN) {
           total.unknownPieces++;
         } else if (piece.state() == PieceState.ELIGIBLE) {
@@ -277,7 +282,9 @@ public class ProposalStockQueryService {
       List<StockUnit> units,
       Map<UUID, StockUnitCut> latestCut,
       Map<UUID, QualityGradeQueryService.QualityGradeReference> grades,
-      boolean anonymousReservation) {
+      boolean anonymousReservation,
+      boolean inventoryComplete) {
+    inventoryComplete = inventoryComplete && !units.isEmpty();
     WidthEvidence widthEvidence = WidthEvidence.NOT_REQUIRED;
     if (query.finishedWidth() != null) {
       if (width == null) {
@@ -308,8 +315,12 @@ public class ProposalStockQueryService {
                         lotWidth,
                         latestCut.get(unit.getId()),
                         grades,
-                        anonymousReservation))
+                        anonymousReservation,
+                        batch.getProductType()
+                                == com.fabricmanagement.product.core.domain.ProductType.FABRIC
+                            && measure == PrimaryMeasure.LENGTH))
             .toList();
+    AverageMeasurement average = averageMeasurement(units, measure, inventoryComplete);
     return Optional.of(
         new ProposalLot(
             batch.getId(),
@@ -319,33 +330,61 @@ public class ProposalStockQueryService {
             resolution.get().primaryUnit(),
             lotWidth,
             pieces,
-            averagePieceAsProduced(units, measure)));
+            average.value(),
+            average.basis(),
+            inventoryComplete));
   }
 
-  /**
-   * The lot's average piece as produced (Fatih, 2026-10-14): the pieces' quantities when they were
-   * made, over every piece of the lot, shipped ones included, so the average does not fall as
-   * normal pieces are sold. Null when no piece states one; the evaluation then averages the pieces
-   * at hand.
-   */
-  private BigDecimal averagePieceAsProduced(List<StockUnit> units, PrimaryMeasure measure) {
-    List<BigDecimal> made =
+  private record AverageMeasurement(BigDecimal value, PieceAverageBasis basis) {}
+
+  private AverageMeasurement averageMeasurement(
+      List<StockUnit> units, PrimaryMeasure measure, boolean inventoryComplete) {
+    List<StockUnit> measuredKind =
         units.stream()
+            .filter(
+                unit ->
+                    measure != PrimaryMeasure.LENGTH || unit.getPackageType() == PackageType.ROLL)
+            .toList();
+    List<BigDecimal> initial =
+        measuredKind.stream()
+            .map(
+                unit ->
+                    measure == PrimaryMeasure.LENGTH
+                        ? measureService.toCanonical(
+                            unit.getInitialLength(), unit.getInitialLengthUnit(), measure)
+                        : measureService.toCanonical(
+                            unit.getInitialWeight(), unit.getUnit(), measure))
+            .flatMap(Optional::stream)
+            .filter(value -> value.signum() > 0)
+            .toList();
+    if (inventoryComplete && !initial.isEmpty() && initial.size() == measuredKind.size()) {
+      return new AverageMeasurement(average(initial), PieceAverageBasis.INITIAL_MEASUREMENTS);
+    }
+    List<BigDecimal> current =
+        measuredKind.stream()
+            .filter(
+                unit ->
+                    unit.getStatus() != StockUnitStatus.DEPLETED
+                        && unit.getStatus() != StockUnitStatus.DISPOSED)
             .map(
                 unit ->
                     measure == PrimaryMeasure.LENGTH
                         ? measureService.toCanonical(
                             unit.getLength(), unit.getLengthUnit(), measure)
                         : measureService.toCanonical(
-                            unit.getInitialWeight(), unit.getUnit(), measure))
+                            unit.getCurrentWeight(), unit.getUnit(), measure))
             .flatMap(Optional::stream)
             .filter(value -> value.signum() > 0)
             .toList();
-    if (made.isEmpty()) {
-      return null;
-    }
-    BigDecimal total = made.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-    return total.divide(BigDecimal.valueOf(made.size()), MathContext.DECIMAL64);
+    return current.isEmpty()
+        ? new AverageMeasurement(null, PieceAverageBasis.UNKNOWN)
+        : new AverageMeasurement(average(current), PieceAverageBasis.CURRENT_MEASUREMENTS);
+  }
+
+  private static BigDecimal average(List<BigDecimal> values) {
+    return values.stream()
+        .reduce(BigDecimal.ZERO, BigDecimal::add)
+        .divide(BigDecimal.valueOf(values.size()), MathContext.DECIMAL64);
   }
 
   private ProposalPiece toPiece(
@@ -354,7 +393,8 @@ public class ProposalStockQueryService {
       WidthEvidence width,
       StockUnitCut cut,
       Map<UUID, QualityGradeQueryService.QualityGradeReference> grades,
-      boolean anonymousReservation) {
+      boolean anonymousReservation,
+      boolean fabricRollPolicy) {
     BigDecimal value =
         measure == PrimaryMeasure.LENGTH
             ? measureService
@@ -365,7 +405,10 @@ public class ProposalStockQueryService {
                 .orElse(null);
     PieceState state = PieceState.ELIGIBLE;
     String reason = null;
-    if (unit.getStatus() == StockUnitStatus.RESERVED) {
+    if (fabricRollPolicy && unit.getPackageType() != PackageType.ROLL) {
+      state = PieceState.EXCLUDED;
+      reason = "UNSUPPORTED_PACKAGE";
+    } else if (unit.getStatus() == StockUnitStatus.RESERVED) {
       state = PieceState.EXCLUDED;
       reason = "ALLOCATED";
     } else if (unit.getStatus() == StockUnitStatus.PARTIAL) {
@@ -408,7 +451,18 @@ public class ProposalStockQueryService {
       reason = "LOT_RESERVED_WITHOUT_PIECES";
     }
     return new ProposalPiece(
-        unit.getId(), unit.getBarcode(), value, state, reason, unit.getVersion());
+        unit.getId(),
+        unit.getBarcode(),
+        value,
+        state,
+        reason,
+        unit.getVersion(),
+        unit.getPackageType(),
+        (measure == PrimaryMeasure.LENGTH
+                ? measureService.toCanonical(
+                    unit.getInitialLength(), unit.getInitialLengthUnit(), measure)
+                : measureService.toCanonical(unit.getInitialWeight(), unit.getUnit(), measure))
+            .orElse(null));
   }
 
   private List<Set<UUID>> compatibleGroups(ProposalStockQuery query, List<ProposalLot> lots) {
@@ -508,7 +562,31 @@ public class ProposalStockQueryService {
       String canonicalUnit,
       WidthEvidence widthEvidence,
       List<ProposalPiece> pieces,
-      BigDecimal averagePiece) {
+      BigDecimal averagePiece,
+      PieceAverageBasis averageBasis,
+      boolean inventoryComplete) {
+
+    public ProposalLot(
+        UUID batchId,
+        String lotNo,
+        Instant productionDate,
+        PrimaryMeasure measure,
+        String canonicalUnit,
+        WidthEvidence widthEvidence,
+        List<ProposalPiece> pieces,
+        BigDecimal averagePiece) {
+      this(
+          batchId,
+          lotNo,
+          productionDate,
+          measure,
+          canonicalUnit,
+          widthEvidence,
+          pieces,
+          averagePiece,
+          averagePiece == null ? PieceAverageBasis.UNKNOWN : PieceAverageBasis.CURRENT_MEASUREMENTS,
+          true);
+    }
 
     /** A lot whose average piece as produced is unknown. */
     public ProposalLot(
@@ -529,7 +607,20 @@ public class ProposalStockQueryService {
       BigDecimal canonicalMeasure,
       PieceState state,
       String reason,
-      Long version) {}
+      Long version,
+      PackageType packageType,
+      BigDecimal initialCanonicalMeasure) {
+    /** Legacy callers lack package evidence; never infer it from a unit or barcode. */
+    public ProposalPiece(
+        UUID id,
+        String pieceNo,
+        BigDecimal measure,
+        PieceState state,
+        String reason,
+        Long version) {
+      this(id, pieceNo, measure, state, reason, version, null, null);
+    }
+  }
 
   public enum PieceState {
     ELIGIBLE,

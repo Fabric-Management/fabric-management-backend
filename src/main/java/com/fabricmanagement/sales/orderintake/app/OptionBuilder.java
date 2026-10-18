@@ -64,13 +64,16 @@ final class OptionBuilder {
     BigDecimal requested = context.input().requestedQuantity();
     BigDecimal quantity = context.toLineUnit(canonical);
     BigDecimal difference = quantity.subtract(requested);
+    BigDecimal canonicalDifference = canonical.subtract(context.input().canonicalTarget());
     BigDecimal percent =
-        difference.multiply(EvaluationContext.HUNDRED).divide(requested, 1, RoundingMode.HALF_UP);
+        canonicalDifference
+            .multiply(EvaluationContext.HUNDRED)
+            .divide(context.input().canonicalTarget(), 1, RoundingMode.HALF_UP);
     boolean remnant = parts.stream().anyMatch(QuantityOption.LotPart::remnant);
     OptionKind kind =
-        difference.signum() == 0
+        canonicalDifference.signum() == 0
             ? remnant ? OptionKind.REQUESTED_WITH_REMNANT : OptionKind.EXACT
-            : difference.signum() > 0 ? OptionKind.ABOVE : OptionKind.BELOW;
+            : canonicalDifference.signum() > 0 ? OptionKind.ABOVE : OptionKind.BELOW;
     BlockedReason blocked = compatibilityBlock;
     if (blocked == null && touchesVerified) {
       blocked = BlockedReason.HELD_BY_ANOTHER_QUOTE;
@@ -87,11 +90,22 @@ final class OptionBuilder {
         canonical,
         difference,
         percent,
-        context.tolerance(difference),
+        context.tolerance(canonicalDifference),
         List.of(),
         parts,
         held,
         blocked);
+  }
+
+  /** Unknown inventory completeness cannot establish a physical lot closure. */
+  static Boolean physicalClosure(EvaluationContext context, ProposalLot lot, Set<UUID> taken) {
+    if (!lot.inventoryComplete()) return null;
+    if (context.free().get(lot.batchId()).intents()) return false;
+    return lot.pieces().stream()
+        .allMatch(
+            piece ->
+                taken.contains(piece.stockUnitId())
+                    && !context.input().holds().pieceHolds().containsKey(piece.stockUnitId()));
   }
 
   private static QuantityOption.LotPart part(
@@ -130,7 +144,15 @@ final class OptionBuilder {
             .map(id -> context.piecesById().get(id).canonicalMeasure())
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-    boolean closes = lot.pieces().stream().allMatch(piece -> taken.contains(piece.stockUnitId()));
+    Boolean closes = physicalClosure(context, lot, taken);
+    WholePieceSearch.Lot freePool =
+        StockPools.pools(context, StockPools.Tier.FREE).get(lot.batchId());
+    Boolean depletesFree =
+        !context.free().get(lot.batchId()).known()
+            ? null
+            : !freePool.pieces().isEmpty()
+                && freePool.pieces().stream().allMatch(piece -> taken.contains(piece.id()))
+                && context.units(take.pieceIds()) <= freePool.capacity();
     return new QuantityOption.LotPart(
         lot.batchId(),
         lot.lotNo(),
@@ -143,6 +165,9 @@ final class OptionBuilder {
         remnant,
         remnantPieces,
         remnant ? context.toLineUnit(remnantCanonical) : null,
-        closes);
+        closes,
+        depletesFree,
+        lot.averageBasis(),
+        lot.averagePiece());
   }
 }

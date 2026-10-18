@@ -6,6 +6,7 @@ import com.fabricmanagement.inventory.lothealth.app.port.LotHealthSettingsUnavai
 import com.fabricmanagement.inventory.lothealth.app.port.ProductSpeedPort;
 import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
 import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQueryService;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService;
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService;
@@ -13,6 +14,7 @@ import com.fabricmanagement.production.core.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.CustomerToneAcceptance;
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.dto.QuantityProposalDto;
@@ -294,6 +296,8 @@ public class QuantityEvaluationService {
                 .fromCanonical(canonical, request.unit(), dimension)
                 .map(value -> value.setScale(3, RoundingMode.HALF_UP))
                 .orElse(canonical);
+    boolean fabricRolls =
+        product.productType() == ProductType.FABRIC && dimension == PrimaryMeasure.LENGTH;
     QuantityEvaluator.Evaluation evaluation =
         QuantityEvaluator.evaluate(
             new QuantityEvaluator.Input(
@@ -309,8 +313,9 @@ public class QuantityEvaluationService {
                 request.toleranceUpPct(),
                 request.toleranceDownPct(),
                 QuoteHoldEvidence.of(holds),
-                request.manualPieceIds()),
-            lotHealthPolicy(tenantId, request.productId(), request.colorId()));
+                request.manualPieceIds(),
+                fabricRolls ? ProposalPolicyCode.FABRIC_ROLL_BASE : ProposalPolicyCode.STANDARD),
+            lotHealthPolicy(tenantId, request.productId(), request.colorId(), fabricRolls));
     if (!evaluation.manualUnavailablePieceIds().isEmpty()) {
       throw OrderIntakeException.conflict(
           "MANUAL_PIECES_UNAVAILABLE",
@@ -324,11 +329,13 @@ public class QuantityEvaluationService {
    * The tenant's lot-health rule for the product at its speed (Fatih, 2026-10-14): the slower it
    * sells, the more normal pieces a lot keeps.
    */
-  private LotHealthPolicy lotHealthPolicy(UUID tenantId, UUID productId, UUID colorId) {
+  private LotHealthPolicy lotHealthPolicy(
+      UUID tenantId, UUID productId, UUID colorId, boolean fabricRolls) {
     try {
-      return lotHealthSettings
-          .forTenant(tenantId)
-          .policyFor(productSpeed.speedOf(tenantId, productId, colorId));
+      var settings = lotHealthSettings.forTenant(tenantId);
+      return fabricRolls
+          ? settings.fabricRollPolicy()
+          : settings.policyFor(productSpeed.speedOf(tenantId, productId, colorId));
     } catch (LotHealthSettingsUnavailableException e) {
       // Never propose on the standard when the tenant's own threshold may be stricter.
       throw OrderIntakeException.conflict(

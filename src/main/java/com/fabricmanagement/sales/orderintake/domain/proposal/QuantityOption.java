@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.orderintake.domain.proposal;
 
+import com.fabricmanagement.inventory.lothealth.domain.PieceAverageBasis;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -120,8 +121,8 @@ public record QuantityOption(
   @Schema(name = "StockProposalPlacement", enumAsRef = true)
   public enum OptionPlacement {
     /**
-     * The option the proposal opens at: the best that meets the request within the tolerance,
-     * otherwise the nearest above it, otherwise the best below it, otherwise held stock.
+     * The option the proposal opens at under its policy: fabric completion, otherwise below,
+     * otherwise informational held stock. STANDARD retains its window-based opening.
      */
     MAIN,
     /** A computed alternative below the request. */
@@ -210,9 +211,44 @@ public record QuantityOption(
       boolean remnant,
       List<UUID> remnantPieceIds,
       BigDecimal remnantQuantity,
-      boolean closesLot) {
+      Boolean closesLot,
+      Boolean depletesFreePool,
+      PieceAverageBasis averageBasis,
+      BigDecimal averagePiece) {
+
+    public LotPart(
+        UUID batchId,
+        String lotNo,
+        Instant productionDate,
+        List<UUID> pieceIds,
+        BigDecimal quantity,
+        int remainingEligiblePieces,
+        BigDecimal remainingQuantity,
+        int unknownPieces,
+        boolean remnant,
+        List<UUID> remnantPieceIds,
+        BigDecimal remnantQuantity,
+        boolean closesLot) {
+      this(
+          batchId,
+          lotNo,
+          productionDate,
+          pieceIds,
+          quantity,
+          remainingEligiblePieces,
+          remainingQuantity,
+          unknownPieces,
+          remnant,
+          remnantPieceIds,
+          remnantQuantity,
+          closesLot,
+          null,
+          PieceAverageBasis.UNKNOWN,
+          null);
+    }
 
     public LotPart {
+      averageBasis = averageBasis == null ? PieceAverageBasis.UNKNOWN : averageBasis;
       pieceIds = List.copyOf(pieceIds);
       remnantPieceIds = remnantPieceIds == null ? List.of() : List.copyOf(remnantPieceIds);
     }

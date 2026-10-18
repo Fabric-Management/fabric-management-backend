@@ -63,6 +63,12 @@ record EvaluationContext(
               ? lot.averagePiece()
               : LotHealthPolicy.averagePiece(
                   lot.pieces().stream()
+                      .filter(
+                          piece ->
+                              !input.fabricRollPolicy()
+                                  || piece.packageType()
+                                      == com.fabricmanagement.production.core.stockunit.domain
+                                          .PackageType.ROLL)
                       .map(ProposalPiece::canonicalMeasure)
                       .filter(Objects::nonNull)
                       .toList());
@@ -73,11 +79,12 @@ record EvaluationContext(
     // The agreed tolerance as a window of search units around the target.
     BigDecimal units = BigDecimal.valueOf(target);
     long windowHigh =
-        target
-            + units
+        Math.addExact(
+            target,
+            units
                 .multiply(input.agreedToleranceUpPct())
                 .divide(HUNDRED, 0, RoundingMode.FLOOR)
-                .longValueExact();
+                .longValueExact());
     long windowLow =
         Math.max(
             1,
@@ -136,7 +143,7 @@ record EvaluationContext(
     BigDecimal limit =
         difference.signum() > 0 ? input.agreedToleranceUpPct() : input.agreedToleranceDownPct();
     boolean outside =
-        difference.abs().multiply(HUNDRED).compareTo(input.requestedQuantity().multiply(limit)) > 0;
+        difference.abs().multiply(HUNDRED).compareTo(input.canonicalTarget().multiply(limit)) > 0;
     return outside ? ToleranceStatus.OUTSIDE : ToleranceStatus.WITHIN;
   }
 
@@ -144,6 +151,6 @@ record EvaluationContext(
   long units(List<UUID> pieceIds) {
     return pieceIds.stream()
         .mapToLong(id -> QuantityEvaluator.toUnits(piecesById.get(id).canonicalMeasure()))
-        .sum();
+        .reduce(0L, Math::addExact);
   }
 }

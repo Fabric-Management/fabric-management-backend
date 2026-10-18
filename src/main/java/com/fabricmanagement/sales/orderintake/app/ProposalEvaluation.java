@@ -7,7 +7,10 @@ import com.fabricmanagement.sales.orderintake.app.ProposalRanking.Ranked;
 import com.fabricmanagement.sales.orderintake.app.QuantityEvaluator.Counts;
 import com.fabricmanagement.sales.orderintake.app.QuantityEvaluator.Evaluation;
 import com.fabricmanagement.sales.orderintake.app.StockPools.Tier;
+import com.fabricmanagement.sales.orderintake.domain.proposal.FabricRollRank;
 import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalSearch;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage.Reason;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult.EvaluationStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.BlockedReason;
@@ -29,22 +32,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * One evaluation (STOCK-PROPOSAL-2): searches the lots the line may use, picks the cards and their
- * order, adds the salesperson's changed pieces and states the result. The rules are in {@link
- * QuantityEvaluator}'s description; the ranking in {@link ProposalRanking}.
- *
- * <p>The cards (Fatih, 2026-10-15), each healthy stock ranked first among the selections it allows:
- *
- * <ol>
- *   <li>meets the request within the tolerance (the request up to the upper limit): the opening;
- *   <li>the most within the upper limit, when it is more than the first: selling more;
- *   <li>short of the request within the lower limit;
- *   <li>only when none of these exists: the nearest above the upper limit, then the nearest below
- *       the lower limit;
- *   <li>stock others hold, only when free stock cannot reach the lower limit.
- * </ol>
- *
- * <p>The salesperson's changed pieces come first. The first card is the opening.
+ * Searches within the line's constraints and places cards under its explicit policy. Fabric
+ * completion precedes the below-request alternative even outside tolerance. STANDARD preserves its
+ * existing window cards. Manual picks precede calculated cards; duplicate piece sets appear once
+ * and retain the opening index. Held stock is informational and follows free stock.
  */
 final class ProposalEvaluation {
 
@@ -120,7 +111,7 @@ final class ProposalEvaluation {
     List<QuantityOption> listed = new ArrayList<>();
     for (Ranked ranked : unique.values()) {
       QuantityOption option = ranked.option();
-      if (option.placement() != OptionPlacement.MANUAL) {
+      if (option.placement() != OptionPlacement.MANUAL || ranked.pieceKey().equals(openingKey)) {
         option =
             option.as(
                 ranked.pieceKey().equals(openingKey)
@@ -130,6 +121,7 @@ final class ProposalEvaluation {
       listed.add(option);
     }
 
+    QuantityCoverage coverage = coverage(listed, runs);
     List<QuantityOption> options = ProposalReasons.withReasons(context, limitExceeded, listed);
     Integer mainIndex = null;
     for (int i = 0; i < options.size(); i++) {
@@ -140,12 +132,13 @@ final class ProposalEvaluation {
 
     EvaluationStatus status;
     if (mainIndex != null
-        && options.get(mainIndex).difference().signum() == 0
+        && options.get(mainIndex).canonicalQuantity().compareTo(context.input().canonicalTarget())
+            == 0
         && !options.get(mainIndex).needsRemnantAcknowledgement()) {
       status = EvaluationStatus.EXACT;
     } else if (!options.isEmpty()) {
       status = EvaluationStatus.OPTIONS;
-    } else if (counts.unknown() > 0 || limitExceeded) {
+    } else if (coverage.status() == QuantityCoverage.Status.UNKNOWN) {
       status = EvaluationStatus.UNKNOWN;
     } else {
       status = EvaluationStatus.NO_ELIGIBLE_STOCK;
@@ -156,16 +149,104 @@ final class ProposalEvaluation {
     }
     return new Evaluation(
         QuantityEvaluator.result(
-            context.input(),
-            status,
-            options,
-            mainIndex,
-            !limitExceeded,
-            counts,
-            List.copyOf(reasons),
-            context.aged()),
+                context.input(),
+                status,
+                options,
+                mainIndex,
+                !limitExceeded,
+                counts,
+                List.copyOf(reasons),
+                context.aged())
+            .withPolicy(
+                context.input().policyCode(), context.lotHealth().minHealthyPieces(), coverage),
         fingerprint,
         unavailable);
+  }
+
+  private QuantityCoverage coverage(List<QuantityOption> options, List<Run> runs) {
+    List<Reason> reasons = new ArrayList<>();
+    Optional<QuantityOption> covering =
+        options.stream()
+            .filter(option -> option.applicable() && option.source() == StockSource.FREE)
+            .filter(
+                option ->
+                    option.canonicalQuantity().compareTo(context.input().canonicalTarget()) >= 0)
+            .findFirst();
+    boolean unknownEvidence = counts.unknown() > 0;
+    if (unknownEvidence) reasons.add(Reason.MEASUREMENT_OR_ELIGIBILITY_UNKNOWN);
+    boolean unsupported =
+        context.lots().stream()
+            .flatMap(lot -> lot.pieces().stream())
+            .anyMatch(piece -> "UNSUPPORTED_PACKAGE".equals(piece.reason()));
+    if (unsupported) reasons.add(Reason.UNSUPPORTED_PACKAGE);
+    boolean incomplete = context.lots().stream().anyMatch(lot -> !lot.inventoryComplete());
+    if (incomplete) reasons.add(Reason.EVIDENCE_INCOMPLETE);
+    boolean unknownHolds = context.free().values().stream().anyMatch(free -> !free.known());
+    if (unknownHolds) reasons.add(Reason.HOLD_EVIDENCE_UNKNOWN);
+    if (covering.isEmpty() && !limitExceeded && context.input().fabricRollPolicy()) {
+      diagnoseConstraints(runs, reasons);
+    }
+    if (limitExceeded) reasons.add(Reason.SEARCH_LIMIT);
+    if (covering.isPresent()) {
+      return new QuantityCoverage(
+          QuantityCoverage.Status.COVERABLE, covering.get().optionKey(), reasons);
+    }
+    boolean hasFree =
+        options.stream()
+            .anyMatch(option -> option.applicable() && option.source() == StockSource.FREE);
+    if (!hasFree
+        && options.stream().anyMatch(option -> option.source() == StockSource.HELD)
+        && !unknownHolds
+        && !unknownEvidence
+        && !limitExceeded
+        && !unsupported
+        && !incomplete) {
+      reasons.add(Reason.HELD_STOCK_ONLY);
+    }
+    QuantityCoverage.Status status =
+        unknownEvidence || unknownHolds || unsupported || incomplete || limitExceeded
+            ? QuantityCoverage.Status.UNKNOWN
+            : hasFree
+                ? QuantityCoverage.Status.BELOW_REQUEST_ONLY
+                : QuantityCoverage.Status.NO_APPLICABLE_OPTION;
+    return new QuantityCoverage(status, null, reasons);
+  }
+
+  /** Diagnose only by finding an actual counterexample with one restriction relaxed. */
+  private void diagnoseConstraints(List<Run> runs, List<Reason> reasons) {
+    Map<UUID, WholePieceSearch.Lot> pools = StockPools.pools(context, Tier.FREE);
+    if (context.input().singleLotRequired()) {
+      List<ProposalSearch.SearchLot> together =
+          searchLots(new Run(context.lots().stream().map(ProposalLot::batchId).toList()), pools);
+      ProposalSearch.Result mixed = ProposalSearch.smallestFrom(together, target);
+      limitExceeded |= mixed.limitExceeded();
+      if (mixed.best().isPresent()) reasons.add(Reason.SINGLE_LOT_REQUIRED);
+    }
+    for (Run run : runs) {
+      List<ProposalSearch.SearchLot> relaxed =
+          searchLots(run, pools).stream()
+              .map(
+                  lot ->
+                      new ProposalSearch.SearchLot(
+                          new WholePieceSearch.Lot(
+                              lot.lot().id(),
+                              lot.lot().pieces().stream()
+                                  .map(
+                                      piece ->
+                                          new WholePieceSearch.Piece(
+                                              piece.id(), piece.units(), false))
+                                  .toList(),
+                              lot.lot().capacity()),
+                          lot.ageRank(),
+                          1))
+              .toList();
+      ProposalSearch.Result withoutHealth = ProposalSearch.smallestFrom(relaxed, target);
+      limitExceeded |= withoutHealth.limitExceeded();
+      if (withoutHealth.best().isPresent()) {
+        reasons.add(Reason.HEALTHY_REMAINDER_REQUIRED);
+        break;
+      }
+    }
   }
 
   // ---------------------------------------------------------------- cards
@@ -178,12 +259,7 @@ final class ProposalEvaluation {
     return ordered.stream().map(lot -> new Run(List.of(lot))).toList();
   }
 
-  /**
-   * The cards one tier of stock offers (Fatih, 2026-10-15): meets the request, the most within the
-   * upper limit, short within the lower limit; only when none exists, the nearest above and below
-   * outside the tolerance. Each search ranks healthy stock first; no computed selection leaves a
-   * lot fewer normal pieces than its lot-health minimum.
-   */
+  /** Fabric completion/below searches and the legacy STANDARD window cards share one engine. */
   private Cards cards(Tier tier, List<Run> runs) {
     Map<UUID, WholePieceSearch.Lot> pools = StockPools.pools(context, tier);
     List<List<ProposalSearch.SearchLot>> searchable = new ArrayList<>();
@@ -192,6 +268,27 @@ final class ProposalEvaluation {
       if (!lots.isEmpty()) {
         searchable.add(lots);
       }
+    }
+    if (context.input().fabricRollPolicy()) {
+      Comparator<Ranked> completionOrder =
+          Comparator.comparing(Ranked::fabricRank, FabricRollRank.COMPLETION);
+      Comparator<Ranked> belowOrder =
+          Comparator.comparing(Ranked::fabricRank, FabricRollRank.BELOW);
+      Optional<Ranked> completion =
+          best(
+              searchable,
+              pools,
+              lots -> ProposalSearch.fabricCompletion(lots, target),
+              completionOrder);
+      Optional<Ranked> below =
+          best(searchable, pools, lots -> ProposalSearch.fabricBelow(lots, target), belowOrder);
+      List<Ranked> cards = new ArrayList<>();
+      completion.ifPresent(cards::add);
+      below.ifPresent(cards::add);
+      return new Cards(
+          cards,
+          completion.isPresent()
+              || below.map(candidate -> candidate.units() >= windowLow).orElse(false));
     }
     Comparator<Ranked> mostFirst =
         Comparator.comparingLong(Ranked::units).reversed().thenComparing(tenantFirst);
@@ -255,7 +352,19 @@ final class ProposalEvaluation {
         .map(pools::get)
         .filter(Objects::nonNull)
         .filter(lot -> !lot.pieces().isEmpty())
-        .map(lot -> new ProposalSearch.SearchLot(lot, context.ageRanks().get(lot.id()), minKeep))
+        .map(
+            lot ->
+                new ProposalSearch.SearchLot(
+                    lot,
+                    context.ageRanks().get(lot.id()),
+                    minKeep,
+                    Boolean.TRUE.equals(
+                        OptionBuilder.physicalClosure(
+                            context,
+                            context.lotsById().get(lot.id()),
+                            lot.pieces().stream()
+                                .map(WholePieceSearch.Piece::id)
+                                .collect(Collectors.toSet())))))
         .toList();
   }
 
@@ -269,7 +378,10 @@ final class ProposalEvaluation {
     for (List<ProposalSearch.SearchLot> lots : searchable) {
       ProposalSearch.Result result = search.apply(lots);
       limitExceeded |= result.limitExceeded();
-      result.best().ifPresent(selection -> found.add(ranked(pools, selection)));
+      result
+          .best()
+          .ifPresent(
+              selection -> found.add(ranked(pools, selection).withFabricRank(result.fabricRank())));
     }
     return found.stream().min(order);
   }

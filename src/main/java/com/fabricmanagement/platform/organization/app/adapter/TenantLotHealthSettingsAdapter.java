@@ -36,6 +36,7 @@ public class TenantLotHealthSettingsAdapter implements LotHealthSettingsPort {
         settings.minHealthyPiecesMoving(),
         settings.minHealthyPiecesSlowing(),
         settings.minHealthyPiecesStalled(),
-        settings.shortPiecePct().divide(HUNDRED));
+        settings.shortPiecePct().divide(HUNDRED),
+        settings.fabricRollMinHealthyPieces());
   }
 }

@@ -17,12 +17,24 @@ public record LotHealthSettings(
     int minHealthyPiecesMoving,
     int minHealthyPiecesSlowing,
     int minHealthyPiecesStalled,
-    BigDecimal shortPieceRatio) {
+    BigDecimal shortPieceRatio,
+    int fabricRollMinHealthyPieces) {
 
   public static final LotHealthSettings STANDARD =
       new LotHealthSettings(3, 5, 8, new BigDecimal("0.51"));
 
+  public LotHealthSettings(int moving, int slowing, int stalled, BigDecimal ratio) {
+    this(moving, slowing, stalled, ratio, 4);
+  }
+
+  public LotHealthPolicy fabricRollPolicy() {
+    return new LotHealthPolicy(fabricRollMinHealthyPieces, shortPieceRatio);
+  }
+
   public LotHealthSettings {
+    if (fabricRollMinHealthyPieces < 4 || fabricRollMinHealthyPieces > 50) {
+      throw new IllegalArgumentException("Fabric roll minimum must be between 4 and 50");
+    }
     Objects.requireNonNull(shortPieceRatio, "shortPieceRatio");
     if (minHealthyPiecesMoving < 1
         || minHealthyPiecesSlowing < minHealthyPiecesMoving

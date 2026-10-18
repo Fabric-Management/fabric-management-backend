@@ -1,7 +1,9 @@
 package com.fabricmanagement.sales.orderintake.dto;
 
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode;
 import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalReason;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -33,8 +35,7 @@ public record QuantityProposalDto(
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
             description =
-                "Ascending quantity; same quantity in the tenant-first ranking, then a"
-                    + " deterministic order. Keep this order")
+                "Business priority order for the stated policy; preserve it, never sort by quantity")
         List<Option> options,
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
@@ -57,6 +58,13 @@ public record QuantityProposalDto(
             requiredMode = Schema.RequiredMode.REQUIRED,
             description = "Every lot with offerable stock has a known production date")
         boolean agedByProductionDate,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ProposalPolicyCode policyCode,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            description = "Effective minimum; null for a stored evaluation without policy evidence")
+        Integer effectiveMinHealthyPieces,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityCoverage coverage,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String evidenceFingerprint,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant evaluatedAt) {
 
@@ -81,6 +89,9 @@ public record QuantityProposalDto(
         result.excludedPieces(),
         result.unknownReasons(),
         result.agedByProductionDate(),
+        result.policyCode(),
+        result.effectiveMinHealthyPieces(),
+        result.coverage(),
         proposal.getEvidenceFingerprint(),
         proposal.getEvaluatedAt());
   }
@@ -115,7 +126,7 @@ public record QuantityProposalDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
-                  "One or two pieces stay in a used lot. Never for a computed option; a manual"
+                  "Fewer normal pieces than the policy minimum stay. Never for a computed option; a manual"
                       + " pick may, with acknowledgement")
           boolean leavesRemnant,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int lotCount,
@@ -190,10 +201,13 @@ public record QuantityProposalDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal quantity,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
               description =
-                  "Every piece of the lot is taken. Never claimed while held, unknown or otherwise"
-                      + " unsuitable pieces stay")
-          boolean closesLot,
+                  "Every physical piece of the lot is taken; null when inventory completeness is unknown."
+                      + " False while held, unknown or excluded physical pieces remain")
+          Boolean closesLot,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+          Boolean depletesFreePool,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description = "Eligible pieces the option leaves in the lot, held or free")
@@ -222,6 +236,7 @@ public record QuantityProposalDto(
           part.pieceIds().size(),
           part.quantity(),
           part.closesLot(),
+          part.depletesFreePool(),
           part.remainingEligiblePieces(),
           part.remainingQuantity(),
           part.exhausted(),
@@ -301,7 +316,7 @@ public record QuantityProposalDto(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
                   "Applying asks the salesperson's single confirmation: outside the tolerance"
-                      + " and/or a single piece left. A stock choice, never the customer's"
+                      + " and/or an unhealthy remainder. A stock choice, never the customer's"
                       + " acceptance")
           boolean needsConfirmation) {
 

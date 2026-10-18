@@ -93,6 +93,8 @@ class StockUnitServiceCreationTest {
             StockUnitSourceType.PRODUCTION,
             UUID.randomUUID());
 
+    assertThat(result.getInitialLength()).isEqualByComparingTo("100");
+    assertThat(result.getInitialLengthUnit()).isEqualTo("M");
     assertThat(result.getQualityDisposition()).isEqualTo(QualityDisposition.PENDING_INSPECTION);
   }
 
@@ -117,6 +119,8 @@ class StockUnitServiceCreationTest {
                     UUID.randomUUID())),
             TenantContext.SYSTEM_ACTOR_ID);
 
+    assertThat(result)
+        .allSatisfy(piece -> assertThat(piece.getInitialLength()).isEqualByComparingTo("100"));
     assertThat(result)
         .extracting(StockUnit::getQualityDisposition)
         .containsExactly(QualityDisposition.PENDING_INSPECTION);
@@ -144,6 +148,8 @@ class StockUnitServiceCreationTest {
                     UUID.randomUUID())),
             TenantContext.SYSTEM_ACTOR_ID);
 
+    assertThat(result)
+        .allSatisfy(piece -> assertThat(piece.getInitialLength()).isEqualByComparingTo("100"));
     assertThat(result)
         .extracting(StockUnit::getQualityDisposition)
         .containsExactly(QualityDisposition.PENDING_INSPECTION);

@@ -28,6 +28,10 @@ import java.util.UUID;
  *       ranking.
  * </ul>
  *
+ * <p>FABRIC_ROLL_BASE uses {@link #fabricCompletion} and {@link #fabricBelow}. Completion keeps the
+ * minimum healthy total for each cleanup anchor, then compares anchors with the shared total order
+ * {@link FabricRollRank}; it does not use the legacy prefix-tie comparison below.
+ *
  * <p>Every ranking criterion depends only on how each lot is used: not at all, closed, or partly
  * (at least the minimum of normal pieces left). The searches walk these lot patterns depth first
  * and check each against the totals its lots reach together (bitset sums). They are exact, because
@@ -48,7 +52,12 @@ public final class ProposalSearch {
    * orders production dates: lower is older, equal dates share a rank and an unknown date ranks
    * last.
    */
-  public record SearchLot(WholePieceSearch.Lot lot, int ageRank, int minKeep) {
+  public record SearchLot(
+      WholePieceSearch.Lot lot, int ageRank, int minKeep, boolean physicalClosure) {
+    public SearchLot(WholePieceSearch.Lot lot, int ageRank, int minKeep) {
+      this(lot, ageRank, minKeep, false);
+    }
+
     public SearchLot {
       if (minKeep < 1) {
         throw new IllegalArgumentException("A lot keeps at least one piece when it is not closed");
@@ -67,7 +76,12 @@ public final class ProposalSearch {
   }
 
   /** The best selection, if any, or a reached limit. */
-  public record Result(Optional<WholePieceSearch.Selection> best, boolean limitExceeded) {
+  public record Result(
+      Optional<WholePieceSearch.Selection> best, boolean limitExceeded, FabricRollRank fabricRank) {
+    public Result(Optional<WholePieceSearch.Selection> best, boolean limitExceeded) {
+      this(best, limitExceeded, null);
+    }
+
     static Result none() {
       return new Result(Optional.empty(), false);
     }
@@ -101,10 +115,22 @@ public final class ProposalSearch {
     return run(lots, Goal.AT_MOST, bound, 0, 0);
   }
 
+  /** Minimum healthy completion per cleanup anchor, then cleanup priority. */
+  public static Result fabricCompletion(List<SearchLot> lots, long target) {
+    return run(lots, Goal.FABRIC_COVER, Math.max(1, target), 0, target);
+  }
+
+  /** Greatest legal amount strictly below the request. */
+  public static Result fabricBelow(List<SearchLot> lots, long target) {
+    return target <= 1 ? Result.none() : run(lots, Goal.FABRIC_BELOW, target - 1, 0, target);
+  }
+
   private enum Goal {
     WINDOW,
     AT_LEAST,
-    AT_MOST
+    AT_MOST,
+    FABRIC_COVER,
+    FABRIC_BELOW
   }
 
   /** How a lot is used; the order is the order in which the walk tries them. */
@@ -123,6 +149,7 @@ public final class ProposalSearch {
       int ageRank,
       int minKeep,
       boolean remnant,
+      boolean physicalClosure,
       Bits[] normalOnly,
       Bits[] withShort,
       Bits closed,
@@ -214,6 +241,23 @@ public final class ProposalSearch {
   }
 
   private static Result run(List<SearchLot> lots, Goal goal, long first, long second, long target) {
+    return run(lots, goal, first, second, target, PATTERN_BUDGET, SUM_BUDGET);
+  }
+
+  // Package-visible deterministic budget seam: production always uses the unchanged limits above.
+  static Result fabricCompletion(
+      List<SearchLot> lots, long target, long patternBudget, long sumBudget) {
+    return run(lots, Goal.FABRIC_COVER, Math.max(1, target), 0, target, patternBudget, sumBudget);
+  }
+
+  private static Result run(
+      List<SearchLot> lots,
+      Goal goal,
+      long first,
+      long second,
+      long target,
+      long patternBudget,
+      long sumBudget) {
     List<SearchLot> usable =
         lots.stream()
             .filter(lot -> !lot.lot().pieces().isEmpty() && lot.lot().capacity() > 0)
@@ -226,6 +270,10 @@ public final class ProposalSearch {
             .anyMatch(lot -> lot.lot().pieces().size() > WholePieceSearch.MAX_PIECES_PER_LOT)) {
       return Result.limit();
     }
+    if (goal == Goal.FABRIC_COVER || goal == Goal.FABRIC_BELOW) {
+      usable =
+          usable.stream().sorted(java.util.Comparator.comparing(lot -> lot.lot().id())).toList();
+    }
     long scale = goal == Goal.WINDOW ? target : 0;
     for (SearchLot lot : usable) {
       for (WholePieceSearch.Piece piece : lot.lot().pieces()) {
@@ -234,8 +282,13 @@ public final class ProposalSearch {
     }
     scale = Math.max(1, scale);
     long takeable = 0;
-    for (SearchLot lot : usable) {
-      takeable += Math.min(lot.lot().total(), lot.lot().capacity()) / scale;
+    try {
+      for (SearchLot lot : usable) {
+        takeable =
+            Math.addExact(takeable, Math.min(lot.lot().total(), lot.lot().capacity()) / scale);
+      }
+    } catch (ArithmeticException overflow) {
+      return Result.limit();
     }
     long low;
     long high;
@@ -245,7 +298,7 @@ public final class ProposalSearch {
         low = ceilDiv(first, scale);
         high = Math.min(Math.floorDiv(second, scale), takeable);
       }
-      case AT_LEAST -> {
+      case AT_LEAST, FABRIC_COVER -> {
         low = ceilDiv(first, scale);
         high = Math.min(takeable, WholePieceSearch.MAX_UNITS);
         truncated = takeable > WholePieceSearch.MAX_UNITS;
@@ -262,12 +315,14 @@ public final class ProposalSearch {
       return Result.limit();
     }
     try {
-      Optional<WholePieceSearch.Selection> best =
-          searchNormalized(usable, goal, scale, (int) low, (int) high, target / scale);
-      if (best.isEmpty() && truncated) {
-        return Result.limit();
-      }
-      return new Result(best, false);
+      Result result =
+          searchNormalized(
+              usable, goal, scale, (int) low, (int) high, target / scale, patternBudget, sumBudget);
+      if (result.best().isEmpty() && truncated) return Result.limit();
+      return new Result(
+          result.best(),
+          result.limitExceeded() || (truncated && goal == Goal.FABRIC_COVER),
+          result.fabricRank());
     } catch (WholePieceSearch.SearchBudgetExceeded e) {
       return Result.limit();
     }
@@ -277,22 +332,37 @@ public final class ProposalSearch {
     return -Math.floorDiv(-value, divisor);
   }
 
-  private static Optional<WholePieceSearch.Selection> searchNormalized(
-      List<SearchLot> lots, Goal goal, long scale, int low, int high, long target) {
+  private static Result searchNormalized(
+      List<SearchLot> lots,
+      Goal goal,
+      long scale,
+      int low,
+      int high,
+      long target,
+      long patternBudget,
+      long sumBudget) {
     int size = high + 1;
     List<Prepared> prepared = new ArrayList<>();
     for (SearchLot lot : lots) {
       prepared.add(prepare(lot, scale, size));
     }
-    long[] sums = {SUM_BUDGET};
-    Walk walk = new Walk(prepared, goal, low, high, target, sums);
+    long[] sums = {sumBudget};
+    Walk walk = new Walk(prepared, goal, low, high, target, sums, patternBudget);
     Bits start = new Bits(size);
     start.set(0);
-    walk.walk(0, start, 0, 0, 0);
-    if (walk.best == null) {
-      return Optional.empty();
+    boolean limited = false;
+    try {
+      walk.walk(0, start, 0, 0, 0);
+    } catch (WholePieceSearch.SearchBudgetExceeded e) {
+      limited = true;
     }
-    return Optional.of(reconstruct(prepared, walk.bestUses, walk.best.total(), scale, size, sums));
+    if (goal == Goal.FABRIC_COVER) walk.finishAnchors();
+    if (walk.best == null) return new Result(Optional.empty(), limited);
+    // Reconstruction shares the sum budget; never invent a selection when that budget is spent.
+    return new Result(
+        Optional.of(reconstruct(prepared, walk.bestUses, walk.best.total(), scale, size, sums)),
+        limited,
+        walk.fabricBest == null ? null : walk.fabricBest.scaled(scale));
   }
 
   private static Prepared prepare(SearchLot source, long scale, int size) {
@@ -332,6 +402,7 @@ public final class ProposalSearch {
         source.ageRank(),
         source.minKeep(),
         source.remnant(),
+        source.physicalClosure(),
         normalOnly,
         withShort,
         closed,
@@ -349,11 +420,24 @@ public final class ProposalSearch {
     private final int[] closableFrom;
     private final int[] remnantClosableFrom;
     private final Use[] uses;
-    private long patterns = PATTERN_BUDGET;
+    private long patterns;
     private Key best;
     private Use[] bestUses;
+    private FabricRollRank fabricBest;
 
-    Walk(List<Prepared> lots, Goal goal, int low, int high, long target, long[] sums) {
+    private record AnchorCandidate(Key key, Use[] uses, FabricRollRank rank) {}
+
+    private final java.util.Map<Integer, AnchorCandidate> anchors = new java.util.HashMap<>();
+
+    Walk(
+        List<Prepared> lots,
+        Goal goal,
+        int low,
+        int high,
+        long target,
+        long[] sums,
+        long patternBudget) {
+      this.patterns = patternBudget;
       this.lots = lots;
       this.goal = goal;
       this.low = low;
@@ -420,8 +504,8 @@ public final class ProposalSearch {
       int total =
           switch (goal) {
             case WINDOW -> nearestInWindow(reach);
-            case AT_LEAST -> reach.nextSetBit(low);
-            case AT_MOST -> {
+            case AT_LEAST, FABRIC_COVER -> reach.nextSetBit(low);
+            case AT_MOST, FABRIC_BELOW -> {
               int found = reach.previousSetBit(high);
               yield found >= low ? found : -1;
             }
@@ -439,7 +523,10 @@ public final class ProposalSearch {
         }
         youngestFirst[ranked++] = lots.get(i).ageRank();
         if (uses[i] == Use.PARTIAL) {
-          partialSizes[partials++] = lots.get(i).pieces();
+          partialSizes[partials++] =
+              goal == Goal.FABRIC_COVER || goal == Goal.FABRIC_BELOW
+                  ? lots.get(i).normals()
+                  : lots.get(i).pieces();
         }
       }
       Arrays.sort(partialSizes);
@@ -456,9 +543,84 @@ public final class ProposalSearch {
               used,
               Math.abs(total - target),
               total < target);
+      if (goal == Goal.FABRIC_COVER || goal == Goal.FABRIC_BELOW) {
+        considerFabric(key);
+        return;
+      }
       if (best == null || key.compareTo(best, goal) < 0) {
         best = key;
         bestUses = uses.clone();
+      }
+    }
+
+    private void considerFabric(Key key) {
+      int closedRemnants = 0;
+      for (int i = 0; i < lots.size(); i++) {
+        if (uses[i] == Use.CLOSED && lots.get(i).remnant()) closedRemnants |= 1 << i;
+      }
+      if (goal == Goal.FABRIC_BELOW) {
+        FabricRollRank rank = fabricRank(key, closedRemnants);
+        if (fabricBest == null || FabricRollRank.BELOW.compare(rank, fabricBest) < 0) {
+          best = key;
+          bestUses = uses.clone();
+          fabricBest = rank;
+        }
+        return;
+      }
+      // Each pattern can complete every subset of its closed remnant pools. Keep the minimum
+      // total for each anchor BEFORE comparing cleanup benefit across anchors (including empty).
+      for (int anchor = closedRemnants; ; anchor = (anchor - 1) & closedRemnants) {
+        if (--patterns < 0) throw new WholePieceSearch.SearchBudgetExceeded();
+        long anchorTotal = 0;
+        for (int i = 0; i < lots.size(); i++) {
+          if ((anchor & (1 << i)) != 0) anchorTotal += lots.get(i).lot().total();
+        }
+        if (anchorTotal <= target) {
+          // The anchor constrains minimization; benefit describes all remnant pools the
+          // resulting minimum completion actually closes, including forced completion pools.
+          FabricRollRank rank = fabricRank(key, closedRemnants);
+          AnchorCandidate previous = anchors.get(anchor);
+          if (previous == null
+              || key.total() < previous.key().total()
+              || (key.total() == previous.key().total()
+                  && FabricRollRank.COMPLETION.compare(rank, previous.rank()) < 0)) {
+            anchors.put(anchor, new AnchorCandidate(key, uses.clone(), rank));
+          }
+        }
+        if (anchor == 0) break;
+      }
+    }
+
+    private FabricRollRank fabricRank(Key key, int anchor) {
+      int physical = 0;
+      int freeOnly = 0;
+      StringBuilder stable = new StringBuilder();
+      for (int i = 0; i < lots.size(); i++) {
+        if ((anchor & (1 << i)) != 0) {
+          if (lots.get(i).physicalClosure()) physical++;
+          else freeOnly++;
+        }
+        if (uses[i] != null)
+          stable.append(lots.get(i).id()).append(':').append(uses[i]).append(';');
+      }
+      return new FabricRollRank(
+          physical,
+          freeOnly,
+          key.total(),
+          Arrays.stream(key.partialSizes()).boxed().toList(),
+          Arrays.stream(key.youngestFirst()).boxed().toList(),
+          key.lots(),
+          stable.toString());
+    }
+
+    private void finishAnchors() {
+      for (AnchorCandidate candidate : anchors.values()) {
+        if (fabricBest == null
+            || FabricRollRank.COMPLETION.compare(candidate.rank(), fabricBest) < 0) {
+          fabricBest = candidate.rank();
+          best = candidate.key();
+          bestUses = candidate.uses();
+        }
       }
     }
 

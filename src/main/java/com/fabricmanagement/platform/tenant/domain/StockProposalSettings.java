@@ -40,7 +40,8 @@ public record StockProposalSettings(
     BigDecimal stalledBelowPct,
     Integer slowingCoverDays,
     BigDecimal lotCloseExtraSlowingPct,
-    BigDecimal lotCloseExtraStalledPct)
+    BigDecimal lotCloseExtraStalledPct,
+    Integer fabricRollMinHealthyPieces)
     implements Serializable {
 
   private static final long serialVersionUID = 1L;
@@ -57,7 +58,16 @@ public record StockProposalSettings(
   public static final BigDecimal DEFAULT_LOT_CLOSE_EXTRA_SLOWING_PCT = new BigDecimal("10");
   public static final BigDecimal DEFAULT_LOT_CLOSE_EXTRA_STALLED_PCT = new BigDecimal("20");
 
+  public static final int DEFAULT_FABRIC_ROLL_MIN_PIECES = 4;
+
   public StockProposalSettings {
+    fabricRollMinHealthyPieces =
+        fabricRollMinHealthyPieces == null
+            ? DEFAULT_FABRIC_ROLL_MIN_PIECES
+            : fabricRollMinHealthyPieces;
+    if (fabricRollMinHealthyPieces < 4 || fabricRollMinHealthyPieces > 50) {
+      throw new IllegalArgumentException("Fabric rolls must keep between 4 and 50 normal pieces");
+    }
     toleranceDownPct = toleranceDownPct != null ? toleranceDownPct : DEFAULT_TOLERANCE_PCT;
     toleranceUpPct = toleranceUpPct != null ? toleranceUpPct : DEFAULT_TOLERANCE_PCT;
     minHealthyPiecesMoving =
@@ -79,6 +89,35 @@ public record StockProposalSettings(
         lotCloseExtraStalledPct != null
             ? lotCloseExtraStalledPct
             : DEFAULT_LOT_CLOSE_EXTRA_STALLED_PCT;
+  }
+
+  public StockProposalSettings(
+      BigDecimal toleranceDownPct,
+      BigDecimal toleranceUpPct,
+      Integer minHealthyPiecesMoving,
+      Integer minHealthyPiecesSlowing,
+      Integer minHealthyPiecesStalled,
+      BigDecimal shortPiecePct,
+      Integer speedWindowDays,
+      BigDecimal slowingBelowPct,
+      BigDecimal stalledBelowPct,
+      Integer slowingCoverDays,
+      BigDecimal lotCloseExtraSlowingPct,
+      BigDecimal lotCloseExtraStalledPct) {
+    this(
+        toleranceDownPct,
+        toleranceUpPct,
+        minHealthyPiecesMoving,
+        minHealthyPiecesSlowing,
+        minHealthyPiecesStalled,
+        shortPiecePct,
+        speedWindowDays,
+        slowingBelowPct,
+        stalledBelowPct,
+        slowingCoverDays,
+        lotCloseExtraSlowingPct,
+        lotCloseExtraStalledPct,
+        null);
   }
 
   /** The decided defaults. */

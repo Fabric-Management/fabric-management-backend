@@ -76,6 +76,7 @@ public class OrderIntakeStockPreviewService {
                 request.manualPieceIds()));
     List<ProposalLot> stockLots = run.stock().lots();
     QuoteHolds holds = run.holds();
+    QuantityEvaluator.StockHolds holdEvidence = QuoteHoldEvidence.of(holds);
     Set<UUID> readableQuotes = readableQuotes(tenantId, actor, holds.intents());
     Units units = new Units(stockQuery, run.measure(), request.unit());
 
@@ -90,7 +91,8 @@ public class OrderIntakeStockPreviewService {
                     LotFacts.of(
                         lot,
                         intentsByLot.getOrDefault(lot.batchId(), List.of()),
-                        holdsByLot.getOrDefault(lot.batchId(), List.of())))
+                        holdsByLot.getOrDefault(lot.batchId(), List.of()),
+                        holdEvidence))
             .toList();
 
     // Every quote an option's held stock names is one of the lots' intents: same readable set.
@@ -159,7 +161,10 @@ public class OrderIntakeStockPreviewService {
   private OrderIntakeStockPreviewDto.HeldPiece toHeldPiece(
       HeldPieceView hold, LotFacts facts, Set<UUID> readableQuotes) {
     String pieceNo = facts.pieceNumbers().get(hold.stockUnitId());
-    Optional<LotIntentView> backing = facts.backingIntent(hold);
+    Optional<LotIntentView> backing =
+        facts.unverifiedHoldPieceIds().contains(hold.stockUnitId())
+            ? Optional.empty()
+            : facts.backingIntent(hold);
     if (backing.isEmpty()) {
       // Not evidence of a live quote hold; no quote is named or looked up for it.
       return new OrderIntakeStockPreviewDto.HeldPiece(
@@ -253,20 +258,32 @@ public class OrderIntakeStockPreviewService {
       BigDecimal free,
       EnumSet<FreeIncompleteReason> reasons) {
 
-    static LotFacts of(ProposalLot lot, List<LotIntentView> intents, List<HeldPieceView> allHolds) {
+    static LotFacts of(
+        ProposalLot lot,
+        List<LotIntentView> intents,
+        List<HeldPieceView> allHolds,
+        QuantityEvaluator.StockHolds evidence) {
       Map<UUID, String> pieceNumbers = new HashMap<>();
       lot.pieces().forEach(piece -> pieceNumbers.put(piece.stockUnitId(), piece.pieceNo()));
       // A hold on a piece outside the current stock (depleted, disposed) cannot be offered and is
       // left out.
       List<HeldPieceView> holds =
-          allHolds.stream().filter(hold -> pieceNumbers.containsKey(hold.stockUnitId())).toList();
-      Set<UUID> intentLines =
-          intents.stream().map(LotIntentView::quoteLineId).collect(Collectors.toSet());
+          allHolds.stream()
+              .filter(hold -> pieceNumbers.containsKey(hold.stockUnitId()))
+              .collect(
+                  Collectors.toMap(
+                      HeldPieceView::stockUnitId,
+                      Function.identity(),
+                      (left, right) -> left,
+                      java.util.LinkedHashMap::new))
+              .values()
+              .stream()
+              .toList();
       Set<UUID> verified = new LinkedHashSet<>();
       Set<UUID> unverified = new LinkedHashSet<>();
       holds.forEach(
           hold ->
-              (intentLines.contains(hold.quoteLineId()) ? verified : unverified)
+              (evidence.pieceHolds().get(hold.stockUnitId()).verified() ? verified : unverified)
                   .add(hold.stockUnitId()));
 
       List<ProposalPiece> eligiblePieces = pieces(lot, PieceState.ELIGIBLE);
@@ -293,8 +310,7 @@ public class OrderIntakeStockPreviewService {
       if (!unverifiedEligible.isEmpty()) {
         reasons.add(FreeIncompleteReason.UNVERIFIED_HOLD);
       }
-      BigDecimal free =
-          reasons.isEmpty() ? eligible.subtract(heldByQuotes).max(BigDecimal.ZERO) : null;
+      BigDecimal free = StockPools.lotFree(evidence, lot).canonical();
 
       return new LotFacts(
           lot,

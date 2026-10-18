@@ -168,7 +168,7 @@ public class StockUnitService {
             sourceId,
             initialQualityDisposition);
     if (length != null || lengthUnit != null) {
-      stockUnit.recordLength(length, lengthUnit);
+      stockUnit.recordInitialLength(length, lengthUnit);
     }
 
     stockUnit = stockUnitRepository.save(stockUnit);
