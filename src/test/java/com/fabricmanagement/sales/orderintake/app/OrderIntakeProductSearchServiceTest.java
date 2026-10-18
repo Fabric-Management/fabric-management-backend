@@ -163,6 +163,72 @@ class OrderIntakeProductSearchServiceTest {
     verify(stockQuery, never()).offerableSummaries(eq(tenantId), anyCollection());
   }
 
+  @Test
+  void unnamedFabricIsSearchableByItsVisibleCatalogueNameAndKeepsItsWidths() {
+    ProductDto fabric = product("SYS-000-PROD-F3401FC5", "SYS-000-PROD-F3401FC5");
+    SalesProduct named = entry(fabric.getId(), null, "8.60");
+    named.setProductName("Cotton Poplin 120gsm");
+    stubSingleProduct(fabric, List.of(named));
+
+    var result = service.search(customerA, ProductType.FABRIC, "poplin");
+
+    assertThat(result)
+        .singleElement()
+        .satisfies(
+            option -> {
+              assertThat(option.displayName()).isEqualTo("Cotton Poplin 120gsm");
+              assertThat(option.uid()).isEqualTo("SYS-000-PROD-F3401FC5");
+              assertThat(option.finishedWidths())
+                  .containsExactly(
+                      new ProductSalesDefinitionDto.FinishedWidthOption(
+                          new BigDecimal("160.00"), "CM"));
+            });
+  }
+
+  @Test
+  void catalogueFallbackNeverSearchesOrRevealsAnotherCustomersPrivateName() {
+    ProductDto fabric = product("FAB-GENERIC", "FAB-GENERIC");
+    SalesProduct general = entry(fabric.getId(), null, "8.60");
+    general.setProductName("General Poplin");
+    SalesProduct privateName = entry(fabric.getId(), customerB, "7.80");
+    privateName.setProductName("Confidential customer B design");
+    stubSingleProduct(fabric, List.of(privateName, general));
+
+    assertThat(service.search(customerA, ProductType.FABRIC, "confidential")).isEmpty();
+    assertThat(service.search(customerA, ProductType.FABRIC, "poplin"))
+        .extracting(OrderIntakeProductOption::displayName)
+        .containsExactly("General Poplin");
+    assertThat(service.search(customerB, ProductType.FABRIC, "confidential"))
+        .extracting(OrderIntakeProductOption::displayName)
+        .containsExactly("Confidential customer B design");
+  }
+
+  @Test
+  void realMasterDataNameWinsOverCatalogueSnapshot() {
+    ProductDto fabric = product("FAB-POPLIN", "Current Poplin Definition");
+    SalesProduct older = entry(fabric.getId(), null, "8.60");
+    older.setProductName("Older catalogue name");
+    stubSingleProduct(fabric, List.of(older));
+
+    assertThat(service.search(customerA, ProductType.FABRIC, "current"))
+        .extracting(OrderIntakeProductOption::displayName)
+        .containsExactly("Current Poplin Definition");
+  }
+
+  private void stubSingleProduct(ProductDto product, List<SalesProduct> entries) {
+    when(productDefinitions.sellableProducts(tenantId, ProductType.FABRIC))
+        .thenReturn(List.of(product));
+    when(catalogue.findAllByTenantIdAndProductIdInAndIsActiveTrue(eq(tenantId), anyCollection()))
+        .thenReturn(entries);
+    when(productDefinitions.findAll(eq(tenantId), anyList()))
+        .thenAnswer(
+            invocation -> {
+              List<ProductDto> selected = invocation.getArgument(1);
+              return selected.isEmpty() ? Map.of() : Map.of(product.getId(), definition(product));
+            });
+    when(stockQuery.offerableSummaries(eq(tenantId), anyCollection())).thenReturn(Map.of());
+  }
+
   private static ProductDto product(String uid, String name) {
     return ProductDto.builder()
         .id(UUID.randomUUID())
