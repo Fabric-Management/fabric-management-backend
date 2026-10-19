@@ -62,6 +62,10 @@ public class OpenApiExportIT {
 
   private static final String SCHEMA_REF_PREFIX = "#/components/schemas/";
 
+  private static final NullableReference NULLABLE_REFERENCE_PROBE =
+      new NullableReference(
+          "OrderCoverSelectionPreview", "rejection", "OrderCoverSelectionPreviewRejection");
+
   /**
    * OPENAPI-NULLREF-1 reviewed inventory: every nullable reference in the export as (schema,
    * property, target). This is the regression pin, not a production allowlist — the repair is
@@ -69,6 +73,11 @@ public class OpenApiExportIT {
    */
   private static final List<NullableReference> NULLABLE_REFERENCES =
       List.of(
+          new NullableReference("DraftStockSelection", "option", "QuantityProposalOption"),
+          new NullableReference(
+              "DraftStockSelectionCapability", "reason", "DraftStockSelectionReason"),
+          new NullableReference(
+              "OrderIntakeStockPreviewPiece", "ownerType", "StockProposalOwnerType"),
           new NullableReference("TenantBrandingDto", "logo", "TenantBrandAssetDto"),
           new NullableReference("TenantBrandingDto", "icon", "TenantBrandAssetDto"),
           new NullableReference("TenantBrandingDto", "logoDark", "TenantBrandAssetDto"),
@@ -78,15 +87,13 @@ public class OpenApiExportIT {
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
           new NullableReference("OrderCoverDetail", "evidence", "OrderCoverEvidence"),
           new NullableReference("OrderDeliveryOutlook", "arrival", "ArrivalEstimateView"),
-          new NullableReference("QuantityAcceptance", "remainingNeed", "RemainingNeedDecision"),
           new NullableReference(
               "OrderIntakeReadinessLine", "stockChoice", "QuantityAcceptanceBasis"),
           new NullableReference(
               "OrderCoverLineDecision", "blockReason", "OrderCoverLineBlockReason"),
           new NullableReference(
               "OrderCoverLineDecision", "productionQuantity", "OrderCoverQuantity"),
-          new NullableReference(
-              "OrderCoverSelectionPreview", "rejection", "OrderCoverSelectionPreviewRejection"),
+          NULLABLE_REFERENCE_PROBE,
           new NullableReference(
               "ProductionStockAvailabilityLot", "colour", "ProductionStockAvailabilityColour"),
           new NullableReference(
@@ -182,6 +189,7 @@ public class OpenApiExportIT {
     assertPermissionCatalogueContract(generatedDocument);
     assertNavPreferencesImportContract(generatedDocument);
     assertOrderIntakeStockPreviewContract(generatedDocument);
+    assertDraftStockSelectionContract(generatedDocument);
     assertNoNullTypedReferences(generatedDocument);
     assertNullableReferenceContract(generatedDocument);
 
@@ -196,6 +204,7 @@ public class OpenApiExportIT {
 
     assertNullableReferenceRedProbes(generatedSpec);
     assertStockNullableScalarRedProbes(generatedSpec);
+    assertRetiredQuantityAcceptanceRedProbe(generatedSpec);
 
     // 2. Define the target spec file location
     File specFile = new File("api/openapi.yaml");
@@ -327,6 +336,117 @@ public class OpenApiExportIT {
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");
     assertThat(mapAt(document, "components", "schemas", "OrderIntakeStockPreviewHoldStatus"))
         .containsEntry("enum", List.of("VERIFIED", "UNVERIFIED"));
+  }
+
+  /** DRAFT-HOLD-BE-1: published ownership, capabilities and command identity. */
+  private void assertDraftStockSelectionContract(Map<String, Object> document) {
+    String root = "/api/v1/sales/order-intake/stock-selections";
+    assertThat(mapAt(document, "paths", root, "post"))
+        .containsEntry("operationId", "openDraftStockSelection");
+    assertThat(mapAt(document, "paths", root + "/{id}", "get"))
+        .containsEntry("operationId", "getDraftStockSelection");
+    for (String action : List.of("acquire", "renew", "release", "close")) {
+      assertThat(mapAt(document, "paths", root + "/{id}/" + action, "post"))
+          .containsKey("requestBody");
+    }
+    assertThat(mapAt(document, "paths", root + "/orders/{orderId}/lines/{lineId}/apply", "post"))
+        .containsEntry("operationId", "applyDraftStockSelection");
+    assertThat(
+            mapAt(document, "paths", root + "/orders/{orderId}/lines/{lineId}/selection", "delete"))
+        .containsEntry("operationId", "removeAppliedStockSelection");
+    assertThat(mapAt(document, "paths").keySet())
+        .noneMatch(path -> path.contains("/quantity-acceptances"));
+    // Historical acceptance records remain internal; the retired HTTP DTO must not be exported.
+    assertThat(mapAt(document, "components", "schemas")).doesNotContainKey("QuantityAcceptance");
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                "/api/v1/sales/order-intake/products/{productId}/stock-live-events",
+                "get"))
+        .containsEntry("operationId", "subscribeDraftStockLiveEvents");
+    assertThat(requiredOf(document, "DraftStockSelection"))
+        .contains(
+            "selectionId",
+            "sessionId",
+            "clientLineId",
+            "selectionRevision",
+            "state",
+            "policy",
+            "expiresAt",
+            "remainingMs",
+            "option",
+            "grants",
+            "capabilities",
+            "salesOrderId",
+            "salesOrderLineId",
+            "orderVersion");
+    assertThat(requiredOf(document, "DraftStockSelectionPolicy"))
+        .containsExactlyInAnyOrder(
+            "leaseSeconds",
+            "renewAfterSeconds",
+            "idleAfterSeconds",
+            "idleWarningSeconds",
+            "maxKeysPerRequest");
+    assertThat(requiredOf(document, "DraftStockSelectionCapability"))
+        .containsExactlyInAnyOrder(
+            "action", "allowed", "reason", "routesTo", "needsApproval", "needsConfirmation");
+    assertThat(requiredOf(document, "AcquireDraftStockSelectionRequest"))
+        .contains("operationId", "expectedRevision", "line", "optionKey", "previousTokens");
+    assertThat(requiredOf(document, "DraftStockSelectionProof"))
+        .contains("selectionId", "selectionRevision", "tokens");
+    assertThat(requiredOf(document, "ApplyDraftStockSelectionRequest"))
+        .containsExactlyInAnyOrder("operationId", "expectedVersion", "selection");
+    assertThat(requiredOf(document, "RemoveAppliedStockSelectionRequest"))
+        .containsExactlyInAnyOrder("operationId", "expectedVersion");
+    assertThat(mapAt(document, "components", "schemas", "DraftStockSelectionState").get("enum"))
+        .isEqualTo(
+            List.of(
+                "OPEN",
+                "HELD",
+                "BLOCKED",
+                "EXPIRED",
+                "RELEASED",
+                "TRANSFERRED",
+                "CONVERTED",
+                "SUPERSEDED"));
+    assertThat(mapAt(document, "components", "schemas", "StockProposalOwnerType").get("enum"))
+        .isEqualTo(List.of("QUOTE", "SALES_ORDER", "DRAFT", "UNKNOWN"));
+    assertThat(requiredOf(document, "OrderIntakeStockPreviewPiece")).contains("ownerType");
+    assertThat(schemaProperty(document, "OrderIntakeStockPreviewRequest", "ownStockSelection"))
+        .isNotEmpty();
+    for (String property :
+        List.of(
+            "customerRequestQty",
+            "clientLineId",
+            "stockSelection",
+            "previewStockSelection",
+            "sourceQuoteLineId")) {
+      assertThat(schemaProperty(document, "SalesOrderLineRequest", property)).isNotEmpty();
+    }
+    assertThat(schemaProperty(document, "SalesOrderLineResponse", "customerRequestQty"))
+        .isNotEmpty();
+    for (String property : List.of("sessionId", "expiresAt", "orderVersion")) {
+      assertThat(schemaProperty(document, "DraftStockSelection", property).get("type"))
+          .as("DraftStockSelection.%s accepts null under OpenAPI 3.1", property)
+          .isInstanceOf(List.class);
+      assertThat(
+              ((List<?>) schemaProperty(document, "DraftStockSelection", property).get("type"))
+                  .stream().map(Object::toString).toList())
+          .contains("null");
+    }
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                root + "/{id}/acquire",
+                "post",
+                "responses",
+                "409",
+                "content",
+                "application/problem+json",
+                "schema"))
+        .containsEntry("$ref", "#/components/schemas/DraftStockSelectionProblem");
   }
 
   /** OpenAPI 3.1 scalar nullability is a type union, independent of the array order. */
@@ -597,9 +717,18 @@ public class OpenApiExportIT {
         .doesNotContainKey("type");
   }
 
+  /** A retired HTTP schema cannot return unnoticed; the real export remains untouched. */
+  private void assertRetiredQuantityAcceptanceRedProbe(String generatedSpec) throws Exception {
+    Map<String, Object> restored = parse(generatedSpec);
+    mapAt(restored, "components", "schemas").put("QuantityAcceptance", Map.of("type", "object"));
+    assertThatThrownBy(() -> assertDraftStockSelectionContract(restored))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("QuantityAcceptance");
+  }
+
   /** Every probe parses its own copy; the exported document is never mutated. */
   private void assertNullableReferenceRedProbes(String generatedSpec) throws Exception {
-    NullableReference row = NULLABLE_REFERENCES.get(6); // OrderCoverSelectionPreview.rejection
+    NullableReference row = NULLABLE_REFERENCE_PROBE;
     String target = SCHEMA_REF_PREFIX + row.target();
 
     // 1. The old $ref + sibling type "null" pair is rejected by both assertions.

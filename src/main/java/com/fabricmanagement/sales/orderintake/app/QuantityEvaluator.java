@@ -132,7 +132,29 @@ public final class QuantityEvaluator {
       String quoteNumber,
       String marketerName,
       LocalDate expiresAt,
-      boolean verified) {
+      boolean verified,
+      com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+          ownerType) {
+    public Holder(
+        UUID quoteId,
+        UUID quoteLineId,
+        String quoteNumber,
+        String marketerName,
+        LocalDate expiresAt,
+        boolean verified) {
+      this(
+          quoteId,
+          quoteLineId,
+          quoteNumber,
+          marketerName,
+          expiresAt,
+          verified,
+          verified
+              ? com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+                  .QUOTE
+              : com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+                  .UNKNOWN);
+    }
 
     static Holder unverified() {
       return new Holder(null, null, null, null, null, false);

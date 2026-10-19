@@ -47,6 +47,10 @@ class BatchLotQuantityIntentServiceTest {
   @Mock private BatchCommitmentQuantityService commitmentQuantityService;
   @Spy private BatchPrimaryMeasureService primaryMeasureService = new BatchPrimaryMeasureService();
 
+  @Mock private com.fabricmanagement.production.core.stockunit.api.StockUnitSoftHoldPort softHolds;
+  @Mock private com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
+  @Mock private jakarta.persistence.EntityManager entityManager;
+
   @InjectMocks private BatchLotQuantityIntentService service;
 
   private final UUID tenantId = UUID.randomUUID();
@@ -125,7 +129,7 @@ class BatchLotQuantityIntentServiceTest {
                     "Q-001",
                     quoteLineId,
                     UUID.randomUUID(),
-                    "Ayse",
+                    "Olivia Bennett",
                     LocalDate.now().plusDays(5),
                     List.of(wrong)));
 
@@ -155,7 +159,7 @@ class BatchLotQuantityIntentServiceTest {
         "Q-001",
         quoteLineId,
         UUID.randomUUID(),
-        "Ayse",
+        "Olivia Bennett",
         LocalDate.now().plusDays(5),
         List.of(new LotIntentRequest(batchId, new BigDecimal("250"), "CM")));
 
@@ -194,7 +198,7 @@ class BatchLotQuantityIntentServiceTest {
             "Q-001",
             quoteLineId,
             UUID.randomUUID(),
-            "Ayse",
+            "Olivia Bennett",
             removedBatchId,
             new BigDecimal("10.000"),
             "M",
@@ -219,7 +223,7 @@ class BatchLotQuantityIntentServiceTest {
         "Q-001",
         quoteLineId,
         UUID.randomUUID(),
-        "Ayse",
+        "Olivia Bennett",
         LocalDate.now().plusDays(5),
         List.of(new LotIntentRequest(batchId, new BigDecimal("25.000"), "M")));
 
@@ -239,7 +243,7 @@ class BatchLotQuantityIntentServiceTest {
             "Q-001",
             quoteLineId,
             UUID.randomUUID(),
-            "Ayse",
+            "Olivia Bennett",
             batchId,
             new BigDecimal("10.000"),
             "M",
@@ -313,7 +317,7 @@ class BatchLotQuantityIntentServiceTest {
         "Q-001",
         quoteLineId,
         UUID.randomUUID(),
-        "Ayse",
+        "Olivia Bennett",
         batchId,
         new BigDecimal("10.000"),
         "M",

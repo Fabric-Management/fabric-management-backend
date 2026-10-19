@@ -146,6 +146,8 @@ public class TenantTransactionalPurgeService {
           "production.quality_decision_unit",
           "production.quality_decision",
           "production.stock_unit_audit_log",
+          "sales_ord.draft_stock_selection_operation",
+          "sales_ord.draft_stock_selection",
           "production.stock_unit_soft_hold",
           "production.stock_unit",
           "production.batch_lot_quantity_intent",

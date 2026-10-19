@@ -56,6 +56,18 @@ public class SalesOrderController {
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "201",
       description = "Order created successfully")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "409",
+      description =
+          "Stale stock selection, duplicate fabric distribution or idempotency conflict; no order is created",
+      content =
+          @io.swagger.v3.oas.annotations.media.Content(
+              mediaType = "application/problem+json",
+              schema =
+                  @io.swagger.v3.oas.annotations.media.Schema(
+                      implementation =
+                          com.fabricmanagement.sales.orderintake.dto.DraftStockSelectionProblemDto
+                              .class)))
   public ResponseEntity<ApiResponse<SalesOrderDto>> createOrder(
       @Valid @RequestBody CreateSalesOrderRequest request) {
     SalesOrderDto order = orderService.createOrder(request);

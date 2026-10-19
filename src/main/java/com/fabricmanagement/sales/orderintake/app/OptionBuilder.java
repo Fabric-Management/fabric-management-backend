@@ -76,7 +76,14 @@ final class OptionBuilder {
             : canonicalDifference.signum() > 0 ? OptionKind.ABOVE : OptionKind.BELOW;
     BlockedReason blocked = compatibilityBlock;
     if (blocked == null && touchesVerified) {
-      blocked = BlockedReason.HELD_BY_ANOTHER_QUOTE;
+      blocked =
+          held.stream().anyMatch(entry -> entry.ownerType() == QuantityOption.StockOwnerType.DRAFT)
+              ? BlockedReason.HELD_BY_ANOTHER_DRAFT
+              : held.stream()
+                      .anyMatch(
+                          entry -> entry.ownerType() == QuantityOption.StockOwnerType.SALES_ORDER)
+                  ? BlockedReason.HELD_BY_ANOTHER_ORDER
+                  : BlockedReason.HELD_BY_ANOTHER_QUOTE;
     } else if (blocked == null && touchesUnverified) {
       blocked = BlockedReason.HOLD_UNVERIFIED;
     }

@@ -18,7 +18,10 @@ class SalesOrderRevisionTest {
 
   private final EntityManager entityManager = mock(EntityManager.class);
   private final SalesOrderRevision revision =
-      new SalesOrderRevision(entityManager, mock(SalesOrderLineRepository.class));
+      new SalesOrderRevision(
+          entityManager,
+          mock(SalesOrderLineRepository.class),
+          mock(com.fabricmanagement.sales.orderintake.app.StockSelectionLifecycleService.class));
 
   @Test
   void aLineChangeMovesTheOrderVersionAtOnceAndHoldsTheRow() {

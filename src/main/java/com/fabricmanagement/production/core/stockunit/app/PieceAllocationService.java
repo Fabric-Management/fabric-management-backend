@@ -56,11 +56,13 @@ public class PieceAllocationService implements PieceAllocationPort {
   private final StockUnitCutRepository cutRepository;
   private final BatchPrimaryMeasureService measureService;
   private final Clock clock;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockLots(UUID tenantId, Collection<UUID> batchIds) {
     Objects.requireNonNull(tenantId, "tenantId");
+    ownership.lockLots(batchIds);
     for (UUID batchId : new TreeSet<>(batchIds)) {
       batchRepository.findByIdAndTenantIdForUpdate(batchId, tenantId);
     }
@@ -73,6 +75,10 @@ public class PieceAllocationService implements PieceAllocationPort {
     if (request.pieces() == null || request.pieces().isEmpty()) {
       return AllocationOutcome.success(0);
     }
+    ownership.assertAvailable(
+        request.pieces().stream().map(PieceRef::stockUnitId).toList(),
+        request.salesOrderLineId(),
+        null);
     Map<UUID, List<PieceRef>> byLot = new TreeMap<>();
     request
         .pieces()

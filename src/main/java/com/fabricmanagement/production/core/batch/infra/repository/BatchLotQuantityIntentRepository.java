@@ -17,6 +17,8 @@ import org.springframework.data.repository.query.Param;
 public interface BatchLotQuantityIntentRepository
     extends JpaRepository<BatchLotQuantityIntent, UUID> {
 
+  List<BatchLotQuantityIntent> findByTenantIdAndOwnerLineId(UUID tenantId, UUID lineId);
+
   List<BatchLotQuantityIntent> findByTenantIdAndQuoteLineId(UUID tenantId, UUID quoteLineId);
 
   List<BatchLotQuantityIntent> findByTenantIdAndBatchIdInAndIsActiveTrueOrderById(
@@ -39,7 +41,7 @@ public interface BatchLotQuantityIntentRepository
         AND i.batchId IN :batchIds
         AND i.status = :status
         AND i.isActive = true
-        AND (:excludedQuoteLineId IS NULL OR i.quoteLineId <> :excludedQuoteLineId)
+        AND (:excludedQuoteLineId IS NULL OR i.ownerLineId <> :excludedQuoteLineId)
       GROUP BY i.batchId
       """)
   List<IntentQuantityRow> sumActiveRowsByBatchIds(
@@ -59,7 +61,7 @@ public interface BatchLotQuantityIntentRepository
         AND i.batchId IN :batchIds
         AND i.status = :status
         AND i.isActive = true
-        AND (:excludedQuoteLineId IS NULL OR i.quoteLineId <> :excludedQuoteLineId)
+        AND (:excludedQuoteLineId IS NULL OR i.ownerLineId <> :excludedQuoteLineId)
       GROUP BY i.batchId, UPPER(TRIM(i.unit))
       """)
   List<IntentUnitQuantityRow> sumActiveRowsByBatchIdsAndUnit(
@@ -75,7 +77,7 @@ public interface BatchLotQuantityIntentRepository
         AND i.batchId IN :batchIds
         AND i.status = :status
         AND i.isActive = true
-        AND (:excludedQuoteLineId IS NULL OR i.quoteLineId <> :excludedQuoteLineId)
+        AND (:excludedQuoteLineId IS NULL OR i.ownerLineId <> :excludedQuoteLineId)
       ORDER BY i.expiresAt ASC, i.quoteNumber ASC
       """)
   List<BatchLotQuantityIntent> findActiveByBatchIds(

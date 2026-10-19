@@ -151,7 +151,8 @@ public class OrderVersionSnapshotter {
         line.getTaxAmountValue(),
         line.getRequestedDeliveryDate(),
         line.isSingleLotRequired(),
-        line.getShipmentPreference());
+        line.getShipmentPreference(),
+        line.getCustomerRequestQty());
   }
 
   private static OrderVersionContent.Total total(OrderCurrencyTotal total) {

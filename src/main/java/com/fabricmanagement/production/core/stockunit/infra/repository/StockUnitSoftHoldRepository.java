@@ -14,6 +14,13 @@ import org.springframework.data.repository.query.Param;
 
 public interface StockUnitSoftHoldRepository extends JpaRepository<StockUnitSoftHold, UUID> {
 
+  @Query(
+      "select h from StockUnitSoftHold h where h.tenantId = :tenantId and h.stockUnitId in :ids and h.status = com.fabricmanagement.production.core.stockunit.domain.StockUnitSoftHoldStatus.ACTIVE and h.isActive = true")
+  List<StockUnitSoftHold> findActiveByStockUnitIds(
+      @Param("tenantId") UUID tenantId, @Param("ids") Collection<UUID> ids);
+
+  List<StockUnitSoftHold> findByTenantIdAndOwnerLineId(UUID tenantId, UUID ownerLineId);
+
   List<StockUnitSoftHold> findByTenantIdAndQuoteLineId(UUID tenantId, UUID quoteLineId);
 
   Optional<StockUnitSoftHold> findByTenantIdAndQuoteLineIdAndStockUnitId(
@@ -50,7 +57,7 @@ public interface StockUnitSoftHoldRepository extends JpaRepository<StockUnitSoft
    */
   @Query(
       """
-      SELECT h.stockUnitId AS stockUnitId, s.batchId AS batchId, h.quoteLineId AS quoteLineId
+      SELECT h.stockUnitId AS stockUnitId, s.batchId AS batchId, h.ownerLineId AS quoteLineId
       FROM StockUnitSoftHold h, StockUnit s
       WHERE h.tenantId = :tenantId
         AND s.tenantId = :tenantId
@@ -59,7 +66,7 @@ public interface StockUnitSoftHoldRepository extends JpaRepository<StockUnitSoft
         AND s.isActive = true
         AND h.status = :status
         AND h.isActive = true
-      ORDER BY s.batchId, h.stockUnitId, h.quoteLineId
+      ORDER BY s.batchId, h.stockUnitId, h.ownerLineId
       """)
   List<HeldPieceRow> findActiveRowsByBatchIds(
       @Param("tenantId") UUID tenantId,

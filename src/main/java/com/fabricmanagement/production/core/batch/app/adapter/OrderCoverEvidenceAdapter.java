@@ -192,7 +192,7 @@ public class OrderCoverEvidenceAdapter implements OrderCoverEvidencePort {
                                       intent.getUnit(),
                                       null,
                                       null,
-                                      intent.getQuoteLineId(),
+                                      intent.getOwnerLineId(),
                                       null,
                                       null)));
                   reservationsByBatch.getOrDefault(batch.getId(), List.of()).stream()

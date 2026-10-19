@@ -3,10 +3,9 @@ package com.fabricmanagement.sales.orderintake.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.core.stockunit.api.PieceAllocationPort;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
-import com.fabricmanagement.sales.orderintake.domain.AcceptanceTerms;
-import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptance;
-import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceStatus;
-import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
+import com.fabricmanagement.sales.orderintake.domain.DraftStockSelection;
+import com.fabricmanagement.sales.orderintake.domain.StockSelectionTerms;
+import com.fabricmanagement.sales.orderintake.infra.repository.DraftStockSelectionRepository;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import java.util.ArrayList;
@@ -29,7 +28,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ConfirmationGate {
 
-  private final QuantityAcceptanceRepository acceptances;
+  private final DraftStockSelectionRepository selections;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitSoftHoldPort holds;
   private final QuantityEvaluationService evaluation;
   private final PieceAllocationPort allocation;
   private final CustomRequestGate customRequests;
@@ -38,7 +38,7 @@ public class ConfirmationGate {
   public record Block(UUID lineId, String code, String message, List<UUID> pieceIds) {}
 
   record LinePlan(
-      SalesOrderLine line, QuantityAcceptance acceptance, AcceptedStockCheck.Result check) {}
+      SalesOrderLine line, DraftStockSelection selection, AcceptedStockCheck.Result check) {}
 
   public List<Block> blocks(SalesOrder order, List<SalesOrderLine> lines) {
     List<Block> blocks = new ArrayList<>(customRequests.blocks(order, lines));
@@ -78,12 +78,26 @@ public class ConfirmationGate {
                 "Pieces were taken or changed while confirming (" + outcome.failureCode() + ")",
                 outcome.unavailablePieceIds()));
       }
+      holds.releaseHolds(plan.line().getId());
+      plan.selection().converted();
+      selections.save(plan.selection());
     }
   }
 
   public void release(Collection<UUID> lineIds, UUID actor, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
-    lineIds.forEach(lineId -> allocation.releaseForLine(tenantId, lineId, actor, reason));
+    for (UUID lineId : lineIds) {
+      allocation.releaseForLine(tenantId, lineId, actor, reason);
+      holds.releaseHolds(lineId);
+    }
+    selections
+        .findByTenantIdAndSalesOrderLineIdInAndState(
+            tenantId, lineIds, DraftStockSelection.State.TRANSFERRED)
+        .forEach(
+            selection -> {
+              selection.release();
+              selections.save(selection);
+            });
   }
 
   private List<LinePlan> plan(SalesOrder order, List<SalesOrderLine> lines, List<Block> blocks) {
@@ -91,19 +105,19 @@ public class ConfirmationGate {
       return List.of();
     }
     UUID tenantId = TenantContext.requireTenantId();
-    Map<UUID, QuantityAcceptance> active =
-        acceptances
-            .findByTenantIdAndSalesOrderLineIdInAndStatus(
+    Map<UUID, DraftStockSelection> active =
+        selections
+            .findByTenantIdAndSalesOrderLineIdInAndState(
                 tenantId,
                 lines.stream().map(SalesOrderLine::getId).toList(),
-                QuantityAcceptanceStatus.ACTIVE)
+                DraftStockSelection.State.TRANSFERRED)
             .stream()
             .collect(
-                Collectors.toMap(QuantityAcceptance::getSalesOrderLineId, Function.identity()));
+                Collectors.toMap(DraftStockSelection::getSalesOrderLineId, Function.identity()));
     List<LinePlan> plans = new ArrayList<>();
     for (SalesOrderLine line : lines) {
-      QuantityAcceptance acceptance = active.get(line.getId());
-      if (acceptance == null) {
+      DraftStockSelection selection = active.get(line.getId());
+      if (selection == null) {
         evaluation
             .currentStock(order, line)
             .ifPresent(
@@ -127,12 +141,13 @@ public class ConfirmationGate {
                 });
         continue;
       }
-      if (!acceptance.covers(AcceptanceTerms.fingerprint(line))) {
+      if (!java.util.Objects.equals(
+          selection.getTermsFingerprint(), StockSelectionTerms.fingerprint(order, line))) {
         blocks.add(
             new Block(
                 line.getId(),
-                "ACCEPTANCE_STALE",
-                "The line changed after the customer's acceptance; record it again",
+                "SELECTION_STALE",
+                "The line changed after its stock choice; evaluate it again",
                 List.of()));
         continue;
       }
@@ -144,9 +159,10 @@ public class ConfirmationGate {
         continue;
       }
       AcceptedStockCheck.Result check =
-          AcceptedStockCheck.check(stock.get(), acceptance.getPieceIds(), acceptance.getBatchIds());
+          AcceptedStockCheck.check(
+              stock.get(), selection.getOption().pieceIds(), selection.getOption().batchIds());
       if (!check.piecesAvailable()
-          || check.canonicalQuantity().compareTo(acceptance.getCanonicalQty()) != 0) {
+          || check.canonicalQuantity().compareTo(selection.getOption().canonicalQuantity()) != 0) {
         blocks.add(
             new Block(
                 line.getId(),
@@ -165,7 +181,7 @@ public class ConfirmationGate {
                 List.of()));
         continue;
       }
-      plans.add(new LinePlan(line, acceptance, check));
+      plans.add(new LinePlan(line, selection, check));
     }
     return plans;
   }

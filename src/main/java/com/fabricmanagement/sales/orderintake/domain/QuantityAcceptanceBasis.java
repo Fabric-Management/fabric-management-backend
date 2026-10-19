@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public enum QuantityAcceptanceBasis {
   /** The option is exactly the requested quantity; nothing changes for the customer. */
   EXACT_MATCH,
+  /** Salesperson stock choice; never customer consent. */
+  STOCK_SELECTED,
   /** The customer agreed to a quantity or piece set other than the request. */
   CUSTOMER_ACCEPTED
 }

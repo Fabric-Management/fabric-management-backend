@@ -77,6 +77,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class QuoteService {
 
+  private final jakarta.persistence.EntityManager entityManager;
   private final QuoteRepository quoteRepository;
   private final PricingEngineService pricingEngineService;
   private final SalesProductService catalogService;
@@ -668,9 +669,12 @@ public class QuoteService {
 
   private Quote getActiveQuote(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();
-    return quoteRepository
-        .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
-        .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+    Quote quote =
+        quoteRepository
+            .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
+            .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+    entityManager.refresh(quote, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+    return quote;
   }
 
   private Quote requireWriteAccess(UUID quoteId, UUID currentUserId) {

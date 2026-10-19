@@ -134,7 +134,7 @@ public class QuantityEvaluationService {
             order.getId(),
             line.getId(),
             line.getProductId(),
-            line.getRequestedQty(),
+            line.getCustomerRequestQty(),
             line.getUnit(),
             evaluation.result(),
             evaluation.evidenceFingerprint(),
@@ -219,7 +219,7 @@ public class QuantityEvaluationService {
             line.getFinishedWidth(),
             line.getFinishedWidthUnit(),
             order.getTradingPartnerId(),
-            line.getRequestedQty(),
+            line.getCustomerRequestQty(),
             line.getUnit(),
             line.isSingleLotRequired(),
             line.getToleranceUpPct(),
@@ -278,6 +278,11 @@ public class QuantityEvaluationService {
             ? NO_HOLDS
             : quoteHolds.find(
                 stock.lots().stream().map(ProposalStockQueryService.ProposalLot::batchId).toList());
+    Set<UUID> ownOwners =
+        java.util.stream.Stream.of(request.lineId(), request.ownSessionId())
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    holds = holds.excludingOwners(ownOwners);
     Optional<BigDecimal> canonicalTarget =
         stockQuery.toCanonical(request.requestedQty(), request.unit(), dimension);
     if (canonicalTarget.isEmpty()) {
@@ -384,7 +389,39 @@ public class QuantityEvaluationService {
       BigDecimal toleranceUpPct,
       BigDecimal toleranceDownPct,
       List<Set<UUID>> toneGroups,
-      List<UUID> manualPieceIds) {
+      List<UUID> manualPieceIds,
+      UUID ownSessionId) {
+
+    public EvaluationRequest(
+        UUID lineId,
+        UUID productId,
+        UUID colorId,
+        BigDecimal finishedWidth,
+        String finishedWidthUnit,
+        UUID customerId,
+        BigDecimal requestedQty,
+        String unit,
+        boolean singleLotRequired,
+        BigDecimal toleranceUpPct,
+        BigDecimal toleranceDownPct,
+        List<Set<UUID>> toneGroups,
+        List<UUID> manualPieceIds) {
+      this(
+          lineId,
+          productId,
+          colorId,
+          finishedWidth,
+          finishedWidthUnit,
+          customerId,
+          requestedQty,
+          unit,
+          singleLotRequired,
+          toleranceUpPct,
+          toleranceDownPct,
+          toneGroups,
+          manualPieceIds,
+          null);
+    }
 
     public EvaluationRequest {
       toneGroups = toneGroups == null ? List.of() : List.copyOf(toneGroups);

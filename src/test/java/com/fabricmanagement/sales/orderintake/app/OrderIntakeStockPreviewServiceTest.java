@@ -113,7 +113,12 @@ class OrderIntakeStockPreviewServiceTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             tenant -> LotHealthSettings.STANDARD,
             (tenant, product, colour) -> ProductSpeed.MOVING);
-    service = new OrderIntakeStockPreviewService(evaluations, stockQuery, quoteScopes);
+    service =
+        new OrderIntakeStockPreviewService(
+            evaluations,
+            stockQuery,
+            quoteScopes,
+            org.mockito.Mockito.mock(DraftStockReadContext.class));
     order = SalesOrder.builder().tradingPartnerId(customerId).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
 
@@ -362,7 +367,11 @@ class OrderIntakeStockPreviewServiceTest {
             },
             (tenant, product, colour) -> ProductSpeed.MOVING);
     OrderIntakeStockPreviewService preview =
-        new OrderIntakeStockPreviewService(unreadable, stockQuery, quoteScopes);
+        new OrderIntakeStockPreviewService(
+            unreadable,
+            stockQuery,
+            quoteScopes,
+            org.mockito.Mockito.mock(DraftStockReadContext.class));
 
     assertThatThrownBy(() -> preview.preview(request("100", "M", false, "5", "5"), actor))
         .isInstanceOf(OrderIntakeException.class)
@@ -1053,7 +1062,11 @@ class OrderIntakeStockPreviewServiceTest {
               throw new AssertionError("Base fabric policy must not infer season");
             });
     var preview =
-        new OrderIntakeStockPreviewService(evaluator, stockQuery, quoteScopes)
+        new OrderIntakeStockPreviewService(
+                evaluator,
+                stockQuery,
+                quoteScopes,
+                org.mockito.Mockito.mock(DraftStockReadContext.class))
             .preview(request("100", "M", false, "5", "5"), actor);
     assertThat(preview.evaluation().effectiveMinHealthyPieces()).isEqualTo(6);
     assertThat(preview.evaluation().policyCode())

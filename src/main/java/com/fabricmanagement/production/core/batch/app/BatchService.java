@@ -53,6 +53,7 @@ public class BatchService {
   private final ApplicationEventPublisher applicationEventPublisher;
   private final BatchPrimaryMeasureService primaryMeasureService;
   private final QualityDecisionService qualityDecisionService;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
 
   @Value("${batch.certification.enforce-on-reserve:true}")
   private boolean certEnforceOnReserve;
@@ -278,6 +279,7 @@ public class BatchService {
         request.getQuantity(),
         request.getReferenceType());
 
+    ownership.assertAnonymousLotsFree(java.util.List.of(batchId));
     Batch batch = loadBatchWithLock(batchId, tenantId);
     assertGotsCertificationValid(batch);
     var resolution = primaryMeasureService.resolve(batch);

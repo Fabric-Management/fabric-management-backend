@@ -40,14 +40,26 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class BatchLotQuantityIntent extends BaseEntity {
 
-  @Column(name = "quote_id", nullable = false)
+  @Column(name = "quote_id")
   private UUID quoteId;
 
   @Column(name = "quote_number", length = 50)
   private String quoteNumber;
 
-  @Column(name = "quote_line_id", nullable = false)
+  @Column(name = "quote_line_id")
   private UUID quoteLineId;
+
+  @Column(name = "owner_type", nullable = false)
+  private String ownerType = "QUOTE";
+
+  @Column(name = "owner_id", nullable = false)
+  private UUID ownerId;
+
+  @Column(name = "owner_line_id", nullable = false)
+  private UUID ownerLineId;
+
+  @Column(name = "owner_number", length = 50)
+  private String ownerNumber;
 
   @Column(name = "marketer_id")
   private UUID marketerId;
@@ -90,6 +102,9 @@ public class BatchLotQuantityIntent extends BaseEntity {
     intent.quoteId = quoteId;
     intent.quoteNumber = quoteNumber;
     intent.quoteLineId = quoteLineId;
+    intent.ownerId = quoteId;
+    intent.ownerLineId = quoteLineId;
+    intent.ownerNumber = quoteNumber;
     intent.marketerId = marketerId;
     intent.marketerName = marketerName;
     intent.batchId = batchId;
@@ -101,6 +116,45 @@ public class BatchLotQuantityIntent extends BaseEntity {
     return intent;
   }
 
+  public static BatchLotQuantityIntent forOrder(
+      UUID tenantId,
+      UUID orderId,
+      String number,
+      UUID lineId,
+      UUID actor,
+      UUID batchId,
+      BigDecimal quantity,
+      String unit) {
+    var value =
+        place(tenantId, orderId, number, lineId, actor, null, batchId, quantity, unit, null);
+    value.quoteId = null;
+    value.quoteLineId = null;
+    value.quoteNumber = null;
+    value.ownerType = "SALES_ORDER";
+    return value;
+  }
+
+  public void transferToOrder(UUID orderId, String number, UUID lineId) {
+    if (status != BatchLotQuantityIntentStatus.ACTIVE || !"QUOTE".equals(ownerType))
+      throw new IllegalStateException("Only a quote's live intent may transfer");
+    ownerType = "SALES_ORDER";
+    ownerId = orderId;
+    ownerNumber = number;
+    ownerLineId = lineId;
+    quoteId = null;
+    quoteLineId = null;
+    quoteNumber = null;
+    expiresAt = null;
+  }
+
+  public void updateOrder(BigDecimal quantity, String unit) {
+    if (!"SALES_ORDER".equals(ownerType)) throw new IllegalStateException("Not an order intent");
+    this.quantity = quantity;
+    this.unit = unit;
+    this.status = BatchLotQuantityIntentStatus.ACTIVE;
+    this.releasedAt = null;
+  }
+
   public void update(
       UUID quoteId,
       String quoteNumber,
@@ -109,6 +163,8 @@ public class BatchLotQuantityIntent extends BaseEntity {
       BigDecimal quantity,
       String unit,
       LocalDate expiresAt) {
+    this.ownerId = quoteId;
+    this.ownerNumber = quoteNumber;
     this.quoteId = quoteId;
     this.quoteNumber = quoteNumber;
     this.marketerId = marketerId;

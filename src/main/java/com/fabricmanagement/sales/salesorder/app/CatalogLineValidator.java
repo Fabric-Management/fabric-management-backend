@@ -5,6 +5,7 @@ import com.fabricmanagement.product.core.api.query.ProductSalesDefinitionQuerySe
 import com.fabricmanagement.product.core.dto.ProductSalesDefinitionDto;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.salesorder.domain.CatalogLineInput;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesproduct.domain.SalesProduct;
 import com.fabricmanagement.sales.salesproduct.infra.repository.SalesProductRepository;
 import java.math.BigDecimal;
@@ -48,6 +49,9 @@ public class CatalogLineValidator {
     Map<UUID, ProductSalesDefinitionDto> definitions = new HashMap<>();
     Set<UUID> checkedColors = new HashSet<>();
     Set<String> distributionKeys = new HashSet<>();
+    Map<String, Integer> fabricKeys = new HashMap<>();
+    Map<String, CatalogLineInput> fabricLines = new HashMap<>();
+    int lineIndex = 0;
     Map<UUID, List<SalesProduct>> entriesByProduct = catalogueEntries(tenantId, lines);
 
     for (CatalogLineInput line : lines) {
@@ -78,7 +82,37 @@ public class CatalogLineValidator {
             .orElseThrow(() -> OrderIntakeException.colorNotDefined(line.getColorId()));
       }
       requireDefinedWidth(definition, line.getFinishedWidth(), line.getFinishedWidthUnit());
-      if (!distributionKeys.add(distributionKey(line))) {
+      boolean knownFabricWidth =
+          definition.productType() == com.fabricmanagement.product.core.domain.ProductType.FABRIC
+              && line.getFinishedWidth() != null
+              && line.getFinishedWidthUnit() != null;
+      if (knownFabricWidth) {
+        String key = fabricDistributionKey(line);
+        Integer first = fabricKeys.putIfAbsent(key, lineIndex);
+        if (first != null) {
+          var existing = fabricLines.get(key);
+          throw OrderIntakeException.conflict(
+                  "DUPLICATE_FABRIC_DISTRIBUTION", "Use the existing fabric distribution")
+              .withDetail("existingLineIndex", first)
+              .withDetail(
+                  "existingClientLineId",
+                  existing instanceof SalesOrderLineRequest request
+                      ? request.getClientLineId()
+                      : null)
+              .withDetail(
+                  "existingLineId",
+                  existing
+                          instanceof
+                          com.fabricmanagement.sales.salesorder.domain.SalesOrderLine saved
+                      ? saved.getId()
+                      : null);
+        }
+        fabricLines.put(key, line);
+      }
+      lineIndex++;
+      // Unknown width cannot establish the broader fabric identity. Exact duplicate
+      // distributions must still fail here, before the database uniqueness constraint does.
+      if (!knownFabricWidth && !distributionKeys.add(distributionKey(line))) {
         throw OrderIntakeException.duplicateDistribution();
       }
     }
@@ -118,6 +152,22 @@ public class CatalogLineValidator {
     if (!definition.allowsFinishedWidth(width, unit)) {
       throw OrderIntakeException.widthNotDefined(width, unit);
     }
+  }
+
+  static String fabricDistributionKey(CatalogLineInput line) {
+    BigDecimal width = line.getFinishedWidth();
+    String unit = line.getFinishedWidthUnit().trim().toUpperCase(Locale.ROOT);
+    BigDecimal cm =
+        switch (unit) {
+          case "CM" -> width;
+          case "IN" -> width.multiply(new BigDecimal("2.54"));
+          default -> throw OrderIntakeException.widthNotDefined(width, unit);
+        };
+    return line.getProductId()
+        + "|"
+        + line.getColorId()
+        + "|"
+        + cm.stripTrailingZeros().toPlainString();
   }
 
   static String distributionKey(CatalogLineInput line) {

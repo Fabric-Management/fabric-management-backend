@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -91,19 +92,120 @@ class CatalogLineValidatorTest {
                 customerA,
                 List.of(
                     line(satin, "M", navy, "160", "CM"), line(satin, "m", navy, "160.00", "cm"))),
+        "ORDER_INTAKE_DUPLICATE_FABRIC_DISTRIBUTION");
+  }
+
+  @Test
+  void duplicateErrorNamesTheExistingFormLine() {
+    var first = line(satin, "M", navy, "160", "CM");
+    first.setClientLineId(UUID.randomUUID());
+    var duplicate = line(satin, "M", navy, "160", "CM");
+    assertThatThrownBy(() -> validator.validate(tenantId, customerA, List.of(first, duplicate)))
+        .isInstanceOfSatisfying(
+            OrderIntakeException.class,
+            failure -> {
+              assertThat(failure.getDetails())
+                  .containsEntry("existingClientLineId", first.getClientLineId())
+                  .containsEntry("existingLineIndex", 0);
+            });
+  }
+
+  @Test
+  void aDifferentDeliveryDateDoesNotDuplicateTheSameFabricColourAndWidth() {
+    SalesOrderLineRequest later = line(satin, "M", navy, "160", "CM");
+    later.setRequestedDeliveryDate(LocalDate.of(2026, 12, 1));
+    assertCode(
+        () ->
+            validator.validate(
+                tenantId, customerA, List.of(line(satin, "M", navy, "160", "CM"), later)),
+        "ORDER_INTAKE_DUPLICATE_FABRIC_DISTRIBUTION");
+  }
+
+  @Test
+  void exactWidthConversionKeepsOneFabricIdentityAndDifferentWidthsRemainSeparate() {
+    var centimetres = line(satin, "M", navy, "152.4", "CM");
+    var inches = line(satin, "M", navy, "60", "IN");
+    assertThat(CatalogLineValidator.fabricDistributionKey(centimetres))
+        .isEqualTo(CatalogLineValidator.fabricDistributionKey(inches));
+    assertThatCode(
+            () ->
+                validator.validate(
+                    tenantId,
+                    customerA,
+                    List.of(
+                        line(satin, "M", navy, "150", "CM"), line(satin, "M", navy, "160", "CM"))))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void fabricWithoutDefinedWidthsStillRejectsAnExactDuplicateDistribution() {
+    when(productDefinitions.find(tenantId, satin))
+        .thenReturn(
+            Optional.of(
+                new ProductSalesDefinitionDto(
+                    satin,
+                    "FAB-1",
+                    "Cotton satin",
+                    ProductType.FABRIC,
+                    "M",
+                    true,
+                    List.of(),
+                    List.of())));
+
+    assertCode(
+        () ->
+            validator.validate(
+                tenantId,
+                customerA,
+                List.of(line(satin, "M", null, null, null), line(satin, "m", null, null, null))),
         "ORDER_INTAKE_DUPLICATE_DISTRIBUTION");
   }
 
   @Test
-  void tk2_aDifferentDeliveryDateIsASeparateDistribution() {
-    SalesOrderLineRequest later = line(satin, "M", navy, "160", "CM");
-    later.setRequestedDeliveryDate(LocalDate.of(2026, 12, 1));
+  void unknownWidthDoesNotMergeDistributionsWithDifferentDeliveryDates() {
+    when(productDefinitions.find(tenantId, satin))
+        .thenReturn(
+            Optional.of(
+                new ProductSalesDefinitionDto(
+                    satin,
+                    "FAB-1",
+                    "Cotton satin",
+                    ProductType.FABRIC,
+                    "M",
+                    true,
+                    List.of(),
+                    List.of())));
+    var first = line(satin, "M", null, null, null);
+    var later = line(satin, "M", null, null, null);
+    first.setRequestedDeliveryDate(LocalDate.of(2026, 11, 2));
+    later.setRequestedDeliveryDate(LocalDate.of(2026, 11, 9));
 
-    assertThatCode(
-            () ->
-                validator.validate(
-                    tenantId, customerA, List.of(line(satin, "M", navy, "160", "CM"), later)))
+    assertThatCode(() -> validator.validate(tenantId, customerA, List.of(first, later)))
         .doesNotThrowAnyException();
+  }
+
+  @Test
+  void knownFabricWidthRejectsTheSameDistributionAcrossAllowedQuantityUnits() {
+    when(productDefinitions.find(tenantId, satin))
+        .thenReturn(
+            Optional.of(
+                new ProductSalesDefinitionDto(
+                    satin,
+                    "FAB-1",
+                    "Cotton satin",
+                    ProductType.FABRIC,
+                    "M",
+                    true,
+                    List.of("YD"),
+                    fabric(satin, true).finishedWidths())));
+
+    assertCode(
+        () ->
+            validator.validate(
+                tenantId,
+                customerA,
+                List.of(line(satin, "M", navy, "160", "CM"), line(satin, "YD", navy, "160", "CM"))),
+        "ORDER_INTAKE_DUPLICATE_FABRIC_DISTRIBUTION");
   }
 
   @Test

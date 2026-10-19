@@ -44,7 +44,7 @@ public class SalesOrderLiveService {
         actor(authentication, accessToken), revisions, orderId, request, response);
   }
 
-  LiveActor actor(Authentication authentication, String accessToken) {
+  public LiveActor actor(Authentication authentication, String accessToken) {
     if (authentication == null
         || !(authentication.getPrincipal() instanceof AuthenticatedUserContext principal)
         || principal.userId() == null

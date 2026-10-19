@@ -86,7 +86,8 @@ final class HeldStockView {
                   holder.expiresAt(),
                   List.of(),
                   intent.quantity(),
-                  intent.unit()));
+                  intent.unit(),
+                  holder.ownerType()));
           verified = true;
         }
       }
@@ -122,6 +123,7 @@ final class HeldStockView {
         holder.verified() ? holder.expiresAt() : null,
         pieces,
         null,
-        null);
+        null,
+        holder.ownerType());
   }
 }

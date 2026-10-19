@@ -36,6 +36,9 @@ public class OrderIntakeReadinessService {
   private final PieceAllocationPort allocation;
   private final IntakePermissions permissions;
   private final Clock clock;
+  private final com.fabricmanagement.sales.orderintake.infra.repository
+          .DraftStockSelectionRepository
+      selections;
 
   @Transactional(readOnly = true)
   public OrderIntakeReadinessDto readiness(UUID orderId, UUID actor) {
@@ -56,6 +59,18 @@ public class OrderIntakeReadinessService {
                 .stream()
                 .collect(
                     Collectors.toMap(QuantityAcceptance::getSalesOrderLineId, Function.identity()));
+    var applied =
+        selections
+            .findByTenantIdAndSalesOrderLineIdInAndState(
+                tenantId,
+                orderLines.stream().map(SalesOrderLine::getId).toList(),
+                com.fabricmanagement.sales.orderintake.domain.DraftStockSelection.State.TRANSFERRED)
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    com.fabricmanagement.sales.orderintake.domain.DraftStockSelection
+                        ::getSalesOrderLineId,
+                    Function.identity()));
     Map<UUID, List<PieceAllocationPort.PieceAllocationView>> allocations =
         allocation.activeForOrder(tenantId, order.getId()).stream()
             .collect(
@@ -69,9 +84,16 @@ public class OrderIntakeReadinessService {
       lineViews.add(
           new OrderIntakeReadinessDto.Line(
               line.getId(),
-              acceptance == null ? null : acceptance.getBasis(),
-              acceptance != null && acceptance.isConditional(),
-              acceptance == null ? null : acceptance.getAcceptedQty(),
+              applied.containsKey(line.getId())
+                  ? com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceBasis
+                      .STOCK_SELECTED
+                  : acceptance == null ? null : acceptance.getBasis(),
+              !applied.containsKey(line.getId())
+                  && acceptance != null
+                  && acceptance.isConditional(),
+              applied.containsKey(line.getId())
+                  ? applied.get(line.getId()).getOption().quantity()
+                  : acceptance == null ? null : acceptance.getAcceptedQty(),
               held.size(),
               held.isEmpty()
                   ? null
@@ -113,6 +135,7 @@ public class OrderIntakeReadinessService {
     List<OrderIntakeReadinessDto.Capability> result = new ArrayList<>();
     result.add(draftWrite(OrderIntakeAction.EVALUATE_QUANTITY, draft, null, canWrite));
     result.add(draftWrite(OrderIntakeAction.RECORD_STOCK_CHOICE, draft, contentLock, canWrite));
+    result.add(draftWrite(OrderIntakeAction.REMOVE_STOCK_CHOICE, draft, contentLock, canWrite));
     result.add(anyWrite(OrderIntakeAction.RECORD_TONE_ACCEPTANCE, contentLock, canWrite));
     result.add(draftWrite(OrderIntakeAction.ADD_CUSTOM_REQUEST, draft, contentLock, canWrite));
     result.add(anyWrite(OrderIntakeAction.RECORD_CUSTOMER_DECISION, contentLock, canWrite));

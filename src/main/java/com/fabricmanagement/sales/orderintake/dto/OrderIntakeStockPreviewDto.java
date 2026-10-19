@@ -200,7 +200,14 @@ public record OrderIntakeStockPreviewDto(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID stockUnitId,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String pieceNo,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Quantity quantity,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean held) {}
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean held,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+          com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+              ownerType) {
+    public Piece(UUID id, String number, Quantity quantity, boolean held) {
+      this(id, number, quantity, held, null);
+    }
+  }
 
   /**
    * An active quote lot-quantity intent. The quote and marketer are named only when the viewer may
@@ -211,14 +218,14 @@ public record OrderIntakeStockPreviewDto(
   public record Intent(
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String quoteNumber,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String marketerName,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal quantity,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) BigDecimal quantity,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String unit,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               nullable = true,
               description = "Null when the quantity cannot be converted to the canonical unit")
           BigDecimal canonicalQuantity,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate expiresAt) {}
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) LocalDate expiresAt) {}
 
   /**
    * A piece with an active quote hold. Quote, marketer and expiry are always null when the hold is

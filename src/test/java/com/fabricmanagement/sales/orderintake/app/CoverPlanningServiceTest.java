@@ -168,6 +168,17 @@ class CoverPlanningServiceTest {
   }
 
   @Test
+  void appliedBelowRequestDoesNotCreateThirtyFiveMetresOfNewSupply() {
+    line.applyStockQuantity(new BigDecimal("700"), new BigDecimal("665"));
+    heldStock = Optional.of(new BigDecimal("665"));
+    var portions = byKind(service.outlook(order.getId(), ACTOR).lines().getFirst());
+    assertThat(portions.get(CoverPortionKind.FINISHED_STOCK).quantity())
+        .isEqualByComparingTo("665");
+    assertThat(portions).doesNotContainKey(CoverPortionKind.NEW_SUPPLY);
+    assertThat(line.getCustomerRequestQty()).isEqualByComparingTo("700");
+  }
+
+  @Test
   @DisplayName("LINE-PREFERENCES-1: planning sees each line's own shipment preference")
   void outlookCarriesTheLineShipmentPreference() {
     line.setShipmentPreference(LineShipmentPreference.WHEN_COMPLETE);

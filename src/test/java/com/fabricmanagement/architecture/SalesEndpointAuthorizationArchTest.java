@@ -47,9 +47,9 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(160)
+        .hasSize(166)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(160);
+    assertThat(expected).hasSize(166);
   }
 
   @Test
@@ -123,6 +123,17 @@ class SalesEndpointAuthorizationArchTest {
         .isEqualTo(read);
     assertThat(preAuthorize("SalesOrderEditLeaseController", "listSalesOrderEditLeases"))
         .isEqualTo(read);
+  }
+
+  @Test
+  void holdingStockNeedsWriteEvenWhenTheCommercialApplyHasNotHappened() throws Exception {
+    for (String action :
+        List.of("open", "status", "acquire", "renew", "release", "close", "apply", "remove")) {
+      assertThat(preAuthorize("DraftStockSelectionController", action))
+          .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+    }
+    assertThat(preAuthorize("DraftStockLiveController", "subscribe"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -427,6 +438,19 @@ class SalesEndpointAuthorizationArchTest {
         "holdOrder",
         "resumeOrder",
         "reviseOrder");
+    add(
+        result,
+        "DraftStockSelectionController",
+        Category.MUTATION,
+        "open",
+        "acquire",
+        "renew",
+        "release",
+        "close",
+        "apply",
+        "remove");
+    add(result, "DraftStockSelectionController", Category.TRANSACTIONAL_READ, "status");
+    add(result, "DraftStockLiveController", Category.TRANSACTIONAL_READ, "subscribe");
     // SOI order intake (D1-D8).
     add(result, "OrderIntakeProductController", Category.REFERENCE_READ, "search");
     add(result, "OrderIntakeAvailabilityController", Category.REFERENCE_READ, "get");
@@ -437,16 +461,13 @@ class SalesEndpointAuthorizationArchTest {
         Category.TRANSACTIONAL_READ,
         "getLatestQuantityProposal",
         "listToneAcceptances",
-        "listQuantityAcceptances",
         "getOrderIntakeReadiness");
     add(
         result,
         "OrderIntakeController",
         Category.MUTATION,
         "evaluateLineQuantity",
-        "recordToneAcceptance",
-        "recordQuantityAcceptance",
-        "withdrawQuantityAcceptance");
+        "recordToneAcceptance");
     add(
         result,
         "CustomerRequestController",

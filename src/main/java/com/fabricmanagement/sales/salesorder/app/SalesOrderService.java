@@ -195,6 +195,9 @@ public class SalesOrderService {
       }
     }
 
+    orderIntakeHooks.transferOnCreation(
+        saved, savedLines, request.getLines(), TenantContext.getCurrentUserId());
+
     // Joining the create transaction prevents an order being left behind if a request is invalid.
     if (request.getCustomRequests() != null) {
       for (var customRequest : request.getCustomRequests()) {
@@ -826,6 +829,10 @@ public class SalesOrderService {
             .productId(req.getProductId())
             .productDesc(req.getProductDesc())
             .requestedQty(req.getRequestedQty())
+            .customerRequestQty(
+                req.getCustomerRequestQty() == null
+                    ? req.getRequestedQty()
+                    : req.getCustomerRequestQty())
             .unit(req.getUnit())
             .currency(req.getCurrency())
             .unitPriceAmount(req.getUnitPrice())
@@ -862,6 +869,7 @@ public class SalesOrderService {
         .finishedWidthUnit(line.getFinishedWidthUnit())
         .requestedDeliveryDate(line.getRequestedDeliveryDate())
         .initialRequestedQty(line.getInitialRequestedQty())
+        .customerRequestQty(line.getCustomerRequestQty())
         .singleLotRequired(line.isSingleLotRequired())
         .shipmentPreference(line.getShipmentPreference())
         .requestedQty(line.getRequestedQty())

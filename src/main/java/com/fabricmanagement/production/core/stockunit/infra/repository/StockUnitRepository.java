@@ -23,6 +23,30 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
+  List<StockUnit> findByTenantIdAndIdInAndIsActiveTrue(UUID tenantId, Collection<UUID> ids);
+
+  @Query(
+      value =
+          """
+      select md5(concat_ws(':', count(s.id), coalesce(sum(s.version), 0), max(s.updated_at),
+        (select concat_ws(':', count(h.id), coalesce(sum(h.version), 0), max(h.updated_at))
+         from production.stock_unit_soft_hold h join production.stock_unit u on u.id = h.stock_unit_id and u.tenant_id = h.tenant_id
+         join production.production_execution_batch hb on hb.id = u.batch_id and hb.tenant_id = u.tenant_id
+         where h.tenant_id = :tenant and hb.product_id = :product),
+        (select concat_ws(':', count(lb.id), coalesce(sum(lb.version), 0), max(lb.updated_at))
+         from production.production_execution_batch lb where lb.tenant_id = :tenant and lb.product_id = :product),
+        (select concat_ws(':', count(i.id), coalesce(sum(i.version), 0), max(i.updated_at))
+         from production.batch_lot_quantity_intent i join production.production_execution_batch ib on ib.id = i.batch_id and ib.tenant_id = i.tenant_id
+         where i.tenant_id = :tenant and ib.product_id = :product),
+        (select concat_ws(':', count(w.id), coalesce(sum(w.version), 0), max(w.updated_at))
+         from production.batch_finished_width_measurement w join production.production_execution_batch wb on wb.id = w.batch_id and wb.tenant_id = w.tenant_id
+         where w.tenant_id = :tenant and wb.product_id = :product)))
+      from production.stock_unit s join production.production_execution_batch b on b.id = s.batch_id and b.tenant_id = s.tenant_id
+      where s.tenant_id = :tenant and b.product_id = :product
+      """,
+      nativeQuery = true)
+  String availabilityRevision(@Param("tenant") UUID tenant, @Param("product") UUID product);
+
   Optional<StockUnit> findByTenantIdAndBarcode(UUID tenantId, String barcode);
 
   Optional<StockUnit> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);

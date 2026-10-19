@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public enum OrderIntakeAction {
   EVALUATE_QUANTITY,
   RECORD_STOCK_CHOICE,
+  REMOVE_STOCK_CHOICE,
   RECORD_TONE_ACCEPTANCE,
   ADD_CUSTOM_REQUEST,
   RECORD_CUSTOMER_DECISION,

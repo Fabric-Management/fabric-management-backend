@@ -24,6 +24,76 @@ public class OrderIntakeHooks {
 
   private final CatalogLineValidator catalogLineValidator;
   private final ConfirmationGate confirmationGate;
+  private final com.fabricmanagement.sales.orderintake.app.DraftStockSelectionService draftStock;
+  private final com.fabricmanagement.sales.salesorder.domain.port.QuoteStockOwnershipTransferPort
+      quoteStock;
+
+  public void transferOnCreation(
+      SalesOrder order,
+      List<SalesOrderLine> lines,
+      List<com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest> requests,
+      UUID actor) {
+    if (requests == null) return;
+    var sourceLines =
+        requests.stream()
+            .map(
+                com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest
+                    ::getSourceQuoteLineId)
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    if (sourceLines.size() != java.util.Set.copyOf(sourceLines).size())
+      throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+          "QUOTE_STOCK_SOURCE_REPEATED", "A source quote line may be mapped only once");
+    if (requests.stream().anyMatch(line -> line.getSourceQuoteLineId() != null)) {
+      if (order.getQuoteId() == null)
+        throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+            "QUOTE_STOCK_SOURCE_INVALID", "Quote source is required");
+      // Root quote first, before any provisional line takes the stock writer gate.
+      quoteStock.prepare(order, actor);
+    }
+    for (int index = 0; index < requests.size(); index++) {
+      var request = requests.get(index);
+      try {
+        if (request.getCustomerRequestQty() != null
+            && request.getCustomerRequestQty().compareTo(request.getRequestedQty()) != 0
+            && request.getStockSelection() == null
+            && request.getSourceQuoteLineId() == null)
+          throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+              "STOCK_CHOICE_REQUIRED",
+              "A different commercial quantity needs its applied stock choice");
+        if (request.getSourceQuoteLineId() != null) {
+          if (order.getQuoteId() == null
+              || request.getStockSelection() != null
+              || request.getPreviewStockSelection() != null)
+            throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+                "QUOTE_STOCK_SOURCE_INVALID",
+                "Quote conversion needs one explicit source and no provisional choice");
+          quoteStock.transfer(order, lines.get(index), request.getSourceQuoteLineId(), actor);
+        }
+        if (request.getStockSelection() != null || request.getPreviewStockSelection() != null) {
+          if (request.getClientLineId() == null || order.getCreationKey() == null)
+            throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+                "STOCK_SELECTION_IDENTITY_REQUIRED",
+                "Stock choices need a form line identity and an order creation key");
+          if (request.getStockSelection() != null && request.getPreviewStockSelection() != null)
+            throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+                "STOCK_SELECTION_AMBIGUOUS", "A line cannot apply and discard a preview together");
+          if (request.getStockSelection() != null)
+            draftStock.transferOnCreate(
+                order,
+                lines.get(index),
+                request.getStockSelection(),
+                request.getClientLineId(),
+                actor);
+          else
+            draftStock.discardUnapplied(
+                request.getPreviewStockSelection(), request.getClientLineId(), actor);
+        }
+      } catch (com.fabricmanagement.common.infrastructure.web.exception.DomainException failure) {
+        throw failure.withDetail("clientLineId", request.getClientLineId());
+      }
+    }
+  }
 
   /** Catalogue rules over every active line the order will hold after the write (SOI R02–R06). */
   public void validateLines(

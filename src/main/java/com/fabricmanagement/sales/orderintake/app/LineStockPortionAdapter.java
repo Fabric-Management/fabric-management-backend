@@ -22,6 +22,9 @@ public class LineStockPortionAdapter implements LineStockPortionPort {
   private final PieceAllocationPort allocation;
   private final ProductSalesDefinitionQueryService products;
   private final ProposalStockQueryService stockQuery;
+  private final com.fabricmanagement.sales.orderintake.infra.repository
+          .DraftStockSelectionRepository
+      selections;
 
   @Override
   public Optional<BigDecimal> ownFinishedStock(SalesOrderLine line) {
@@ -29,7 +32,13 @@ public class LineStockPortionAdapter implements LineStockPortionPort {
     List<PieceAllocationPort.PieceAllocationView> held =
         allocation.activeForLine(tenantId, line.getId());
     if (held.isEmpty()) {
-      return Optional.of(BigDecimal.ZERO);
+      var selected =
+          selections.findByTenantIdAndSalesOrderLineIdInAndState(
+              tenantId,
+              List.of(line.getId()),
+              com.fabricmanagement.sales.orderintake.domain.DraftStockSelection.State.TRANSFERRED);
+      if (selected.isEmpty()) return Optional.of(BigDecimal.ZERO);
+      return Optional.of(selected.getFirst().getOption().quantity());
     }
     BigDecimal canonical =
         held.stream()
