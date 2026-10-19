@@ -85,7 +85,7 @@ class SalesQuoteDemoSeederTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID EMMA_ID = UUID.randomUUID();
   private static final UUID SANDRA_ID = UUID.randomUUID();
-  private static final UUID AEGEAN_ID = UUID.randomUUID();
+  private static final UUID PENNINE_ID = UUID.randomUUID();
   private static final LocalDate TODAY = LocalDate.of(2026, 7, 8);
 
   @Mock private TradingPartnerService tradingPartnerService;
@@ -269,7 +269,7 @@ class SalesQuoteDemoSeederTest {
     assertThat(refCaptor.getAllValues())
         .extracting(request -> request.initialPrimaryCode().externalCode())
         .containsExactly("ALB-NVY-26", "ALB-ECR-26", "AYM-IND-2201");
-    assertThat(refCaptor.getAllValues().get(2).partnerId()).isEqualTo(AEGEAN_ID);
+    assertThat(refCaptor.getAllValues().get(2).partnerId()).isEqualTo(PENNINE_ID);
     verify(colorPartnerRefService, times(1))
         .addCode(
             any(UUID.class),
@@ -446,12 +446,12 @@ class SalesQuoteDemoSeederTest {
               ref.setId(UUID.randomUUID());
               return ref;
             });
-    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_AEGEAN))
+    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_PENNINE))
         .thenReturn(
             List.of(
                 TradingPartnerDto.builder()
-                    .id(AEGEAN_ID)
-                    .displayName(ProcurementDemoSeeder.SUPPLIER_AEGEAN)
+                    .id(PENNINE_ID)
+                    .displayName(ProcurementDemoSeeder.SUPPLIER_PENNINE)
                     .partnerType(PartnerType.SUPPLIER)
                     .build()));
     when(salesProductService.getActiveCatalogForModule("FABRIC")).thenReturn(List.of());

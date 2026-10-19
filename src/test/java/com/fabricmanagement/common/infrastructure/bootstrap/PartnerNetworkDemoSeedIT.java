@@ -115,7 +115,7 @@ class PartnerNetworkDemoSeedIT {
     Map<String, List<String>> contacts = contactsByOwner(tenant);
     assertThat(contacts.get("Albion Apparel Ltd"))
         .containsExactlyInAnyOrder("BUYER", "FINANCE", "LOGISTICS");
-    assertThat(contacts.get("Anadolu Tekstil A.Ş."))
+    assertThat(contacts.get("Caledonian Outfitters Ltd"))
         .containsExactlyInAnyOrder("BUYER", "FINANCE", "LOGISTICS");
     assertThat(contacts.get("Europa Mode GmbH")).containsExactlyInAnyOrder("BUYER", "QUALITY");
     assertThat(contacts.get("Global Fashion Wear Corp."))
@@ -125,12 +125,13 @@ class PartnerNetworkDemoSeedIT {
             "Midlands Garment Makers Ltd",
             "Northern Dyeworks Ltd",
             "Channel Freight Ltd",
-            "Çorlu Konfeksiyon Sanayi",
+            "Pennine Cut & Sew Ltd",
             "Porto Confecções Lda",
             "Dhaka Apparel Works Ltd")) {
       assertThat(contacts.get(linked)).as(linked).hasSize(1);
     }
-    for (String supplier : List.of("Ege Pamuk Kooperatifi", "Yarn Source Ltd.", "Dye & Chem BV")) {
+    for (String supplier :
+        List.of("Humber Cotton Merchants Ltd", "Yarn Source Ltd.", "Dye & Chem BV")) {
       assertThat(contacts.get(supplier)).as(supplier).containsExactly("OTHER");
     }
     assertThat(
@@ -145,15 +146,16 @@ class PartnerNetworkDemoSeedIT {
     for (String customer :
         List.of(
             "Albion Apparel Ltd",
-            "Anadolu Tekstil A.Ş.",
+            "Caledonian Outfitters Ltd",
             "Europa Mode GmbH",
             "Global Fashion Wear Corp.")) {
       assertThat(cards.get(customer)).as(customer).hasSize(2);
     }
     assertThat(cards.get("Northern Dyeworks Ltd")).containsExactly("Dyehouse, Bradford|UNVERIFIED");
     assertThat(cards.get("Channel Freight Ltd")).containsExactly("Dover depot|VERIFIED");
-    assertThat(cards.get("Anadolu Tekstil A.Ş."))
-        .containsExactlyInAnyOrder("Merkez ofis, Bağcılar|VERIFIED", "Depo, Esenyurt|UNVERIFIED");
+    assertThat(cards.get("Caledonian Outfitters Ltd"))
+        .containsExactlyInAnyOrder(
+            "Head office, Glasgow|VERIFIED", "Warehouse, Paisley|UNVERIFIED");
     assertThat(
             cards.values().stream()
                 .flatMap(List::stream)
@@ -183,7 +185,7 @@ class PartnerNetworkDemoSeedIT {
                 Integer.class,
                 tenant))
         .isEqualTo(1);
-    assertThat(links.get("Anadolu Tekstil A.Ş.")).hasSize(3);
+    assertThat(links.get("Caledonian Outfitters Ltd")).hasSize(3);
     assertThat(links.get("Europa Mode GmbH")).hasSize(2);
   }
 

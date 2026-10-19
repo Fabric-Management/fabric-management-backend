@@ -42,7 +42,7 @@ public class TenantSeeder implements DataSeeder {
                   CreateTenantRequest.builder()
                       .name(TENANT_NAME)
                       .billingEmail("admin@nexusfabrics.com")
-                      .country("TR")
+                      .country("GB")
                       .settings(settings)
                       .type(TenantType.TEMPLATE)
                       .trialDays(365) // Dev env, don't expire soon

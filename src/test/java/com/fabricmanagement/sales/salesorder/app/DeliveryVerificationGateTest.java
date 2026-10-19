@@ -148,14 +148,14 @@ class DeliveryVerificationGateTest {
   void aNoteOnlyDeliveryUnderAnotherTermStaysUnverified() {
     order = order(DeliveryTerm.FCA);
     when(policy.actorMayVerify()).thenReturn(true);
-    theOrderHas(delivery(1, false, "Merter workshop", false));
+    theOrderHas(delivery(1, false, "Hackney workshop", false));
 
     assertThat(gate.sendBlock(order)).isEqualTo(DeliveryVerificationGate.NOT_VERIFIED);
   }
 
   @Test
   void theRefusalNamesTheDeliveriesAndWhatEachOneLacks() {
-    OrderDelivery noteOnly = delivery(2, false, "Merter workshop", false);
+    OrderDelivery noteOnly = delivery(2, false, "Hackney workshop", false);
     theOrderHas(delivery(1, true, null, true), noteOnly, delivery(3, true, null, false));
 
     assertThat(gate.describe(order))

@@ -72,9 +72,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ProcurementDemoSeeder {
 
-  static final String SUPPLIER_ANATOLIA = "Anatolia Cotton Co.";
-  static final String SUPPLIER_AEGEAN = "Aegean Yarn Mills";
-  static final String SUBCONTRACTOR_MARMARA = "Marmara Dye & Finish";
+  static final String SUPPLIER_MERSEY = "Mersey Cotton Co. Ltd";
+  static final String SUPPLIER_PENNINE = "Pennine Yarn Mills Ltd";
+  static final String SUBCONTRACTOR_CALDER = "Calder Dye & Finish Ltd";
 
   private final TradingPartnerService tradingPartnerService;
   private final ProductFacade productFacade;
@@ -93,7 +93,7 @@ public class ProcurementDemoSeeder {
       TenantContext.setCurrentTenantId(tenantId);
       TenantContext.setCurrentUserId(SystemUser.ID);
 
-      if (!tradingPartnerService.searchByName(tenantId, SUPPLIER_ANATOLIA).isEmpty()) {
+      if (!tradingPartnerService.searchByName(tenantId, SUPPLIER_MERSEY).isEmpty()) {
         log.info("Procurement demo data already exists for tenant: {}. Skipping.", tenantId);
         return;
       }
@@ -117,30 +117,30 @@ public class ProcurementDemoSeeder {
       LocalDate today = LocalDate.now(clock);
       UUID procurementPersonaUserId = resolveProcurementPersonaUserId(tenantId);
 
-      TradingPartnerDto anatolia =
+      TradingPartnerDto mersey =
           createPartner(
               tenantId,
-              SUPPLIER_ANATOLIA,
-              "TR-P2P-ANA-" + tenantSuffix(tenantId),
-              "TUR",
+              SUPPLIER_MERSEY,
+              "GB-P2P-MER-" + tenantSuffix(tenantId),
+              "GBR",
               PartnerType.SUPPLIER,
               "NET30",
               "BCI cotton supplier");
-      TradingPartnerDto aegean =
+      TradingPartnerDto pennine =
           createPartner(
               tenantId,
-              SUPPLIER_AEGEAN,
-              "TR-P2P-AEG-" + tenantSuffix(tenantId),
-              "TUR",
+              SUPPLIER_PENNINE,
+              "GB-P2P-PEN-" + tenantSuffix(tenantId),
+              "GBR",
               PartnerType.SUPPLIER,
               "NET45",
               "Combed yarn and fiber supplier");
-      TradingPartnerDto marmara =
+      TradingPartnerDto calder =
           createPartner(
               tenantId,
-              SUBCONTRACTOR_MARMARA,
-              "TR-P2P-MDF-" + tenantSuffix(tenantId),
-              "TUR",
+              SUBCONTRACTOR_CALDER,
+              "GB-P2P-CDF-" + tenantSuffix(tenantId),
+              "GBR",
               PartnerType.SUBCONTRACTOR,
               "NET30",
               "Dyeing and finishing subcontractor");
@@ -148,17 +148,17 @@ public class ProcurementDemoSeeder {
       WorkOrderResponse chainPurchaseWo =
           approvedWorkOrder(
               cotton,
-              anatolia.getId(),
+              mersey.getId(),
               FulfillmentType.PURCHASE,
               WorkOrderModuleType.SPINNING,
               "2400.000",
               "3.850",
               "USD",
               today.plusDays(18),
-              "Demo P2P chain: Aegean cotton procurement");
+              "Demo P2P chain: cotton procurement");
       approvedWorkOrder(
           blend,
-          aegean.getId(),
+          pennine.getId(),
           FulfillmentType.PURCHASE,
           WorkOrderModuleType.SPINNING,
           "1600.000",
@@ -168,7 +168,7 @@ public class ProcurementDemoSeeder {
           "Open demo flow: combed yarn input procurement");
       approvedWorkOrder(
           cotton,
-          anatolia.getId(),
+          mersey.getId(),
           FulfillmentType.PURCHASE,
           WorkOrderModuleType.GENERIC,
           "900.000",
@@ -180,7 +180,7 @@ public class ProcurementDemoSeeder {
       WorkOrderResponse chainSubcontractWo =
           approvedWorkOrder(
               blend,
-              marmara.getId(),
+              calder.getId(),
               FulfillmentType.SUBCONTRACT,
               WorkOrderModuleType.DYEING,
               "1200.000",
@@ -190,7 +190,7 @@ public class ProcurementDemoSeeder {
               "Demo subcontract: reactive dyeing and finishing");
       approvedWorkOrder(
           cotton,
-          marmara.getId(),
+          calder.getId(),
           FulfillmentType.SUBCONTRACT,
           WorkOrderModuleType.FINISHING,
           "700.000",
@@ -201,28 +201,28 @@ public class ProcurementDemoSeeder {
 
       SupplierRFQResponse sentRfq =
           createSentPurchaseRfq(
-              chainPurchaseWo.id(), cotton, blend, wording, anatolia.getId(), aegean.getId());
+              chainPurchaseWo.id(), cotton, blend, wording, mersey.getId(), pennine.getId());
       createDraftPurchaseRfq(chainPurchaseWo.id(), cotton);
 
       List<SupplierRFQResponse.RfqLineResponse> rfqLines = sentRfq.getLines();
       createQuote(
           sentRfq.getId(),
-          aegean.getId(),
+          pennine.getId(),
           rfqLines,
           "3.92",
           "4.18",
           "14",
-          "Aegean quote: balanced price and lead time",
+          "Pennine quote: balanced price and lead time",
           wording);
       SupplierQuoteResponse anatoliaQuote =
           createQuote(
               sentRfq.getId(),
-              anatolia.getId(),
+              mersey.getId(),
               rfqLines,
               "3.78",
               "4.05",
               "12",
-              "Anatolia quote: preferred quality lot",
+              "Mersey quote: preferred quality lot",
               wording);
 
       supplierQuoteService.startReview(anatoliaQuote.getId());
@@ -231,12 +231,12 @@ public class ProcurementDemoSeeder {
 
       createConfirmedPurchaseOrderAndReceipt(
           chainPurchaseWo.id(),
-          anatolia.getId(),
+          mersey.getId(),
           acceptedQuote.getId(),
           rfqLines,
           procurementPersonaUserId);
 
-      createInProgressSubcontract(chainSubcontractWo.id(), marmara.getId(), cotton, blend, today);
+      createInProgressSubcontract(chainSubcontractWo.id(), calder.getId(), cotton, blend, today);
 
       log.info("Successfully provisioned procurement demo data for tenant: {}", tenantId);
     } catch (Exception e) {
@@ -288,7 +288,7 @@ public class ProcurementDemoSeeder {
                 .currency(currency)
                 .deadline(deadline)
                 .certificationReq("BCI")
-                .originReq("TR")
+                .originReq("IN")
                 .notes(notes)
                 .build());
     workOrderService.changeStatus(created.id(), WorkOrderStatus.PENDING_APPROVAL);
@@ -321,7 +321,7 @@ public class ProcurementDemoSeeder {
             workOrderId, SupplierRFQType.PURCHASE, "Demo RFQ: cotton lots for May production");
     rfq =
         addFiberRfqLine(
-            rfq.getId(), cotton, "1400.000", "Aegean cotton, BCI, 28.5 mm staple", cottonSpecs());
+            rfq.getId(), cotton, "1400.000", "Gujarat cotton, BCI, 28.5 mm staple", cottonSpecs());
     // Cotton staple specs describe cotton only; the second line carries no invented specs.
     rfq = addFiberRfqLine(rfq.getId(), blend, "1000.000", wording.rfqLine, null);
     addRecipient(rfq.getId(), supplierOne);
@@ -569,7 +569,7 @@ public class ProcurementDemoSeeder {
                 .agreedUnitPrice(new BigDecimal("1.35"))
                 .currency("USD")
                 .expectedReturnDate(today.plusDays(12))
-                .notes("Demo subcontract: dyeing in progress at Marmara")
+                .notes("Demo subcontract: dyeing in progress at Calder")
                 .build());
     sc = subcontractOrderService.changeStatus(sc.getId(), SubcontractOrderStatus.CONFIRMED, null);
     sc =
@@ -580,7 +580,7 @@ public class ProcurementDemoSeeder {
 
   private FiberPurchaseSpecs fiberPurchaseSpecs() {
     return new FiberPurchaseSpecs(
-        28.5, "A", 8.2, 4.2, 30.5, 83.0, 1.1, "41-3", "Turkey-Aegean", List.of("BCI"), "2025/2026");
+        28.5, "A", 8.2, 4.2, 30.5, 83.0, 1.1, "41-3", "India-Gujarat", List.of("BCI"), "2025/2026");
   }
 
   private String unit(ProductDto product) {

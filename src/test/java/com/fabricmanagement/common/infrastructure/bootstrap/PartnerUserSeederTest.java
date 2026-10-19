@@ -113,7 +113,7 @@ class PartnerUserSeederTest {
     Role ownerRole = mock(Role.class);
     when(roleService.findByCode("PARTNER_OWNER")).thenReturn(Optional.of(ownerRole));
 
-    // First user is "Oscar Ozkan" — let's mock existsByTenantIdAndContactValue to false for Oscar,
+    // First user is "Oscar Oakley" — let's mock existsByTenantIdAndContactValue to false for Oscar,
     // true for others to test just one
     when(userRepository.existsByTenantIdAndContactValue(eq(tenantId), eq("oscar@ozcotton.com")))
         .thenReturn(false);

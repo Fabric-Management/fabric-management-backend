@@ -117,7 +117,7 @@ class OrderDeliveryVerificationTest {
   void aNoteIsNotAnAddress() {
     SalesOrder order = order(DeliveryTerm.FCA);
     OrderDelivery delivery =
-        delivery(order, customer(), null, "The Merter workshop - Ahmet to confirm");
+        delivery(order, customer(), null, "The Hackney workshop - Oliver to confirm");
 
     assertThat(delivery.isNoteOnly()).isTrue();
     assertThatThrownBy(() -> delivery.verify(order, VERIFIER, AT))
@@ -131,7 +131,7 @@ class OrderDeliveryVerificationTest {
   void aNoteBesideACompleteAddressIsNotNoteOnly() {
     SalesOrder order = order(null);
     OrderDelivery delivery =
-        delivery(order, customer(), completeAddress(), "Gate 3, ask for Ahmet");
+        delivery(order, customer(), completeAddress(), "Gate 3, ask for Oliver");
 
     assertThat(delivery.isNoteOnly()).isFalse();
     assertThat(delivery.verificationBlocker(order)).isEmpty();
@@ -156,7 +156,7 @@ class OrderDeliveryVerificationTest {
   @Test
   void aNoteOnlyDeliveryCanBeVerifiedWhenTheOrderTermIsExw() {
     SalesOrder order = order(DeliveryTerm.EXW);
-    OrderDelivery delivery = delivery(order, customer(), null, "Customer collects, Ahmet calls");
+    OrderDelivery delivery = delivery(order, customer(), null, "Customer collects, Oliver calls");
 
     delivery.verify(order, VERIFIER, AT);
 

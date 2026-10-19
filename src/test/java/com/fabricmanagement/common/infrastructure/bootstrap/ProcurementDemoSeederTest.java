@@ -124,11 +124,11 @@ class ProcurementDemoSeederTest {
             TENANT_ID, "Yolanda", "Bidwell"))
         .thenReturn(Optional.of(user(UUID.randomUUID())));
 
-    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_ANATOLIA))
+    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_MERSEY))
         .thenAnswer(
             invocation ->
                 partners.stream()
-                    .filter(p -> ProcurementDemoSeeder.SUPPLIER_ANATOLIA.equals(p.getDisplayName()))
+                    .filter(p -> ProcurementDemoSeeder.SUPPLIER_MERSEY.equals(p.getDisplayName()))
                     .toList());
     when(tradingPartnerService.createPartner(any(CreateTradingPartnerRequest.class), isNull()))
         .thenAnswer(
@@ -322,7 +322,7 @@ class ProcurementDemoSeederTest {
 
   @Test
   void seedFor_neverThrowsWhenDependencyFails() {
-    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_ANATOLIA))
+    when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_MERSEY))
         .thenReturn(List.of());
     when(productFacade.findCanonicalFiberProduct(any()))
         .thenThrow(new IllegalStateException("catalogue unavailable"));

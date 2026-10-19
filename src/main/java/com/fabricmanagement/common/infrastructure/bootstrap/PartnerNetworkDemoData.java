@@ -59,7 +59,6 @@ final class PartnerNetworkDemoData {
   record SupplierSpec(String name, ContactSpec contact) {}
 
   static final Place GB = new Place("GBR", "GB", "United Kingdom");
-  static final Place TR = new Place("TUR", "TR", "Türkiye");
   static final Place DE = new Place("DEU", "DE", "Germany");
   static final Place US = new Place("USA", "US", "United States");
   static final Place PT = new Place("PRT", "PT", "Portugal");
@@ -190,120 +189,120 @@ final class PartnerNetworkDemoData {
                               false))),
                   CHANNEL_FREIGHT)),
           new CustomerSpec(
-              "Anadolu Tekstil A.Ş.",
-              TR,
+              "Caledonian Outfitters Ltd",
+              GB,
               List.of(
                   contact(
-                      "Ayşe Yılmaz",
+                      "Fiona Campbell",
                       PartnerContactRole.BUYER,
-                      "ayse.yilmaz@anadolu-tekstil.example",
-                      "+90 212 555 0101"),
+                      "fiona.campbell@caledonian-outfitters.example",
+                      "+44 141 496 0101"),
                   contact(
-                      "Mehmet Demir",
+                      "Callum Reid",
                       PartnerContactRole.FINANCE,
-                      "mehmet.demir@anadolu-tekstil.example",
-                      "+90 212 555 0102"),
+                      "callum.reid@caledonian-outfitters.example",
+                      "+44 141 496 0102"),
                   contact(
-                      "Ali Kaya",
+                      "Hannah Brooks",
                       PartnerContactRole.LOGISTICS,
-                      "ali.kaya@anadolu-tekstil.example",
-                      "+90 212 555 0103")),
+                      "hannah.brooks@caledonian-outfitters.example",
+                      "+44 141 496 0103")),
               List.of(
                   card(
-                      "Merkez ofis, Bağcılar",
+                      "Head office, Glasgow",
                       AddressType.HEADQUARTERS,
-                      "Atatürk Caddesi No: 45",
-                      "Kat 4",
-                      "İstanbul",
-                      "Bağcılar",
-                      "34200",
+                      "28 Merchant Square",
+                      "Floor 4",
+                      "Glasgow",
+                      "Scotland",
+                      "G1 1AB",
                       true,
                       true,
                       true),
                   card(
-                      "Depo, Esenyurt",
+                      "Warehouse, Paisley",
                       AddressType.SHIPPING,
-                      "Organize Sanayi Bölgesi 3. Cadde No: 12",
+                      "Unit 7, Abbotsinch Trade Park",
                       null,
-                      "İstanbul",
-                      "Esenyurt",
-                      "34510",
+                      "Paisley",
+                      "Renfrewshire",
+                      "PA3 2AB",
                       false,
                       false,
                       false)),
               List.of(
                   new LinkedSpec(
-                      "Çorlu Konfeksiyon Sanayi",
-                      "TR-CKS",
-                      TR,
+                      "Pennine Cut & Sew Ltd",
+                      "GB-PCS",
+                      GB,
                       PartnerLinkRole.GARMENT_MAKER,
-                      "Dikim atölyesi",
+                      "Cut-and-sew workshop",
                       true,
                       List.of(
                           contact(
-                              "Hakan Öztürk",
+                              "Dominic Hartley",
                               PartnerContactRole.LOGISTICS,
-                              "hakan.ozturk@corlu-konfeksiyon.example",
-                              "+90 282 555 0111")),
+                              "dominic.hartley@pennine-cutsew.example",
+                              "+44 1484 496 0111")),
                       List.of(
                           card(
-                              "Fabrika, Çorlu",
+                              "Factory, Huddersfield",
                               AddressType.SHIPPING,
-                              "Çorlu Sanayi Sitesi 14. Sokak No: 8",
+                              "Unit 9, Colne Valley Works",
                               null,
-                              "Çorlu",
-                              "Tekirdağ",
-                              "59850",
+                              "Huddersfield",
+                              "West Yorkshire",
+                              "HD3 3AB",
                               true,
                               true,
                               true))),
                   new LinkedSpec(
-                      "Bursa Baskı Atölyesi",
-                      "TR-BBA",
-                      TR,
+                      "Mersey Print Works Ltd",
+                      "GB-MPW",
+                      GB,
                       PartnerLinkRole.PRINTER,
-                      "Dijital ve rotasyon baskı",
+                      "Digital and rotary printing",
                       true,
                       List.of(
                           contact(
-                              "Selin Arslan",
+                              "Ruth Gallagher",
                               PartnerContactRole.OTHER,
-                              "selin.arslan@bursa-baski.example",
-                              "+90 224 555 0121")),
+                              "ruth.gallagher@mersey-print.example",
+                              "+44 151 496 0121")),
                       List.of(
                           card(
-                              "Baskı atölyesi, Bursa",
+                              "Print works, Birkenhead",
                               AddressType.SHIPPING,
-                              "Demirtaş OSB Mah. Sanayi Cad. No: 27",
+                              "Unit 3, Vulcan Business Park",
                               null,
-                              "Bursa",
-                              "Osmangazi",
-                              "16110",
+                              "Birkenhead",
+                              "Merseyside",
+                              "CH41 1AB",
                               true,
                               true,
                               true))),
                   new LinkedSpec(
-                      "Ege Lojistik A.Ş.",
-                      "TR-EGL",
-                      TR,
+                      "Forth Freight Services Ltd",
+                      "GB-FFS",
+                      GB,
                       PartnerLinkRole.FORWARDER,
-                      "İhracat sevkiyatları",
+                      "Export shipments",
                       true,
                       List.of(
                           contact(
-                              "Murat Şahin",
+                              "Neil Mackenzie",
                               PartnerContactRole.LOGISTICS,
-                              "murat.sahin@ege-lojistik.example",
-                              "+90 232 555 0131")),
+                              "neil.mackenzie@forth-freight.example",
+                              "+44 131 496 0131")),
                       List.of(
                           card(
-                              "Antrepo, İzmir",
+                              "Bonded warehouse, Grangemouth",
                               AddressType.SHIPPING,
-                              "Alsancak Liman Arkası No: 5",
+                              "Port Terminal 5, Dock Road",
                               null,
-                              "İzmir",
-                              "Konak",
-                              "35220",
+                              "Grangemouth",
+                              "Falkirk",
+                              "FK3 8AB",
                               true,
                               true,
                               true))))),
@@ -464,10 +463,10 @@ final class PartnerNetworkDemoData {
   static final List<SupplierSpec> SUPPLIERS =
       List.of(
           supplier(
-              "Ege Pamuk Kooperatifi",
-              "Fatma Aydın",
-              "fatma.aydin@ege-pamuk.example",
-              "+90 232 555 0201"),
+              "Humber Cotton Merchants Ltd",
+              "Margaret Ellis",
+              "margaret.ellis@humber-cotton.example",
+              "+44 1482 496 0201"),
           supplier(
               "Yarn Source Ltd.",
               "Robert Hale",
@@ -476,20 +475,20 @@ final class PartnerNetworkDemoData {
           supplier(
               "Dye & Chem BV", "Daan de Vries", "daan.devries@dye-chem.example", "+31 20 555 0203"),
           supplier(
-              "Anatolia Cotton Co.",
-              "Emre Tunç",
-              "emre.tunc@anatolia-cotton.example",
-              "+90 322 555 0204"),
+              "Mersey Cotton Co. Ltd",
+              "Gareth Pritchard",
+              "gareth.pritchard@mersey-cotton.example",
+              "+44 151 496 0204"),
           supplier(
-              "Aegean Yarn Mills",
-              "Zeynep Koç",
-              "zeynep.koc@aegean-yarn.example",
-              "+90 232 555 0205"),
+              "Pennine Yarn Mills Ltd",
+              "Eleanor Whitaker",
+              "eleanor.whitaker@pennine-yarn.example",
+              "+44 1484 496 0205"),
           supplier(
-              "Marmara Dye & Finish",
-              "Burak Yıldız",
-              "burak.yildiz@marmara-dye.example",
-              "+90 212 555 0206"));
+              "Calder Dye & Finish Ltd",
+              "Joseph Ackroyd",
+              "joseph.ackroyd@calder-dye.example",
+              "+44 1422 496 0206"));
 
   private static ContactSpec contact(
       String name, PartnerContactRole role, String email, String phone) {

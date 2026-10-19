@@ -251,8 +251,8 @@ public class SalesQuoteDemoSeeder {
       new ColorPartnerCodeInput("SS26-NAVY", "Navy (SS26 season code)");
   static final ColorPartnerCodeInput ALBION_ECRU_PRIMARY =
       new ColorPartnerCodeInput("ALB-ECR-26", "Albion Ecru");
-  static final ColorPartnerCodeInput AEGEAN_INDIGO_PRIMARY =
-      new ColorPartnerCodeInput("AYM-IND-2201", "Indigo 22");
+  static final ColorPartnerCodeInput PENNINE_INDIGO_PRIMARY =
+      new ColorPartnerCodeInput("PYM-IND-2201", "Indigo 22");
 
   private static final String CURRENCY = "GBP";
   private static final String QUOTE_MODULE_TYPE = "FABRIC";
@@ -422,8 +422,8 @@ public class SalesQuoteDemoSeeder {
           List.of(ALBION_NAVY_PREVIOUS_SEASON));
       ensurePartnerCodes(
           ecru, albion.getId(), PartnerRole.CUSTOMER, ALBION_ECRU_PRIMARY, List.of());
-      UUID aegean = ensureSupplier(tenantId, ProcurementDemoSeeder.SUPPLIER_AEGEAN);
-      ensurePartnerCodes(indigo, aegean, PartnerRole.SUPPLIER, AEGEAN_INDIGO_PRIMARY, List.of());
+      UUID pennine = ensureSupplier(tenantId, ProcurementDemoSeeder.SUPPLIER_PENNINE);
+      ensurePartnerCodes(indigo, pennine, PartnerRole.SUPPLIER, PENNINE_INDIGO_PRIMARY, List.of());
 
       // ── Emma's competing open quote: soft intents shrink Navy free stock ──
       Quote emmaQuote =
@@ -758,8 +758,8 @@ public class SalesQuoteDemoSeeder {
               req.setCompanyName(companyName);
               req.setCustomName(companyName);
               // Same tax id the procurement demo would use, so the two seeds never disagree.
-              req.setTaxId("TR-P2P-AEG-" + tenantSuffix(tenantId));
-              req.setCountry("TUR");
+              req.setTaxId("GB-P2P-PEN-" + tenantSuffix(tenantId));
+              req.setCountry("GBR");
               req.setPartnerType(PartnerType.SUPPLIER);
               req.setRelationshipMeta(
                   Map.of("payment_terms", "NET45", "notes", "Combed yarn and fiber supplier"));

@@ -58,9 +58,9 @@ public class PartnerUserSeeder implements DataSeeder {
       List.of(
           // ── 10. EXTERNAL — Supplier (Oz Cotton Yarns Inc.) ──
           new SeedExternalUserProfile(
-              "Oscar", "Ozkan", "oscar@ozcotton.com", "PARTNER_OWNER", "Oz Cotton Yarns Inc."),
+              "Oscar", "Oakley", "oscar@ozcotton.com", "PARTNER_OWNER", "Oz Cotton Yarns Inc."),
           new SeedExternalUserProfile(
-              "Aylin",
+              "Amelia",
               "Accounts",
               "accounting@ozcotton.com",
               "PARTNER_ACCOUNTANT",
@@ -74,21 +74,21 @@ public class PartnerUserSeeder implements DataSeeder {
               "PARTNER_BUYER",
               "Global Fashion Wear Corp."),
           new SeedExternalUserProfile(
-              "Fatma",
+              "Fiona",
               "Fashion",
               "merchandiser@globalfashion.com",
               "PARTNER_VIEWER",
               "Global Fashion Wear Corp."),
 
-          // ── 12. EXTERNAL — Subcontractor / Fason (South Dyeing Facilities) ──
+          // ── 12. EXTERNAL — Subcontractor (South Dyeing Facilities) ──
           new SeedExternalUserProfile(
-              "Selim",
+              "Simon",
               "South",
               "manager@southdyeing.com",
               "PARTNER_OWNER",
               "South Dyeing Facilities"),
           new SeedExternalUserProfile(
-              "Deniz",
+              "Daniel",
               "Dispatch",
               "logistics@southdyeing.com",
               "PARTNER_VIEWER",
@@ -102,15 +102,15 @@ public class PartnerUserSeeder implements DataSeeder {
               "PARTNER_VIEWER",
               "Fast Logistics Shipping LLC"),
 
-          // ── 14. EXTERNAL — Both / Hem Tedarikçi Hem Müşteri (Central Textile Mills Ltd.) ──
+          // ── 14. EXTERNAL — Both / Both supplier and customer (Central Textile Mills Ltd.) ──
           new SeedExternalUserProfile(
-              "Cenk",
+              "Charles",
               "Central",
               "trade@centraltextile.com",
               "PARTNER_OWNER",
               "Central Textile Mills Ltd."),
           new SeedExternalUserProfile(
-              "Burcu",
+              "Beth",
               "Books",
               "finance@centraltextile.com",
               "PARTNER_ACCOUNTANT",

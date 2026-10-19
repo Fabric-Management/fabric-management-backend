@@ -126,9 +126,9 @@ class FinanceDemoSeederTest {
     verify(rootOrg).setReportingCurrency("USD");
     verify(organizationRepository).save(rootOrg);
 
-    // FX rates: 2 pairs (USD↔TRY, USD↔EUR) for each of the 11 offsets.
+    // FX rates: 2 pairs (USD↔GBP, USD↔EUR) for each of the 11 offsets.
     verify(exchangeRateService, times(11))
-        .saveRate(eq("USD"), eq("TRY"), any(), any(), eq(ExchangeRateSource.MANUAL));
+        .saveRate(eq("USD"), eq("GBP"), any(), any(), eq(ExchangeRateSource.MANUAL));
     verify(exchangeRateService, times(11))
         .saveRate(eq("USD"), eq("EUR"), any(), any(), eq(ExchangeRateSource.MANUAL));
 
@@ -143,7 +143,7 @@ class FinanceDemoSeederTest {
 
   @Test
   void isIdempotentWhenDemoFinanceDataAlreadyExists() {
-    when(tradingPartnerService.searchByName(TENANT_ID, FinanceDemoSeeder.CUSTOMER_ANADOLU))
+    when(tradingPartnerService.searchByName(TENANT_ID, FinanceDemoSeeder.CUSTOMER_CALEDONIAN))
         .thenReturn(List.of(TradingPartnerDto.builder().id(UUID.randomUUID()).build()));
 
     seeder.seedFor(TENANT_ID);

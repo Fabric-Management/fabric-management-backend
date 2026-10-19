@@ -468,7 +468,7 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_delivery (
     transport_preference VARCHAR(100),
     -- OD-8: ships only when every quantity allocated to it is ready.
     ship_complete BOOLEAN NOT NULL DEFAULT FALSE,
-    -- CONSIGNEE-1 C7: a note may stand in for the address ("the Merter workshop - Ahmet to confirm").
+    -- CONSIGNEE-1 C7: a note may stand in for the address ("the Hackney workshop - Oliver to confirm").
     note VARCHAR(500),
     -- CONSIGNEE-1 C5: confirmed by a holder of sales:verify-delivery; anything not known to be
     -- verified is not. C10: whether the address card it was copied from was verified at copy time.

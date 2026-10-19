@@ -180,7 +180,7 @@ class SalesQuoteDemoSeedIT {
                 "CUSTOMER|NAVY-01|ALB-NVY-26|true",
                 "CUSTOMER|NAVY-01|SS26-NAVY|false",
                 "CUSTOMER|ECRU-02|ALB-ECR-26|true",
-                "SUPPLIER|IND-05|AYM-IND-2201|true"));
+                "SUPPLIER|IND-05|PYM-IND-2201|true"));
 
     // Stock: fabric lots are booked in metres and the coloured yarn lot exists.
     assertThat(
@@ -232,7 +232,7 @@ class SalesQuoteDemoSeedIT {
   }
 
   private void assertFabricWidthExamples(UUID tenant) {
-    for (var fabric : FabricStockDemoSeeder.FABRICS) {
+    for (var fabric : FabricStockDemoPlan.FABRICS) {
       var options =
           TenantContext.executeInTenantContext(
               tenant, () -> productSearch.search(null, ProductType.FABRIC, fabric.name()));
@@ -243,48 +243,109 @@ class SalesQuoteDemoSeedIT {
       assertThat(product.finishedWidths())
           .extracting(width -> width.value())
           .containsExactly(new BigDecimal("150.00"), new BigDecimal("160.00"));
-      UUID colour =
-          jdbc.queryForObject(
-              "SELECT id FROM production.color WHERE tenant_id = ? AND code = ?",
-              UUID.class,
-              tenant,
-              fabric.colour());
-      for (int width : FabricStockDemoSeeder.WIDTHS_CM) {
-        var preview =
-            TenantContext.executeInTenantContext(
+      for (String colourCode :
+          fabric.lots().stream().map(FabricStockDemoPlan.Lot::colour).distinct().toList()) {
+        UUID colour =
+            jdbc.queryForObject(
+                "SELECT id FROM production.color WHERE tenant_id = ? AND code = ?",
+                UUID.class,
                 tenant,
-                () ->
-                    stockPreview.preview(
-                        new OrderIntakeStockPreviewRequest(
-                            product.productId(),
-                            colour,
-                            BigDecimal.valueOf(width),
-                            "CM",
-                            null,
-                            new BigDecimal("700"),
-                            "M",
-                            false,
-                            new BigDecimal("5"),
-                            new BigDecimal("5"),
-                            null),
-                        SystemUser.ID));
-        assertThat(preview.lots())
-            .hasSize(2)
-            .allSatisfy(lot -> assertThat(lot.lotNo()).contains("-" + width + "-"));
-        assertThat(preview.totals().free().canonical()).isEqualByComparingTo("1790");
-        assertThat(preview.evaluation().unknownPieces()).isZero();
-        assertThat(preview.evaluation().options())
-            .extracting(option -> option.quantity())
-            .usingElementComparator(BigDecimal::compareTo)
-            .containsExactly(new BigDecimal("790"), new BigDecimal("665"));
+                colourCode);
+        for (int width : FabricStockDemoSeeder.WIDTHS_CM) {
+          assertColourWidthStock(tenant, fabric, product.productId(), colourCode, colour, width);
+        }
       }
     }
+    assertRollsAndLots(tenant);
+  }
+
+  /** What the order form finds when it picks one fabric, one colour and one width. */
+  private void assertColourWidthStock(
+      UUID tenant,
+      FabricStockDemoPlan.Fabric fabric,
+      UUID productId,
+      String colourCode,
+      UUID colour,
+      int width) {
+    var lots = FabricStockDemoPlan.lotsOf(fabric, colourCode, width);
+    var preview =
+        TenantContext.executeInTenantContext(
+            tenant,
+            () ->
+                stockPreview.preview(
+                    new OrderIntakeStockPreviewRequest(
+                        productId,
+                        colour,
+                        BigDecimal.valueOf(width),
+                        "CM",
+                        null,
+                        new BigDecimal("700"),
+                        "M",
+                        false,
+                        new BigDecimal("5"),
+                        new BigDecimal("5"),
+                        null),
+                    SystemUser.ID));
+    String where = fabric.name() + " / " + colourCode + " / " + width + " cm";
+    if (lots.isEmpty()) {
+      assertThat(preview.lots()).as("no lot is stocked for %s", where).isEmpty();
+      return;
+    }
+    assertThat(preview.lots())
+        .as("lots found for %s", where)
+        .extracting(lot -> lot.lotNo())
+        .containsExactlyInAnyOrderElementsOf(
+            lots.stream().map(lot -> FabricStockDemoPlan.lotCode(fabric, lot)).toList());
+    BigDecimal metres =
+        lots.stream()
+            .map(FabricStockDemoPlan.Lot::metresDecimal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    assertThat(preview.totals().free().canonical())
+        .as("free metres for %s", where)
+        .isEqualByComparingTo(metres);
+    assertThat(preview.evaluation().unknownPieces()).as(where).isZero();
+  }
+
+  /** Lots and rolls as the database holds them: every roll is a stock unit with its own length. */
+  private void assertRollsAndLots(UUID tenant) {
+    var plan =
+        FabricStockDemoPlan.FABRICS.stream().flatMap(fabric -> fabric.lots().stream()).toList();
+    assertThat(plan.size()).isGreaterThanOrEqualTo(20);
     assertThat(
             count(
-                "SELECT count(*) FROM production.stock_unit s"
-                    + " JOIN production.production_execution_batch b ON b.id = s.batch_id"
-                    + " WHERE s.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'"
+                "SELECT count(*) FROM production.production_execution_batch"
+                    + " WHERE tenant_id = ? AND batch_code LIKE 'PG-FAB-%'",
+                tenant))
+        .isEqualTo(plan.size());
+    long rolls = plan.stream().mapToLong(lot -> lot.rolls().size()).sum();
+    String rollsOfPlayground =
+        " FROM production.stock_unit s"
+            + " JOIN production.production_execution_batch b ON b.id = s.batch_id"
+            + " WHERE s.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'";
+    assertThat(count("SELECT count(*)" + rollsOfPlayground, tenant)).isEqualTo(rolls);
+    // The winder cuts 120 m rolls, lot ends leave 90 m and 135 m, and a fault cut leaves less.
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 120", tenant))
+        .isGreaterThan(rolls / 2);
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 90", tenant))
+        .isPositive();
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 135", tenant))
+        .isPositive();
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length < 90", tenant))
+        .isPositive();
+    assertThat(
+            count(
+                "SELECT count(*)"
+                    + rollsOfPlayground
                     + " AND (s.initial_length IS NULL OR s.initial_length <> s.length)",
+                tenant))
+        .isZero();
+    // A lot's booked quantity is the sum of its rolls.
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.production_execution_batch b"
+                    + " WHERE b.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'"
+                    + " AND b.quantity <> (SELECT COALESCE(SUM(s.length), 0)"
+                    + " FROM production.stock_unit s WHERE s.batch_id = b.id)",
                 tenant))
         .isZero();
   }

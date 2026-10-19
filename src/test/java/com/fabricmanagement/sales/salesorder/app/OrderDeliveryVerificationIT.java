@@ -203,7 +203,7 @@ class OrderDeliveryVerificationIT {
   void aNoteOnlyDeliveryIsRefusedUnlessTheCustomerCollects() {
     UUID orderId = newOrder("PO-V3");
     DeliveriesView saved =
-        save(orderId, content(customerInput(), null, "The Merter workshop - Ahmet to confirm"));
+        save(orderId, content(customerInput(), null, "The Hackney workshop - Oliver to confirm"));
     UUID deliveryId = saved.deliveries().get(0).id();
 
     Object refused =
@@ -298,7 +298,7 @@ class OrderDeliveryVerificationIT {
         saveAt(
             orderId,
             complete.orderVersion(),
-            content(customerInput(), null, "Merter workshop, Ahmet confirms"));
+            content(customerInput(), null, "Hackney workshop, Oliver confirms"));
 
     DeliveryView first = complete.deliveries().get(0);
     assertThat(first.verificationStatus()).isEqualTo(DeliveryVerificationStatus.VERIFIED);

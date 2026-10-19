@@ -104,7 +104,7 @@ class TradingPartnerVerificationTest {
   private TradingPartner quickCreated() {
     stubCreation();
     QuickCreatePartnerLinkRequest request = new QuickCreatePartnerLinkRequest();
-    request.setCompanyName("Merter Atölye");
+    request.setCompanyName("Hackney Workshop");
     request.setCountry("TUR");
     return deliveryPartners.findOrCreate(request);
   }
