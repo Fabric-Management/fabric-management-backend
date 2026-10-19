@@ -33144,6 +33144,78 @@ paths:
       summary: Create a draft fabric article and its product
       tags:
       - Fabric Articles
+  /api/v1/production/fabrics/composition-suggestion:
+    post:
+      description: "Each yarn's share of the mass times its fibre percentages, rounded\
+        \ to add up to 100. Nothing is saved."
+      operationId: suggestFabricComposition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FabricCompositionSuggestionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricCompositionSuggestion"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Work out a fabric composition from its yarns
+      tags:
+      - Fabric Articles
   /api/v1/production/fabrics/constructions:
     get:
       operationId: listFabricConstructions
@@ -61706,6 +61778,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFabricCompositionSuggestion:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FabricCompositionSuggestion"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFabricConstruction:
       type: object
       properties:
@@ -74040,7 +74130,8 @@ components:
         activationProblems:
           type: array
           description: "Stable codes of what still stops activation: CONSTRUCTION_MISSING,\
-            \ COLOUR_STATE_MISSING, GSM_FINISHED_MISSING"
+            \ COLOUR_STATE_MISSING, GSM_FINISHED_MISSING, COMPOSITION_INCOMPLETE,\
+            \ YARN_SHARES_INCOMPLETE"
           items:
             type: string
         articleCode:
@@ -74060,6 +74151,10 @@ components:
           - PIECE_DYED
           - YARN_DYED
           - PRINTED
+        composition:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricComposition"
         construction:
           anyOf:
           - $ref: "#/components/schemas/FabricConstruction"
@@ -74132,11 +74227,16 @@ components:
           anyOf:
           - $ref: "#/components/schemas/FabricWoven"
           - type: "null"
+        yarns:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricYarn"
       required:
       - activationProblems
       - articleCode
       - articleSpecVersion
       - colourState
+      - composition
       - construction
       - createdAt
       - description
@@ -74156,6 +74256,7 @@ components:
       - updatedAt
       - usableWidthCm
       - woven
+      - yarns
     FabricArticleListItem:
       type: object
       properties:
@@ -74257,6 +74358,15 @@ components:
           - PIECE_DYED
           - YARN_DYED
           - PRINTED
+        composition:
+          type: array
+          description: The declared fibre composition; it must add up to 100 before
+            activation. Omitted on update keeps the current composition; an empty
+            list removes it.
+          items:
+            $ref: "#/components/schemas/FabricCompositionRequest"
+          maxItems: 20
+          minItems: 0
         constructionId:
           type: string
           format: uuid
@@ -74310,9 +74420,95 @@ components:
           - $ref: "#/components/schemas/FabricWoven"
           - type: "null"
           description: Woven fabrics only
+        yarns:
+          type: array
+          description: "The fabric's yarns; when given, their shares must add up to\
+            \ 100 before activation. Omitted on update keeps the current yarns; an\
+            \ empty list removes them."
+          items:
+            $ref: "#/components/schemas/FabricYarnRequest"
+          maxItems: 20
+          minItems: 0
       required:
       - formation
       - name
+    FabricComposition:
+      type: object
+      description: One fibre of a fabric's declared composition
+      properties:
+        fiberId:
+          type: string
+          format: uuid
+        fiberName:
+          type: string
+          example: Cotton
+        isoCode:
+          type: string
+          example: CO
+        materialSource:
+          type:
+          - string
+          - "null"
+          enum:
+          - VIRGIN
+          - RECYCLED
+        percentage:
+          type: number
+          example: 80
+      required:
+      - fiberId
+      - fiberName
+      - isoCode
+      - materialSource
+      - percentage
+    FabricCompositionRequest:
+      type: object
+      properties:
+        fiberId:
+          type: string
+          format: uuid
+        percentage:
+          type: number
+          example: 80
+          exclusiveMinimum: 0
+          maximum: 100
+      required:
+      - fiberId
+      - percentage
+    FabricCompositionSuggestion:
+      type: object
+      properties:
+        composition:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricComposition"
+        problems:
+          type: array
+          description: "Stable codes: NO_YARNS, YARN_SHARES_INCOMPLETE (shares do\
+            \ not add up to 100, so they were scaled), YARN_COMPOSITION_MISSING"
+          items:
+            type: string
+        yarnsWithoutComposition:
+          type: array
+          description: Yarn products left out because they declare no composition
+          items:
+            type: string
+            format: uuid
+      required:
+      - composition
+      - problems
+      - yarnsWithoutComposition
+    FabricCompositionSuggestionRequest:
+      type: object
+      properties:
+        yarns:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricYarnRequest"
+          maxItems: 20
+          minItems: 0
+      required:
+      - yarns
     FabricConstruction:
       type: object
       description: A tenant's fabric construction
@@ -74550,6 +74746,57 @@ components:
       - picksPerCm
       - reedNotation
       - weaveNotation
+    FabricYarn:
+      type: object
+      description: One yarn of a fabric and its share of the mass
+      properties:
+        designation:
+          type:
+          - string
+          - "null"
+          description: The yarn's designation when it was linked
+        role:
+          type: string
+          enum:
+          - WARP
+          - WEFT
+          - KNIT_FEED
+          - PILE
+          - GROUND
+        sharePercent:
+          type: number
+        yarnProductId:
+          type: string
+          format: uuid
+      required:
+      - designation
+      - role
+      - sharePercent
+      - yarnProductId
+    FabricYarnRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - WARP
+          - WEFT
+          - KNIT_FEED
+          - PILE
+          - GROUND
+        sharePercent:
+          type: number
+          description: "Share of the fabric's mass, in percent"
+          example: 60
+          exclusiveMinimum: 0
+          maximum: 100
+        yarnProductId:
+          type: string
+          format: uuid
+      required:
+      - role
+      - sharePercent
+      - yarnProductId
     FiberActionCapabilityDto:
       type: object
       properties:

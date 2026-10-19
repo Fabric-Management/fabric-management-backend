@@ -802,6 +802,38 @@ CREATE INDEX idx_product_tenant_type ON production.prod_product(tenant_id, produ
 CREATE INDEX idx_product_active ON production.prod_product(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_product_tenant_active ON production.prod_product(tenant_id, is_active) WHERE is_active = TRUE;
 
+
+-- =====================================================
+-- prod_fiber (final: composition JSONB, no fiber_grade, category/iso NOT NULL)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS production.prod_fiber (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL,
+    product_id UUID NOT NULL UNIQUE REFERENCES production.prod_product(id) ON DELETE CASCADE,
+    fiber_category_id UUID NOT NULL REFERENCES production.prod_fiber_category(id),
+    fiber_iso_code_id UUID NOT NULL REFERENCES production.prod_fiber_iso_code(id),
+    fiber_name VARCHAR(255) NOT NULL,
+    composition JSONB,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'OBSOLETE')),
+    remarks TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
+CREATE INDEX idx_fiber_product ON production.prod_fiber(product_id);
+CREATE INDEX idx_fiber_category ON production.prod_fiber(fiber_category_id);
+CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
+CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
+CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_fiber_composition_gin ON production.prod_fiber USING GIN (composition);
+
 -- =====================================================
 -- FABRIC-1: fabric master data (docs/production/FABRIC-ARCHITECTURE.md)
 -- prod_product (FABRIC) 1:1 prod_fabric_article; woven / knitted detail in their own tables;
@@ -957,6 +989,69 @@ CREATE TABLE IF NOT EXISTS production.prod_fabric_knitted (
     )
 );
 
+-- FABRIC-2: the yarns a fabric is made of. share_percent is the yarn's share of the fabric's
+-- mass; when yarns are given, the shares of an ACTIVE article total 100.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_yarn (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    position SMALLINT NOT NULL,
+    yarn_product_id UUID NOT NULL,
+    share_percent NUMERIC(5,2) NOT NULL,
+    yarn_designation_snapshot VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_yarn_role_position UNIQUE (fabric_article_id, role, position)
+        DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT fk_fabric_yarn_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fabric_yarn_product FOREIGN KEY (yarn_product_id)
+        REFERENCES production.prod_product (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_yarn_role CHECK (role IN ('WARP', 'WEFT', 'KNIT_FEED', 'PILE', 'GROUND')),
+    CONSTRAINT ck_fabric_yarn_share CHECK (share_percent > 0 AND share_percent <= 100),
+    CONSTRAINT ck_fabric_yarn_position CHECK (position >= 1)
+);
+
+-- FABRIC-2: declared (label) fibre composition; tested composition is a QC result and never
+-- writes here (YARN-ARCHITECTURE Y5 parity). An ACTIVE article's lines total 100.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_composition (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    fiber_id UUID NOT NULL,
+    fiber_iso_code VARCHAR(10) NOT NULL,
+    fiber_name VARCHAR(255) NOT NULL,
+    material_source VARCHAR(20),
+    percentage NUMERIC(5,2) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fabric_composition_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fabric_composition_fiber FOREIGN KEY (fiber_id)
+        REFERENCES production.prod_fiber (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_composition_percentage CHECK (percentage > 0 AND percentage <= 100),
+    CONSTRAINT ck_fabric_composition_source CHECK (
+        material_source IS NULL OR material_source IN ('VIRGIN', 'RECYCLED')
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fabric_composition_fiber_source
+    ON production.prod_fabric_composition
+        (fabric_article_id, fiber_id, COALESCE(material_source, ''));
+
 DO $$
 DECLARE
     table_name TEXT;
@@ -965,7 +1060,9 @@ BEGIN
         'prod_fabric_construction',
         'prod_fabric_article',
         'prod_fabric_woven',
-        'prod_fabric_knitted'
+        'prod_fabric_knitted',
+        'prod_fabric_yarn',
+        'prod_fabric_composition'
     ]
     LOOP
         EXECUTE format('ALTER TABLE production.%I ENABLE ROW LEVEL SECURITY', table_name);
@@ -979,37 +1076,6 @@ BEGIN
         );
     END LOOP;
 END $$;
-
--- =====================================================
--- prod_fiber (final: composition JSONB, no fiber_grade, category/iso NOT NULL)
--- =====================================================
-CREATE TABLE IF NOT EXISTS production.prod_fiber (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
-    uid VARCHAR(100) UNIQUE NOT NULL,
-    product_id UUID NOT NULL UNIQUE REFERENCES production.prod_product(id) ON DELETE CASCADE,
-    fiber_category_id UUID NOT NULL REFERENCES production.prod_fiber_category(id),
-    fiber_iso_code_id UUID NOT NULL REFERENCES production.prod_fiber_iso_code(id),
-    fiber_name VARCHAR(255) NOT NULL,
-    composition JSONB,
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'OBSOLETE')),
-    remarks TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    deleted_at TIMESTAMPTZ,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID,
-    version BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
-CREATE INDEX idx_fiber_product ON production.prod_fiber(product_id);
-CREATE INDEX idx_fiber_category ON production.prod_fiber(fiber_category_id);
-CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
-CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
-CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
-CREATE INDEX IF NOT EXISTS idx_fiber_composition_gin ON production.prod_fiber USING GIN (composition);
 
 -- =====================================================
 -- prod_fiber_quality_standard (V082; replaces prod_fiber_specification)

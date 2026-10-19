@@ -2,6 +2,7 @@ package com.fabricmanagement.product.fabric.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,9 +21,20 @@ import com.fabricmanagement.product.fabric.domain.article.FabricArticle;
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
 import com.fabricmanagement.product.fabric.dto.FabricArticleDto;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionDto;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionRequest;
+import com.fabricmanagement.product.fabric.dto.FabricYarnRequest;
 import com.fabricmanagement.product.fabric.infra.repository.FabricArticleRepository;
+import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.product.fiber.domain.FiberKind;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
+import com.fabricmanagement.product.fiber.dto.FiberDto;
+import com.fabricmanagement.product.fiber.dto.FiberIsoCodeDto;
+import com.fabricmanagement.product.yarn.api.facade.YarnFacade;
+import com.fabricmanagement.product.yarn.dto.YarnArticleSummaryDto;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -50,6 +62,8 @@ class FabricArticleServiceTest {
   @Mock private FabricConstructionCatalogService constructions;
   @Mock private ProductService products;
   @Mock private ProductRepository productRepository;
+  @Mock private YarnFacade yarns;
+  @Mock private FiberFacade fibers;
 
   private FabricArticleService service;
 
@@ -58,7 +72,12 @@ class FabricArticleServiceTest {
     TenantContext.setCurrentTenantId(TENANT);
     service =
         new FabricArticleService(
-            articles, constructions, products, productRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            articles,
+            constructions,
+            products,
+            productRepository,
+            new FabricMaterialResolver(productRepository, yarns, fibers),
+            Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @AfterEach
@@ -123,6 +142,8 @@ class FabricArticleServiceTest {
             null,
             null,
             null,
+            null,
+            null,
             null);
     assertThatThrownBy(() -> service.update(article.getId(), knitted))
         .isInstanceOf(FabricDomainException.class)
@@ -164,6 +185,84 @@ class FabricArticleServiceTest {
     verify(products, never()).describe(eq(product.getId()), anyString(), any());
   }
 
+  @Test
+  void yarnsAndFibresAreTheTenantsOwnAndKeepTheirNamesAsSnapshots() {
+    FabricArticle article = FabricArticle.draft(fabric("Linen Blend"), FabricFormation.WOVEN);
+    ReflectionTestUtils.setField(article, "id", UUID.randomUUID());
+    when(articles.findByTenantIdAndIdAndDeletedAtIsNull(TENANT, article.getId()))
+        .thenReturn(Optional.of(article));
+    when(articles.save(any(FabricArticle.class))).thenAnswer(call -> call.getArgument(0));
+    Product warp = Product.create(ProductType.YARN, "KG", null, null);
+    ReflectionTestUtils.setField(warp, "id", UUID.randomUUID());
+    UUID strangerYarn = UUID.randomUUID();
+    UUID linen = UUID.randomUUID();
+    UUID cotton = UUID.randomUUID();
+    UUID blend = UUID.randomUUID();
+    when(productRepository.findByTenantIdAndIdInAndProductType(
+            eq(TENANT), any(), eq(ProductType.YARN)))
+        .thenReturn(List.of(warp));
+    when(yarns.findByProductIds(any()))
+        .thenReturn(
+            List.of(
+                new YarnArticleSummaryDto(
+                    warp.getId(), UUID.randomUUID(), null, null, "Nm 34/1 LI")));
+    when(fibers.findById(linen))
+        .thenReturn(Optional.of(fibre(linen, "LI", "Linen", FiberKind.PURE)));
+    when(fibers.findById(cotton))
+        .thenReturn(Optional.of(fibre(cotton, "CO", "Cotton", FiberKind.PURE)));
+    when(fibers.findById(blend))
+        .thenReturn(Optional.of(fibre(blend, "CO", "Cotton-linen blend", FiberKind.BLEND)));
+
+    FabricArticleDto saved =
+        service.update(
+            article.getId(),
+            withMaterials(
+                request("Linen Blend", null),
+                List.of(
+                    new FabricYarnRequest(
+                        FabricYarnRole.WARP, warp.getId(), new BigDecimal("100"))),
+                List.of(
+                    new FabricCompositionRequest(linen, new BigDecimal("55")),
+                    new FabricCompositionRequest(cotton, new BigDecimal("45")))));
+
+    assertThat(saved.yarns())
+        .singleElement()
+        .satisfies(
+            yarn -> {
+              assertThat(yarn.designation()).isEqualTo("Nm 34/1 LI");
+              assertThat(yarn.role()).isEqualTo(FabricYarnRole.WARP);
+            });
+    assertThat(saved.composition())
+        .extracting(FabricCompositionDto::isoCode, FabricCompositionDto::fiberName)
+        .containsExactly(tuple("LI", "Linen"), tuple("CO", "Cotton"));
+    assertThat(service.update(article.getId(), request("Linen Blend", null)).composition())
+        .as("an update that leaves the composition out keeps it")
+        .hasSize(2);
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    article.getId(),
+                    withMaterials(
+                        request("Linen Blend", null),
+                        List.of(
+                            new FabricYarnRequest(
+                                FabricYarnRole.WARP, strangerYarn, new BigDecimal("100"))),
+                        null)))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("Not a yarn");
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    article.getId(),
+                    withMaterials(
+                        request("Linen Blend", null),
+                        null,
+                        List.of(new FabricCompositionRequest(blend, new BigDecimal("100"))))))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("blend");
+  }
+
   private static FabricArticleRequest request(String name, String code) {
     return new FabricArticleRequest(
         name,
@@ -180,7 +279,43 @@ class FabricArticleServiceTest {
         new BigDecimal("120"),
         null,
         null,
+        null,
+        null,
         null);
+  }
+
+  private static FabricArticleRequest withMaterials(
+      FabricArticleRequest request,
+      List<FabricYarnRequest> yarns,
+      List<FabricCompositionRequest> composition) {
+    return new FabricArticleRequest(
+        request.name(),
+        request.description(),
+        request.formation(),
+        request.articleCode(),
+        request.constructionId(),
+        request.colourState(),
+        request.gsmFinished(),
+        request.gsmGreige(),
+        request.nominalFinishedWidthCm(),
+        request.usableWidthCm(),
+        request.nominalGreigeWidthCm(),
+        request.standardRollLengthM(),
+        request.remarks(),
+        request.woven(),
+        request.knitted(),
+        yarns,
+        composition);
+  }
+
+  private static FiberDto fibre(UUID id, String iso, String name, FiberKind kind) {
+    return FiberDto.builder()
+        .id(id)
+        .kind(kind)
+        .fiberName(name)
+        .materialSource(MaterialSource.VIRGIN)
+        .isoCode(FiberIsoCodeDto.builder().isoCode(iso).build())
+        .build();
   }
 
   private static Product fabric(String name) {

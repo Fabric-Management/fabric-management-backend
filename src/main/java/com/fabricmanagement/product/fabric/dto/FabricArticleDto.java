@@ -39,13 +39,18 @@ public record FabricArticleDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String remarks,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) FabricWovenDto woven,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) FabricKnittedDto knitted,
+    @ArraySchema(arraySchema = @Schema(requiredMode = Schema.RequiredMode.REQUIRED))
+        List<FabricYarnDto> yarns,
+    @ArraySchema(arraySchema = @Schema(requiredMode = Schema.RequiredMode.REQUIRED))
+        List<FabricCompositionDto> composition,
     @ArraySchema(
             arraySchema =
                 @Schema(
                     requiredMode = Schema.RequiredMode.REQUIRED,
                     description =
                         "Stable codes of what still stops activation: CONSTRUCTION_MISSING,"
-                            + " COLOUR_STATE_MISSING, GSM_FINISHED_MISSING"))
+                            + " COLOUR_STATE_MISSING, GSM_FINISHED_MISSING,"
+                            + " COMPOSITION_INCOMPLETE, YARN_SHARES_INCOMPLETE"))
         List<String> activationProblems,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant createdAt,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant updatedAt) {
@@ -87,6 +92,8 @@ public record FabricArticleDto(
                 spec.knitted().walesPerCm(),
                 spec.knitted().stitchLengthMm(),
                 spec.knitted().feeders()),
+        spec.yarns().stream().map(FabricYarnDto::from).toList(),
+        spec.composition().stream().map(FabricCompositionDto::from).toList(),
         article.activationProblems(),
         article.getCreatedAt(),
         article.getUpdatedAt());

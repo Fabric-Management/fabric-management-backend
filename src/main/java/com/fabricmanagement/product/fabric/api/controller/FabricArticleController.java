@@ -3,6 +3,7 @@ package com.fabricmanagement.product.fabric.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.product.fabric.app.FabricArticleService;
+import com.fabricmanagement.product.fabric.app.FabricCompositionSuggestionService;
 import com.fabricmanagement.product.fabric.app.FabricConstructionCatalogService;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
@@ -10,6 +11,8 @@ import com.fabricmanagement.product.fabric.dto.CreateFabricConstructionRequest;
 import com.fabricmanagement.product.fabric.dto.FabricArticleDto;
 import com.fabricmanagement.product.fabric.dto.FabricArticleListItemDto;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionSuggestionDto;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionSuggestionRequest;
 import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
 import com.fabricmanagement.product.fabric.dto.UpdateFabricConstructionRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,6 +49,7 @@ public class FabricArticleController {
 
   private final FabricArticleService articles;
   private final FabricConstructionCatalogService constructions;
+  private final FabricCompositionSuggestionService suggestions;
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'fabric', 'read')")
@@ -86,6 +90,19 @@ public class FabricArticleController {
       @Valid @RequestBody FabricArticleRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(articles.create(request)));
+  }
+
+  @PostMapping("/composition-suggestion")
+  @PreAuthorize("@auth.can(authentication, 'fabric', 'read')")
+  @Operation(
+      operationId = "suggestFabricComposition",
+      summary = "Work out a fabric composition from its yarns",
+      description =
+          "Each yarn's share of the mass times its fibre percentages, rounded to add up to 100."
+              + " Nothing is saved.")
+  public ResponseEntity<ApiResponse<FabricCompositionSuggestionDto>> suggestComposition(
+      @Valid @RequestBody FabricCompositionSuggestionRequest request) {
+    return ResponseEntity.ok(ApiResponse.success(suggestions.suggest(request.yarns())));
   }
 
   @PutMapping("/{id}")

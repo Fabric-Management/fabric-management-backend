@@ -13,8 +13,12 @@ import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricConstructionFamily;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
+import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -74,6 +78,8 @@ class FabricArticleTest {
             null,
             null,
             new FabricArticleSpec.Woven(new BigDecimal("40"), null, null, null),
+            null,
+            null,
             null);
 
     assertThatThrownBy(() -> knitted.apply(withWoven))
@@ -101,13 +107,14 @@ class FabricArticleTest {
         .containsExactly(
             FabricArticle.CONSTRUCTION_MISSING,
             FabricArticle.COLOUR_STATE_MISSING,
-            FabricArticle.GSM_FINISHED_MISSING);
+            FabricArticle.GSM_FINISHED_MISSING,
+            FabricArticle.COMPOSITION_INCOMPLETE);
     assertThatThrownBy(article::activate)
         .isInstanceOfSatisfying(
             FabricDomainException.class,
             problem -> {
               assertThat(problem.getHttpStatus()).isEqualTo(409);
-              assertThat(problem.getProblems()).hasSize(3);
+              assertThat(problem.getProblems()).hasSize(4);
             });
 
     article.apply(spec(twill, "220", null, null));
@@ -176,6 +183,150 @@ class FabricArticleTest {
         .isInstanceOf(FabricDomainException.class);
   }
 
+  @Test
+  void anActiveFabricDeclaresACompositionOfExactlyOneHundredPercent() {
+    FabricArticle article = FabricArticle.draft(fabric(), FabricFormation.WOVEN);
+    article.apply(with(spec(twill, "220", null, null), List.of(), List.of(fibre(CO, "60"))));
+    assertThat(article.activationProblems()).containsExactly(FabricArticle.COMPOSITION_INCOMPLETE);
+    assertThatThrownBy(article::activate).isInstanceOf(FabricDomainException.class);
+
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(
+                        spec(twill, "220", null, null),
+                        List.of(),
+                        List.of(fibre(CO, "60"), fibre(LI, "45")))))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("more than 100");
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(
+                        spec(twill, "220", null, null),
+                        List.of(),
+                        List.of(fibre(CO, "50"), fibre(CO, "50")))))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("twice");
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(spec(twill, "220", null, null), List.of(), List.of(fibre(CO, "99.995")))))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("two decimal places");
+
+    article.apply(
+        with(spec(twill, "220", null, null), List.of(), List.of(fibre(LI, "55"), fibre(CO, "45"))));
+    article.activate();
+    assertThat(article.compositionLines())
+        .extracting(FabricArticleSpec.CompositionLine::isoCode)
+        .containsExactly("LI", "CO");
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(spec(twill, "220", null, null), List.of(), List.of(fibre(LI, "55")))))
+        .as("an active fabric keeps a full composition")
+        .isInstanceOf(FabricDomainException.class);
+  }
+
+  @Test
+  void yarnsAreOptionalButTheirRolesFitTheFormationAndTheirSharesMakeOneHundred() {
+    UUID warpYarn = UUID.randomUUID();
+    UUID weftYarn = UUID.randomUUID();
+    FabricArticle article = FabricArticle.draft(fabric(), FabricFormation.WOVEN);
+
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(
+                        spec(twill, "220", null, null),
+                        List.of(yarn(FabricYarnRole.KNIT_FEED, warpYarn, "100")),
+                        cotton())))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("does not fit");
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(
+                        spec(twill, "220", null, null),
+                        List.of(
+                            yarn(FabricYarnRole.WARP, warpYarn, "70"),
+                            yarn(FabricYarnRole.WEFT, weftYarn, "40")),
+                        cotton())))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("more than 100");
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    with(
+                        spec(twill, "220", null, null),
+                        List.of(
+                            yarn(FabricYarnRole.WARP, warpYarn, "30"),
+                            yarn(FabricYarnRole.WARP, warpYarn, "30")),
+                        cotton())))
+        .isInstanceOf(FabricDomainException.class)
+        .hasMessageContaining("twice");
+
+    article.apply(
+        with(
+            spec(twill, "220", null, null),
+            List.of(yarn(FabricYarnRole.WARP, warpYarn, "60")),
+            cotton()));
+    assertThat(article.activationProblems()).containsExactly(FabricArticle.YARN_SHARES_INCOMPLETE);
+
+    article.apply(
+        with(
+            spec(twill, "220", null, null),
+            List.of(
+                yarn(FabricYarnRole.WEFT, weftYarn, "40"),
+                yarn(FabricYarnRole.WARP, warpYarn, "60")),
+            cotton()));
+    article.activate();
+    assertThat(article.yarnLines())
+        .extracting(FabricArticleSpec.YarnLine::role)
+        .as("listed in role order")
+        .containsExactly(FabricYarnRole.WARP, FabricYarnRole.WEFT);
+  }
+
+  @Test
+  void resavingTheSameLinesKeepsTheRowsAndTheSpecVersion() {
+    UUID warpYarn = UUID.randomUUID();
+    FabricArticle article = FabricArticle.draft(fabric(), FabricFormation.WOVEN);
+    FabricArticleSpec blend =
+        with(
+            spec(twill, "220", null, null),
+            List.of(yarn(FabricYarnRole.WARP, warpYarn, "100")),
+            List.of(fibre(CO, "45"), fibre(LI, "55")));
+    article.apply(blend);
+    article.activate();
+    List<Object> compositionRows = rows(article, "composition");
+    List<Object> yarnRows = rows(article, "yarns");
+
+    article.apply(
+        with(
+            spec(twill, "220", null, null),
+            List.of(yarn(FabricYarnRole.WARP, warpYarn, "100.00")),
+            List.of(fibre(LI, "55.00"), fibre(CO, "45"))));
+    assertThat(article.getArticleSpecVersion()).as("same lines, other order").isEqualTo(1);
+    assertThat(rows(article, "composition")).containsExactlyInAnyOrderElementsOf(compositionRows);
+    assertThat(rows(article, "yarns")).containsExactlyElementsOf(yarnRows);
+
+    article.apply(
+        with(
+            spec(twill, "220", null, null),
+            List.of(yarn(FabricYarnRole.WARP, warpYarn, "100")),
+            List.of(fibre(LI, "50"), fibre(CO, "50"))));
+    assertThat(article.getArticleSpecVersion()).isEqualTo(2);
+    assertThat(article.compositionLines())
+        .extracting(FabricArticleSpec.CompositionLine::percentage)
+        .allSatisfy(value -> assertThat(value).isEqualByComparingTo("50"));
+  }
+
+  /** The child rows themselves, to see that a re-save keeps them rather than replacing them. */
+  private static List<Object> rows(FabricArticle article, String field) {
+    return new ArrayList<>((List<?>) ReflectionTestUtils.getField(article, field));
+  }
+
   private FabricArticle active() {
     FabricArticle article = FabricArticle.draft(fabric(), FabricFormation.WOVEN);
     article.apply(spec(twill, "220", null, null));
@@ -197,7 +348,51 @@ class FabricArticleTest {
         new BigDecimal("120"),
         null,
         null,
-        null);
+        null,
+        null,
+        gsm == null ? List.of() : cotton());
+  }
+
+  private static FabricArticleSpec with(
+      FabricArticleSpec spec,
+      List<FabricArticleSpec.YarnLine> yarns,
+      List<FabricArticleSpec.CompositionLine> composition) {
+    return new FabricArticleSpec(
+        spec.articleCode(),
+        spec.construction(),
+        spec.colourState(),
+        spec.gsmFinished(),
+        spec.gsmGreige(),
+        spec.nominalFinishedWidthCm(),
+        spec.usableWidthCm(),
+        spec.nominalGreigeWidthCm(),
+        spec.standardRollLengthM(),
+        spec.remarks(),
+        spec.woven(),
+        spec.knitted(),
+        yarns,
+        composition);
+  }
+
+  private static final UUID CO = UUID.randomUUID();
+  private static final UUID LI = UUID.randomUUID();
+
+  private static List<FabricArticleSpec.CompositionLine> cotton() {
+    return List.of(fibre(CO, "100"));
+  }
+
+  private static FabricArticleSpec.CompositionLine fibre(UUID fiberId, String percentage) {
+    return new FabricArticleSpec.CompositionLine(
+        fiberId,
+        fiberId.equals(CO) ? "CO" : "LI",
+        fiberId.equals(CO) ? "Cotton" : "Linen",
+        MaterialSource.VIRGIN,
+        new BigDecimal(percentage));
+  }
+
+  private static FabricArticleSpec.YarnLine yarn(
+      FabricYarnRole role, UUID yarnProductId, String share) {
+    return new FabricArticleSpec.YarnLine(role, yarnProductId, new BigDecimal(share), "Ne 40/1 CO");
   }
 
   private static Product fabric() {

@@ -14,9 +14,12 @@ import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionRequest;
 import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
 import com.fabricmanagement.product.fabric.dto.FabricKnittedDto;
 import com.fabricmanagement.product.fabric.dto.FabricWovenDto;
+import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.product.fiber.dto.FiberCatalogReferenceDto;
 import com.fabricmanagement.product.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.core.batch.app.BatchService;
 import com.fabricmanagement.production.core.batch.app.LotEvidenceService;
@@ -74,6 +77,7 @@ public class FabricStockDemoSeeder {
   private final LotEvidenceService evidence;
   private final StockUnitService pieces;
   private final FabricFacade fabrics;
+  private final FiberFacade fibres;
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void seedFor(UUID tenantId) {
@@ -147,6 +151,8 @@ public class FabricStockDemoSeeder {
    */
   private void ensureArticle(Fabric fabric, ProductDto product) {
     Optional<FabricConstructionDto> construction = fabrics.findConstruction(fabric.construction());
+    Optional<List<FabricCompositionRequest>> composition =
+        composition(COMPOSITION.getOrDefault(fabric.code(), COTTON));
     FabricArticleRequest request =
         new FabricArticleRequest(
             fabric.name(),
@@ -163,8 +169,40 @@ public class FabricStockDemoSeeder {
             BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
             ARTICLE_NOTE,
             fabric.formation() == FabricFormation.WOVEN ? WOVEN.get(fabric.code()) : null,
-            fabric.formation() == FabricFormation.KNITTED ? KNITTED.get(fabric.code()) : null);
-    fabrics.ensureArticle(product.getId(), request, construction.isPresent());
+            fabric.formation() == FabricFormation.KNITTED ? KNITTED.get(fabric.code()) : null,
+            null,
+            composition.orElse(null));
+    fabrics.ensureArticle(
+        product.getId(), request, construction.isPresent() && composition.isPresent());
+  }
+
+  /** Label compositions by ISO code; a demo fabric not listed is 100% cotton. */
+  private static final Map<String, String> COTTON = Map.of("CO", "100");
+
+  private static final Map<String, Map<String, String>> COMPOSITION =
+      Map.of("P1457", orderedComposition("LI", "55", "CO", "45"));
+
+  private static Map<String, String> orderedComposition(String... isoAndPercent) {
+    Map<String, String> lines = new LinkedHashMap<>();
+    for (int index = 0; index < isoAndPercent.length; index += 2) {
+      lines.put(isoAndPercent[index], isoAndPercent[index + 1]);
+    }
+    return lines;
+  }
+
+  /**
+   * The composition as canonical shared fibres; empty when one of them is missing, so the fabric
+   * stays a draft rather than carrying a wrong label.
+   */
+  private Optional<List<FabricCompositionRequest>> composition(Map<String, String> byIso) {
+    List<FabricCompositionRequest> lines = new ArrayList<>();
+    for (Map.Entry<String, String> line : byIso.entrySet()) {
+      Optional<FiberCatalogReferenceDto> fibre = fibres.findCanonicalByIsoCode(line.getKey());
+      if (fibre.isEmpty()) return Optional.empty();
+      lines.add(
+          new FabricCompositionRequest(fibre.get().fiberId(), new BigDecimal(line.getValue())));
+    }
+    return Optional.of(lines);
   }
 
   /** Illustrative woven design values: ends and picks per centimetre and the weave notation. */
@@ -325,6 +363,7 @@ public class FabricStockDemoSeeder {
     if (gabardine.isEmpty()) return;
     SalesProductDto entry = gabardine.get();
     Optional<FabricConstructionDto> construction = fabrics.findConstruction("GABARDINE");
+    Optional<List<FabricCompositionRequest>> composition = composition(COTTON);
     fabrics.ensureArticle(
         entry.getProductId(),
         new FabricArticleRequest(
@@ -342,8 +381,10 @@ public class FabricStockDemoSeeder {
             BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
             ARTICLE_NOTE,
             woven("40.0", "24.0", "2/1"),
-            null),
-        construction.isPresent());
+            null,
+            null,
+            composition.orElse(null)),
+        construction.isPresent() && composition.isPresent());
     ensureWidths(entry.getProductId(), List.of(155));
     for (String code : List.of("LOT-24011", "LOT-24012", "LOT-23087", "LOT-24020", "LOT-23050")) {
       batches

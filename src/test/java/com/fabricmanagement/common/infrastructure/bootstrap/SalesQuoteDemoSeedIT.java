@@ -298,6 +298,25 @@ class SalesQuoteDemoSeedIT {
                     + " WHERE a.tenant_id = ? AND k.machine_gauge = 28",
                 tenant))
         .isEqualTo(1L);
+    Map<String, String> labelByArticle = new HashMap<>();
+    for (var row :
+        jdbc.queryForList(
+            "SELECT a.article_code,"
+                + " string_agg(c.fiber_iso_code || ' ' || c.percentage::text, ', '"
+                + " ORDER BY c.percentage DESC, c.fiber_iso_code) AS label,"
+                + " sum(c.percentage) AS total"
+                + " FROM production.prod_fabric_article a"
+                + " JOIN production.prod_fabric_composition c ON c.fabric_article_id = a.id"
+                + " WHERE a.tenant_id = ? AND a.deleted_at IS NULL GROUP BY a.article_code",
+            tenant)) {
+      assertThat((BigDecimal) row.get("total"))
+          .as("%s composition", row.get("article_code"))
+          .isEqualByComparingTo("100");
+      labelByArticle.put((String) row.get("article_code"), (String) row.get("label"));
+    }
+    assertThat(labelByArticle).hasSize(expected.size());
+    assertThat(labelByArticle).containsEntry("PM-1454", "CO 100.00");
+    assertThat(labelByArticle).containsEntry("PM-1457", "LI 55.00, CO 45.00");
   }
 
   /** What the order form finds when it picks one fabric, one colour and one width. */

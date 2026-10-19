@@ -43,6 +43,7 @@ public class FabricArticleService {
   private final FabricConstructionCatalogService constructions;
   private final ProductService products;
   private final ProductRepository productRepository;
+  private final FabricMaterialResolver materials;
   private final Clock clock;
 
   @Transactional
@@ -62,7 +63,7 @@ public class FabricArticleService {
             .findByTenantIdInAndId(List.of(tenantId), created.getId())
             .orElseThrow(() -> new IllegalStateException("Created product not found"));
     FabricArticle article = FabricArticle.draft(product, request.formation());
-    article.apply(spec(request));
+    article.apply(spec(request, null));
     return FabricArticleDto.from(articles.save(article));
   }
 
@@ -84,7 +85,7 @@ public class FabricArticleService {
     requireFreeCode(tenantId, request.articleCode(), null);
     product.describe(request.name(), request.description());
     FabricArticle article = FabricArticle.draft(product, request.formation());
-    article.apply(spec(request));
+    article.apply(spec(request, null));
     return FabricArticleDto.from(articles.save(article));
   }
 
@@ -98,7 +99,7 @@ public class FabricArticleService {
     }
     requireFreeCode(tenantId, request.articleCode(), article.getId());
     products.describe(article.getProductId(), request.name(), request.description());
-    article.apply(spec(request));
+    article.apply(spec(request, article));
     return FabricArticleDto.from(articles.save(article));
   }
 
@@ -166,7 +167,11 @@ public class FabricArticleService {
         .orElseThrow(() -> new NotFoundException("Fabric article not found: " + id));
   }
 
-  private FabricArticleSpec spec(FabricArticleRequest request) {
+  /**
+   * The spec a request asks for. Omitted yarns or composition keep what an existing article has, so
+   * a client that does not edit them yet cannot wipe them; an empty list clears them.
+   */
+  private FabricArticleSpec spec(FabricArticleRequest request, FabricArticle existing) {
     return new FabricArticleSpec(
         request.articleCode(),
         request.constructionId() == null ? null : constructions.require(request.constructionId()),
@@ -193,7 +198,13 @@ public class FabricArticleService {
                 request.knitted().coursesPerCm(),
                 request.knitted().walesPerCm(),
                 request.knitted().stitchLengthMm(),
-                request.knitted().feeders()));
+                request.knitted().feeders()),
+        request.yarns() == null && existing != null
+            ? existing.yarnLines()
+            : materials.yarnLines(request.yarns()),
+        request.composition() == null && existing != null
+            ? existing.compositionLines()
+            : materials.compositionLines(request.composition()));
   }
 
   private void requireFreeCode(UUID tenantId, String code, UUID self) {

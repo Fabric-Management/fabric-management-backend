@@ -8,6 +8,7 @@ import com.fabricmanagement.product.fabric.domain.reference.FabricConstruction;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,12 +17,20 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -45,6 +54,10 @@ public class FabricArticle extends BaseEntity {
   public static final String CONSTRUCTION_MISSING = "CONSTRUCTION_MISSING";
   public static final String COLOUR_STATE_MISSING = "COLOUR_STATE_MISSING";
   public static final String GSM_FINISHED_MISSING = "GSM_FINISHED_MISSING";
+  public static final String COMPOSITION_INCOMPLETE = "COMPOSITION_INCOMPLETE";
+  public static final String YARN_SHARES_INCOMPLETE = "YARN_SHARES_INCOMPLETE";
+
+  private static final BigDecimal HUNDRED = new BigDecimal("100");
 
   @OneToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "product_id", nullable = false, updatable = false)
@@ -107,6 +120,16 @@ public class FabricArticle extends BaseEntity {
       fetch = FetchType.LAZY)
   private FabricKnittedDetail knitted;
 
+  @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("position ASC")
+  @Getter(AccessLevel.NONE)
+  private List<FabricYarn> yarns = new ArrayList<>();
+
+  @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("fiberIsoCode ASC")
+  @Getter(AccessLevel.NONE)
+  private List<FabricCompositionLine> composition = new ArrayList<>();
+
   /** A new, possibly incomplete article for a FABRIC product. */
   public static FabricArticle draft(Product product, FabricFormation formation) {
     if (product == null || product.getProductType() != ProductType.FABRIC) {
@@ -163,6 +186,9 @@ public class FabricArticle extends BaseEntity {
     if (finished != null && usable != null && usable.compareTo(finished) > 0) {
       throw new FabricDomainException("The usable width cannot exceed the finished width");
     }
+    List<FabricArticleSpec.YarnLine> yarnLines = checkedYarns(spec.yarns());
+    List<FabricArticleSpec.CompositionLine> compositionLines =
+        checkedComposition(spec.composition());
     boolean changed = !currentSpec().sameAs(normalised(spec));
 
     articleCode = FabricArticleSpec.trimToNull(spec.articleCode());
@@ -183,6 +209,8 @@ public class FabricArticle extends BaseEntity {
     if (knitted != null) {
       knitted.apply(spec.knitted() == null ? FabricArticleSpec.Knitted.EMPTY : spec.knitted());
     }
+    replaceYarns(yarnLines);
+    replaceComposition(compositionLines);
 
     if (status == FabricArticleStatus.ACTIVE) {
       requireComplete("An active fabric article must stay complete");
@@ -198,6 +226,19 @@ public class FabricArticle extends BaseEntity {
     if (construction == null) problems.add(CONSTRUCTION_MISSING);
     if (colourState == null) problems.add(COLOUR_STATE_MISSING);
     if (gsmFinished == null) problems.add(GSM_FINISHED_MISSING);
+    if (composition.isEmpty()
+        || FabricArticleSpec.total(
+                    composition.stream().map(FabricCompositionLine::getPercentage).toList())
+                .compareTo(HUNDRED)
+            != 0) {
+      problems.add(COMPOSITION_INCOMPLETE);
+    }
+    if (!yarns.isEmpty()
+        && FabricArticleSpec.total(yarns.stream().map(FabricYarn::getSharePercent).toList())
+                .compareTo(HUNDRED)
+            != 0) {
+      problems.add(YARN_SHARES_INCOMPLETE);
+    }
     return problems;
   }
 
@@ -239,7 +280,30 @@ public class FabricArticle extends BaseEntity {
         standardRollLengthM,
         remarks,
         woven == null ? null : woven.spec(),
-        knitted == null ? null : knitted.spec());
+        knitted == null ? null : knitted.spec(),
+        yarnLines(),
+        compositionLines());
+  }
+
+  /** The yarns in role order, then position within the role. */
+  public List<FabricArticleSpec.YarnLine> yarnLines() {
+    return yarns.stream()
+        .sorted(
+            Comparator.comparing((FabricYarn yarn) -> yarn.getRole().ordinal())
+                .thenComparing(FabricYarn::getPosition))
+        .map(FabricYarn::line)
+        .toList();
+  }
+
+  /** The declared composition, largest share first. */
+  public List<FabricArticleSpec.CompositionLine> compositionLines() {
+    return composition.stream()
+        .sorted(
+            Comparator.comparing(FabricCompositionLine::getPercentage)
+                .reversed()
+                .thenComparing(FabricCompositionLine::getFiberIsoCode))
+        .map(FabricCompositionLine::line)
+        .toList();
   }
 
   /** The detail an omitted section stands for, so "no woven values" compares as empty values. */
@@ -258,7 +322,100 @@ public class FabricArticle extends BaseEntity {
         woven == null ? null : spec.woven() == null ? FabricArticleSpec.Woven.EMPTY : spec.woven(),
         knitted == null
             ? null
-            : spec.knitted() == null ? FabricArticleSpec.Knitted.EMPTY : spec.knitted());
+            : spec.knitted() == null ? FabricArticleSpec.Knitted.EMPTY : spec.knitted(),
+        spec.yarns(),
+        spec.composition());
+  }
+
+  private List<FabricArticleSpec.YarnLine> checkedYarns(List<FabricArticleSpec.YarnLine> lines) {
+    Set<String> seen = new HashSet<>();
+    List<BigDecimal> shares = new ArrayList<>();
+    for (FabricArticleSpec.YarnLine line : lines) {
+      if (line == null || line.role() == null || line.yarnProductId() == null) {
+        throw new FabricDomainException("Each fabric yarn needs a role and a yarn");
+      }
+      if (!line.role().fits(formation)) {
+        throw new FabricDomainException(
+            "A " + line.role() + " yarn does not fit a " + formation + " fabric");
+      }
+      if (!seen.add(line.role() + "/" + line.yarnProductId())) {
+        throw new FabricDomainException(
+            "The same yarn appears twice as " + line.role() + "; give it one combined share");
+      }
+      shares.add(FabricArticleSpec.percentage("sharePercent", line.sharePercent()));
+    }
+    if (FabricArticleSpec.total(shares).compareTo(HUNDRED) > 0) {
+      throw new FabricDomainException("The yarn shares add up to more than 100%");
+    }
+    return lines;
+  }
+
+  private List<FabricArticleSpec.CompositionLine> checkedComposition(
+      List<FabricArticleSpec.CompositionLine> lines) {
+    Set<String> seen = new HashSet<>();
+    List<BigDecimal> percentages = new ArrayList<>();
+    for (FabricArticleSpec.CompositionLine line : lines) {
+      if (line == null
+          || line.fiberId() == null
+          || FabricArticleSpec.trimToNull(line.isoCode()) == null
+          || FabricArticleSpec.trimToNull(line.fiberName()) == null) {
+        throw new FabricDomainException("Each composition line needs a fibre");
+      }
+      if (!seen.add(line.fiberId() + "/" + line.materialSource())) {
+        throw new FabricDomainException(
+            "Fibre " + line.isoCode() + " appears twice in the composition");
+      }
+      percentages.add(FabricArticleSpec.percentage("percentage", line.percentage()));
+    }
+    if (FabricArticleSpec.total(percentages).compareTo(HUNDRED) > 0) {
+      throw new FabricDomainException("The composition adds up to more than 100%");
+    }
+    return lines;
+  }
+
+  /**
+   * Keeps the rows whose role and position stay, so a re-save does not delete and re-insert them
+   * (the database keeps one row per article, role and position).
+   */
+  private void replaceYarns(List<FabricArticleSpec.YarnLine> lines) {
+    Map<String, FabricYarn> existing = new HashMap<>();
+    yarns.forEach(yarn -> existing.put(yarn.getRole() + "/" + yarn.getPosition(), yarn));
+    Map<FabricYarnRole, Short> nextPosition = new EnumMap<>(FabricYarnRole.class);
+    List<FabricYarn> kept = new ArrayList<>();
+    for (FabricArticleSpec.YarnLine line : lines) {
+      short position = nextPosition.merge(line.role(), (short) 1, (a, b) -> (short) (a + b));
+      FabricYarn yarn = existing.remove(line.role() + "/" + position);
+      if (yarn == null) {
+        yarn = new FabricYarn(this, line, position);
+      } else {
+        yarn.apply(line);
+      }
+      kept.add(yarn);
+    }
+    yarns.removeIf(current -> kept.stream().noneMatch(keep -> keep == current));
+    kept.stream()
+        .filter(keep -> yarns.stream().noneMatch(current -> current == keep))
+        .forEach(yarns::add);
+  }
+
+  /** Keeps the rows whose fibre and source stay; the database keeps one row per pair. */
+  private void replaceComposition(List<FabricArticleSpec.CompositionLine> lines) {
+    Map<String, FabricCompositionLine> existing = new HashMap<>();
+    composition.forEach(row -> existing.put(row.getFiberId() + "/" + row.getMaterialSource(), row));
+    List<FabricCompositionLine> kept = new ArrayList<>();
+    for (FabricArticleSpec.CompositionLine line : lines) {
+      FabricCompositionLine row = existing.remove(line.fiberId() + "/" + line.materialSource());
+      if (row == null) {
+        row = new FabricCompositionLine(this, line);
+      } else {
+        row.apply(line);
+      }
+      kept.add(row);
+    }
+    composition.removeIf(current -> kept.stream().noneMatch(keep -> keep == current));
+    kept.stream()
+        .filter(keep -> composition.stream().noneMatch(current -> current == keep))
+        .forEach(composition::add);
   }
 
   private void requireComplete(String message) {
