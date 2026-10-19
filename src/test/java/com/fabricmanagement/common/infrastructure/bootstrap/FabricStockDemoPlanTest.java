@@ -37,6 +37,16 @@ class FabricStockDemoPlanTest {
   }
 
   @Test
+  void everyFabricSaysWhatItIs() {
+    for (Fabric fabric : FabricStockDemoPlan.FABRICS) {
+      assertThat(fabric.description()).as("%s has a description", fabric.name()).isNotBlank();
+      assertThat(fabric.description())
+          .as("a description is not the name")
+          .isNotEqualTo(fabric.name());
+    }
+  }
+
+  @Test
   void theMainColourHasTwoOrThreeLotsAtEachWidth() {
     for (Fabric fabric : FabricStockDemoPlan.FABRICS) {
       for (int width : FabricStockDemoSeeder.WIDTHS_CM) {

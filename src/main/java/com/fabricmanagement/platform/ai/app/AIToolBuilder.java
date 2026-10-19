@@ -171,7 +171,16 @@ public class AIToolBuilder {
                             Map.of(
                                 "type", "string",
                                 "description",
-                                    "Unit of measurement: kg, m, piece, liter, etc. (required)")),
+                                    "Unit of measurement: kg, m, piece, liter, etc. (required)"),
+                        "name",
+                            Map.of(
+                                "type",
+                                "string",
+                                "description",
+                                "Product name, e.g. Cotton Poplin 120gsm (required for FABRIC,"
+                                    + " CHEMICAL and CONSUMABLE)"),
+                        "description",
+                            Map.of("type", "string", "description", "Free product description")),
                 "required", List.of("productType", "unit"))),
         buildTool(
             "create_fiber",

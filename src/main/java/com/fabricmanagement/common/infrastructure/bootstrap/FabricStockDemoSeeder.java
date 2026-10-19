@@ -110,6 +110,8 @@ public class FabricStockDemoSeeder {
                       CreateProductRequest.builder()
                           .productType(ProductType.FABRIC)
                           .unit("M")
+                          .name(fabric.name())
+                          .description(fabric.description())
                           .build());
               catalogue.createEntry(
                   new CreateSalesProductRequest(

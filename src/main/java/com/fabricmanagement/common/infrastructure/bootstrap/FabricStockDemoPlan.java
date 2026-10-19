@@ -22,7 +22,8 @@ final class FabricStockDemoPlan {
   static final int ROLL_M = 120;
 
   /** One fabric with every lot of every colour and width it is stocked in. */
-  record Fabric(String code, String name, int gsm, String price, List<Lot> lots) {
+  record Fabric(
+      String code, String name, String description, int gsm, String price, List<Lot> lots) {
     Fabric {
       lots = List.copyOf(lots);
     }
@@ -67,6 +68,7 @@ final class FabricStockDemoPlan {
           new Fabric(
               "P1454",
               "PM-1454 Cotton Poplin 120gsm (demo)",
+              "Plain-weave cotton poplin with a crisp hand, for shirts and dresses.",
               120,
               "8.60",
               List.of(
@@ -78,6 +80,7 @@ final class FabricStockDemoPlan {
           new Fabric(
               "P1455",
               "PM-1455 Cotton Twill 220gsm (demo)",
+              "2/1 cotton twill with a firm diagonal face, for workwear and chinos.",
               220,
               "9.20",
               List.of(
@@ -90,6 +93,7 @@ final class FabricStockDemoPlan {
           new Fabric(
               "P1456",
               "PM-1456 Cotton Satin 160gsm (demo)",
+              "Cotton sateen with a soft lustre, for bed linen and light trousers.",
               160,
               "11.40",
               List.of(
@@ -102,6 +106,7 @@ final class FabricStockDemoPlan {
           new Fabric(
               "P1457",
               "PM-1457 Linen Blend 180gsm (demo)",
+              "Linen-cotton blend with a dry, textured hand, for summer shirts.",
               180,
               "12.80",
               List.of(
@@ -115,6 +120,7 @@ final class FabricStockDemoPlan {
           new Fabric(
               "P1458",
               "PM-1458 Single Jersey 180gsm (demo)",
+              "Cotton single jersey knit, finished open width, for T-shirts.",
               180,
               "6.75",
               List.of(

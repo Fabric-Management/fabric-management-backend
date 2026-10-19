@@ -52,7 +52,15 @@ public class ProductService implements ProductFacade {
   public ProductDto createProductInternal(CreateProductRequest request) {
     log.info("Creating product: type={}", request.getProductType());
 
-    Product product = Product.create(request.getProductType(), request.getUnit());
+    Product product =
+        Product.create(
+            request.getProductType(),
+            request.getUnit(),
+            request.getName(),
+            request.getDescription());
+    if (Product.requiresOwnName(product.getProductType()) && product.getName() == null) {
+      throw new IllegalArgumentException("A " + product.getProductType() + " product needs a name");
+    }
 
     Product saved = productRepository.save(product);
 
@@ -61,9 +69,7 @@ public class ProductService implements ProductFacade {
 
     log.info("✅ Product created: id={}, uid={}", saved.getId(), saved.getUid());
 
-    ProductDto dto = ProductDto.from(saved);
-    dto.setDisplayName(dto.getUid());
-    return dto;
+    return ProductDto.from(saved);
   }
 
   @Override
@@ -110,8 +116,8 @@ public class ProductService implements ProductFacade {
   private List<ProductDto> enrichDisplayNames(List<ProductDto> products) {
     if (products.isEmpty()) return products;
 
-    // Fall back to uid by default
-    products.forEach(p -> p.setDisplayName(p.getUid()));
+    // The product's own name, else its uid; fibre and yarn master records override below.
+    products.forEach(p -> p.setDisplayName(p.getName() != null ? p.getName() : p.getUid()));
 
     // Collect FIBER product IDs for batch lookup
     List<UUID> fiberProductIds =

@@ -215,6 +215,45 @@ class OrderIntakeProductSearchServiceTest {
         .containsExactly("Current Poplin Definition");
   }
 
+  @Test
+  void aCustomersUnnamedPrivateEntryFallsBackToTheGeneralCatalogueName() {
+    ProductDto fabric = product("SYS-000-PROD-0A1B2C3D", "SYS-000-PROD-0A1B2C3D");
+    SalesProduct privateWithoutName = entry(fabric.getId(), customerA, "7.80");
+    SalesProduct general = entry(fabric.getId(), null, "8.60");
+    general.setProductName("Cotton Poplin 120gsm");
+    stubSingleProduct(fabric, List.of(privateWithoutName, general));
+
+    assertThat(service.search(customerA, ProductType.FABRIC, null))
+        .singleElement()
+        .satisfies(
+            option -> {
+              assertThat(option.displayName()).isEqualTo("Cotton Poplin 120gsm");
+              assertThat(option.customerSpecific()).isTrue();
+              assertThat(option.listPrice()).isEqualByComparingTo("7.80");
+            });
+  }
+
+  @Test
+  void theProductsDescriptionIsOfferedWithIt() {
+    ProductDto described = product("FAB-POPLIN", "Cotton Poplin 120gsm");
+    described.setDescription("Plain-weave cotton for shirts.");
+    stubSingleProduct(described, List.of(entry(described.getId(), null, "8.60")));
+
+    assertThat(service.search(customerA, ProductType.FABRIC, null))
+        .extracting(OrderIntakeProductOption::description)
+        .containsExactly("Plain-weave cotton for shirts.");
+  }
+
+  @Test
+  void anUndescribedProductHasNoDescription() {
+    ProductDto plain = product("FAB-PLAIN", "Cotton Drill 240gsm");
+    stubSingleProduct(plain, List.of(entry(plain.getId(), null, "8.60")));
+
+    assertThat(service.search(customerA, ProductType.FABRIC, null))
+        .extracting(OrderIntakeProductOption::description)
+        .containsExactly((String) null);
+  }
+
   private void stubSingleProduct(ProductDto product, List<SalesProduct> entries) {
     when(productDefinitions.sellableProducts(tenantId, ProductType.FABRIC))
         .thenReturn(List.of(product));

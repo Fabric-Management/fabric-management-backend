@@ -69285,6 +69285,20 @@ components:
     CreateProductRequest:
       type: object
       properties:
+        description:
+          type:
+          - string
+          - "null"
+          description: Free description of the product
+          maxLength: 4000
+          minLength: 0
+        name:
+          type: string
+          description: "The product's name. Required for FABRIC, CHEMICAL and CONSUMABLE;\
+            \ fibre and yarn take their name from their own master record."
+          example: Cotton Poplin 120gsm
+          maxLength: 255
+          minLength: 0
         productType:
           type: string
           enum:
@@ -75936,6 +75950,12 @@ components:
         customerSpecific:
           type: boolean
           description: True when the catalogue entry is private to this customer
+        description:
+          type:
+          - string
+          - "null"
+          description: "What the product is, written by the tenant; null when not\
+            \ described"
         displayName:
           type: string
         finishedWidths:
@@ -75968,6 +75988,7 @@ components:
       - baseUnit
       - currency
       - customerSpecific
+      - description
       - displayName
       - finishedWidths
       - listPrice
@@ -79245,15 +79266,24 @@ components:
         createdAt:
           type: string
           format: date-time
+        description:
+          type:
+          - string
+          - "null"
+          description: Free description of the product
         displayName:
           type: string
-          description: Human-readable name resolved from type-specific master data;
-            falls back to uid
+          description: "Human-readable name: the fibre or yarn master record's name,\
+            \ else the product's own name, else the uid"
         id:
           type: string
           format: uuid
         isActive:
           type: boolean
+        name:
+          type: string
+          description: "The product's own name; null for fibre and yarn, named by\
+            \ their record"
         productType:
           type: string
           enum:

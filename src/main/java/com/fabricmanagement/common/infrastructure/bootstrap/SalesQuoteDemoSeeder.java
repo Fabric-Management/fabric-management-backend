@@ -139,7 +139,18 @@ public class SalesQuoteDemoSeeder {
 
   static final String PRODUCT_GABARDINE = "PM-1453 Gabardine 155cm 190gsm";
   static final String PRODUCT_COMBED_YARN = "PM-3001 Combed Yarn Ne 30/1";
+
   static final String PRODUCT_RAW_COTTON = "PM-9001 Raw Cotton";
+
+  /** What the demo products are, shown under their name in the order form. */
+  static final Map<String, String> PRODUCT_DESCRIPTIONS =
+      Map.of(
+          PRODUCT_GABARDINE,
+          "Cotton gabardine, 190 gsm at 155 cm, for trousers and outerwear.",
+          PRODUCT_COMBED_YARN,
+          "Combed cotton ring-spun yarn, Ne 30/1, for knitting and weaving.",
+          PRODUCT_RAW_COTTON,
+          "Raw cotton lint, baled, for spinning.");
 
   /** Every demo colour is a synthetic standard; the note makes that visible on the card. */
   static final String SYNTHETIC_STANDARD_NOTE =
@@ -552,7 +563,12 @@ public class SalesQuoteDemoSeeder {
     }
     ProductDto product =
         productFacade.createProduct(
-            CreateProductRequest.builder().productType(productType).unit(unit).build());
+            CreateProductRequest.builder()
+                .productType(productType)
+                .unit(unit)
+                .name(catalogueName)
+                .description(PRODUCT_DESCRIPTIONS.get(catalogueName))
+                .build());
     catalogueEntry(product, catalogueName, listPrice);
     return product;
   }

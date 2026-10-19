@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -101,6 +102,7 @@ public class OrderIntakeProductSearchService {
             product ->
                 toOption(
                     definitions.get(product.getId()),
+                    product.getDescription(),
                     entries.getOrDefault(product.getId(), List.of()),
                     customerId,
                     stock.getOrDefault(product.getId(), OfferableStockSummary.empty())))
@@ -124,16 +126,29 @@ public class OrderIntakeProductSearchService {
         || (product.getUid() != null && product.getUid().toLowerCase(Locale.ROOT).contains(needle));
   }
 
-  /** Master data wins; unnamed products may use this customer's visible catalogue snapshot. */
-  private static String label(
-      String displayName, String uid, List<SalesProduct> entries, UUID customerId) {
+  /**
+   * The product's own name wins (fibre/yarn record, else the product's name); an unnamed product
+   * uses this customer's catalogue name, else the general catalogue name, else its uid. A private
+   * entry without a name never hides the general entry's name.
+   */
+  static String label(String displayName, String uid, List<SalesProduct> entries, UUID customerId) {
     if (displayName != null && !displayName.isBlank() && !displayName.equals(uid)) {
       return displayName;
     }
-    return preferredEntry(entries, customerId)
-        .map(SalesProduct::getProductName)
-        .filter(name -> !name.isBlank())
+    Predicate<SalesProduct> customers =
+        entry -> customerId != null && customerId.equals(entry.getCustomerId());
+    return catalogueName(entries, customers)
+        .or(() -> catalogueName(entries, entry -> entry.getCustomerId() == null))
         .orElse(uid);
+  }
+
+  private static Optional<String> catalogueName(
+      List<SalesProduct> entries, Predicate<SalesProduct> scope) {
+    return entries.stream()
+        .filter(scope)
+        .map(SalesProduct::getProductName)
+        .filter(name -> name != null && !name.isBlank())
+        .findFirst();
   }
 
   private static Optional<SalesProduct> preferredEntry(
@@ -146,6 +161,7 @@ public class OrderIntakeProductSearchService {
 
   private static OrderIntakeProductOption toOption(
       ProductSalesDefinitionDto definition,
+      String description,
       List<SalesProduct> entries,
       UUID customerId,
       OfferableStockSummary stock) {
@@ -158,6 +174,7 @@ public class OrderIntakeProductSearchService {
         definition.productId(),
         definition.uid(),
         label(definition.displayName(), definition.uid(), entries, customerId),
+        description,
         definition.productType(),
         definition.baseUnit(),
         definition.allowedUnits(),

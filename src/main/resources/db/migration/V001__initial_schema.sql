@@ -780,6 +780,10 @@ CREATE TABLE IF NOT EXISTS production.prod_product (
     uid VARCHAR(100) UNIQUE NOT NULL,
     product_type VARCHAR(20) NOT NULL CHECK (product_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
     unit VARCHAR(20) NOT NULL,
+    -- FABRIC-0: the product's own name and description. Fibre and yarn names stay authoritative
+    -- in prod_fiber / prod_yarn_article; for every other type this is the name the tenant sees.
+    name VARCHAR(255),
+    description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -788,6 +792,11 @@ CREATE TABLE IF NOT EXISTS production.prod_product (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0
 );
+
+ALTER TABLE production.prod_product
+    ADD CONSTRAINT ck_product_name_not_blank CHECK (name IS NULL OR btrim(name) <> ''),
+    ADD CONSTRAINT ck_product_description_not_blank
+        CHECK (description IS NULL OR btrim(description) <> '');
 
 CREATE INDEX idx_product_tenant_type ON production.prod_product(tenant_id, product_type);
 CREATE INDEX idx_product_active ON production.prod_product(is_active) WHERE is_active = TRUE;

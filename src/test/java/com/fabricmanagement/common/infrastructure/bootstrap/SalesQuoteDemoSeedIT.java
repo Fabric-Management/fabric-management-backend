@@ -239,6 +239,7 @@ class SalesQuoteDemoSeedIT {
       assertThat(options).hasSize(1);
       var product = options.getFirst();
       assertThat(product.displayName()).isEqualTo(fabric.name());
+      assertThat(product.description()).isEqualTo(fabric.description());
       assertThat(product.listPrice()).isEqualByComparingTo(fabric.price());
       assertThat(product.finishedWidths())
           .extracting(width -> width.value())

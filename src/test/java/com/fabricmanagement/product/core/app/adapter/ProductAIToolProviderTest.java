@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -139,5 +140,43 @@ class ProductAIToolProviderTest {
 
     // Then
     assertThat(result).contains("Product created successfully!").contains("MAT-001");
+  }
+
+  @Test
+  void aFabricIsNotCreatedWithoutAName() {
+    Map<String, Object> params = Map.of("productType", "FABRIC", "unit", "m");
+
+    String result = productAIToolProvider.execute(tenantId, "create_product", params);
+
+    assertThat(result).contains("Name is required");
+    verify(productFacade, never()).createProduct(any(CreateProductRequest.class));
+  }
+
+  @Test
+  void aNamedFabricIsCreatedWithItsNameAndDescription() {
+    Map<String, Object> params =
+        Map.of(
+            "productType", "FABRIC",
+            "unit", "m",
+            "name", "Cotton Poplin 120gsm",
+            "description", "Plain-weave cotton for shirts.");
+    when(productFacade.createProduct(any(CreateProductRequest.class)))
+        .thenReturn(
+            ProductDto.builder()
+                .id(UUID.randomUUID())
+                .uid("PRD-002")
+                .displayName("Cotton Poplin 120gsm")
+                .productType(ProductType.FABRIC)
+                .unit("m")
+                .build());
+
+    String result = productAIToolProvider.execute(tenantId, "create_product", params);
+
+    ArgumentCaptor<CreateProductRequest> request =
+        ArgumentCaptor.forClass(CreateProductRequest.class);
+    verify(productFacade).createProduct(request.capture());
+    assertThat(request.getValue().getName()).isEqualTo("Cotton Poplin 120gsm");
+    assertThat(request.getValue().getDescription()).isEqualTo("Plain-weave cotton for shirts.");
+    assertThat(result).contains("Cotton Poplin 120gsm");
   }
 }

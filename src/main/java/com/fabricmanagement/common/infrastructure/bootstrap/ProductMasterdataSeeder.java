@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.product.core.app.ProductService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,10 +71,17 @@ public class ProductMasterdataSeeder implements DataSeeder {
                 UUID tenantId = tenant.getId();
 
                 // Per-type count check to prevent duplicates on partial re-seed
-                seedProductIfNeeded(tenantId, ProductType.FIBER, "kg", 2);
-                seedProductIfNeeded(tenantId, ProductType.YARN, "kg", 2);
-                seedProductIfNeeded(tenantId, ProductType.FABRIC, "m", 1);
-                seedProductIfNeeded(tenantId, ProductType.CHEMICAL, "lt", 1);
+                seedProductIfNeeded(
+                    tenantId, ProductType.FIBER, "kg", List.of("Raw cotton", "Polyester staple"));
+                seedProductIfNeeded(
+                    tenantId,
+                    ProductType.YARN,
+                    "kg",
+                    List.of("Combed cotton yarn Ne 30/1", "Polyester yarn 150 dtex"));
+                seedProductIfNeeded(
+                    tenantId, ProductType.FABRIC, "m", List.of("Cotton drill 240gsm"));
+                seedProductIfNeeded(
+                    tenantId, ProductType.CHEMICAL, "lt", List.of("Reactive dye, navy"));
               });
         });
   }
@@ -83,9 +91,10 @@ public class ProductMasterdataSeeder implements DataSeeder {
    * This prevents duplicates when a previous seed was partially completed.
    */
   private void seedProductIfNeeded(
-      UUID tenantId, ProductType type, String unit, int expectedCount) {
-    long currentCount = productService.findByType(tenantId, type).size();
-    long toCreate = expectedCount - currentCount;
+      UUID tenantId, ProductType type, String unit, List<String> names) {
+    int expectedCount = names.size();
+    int currentCount = productService.findByType(tenantId, type).size();
+    int toCreate = expectedCount - currentCount;
 
     if (toCreate <= 0) {
       log.debug("Product type {} already has {} records, skipping.", type, currentCount);
@@ -94,7 +103,11 @@ public class ProductMasterdataSeeder implements DataSeeder {
 
     for (int i = 0; i < toCreate; i++) {
       CreateProductRequest req =
-          CreateProductRequest.builder().productType(type).unit(unit).build();
+          CreateProductRequest.builder()
+              .productType(type)
+              .unit(unit)
+              .name(names.get(currentCount + i))
+              .build();
       productService.createProduct(req);
       log.info("Created Product of type {} in unit {} ({}/{})", type, unit, i + 1, toCreate);
     }
