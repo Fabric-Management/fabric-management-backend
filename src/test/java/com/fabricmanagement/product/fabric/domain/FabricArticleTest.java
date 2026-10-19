@@ -104,17 +104,17 @@ class FabricArticleTest {
     article.apply(spec(null, null, null, null));
 
     assertThat(article.activationProblems())
+        .as("colour state and finished weight are recommended settings, not required")
         .containsExactly(
             FabricArticle.CONSTRUCTION_MISSING,
-            FabricArticle.COLOUR_STATE_MISSING,
-            FabricArticle.GSM_FINISHED_MISSING,
+            FabricArticle.THREAD_DENSITY_MISSING,
             FabricArticle.COMPOSITION_INCOMPLETE);
     assertThatThrownBy(article::activate)
         .isInstanceOfSatisfying(
             FabricDomainException.class,
             problem -> {
               assertThat(problem.getHttpStatus()).isEqualTo(409);
-              assertThat(problem.getProblems()).hasSize(4);
+              assertThat(problem.getProblems()).hasSize(3);
             });
 
     article.apply(spec(twill, "220", null, null));
@@ -124,17 +124,53 @@ class FabricArticleTest {
   }
 
   @Test
-  void anActiveArticleStaysCompleteAndARealChangeRaisesItsSpecVersion() {
+  void anActiveArticleStaysCompleteAndOnlyAnIdentityChangeRaisesItsSpecVersion() {
     FabricArticle article = active();
 
     article.apply(spec(twill, "220.0", null, null));
-    assertThat(article.getArticleSpecVersion()).as("120 and 120.0 are the same").isEqualTo(1);
+    assertThat(article.getArticleSpecVersion()).as("220 and 220.0 are the same").isEqualTo(1);
 
-    article.apply(spec(twill, "230", null, null));
+    article.apply(spec(twill, "230", "150", "148"));
+    assertThat(article.getArticleSpecVersion())
+        .as("finished weight and widths are recommended settings")
+        .isEqualTo(1);
+
+    article.apply(withGreige(spec(twill, "230", "150", "148"), "250"));
+    assertThat(article.getArticleSpecVersion())
+        .as("filling in the greige weight completes the fabric")
+        .isEqualTo(1);
+
+    article.apply(withGreige(spec(twill, "230", "150", "148"), "260"));
     assertThat(article.getArticleSpecVersion()).isEqualTo(2);
 
-    assertThatThrownBy(() -> article.apply(spec(twill, null, null, null)))
+    article.apply(
+        withWoven(
+            withGreige(spec(twill, "230", "150", "148"), "260"),
+            new FabricArticleSpec.Woven(new BigDecimal("54"), new BigDecimal("28"), null, "2/1")));
+    assertThat(article.getArticleSpecVersion()).as("a denser warp is another fabric").isEqualTo(3);
+
+    assertThatThrownBy(
+            () ->
+                article.apply(
+                    withWoven(spec(twill, "230", null, null), FabricArticleSpec.Woven.EMPTY)))
+        .as("an active woven fabric keeps its ends and picks")
         .isInstanceOf(FabricDomainException.class);
+  }
+
+  @Test
+  void aKnittedFabricNeedsItsGaugeButNotItsMachineDiameter() {
+    FabricArticle knitted = FabricArticle.draft(fabric(), FabricFormation.KNITTED);
+    knitted.apply(knittedSpec(null, "30", 90));
+    assertThat(knitted.activationProblems()).containsExactly(FabricArticle.MACHINE_GAUGE_MISSING);
+
+    knitted.apply(knittedSpec(28, "30", 90));
+    knitted.activate();
+    knitted.apply(knittedSpec(28, "34", 102));
+    assertThat(knitted.getArticleSpecVersion())
+        .as("the same jersey runs on a 30 or 34 inch machine")
+        .isEqualTo(1);
+    knitted.apply(knittedSpec(24, "34", 102));
+    assertThat(knitted.getArticleSpecVersion()).isEqualTo(2);
   }
 
   @Test
@@ -347,10 +383,69 @@ class FabricArticleTest {
         null,
         new BigDecimal("120"),
         null,
-        null,
+        gsm == null ? null : WOVEN_52_28,
         null,
         null,
         gsm == null ? List.of() : cotton());
+  }
+
+  private static final FabricArticleSpec.Woven WOVEN_52_28 =
+      new FabricArticleSpec.Woven(new BigDecimal("52"), new BigDecimal("28"), null, "2/1");
+
+  private FabricArticleSpec knittedSpec(Integer gauge, String diameter, Integer feeders) {
+    return new FabricArticleSpec(
+        "PM-1458",
+        jersey,
+        FabricColourState.PIECE_DYED,
+        new BigDecimal("160"),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        new FabricArticleSpec.Knitted(
+            gauge, new BigDecimal(diameter), null, null, new BigDecimal("2.75"), feeders),
+        List.of(),
+        cotton());
+  }
+
+  private static FabricArticleSpec withGreige(FabricArticleSpec spec, String greige) {
+    return new FabricArticleSpec(
+        spec.articleCode(),
+        spec.construction(),
+        spec.colourState(),
+        spec.gsmFinished(),
+        new BigDecimal(greige),
+        spec.nominalFinishedWidthCm(),
+        spec.usableWidthCm(),
+        spec.nominalGreigeWidthCm(),
+        spec.standardRollLengthM(),
+        spec.remarks(),
+        spec.woven(),
+        spec.knitted(),
+        spec.yarns(),
+        spec.composition());
+  }
+
+  private static FabricArticleSpec withWoven(
+      FabricArticleSpec spec, FabricArticleSpec.Woven woven) {
+    return new FabricArticleSpec(
+        spec.articleCode(),
+        spec.construction(),
+        spec.colourState(),
+        spec.gsmFinished(),
+        spec.gsmGreige(),
+        spec.nominalFinishedWidthCm(),
+        spec.usableWidthCm(),
+        spec.nominalGreigeWidthCm(),
+        spec.standardRollLengthM(),
+        spec.remarks(),
+        woven,
+        spec.knitted(),
+        spec.yarns(),
+        spec.composition());
   }
 
   private static FabricArticleSpec with(

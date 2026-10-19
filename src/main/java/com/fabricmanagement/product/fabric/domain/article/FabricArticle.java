@@ -43,7 +43,7 @@ import lombok.NoArgsConstructor;
  *
  * <p>Lifecycle: a DRAFT may be incomplete and may be deleted, since nothing has used it yet; only a
  * complete article becomes ACTIVE; an ACTIVE article is retired as OBSOLETE, never deleted, and a
- * change to its spec raises its spec version.
+ * change to its identity raises its spec version (recommended production settings never do).
  */
 @Entity
 @Table(name = "prod_fabric_article", schema = "production")
@@ -52,8 +52,8 @@ import lombok.NoArgsConstructor;
 public class FabricArticle extends BaseEntity {
 
   public static final String CONSTRUCTION_MISSING = "CONSTRUCTION_MISSING";
-  public static final String COLOUR_STATE_MISSING = "COLOUR_STATE_MISSING";
-  public static final String GSM_FINISHED_MISSING = "GSM_FINISHED_MISSING";
+  public static final String THREAD_DENSITY_MISSING = "THREAD_DENSITY_MISSING";
+  public static final String MACHINE_GAUGE_MISSING = "MACHINE_GAUGE_MISSING";
   public static final String COMPOSITION_INCOMPLETE = "COMPOSITION_INCOMPLETE";
   public static final String YARN_SHARES_INCOMPLETE = "YARN_SHARES_INCOMPLETE";
 
@@ -189,7 +189,7 @@ public class FabricArticle extends BaseEntity {
     List<FabricArticleSpec.YarnLine> yarnLines = checkedYarns(spec.yarns());
     List<FabricArticleSpec.CompositionLine> compositionLines =
         checkedComposition(spec.composition());
-    boolean changed = !currentSpec().sameAs(normalised(spec));
+    boolean changed = normalised(spec).revisesIdentityOf(currentSpec());
 
     articleCode = FabricArticleSpec.trimToNull(spec.articleCode());
     construction = spec.construction();
@@ -224,8 +224,14 @@ public class FabricArticle extends BaseEntity {
   public List<String> activationProblems() {
     List<String> problems = new ArrayList<>();
     if (construction == null) problems.add(CONSTRUCTION_MISSING);
-    if (colourState == null) problems.add(COLOUR_STATE_MISSING);
-    if (gsmFinished == null) problems.add(GSM_FINISHED_MISSING);
+    if (formation == FabricFormation.WOVEN
+        && (woven == null || woven.getEndsPerCm() == null || woven.getPicksPerCm() == null)) {
+      problems.add(THREAD_DENSITY_MISSING);
+    }
+    if (formation == FabricFormation.KNITTED
+        && (knitted == null || knitted.getMachineGauge() == null)) {
+      problems.add(MACHINE_GAUGE_MISSING);
+    }
     if (composition.isEmpty()
         || FabricArticleSpec.total(
                     composition.stream().map(FabricCompositionLine::getPercentage).toList())

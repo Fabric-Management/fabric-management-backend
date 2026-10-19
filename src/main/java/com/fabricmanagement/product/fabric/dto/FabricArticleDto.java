@@ -49,7 +49,8 @@ public record FabricArticleDto(
                     requiredMode = Schema.RequiredMode.REQUIRED,
                     description =
                         "Stable codes of what still stops activation: CONSTRUCTION_MISSING,"
-                            + " COLOUR_STATE_MISSING, GSM_FINISHED_MISSING,"
+                            + " THREAD_DENSITY_MISSING (woven ends or picks per cm),"
+                            + " MACHINE_GAUGE_MISSING (knitted),"
                             + " COMPOSITION_INCOMPLETE, YARN_SHARES_INCOMPLETE"))
         List<String> activationProblems,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant createdAt,

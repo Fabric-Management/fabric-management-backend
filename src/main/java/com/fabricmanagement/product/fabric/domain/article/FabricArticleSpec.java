@@ -13,8 +13,17 @@ import java.util.UUID;
 
 /**
  * Everything about a fabric article that a tenant edits, apart from the product's own name and
- * description. Nominal values are design values (FABRIC-ARCHITECTURE F8): the widths a fabric is
- * sold in and the widths a lot measured are separate records.
+ * description. Two kinds of value live here (FABRIC-ARCHITECTURE §1d):
+ *
+ * <ul>
+ *   <li><b>Identity</b> — what makes it this fabric: construction, greige gramme weight, woven
+ *       ends/picks, reed and weave, knitted gauge, stitch length and course/wale density, yarns and
+ *       composition. Changing one raises the article's spec version.
+ *   <li><b>Recommended production settings</b> — colour state, finished gramme weight, the nominal
+ *       widths, standard roll length, knitting machine diameter and feeders, remarks. A weaving or
+ *       knitting order takes them as defaults and may change them; the values actually used belong
+ *       to the order and the lot. Changing them never raises the spec version.
+ * </ul>
  */
 public record FabricArticleSpec(
     String articleCode,
@@ -69,12 +78,11 @@ public record FabricArticleSpec(
 
     public static final Woven EMPTY = new Woven(null, null, null, null);
 
-    boolean sameAs(Woven other) {
-      return other != null
-          && same(endsPerCm, other.endsPerCm)
-          && same(picksPerCm, other.picksPerCm)
-          && Objects.equals(trimToNull(reedNotation), trimToNull(other.reedNotation))
-          && Objects.equals(trimToNull(weaveNotation), trimToNull(other.weaveNotation));
+    boolean revises(Woven previous) {
+      return revised(previous.endsPerCm, endsPerCm)
+          || revised(previous.picksPerCm, picksPerCm)
+          || revised(previous.reedNotation, reedNotation)
+          || revised(previous.weaveNotation, weaveNotation);
     }
   }
 
@@ -89,34 +97,46 @@ public record FabricArticleSpec(
 
     public static final Knitted EMPTY = new Knitted(null, null, null, null, null, null);
 
-    boolean sameAs(Knitted other) {
-      return other != null
-          && Objects.equals(machineGauge, other.machineGauge)
-          && same(machineDiameterIn, other.machineDiameterIn)
-          && same(coursesPerCm, other.coursesPerCm)
-          && same(walesPerCm, other.walesPerCm)
-          && same(stitchLengthMm, other.stitchLengthMm)
-          && Objects.equals(feeders, other.feeders);
+    /**
+     * Diameter and feeders are machine settings, not identity: the same fabric runs on 30" or 34".
+     */
+    boolean revises(Knitted previous) {
+      return revised(previous.machineGauge, machineGauge)
+          || revised(previous.coursesPerCm, coursesPerCm)
+          || revised(previous.walesPerCm, walesPerCm)
+          || revised(previous.stitchLengthMm, stitchLengthMm);
     }
   }
 
-  /** Same values, comparing decimals by value (120 and 120.0 are the same gramme weight). */
-  boolean sameAs(FabricArticleSpec other) {
-    if (other == null) return false;
-    return Objects.equals(trimToNull(articleCode), trimToNull(other.articleCode))
-        && Objects.equals(constructionId(construction), constructionId(other.construction))
-        && colourState == other.colourState
-        && same(gsmFinished, other.gsmFinished)
-        && same(gsmGreige, other.gsmGreige)
-        && same(nominalFinishedWidthCm, other.nominalFinishedWidthCm)
-        && same(usableWidthCm, other.usableWidthCm)
-        && same(nominalGreigeWidthCm, other.nominalGreigeWidthCm)
-        && same(standardRollLengthM, other.standardRollLengthM)
-        && Objects.equals(trimToNull(remarks), trimToNull(other.remarks))
-        && (woven == null ? other.woven == null : woven.sameAs(other.woven))
-        && (knitted == null ? other.knitted == null : knitted.sameAs(other.knitted))
-        && sameLines(byRole(yarns), byRole(other.yarns), YarnLine::sameAs)
-        && sameLines(byFibre(composition), byFibre(other.composition), CompositionLine::sameAs);
+  /**
+   * Whether this spec, replacing {@code previous}, changes the fabric's identity. Filling in an
+   * identity value that was still empty completes the fabric rather than changing it, so it does
+   * not count; replacing or removing one does. Decimals compare by value (120 and 120.0 are one
+   * gramme weight).
+   */
+  boolean revisesIdentityOf(FabricArticleSpec previous) {
+    return (previous.construction != null
+            && !Objects.equals(constructionId(previous.construction), constructionId(construction)))
+        || revised(previous.gsmGreige, gsmGreige)
+        || (woven != null && previous.woven != null && woven.revises(previous.woven))
+        || (knitted != null && previous.knitted != null && knitted.revises(previous.knitted))
+        || (!previous.yarns.isEmpty()
+            && !sameLines(byRole(yarns), byRole(previous.yarns), YarnLine::sameAs))
+        || (!previous.composition.isEmpty()
+            && !sameLines(
+                byFibre(composition), byFibre(previous.composition), CompositionLine::sameAs));
+  }
+
+  private static boolean revised(BigDecimal previous, BigDecimal next) {
+    return previous != null && !same(previous, next);
+  }
+
+  private static boolean revised(Integer previous, Integer next) {
+    return previous != null && !previous.equals(next);
+  }
+
+  private static boolean revised(String previous, String next) {
+    return trimToNull(previous) != null && !Objects.equals(trimToNull(previous), trimToNull(next));
   }
 
   private static <T> boolean sameLines(
