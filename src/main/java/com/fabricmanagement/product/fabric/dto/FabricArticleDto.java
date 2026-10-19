@@ -3,7 +3,6 @@ package com.fabricmanagement.product.fabric.dto;
 import com.fabricmanagement.product.fabric.domain.article.FabricArticle;
 import com.fabricmanagement.product.fabric.domain.article.FabricArticleSpec;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,8 +24,6 @@ public record FabricArticleDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) FabricFormation formation,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         FabricConstructionDto construction,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
-        FabricColourState colourState,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) BigDecimal gsmFinished,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) BigDecimal gsmGreige,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
@@ -69,7 +66,6 @@ public record FabricArticleDto(
         article.getArticleSpecVersion(),
         article.getFormation(),
         spec.construction() == null ? null : FabricConstructionDto.from(spec.construction()),
-        spec.colourState(),
         spec.gsmFinished(),
         spec.gsmGreige(),
         spec.nominalFinishedWidthCm(),

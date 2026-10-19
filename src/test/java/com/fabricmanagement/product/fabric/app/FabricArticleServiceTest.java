@@ -143,7 +143,6 @@ class FabricArticleServiceTest {
             null,
             null,
             null,
-            null,
             null);
     assertThatThrownBy(() -> service.update(article.getId(), knitted))
         .isInstanceOf(FabricDomainException.class)
@@ -270,7 +269,6 @@ class FabricArticleServiceTest {
         FabricFormation.WOVEN,
         code,
         null,
-        null,
         new BigDecimal("120"),
         null,
         null,
@@ -294,7 +292,6 @@ class FabricArticleServiceTest {
         request.formation(),
         request.articleCode(),
         request.constructionId(),
-        request.colourState(),
         request.gsmFinished(),
         request.gsmGreige(),
         request.nominalFinishedWidthCm(),

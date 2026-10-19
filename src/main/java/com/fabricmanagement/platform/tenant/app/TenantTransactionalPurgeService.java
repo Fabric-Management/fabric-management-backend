@@ -173,6 +173,7 @@ public class TenantTransactionalPurgeService {
           "production.prod_fabric_woven",
           "production.prod_fabric_article",
           "production.prod_fabric_construction",
+          "production.prod_fabric_finishing_process",
           "production.prod_yarn_backfill_reconciliation",
           "production.prod_yarn_article_audit",
           "production.prod_yarn_article_twist_stage",

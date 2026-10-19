@@ -25,15 +25,15 @@ public class FabricCatalogueBackfillRunner {
     try {
       int templateInserted = seeder.seed(TenantContext.TEMPLATE_TENANT_ID);
       int tenantInserted =
-          tenantClonerService.copyMissingSystemFabricConstructionsToAllTenants(
+          tenantClonerService.copyMissingSystemFabricCataloguesToAllTenants(
               TenantContext.TEMPLATE_TENANT_ID);
       log.info(
-          "Fabric construction backfill completed: templateInserted={}, tenantInserted={}",
+          "Fabric catalogue backfill completed: templateInserted={}, tenantInserted={}",
           templateInserted,
           tenantInserted);
     } catch (Exception exception) {
-      log.error("CRITICAL: fabric construction seed or tenant propagation failed.", exception);
-      throw new FabricDomainException("Fabric construction startup backfill failed: " + exception);
+      log.error("CRITICAL: fabric catalogue seed or tenant propagation failed.", exception);
+      throw new FabricDomainException("Fabric catalogue startup backfill failed: " + exception);
     }
   }
 }

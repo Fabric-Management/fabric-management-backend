@@ -175,7 +175,6 @@ public class FabricArticleService {
     return new FabricArticleSpec(
         request.articleCode(),
         request.constructionId() == null ? null : constructions.require(request.constructionId()),
-        request.colourState(),
         request.gsmFinished(),
         request.gsmGreige(),
         request.nominalFinishedWidthCm(),

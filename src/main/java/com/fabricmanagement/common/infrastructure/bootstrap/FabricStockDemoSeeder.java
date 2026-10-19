@@ -11,7 +11,6 @@ import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.dto.UpdateProductSalesDefinitionRequest;
 import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
 import com.fabricmanagement.product.fabric.dto.FabricCompositionRequest;
@@ -160,7 +159,6 @@ public class FabricStockDemoSeeder {
             fabric.formation(),
             "PM-" + fabric.code().substring(1),
             construction.map(FabricConstructionDto::id).orElse(null),
-            FabricColourState.PIECE_DYED,
             BigDecimal.valueOf(fabric.gsm()),
             null,
             null,
@@ -372,7 +370,6 @@ public class FabricStockDemoSeeder {
             FabricFormation.WOVEN,
             "PM-1453",
             construction.map(FabricConstructionDto::id).orElse(null),
-            FabricColourState.PIECE_DYED,
             new BigDecimal("190"),
             null,
             new BigDecimal("155"),

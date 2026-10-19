@@ -2,7 +2,6 @@ package com.fabricmanagement.product.fabric.dto;
 
 import com.fabricmanagement.product.fabric.domain.article.FabricArticle;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricConstructionFamily;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,8 +20,6 @@ public record FabricArticleListItemDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String constructionName,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         FabricConstructionFamily constructionFamily,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
-        FabricColourState colourState,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) BigDecimal gsmFinished,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         BigDecimal nominalFinishedWidthCm,
@@ -39,7 +36,6 @@ public record FabricArticleListItemDto(
         article.getFormation(),
         construction == null ? null : construction.getName(),
         construction == null ? null : construction.getFamily(),
-        article.getColourState(),
         article.getGsmFinished(),
         article.getNominalFinishedWidthCm(),
         article.getUpdatedAt());

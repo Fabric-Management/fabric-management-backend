@@ -10,7 +10,6 @@ import com.fabricmanagement.product.fabric.domain.article.FabricArticleSpec;
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.reference.FabricConstruction;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricConstructionFamily;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
@@ -69,7 +68,6 @@ class FabricArticleTest {
         new FabricArticleSpec(
             null,
             jersey,
-            null,
             null,
             null,
             null,
@@ -375,7 +373,6 @@ class FabricArticleTest {
     return new FabricArticleSpec(
         "PM-1455",
         construction,
-        gsm == null ? null : FabricColourState.PIECE_DYED,
         gsm == null ? null : new BigDecimal(gsm),
         null,
         finished == null ? null : new BigDecimal(finished),
@@ -396,7 +393,6 @@ class FabricArticleTest {
     return new FabricArticleSpec(
         "PM-1458",
         jersey,
-        FabricColourState.PIECE_DYED,
         new BigDecimal("160"),
         null,
         null,
@@ -415,7 +411,6 @@ class FabricArticleTest {
     return new FabricArticleSpec(
         spec.articleCode(),
         spec.construction(),
-        spec.colourState(),
         spec.gsmFinished(),
         new BigDecimal(greige),
         spec.nominalFinishedWidthCm(),
@@ -434,7 +429,6 @@ class FabricArticleTest {
     return new FabricArticleSpec(
         spec.articleCode(),
         spec.construction(),
-        spec.colourState(),
         spec.gsmFinished(),
         spec.gsmGreige(),
         spec.nominalFinishedWidthCm(),
@@ -455,7 +449,6 @@ class FabricArticleTest {
     return new FabricArticleSpec(
         spec.articleCode(),
         spec.construction(),
-        spec.colourState(),
         spec.gsmFinished(),
         spec.gsmGreige(),
         spec.nominalFinishedWidthCm(),

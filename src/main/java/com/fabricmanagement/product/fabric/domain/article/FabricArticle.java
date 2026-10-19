@@ -6,7 +6,6 @@ import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.reference.FabricConstruction;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricArticleStatus;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
 import jakarta.persistence.CascadeType;
@@ -80,10 +79,6 @@ public class FabricArticle extends BaseEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "construction_id")
   private FabricConstruction construction;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "colour_state", length = 20)
-  private FabricColourState colourState;
 
   @Column(name = "gsm_finished", precision = 7, scale = 1)
   private BigDecimal gsmFinished;
@@ -193,7 +188,6 @@ public class FabricArticle extends BaseEntity {
 
     articleCode = FabricArticleSpec.trimToNull(spec.articleCode());
     construction = spec.construction();
-    colourState = spec.colourState();
     gsmFinished = FabricArticleSpec.positiveOrNull("gsmFinished", spec.gsmFinished());
     gsmGreige = FabricArticleSpec.positiveOrNull("gsmGreige", spec.gsmGreige());
     nominalFinishedWidthCm = finished;
@@ -277,7 +271,6 @@ public class FabricArticle extends BaseEntity {
     return new FabricArticleSpec(
         articleCode,
         construction,
-        colourState,
         gsmFinished,
         gsmGreige,
         nominalFinishedWidthCm,
@@ -317,7 +310,6 @@ public class FabricArticle extends BaseEntity {
     return new FabricArticleSpec(
         spec.articleCode(),
         spec.construction(),
-        spec.colourState(),
         spec.gsmFinished(),
         spec.gsmGreige(),
         spec.nominalFinishedWidthCm(),

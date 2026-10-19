@@ -1,6 +1,5 @@
 package com.fabricmanagement.product.fabric.dto;
 
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,7 +26,6 @@ public record FabricArticleRequest(
     @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) FabricFormation formation,
     @Size(max = 60) @Schema(example = "PM-1454") String articleCode,
     UUID constructionId,
-    FabricColourState colourState,
     @DecimalMin(value = "0", inclusive = false) @Schema(example = "120") BigDecimal gsmFinished,
     @DecimalMin(value = "0", inclusive = false) BigDecimal gsmGreige,
     @DecimalMin(value = "0", inclusive = false) @Schema(example = "150")

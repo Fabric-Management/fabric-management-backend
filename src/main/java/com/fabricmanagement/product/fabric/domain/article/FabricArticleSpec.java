@@ -2,7 +2,6 @@ package com.fabricmanagement.product.fabric.domain.article;
 
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.reference.FabricConstruction;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricYarnRole;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
 import java.math.BigDecimal;
@@ -19,16 +18,15 @@ import java.util.UUID;
  *   <li><b>Identity</b> — what makes it this fabric: construction, greige gramme weight, woven
  *       ends/picks, reed and weave, knitted gauge, stitch length and course/wale density, yarns and
  *       composition. Changing one raises the article's spec version.
- *   <li><b>Recommended production settings</b> — colour state, finished gramme weight, the nominal
- *       widths, standard roll length, knitting machine diameter and feeders, remarks. A weaving or
- *       knitting order takes them as defaults and may change them; the values actually used belong
- *       to the order and the lot. Changing them never raises the spec version.
+ *   <li><b>Recommended production settings</b> — finished gramme weight, the nominal widths,
+ *       standard roll length, knitting machine diameter and feeders, remarks. A weaving or knitting
+ *       order takes them as defaults and may change them; the values actually used belong to the
+ *       order and the lot. Changing them never raises the spec version.
  * </ul>
  */
 public record FabricArticleSpec(
     String articleCode,
     FabricConstruction construction,
-    FabricColourState colourState,
     BigDecimal gsmFinished,
     BigDecimal gsmGreige,
     BigDecimal nominalFinishedWidthCm,

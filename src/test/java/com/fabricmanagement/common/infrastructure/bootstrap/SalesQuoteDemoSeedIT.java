@@ -273,6 +273,13 @@ class SalesQuoteDemoSeedIT {
                     + " WHERE tenant_id = ? AND system_defined AND deleted_at IS NULL",
                 tenant))
         .isEqualTo(FabricCatalogueSeeder.constructions().size());
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fabric_finishing_process"
+                    + " WHERE tenant_id = ? AND system_defined AND deleted_at IS NULL",
+                tenant))
+        .as("every tenant gets the finishing dictionary")
+        .isEqualTo(FabricCatalogueSeeder.finishingProcesses().size());
     Map<String, String> constructionByArticle = new HashMap<>();
     for (var row :
         jdbc.queryForList(

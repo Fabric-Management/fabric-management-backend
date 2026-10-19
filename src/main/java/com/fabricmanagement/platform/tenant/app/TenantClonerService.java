@@ -226,19 +226,20 @@ public class TenantClonerService {
   }
 
   /**
-   * Copies only missing, system-owned fabric constructions from source to target (FABRIC-1). A
-   * tenant's renamed system row keeps its name; a code the tenant already uses is left alone.
+   * Copies only missing, system-owned fabric constructions (FABRIC-1) and finishing processes
+   * (FABRIC-3a) from source to target. A tenant's renamed system row keeps its name; a code the
+   * tenant already uses is left alone.
    */
-  public int copyMissingSystemFabricConstructions(UUID sourceTenantId, UUID targetTenantId) {
+  public int copyMissingSystemFabricCatalogues(UUID sourceTenantId, UUID targetTenantId) {
     if (sourceTenantId == null || targetTenantId == null) {
       return 0;
     }
     return systemTransactionExecutor.executeInTransaction(
-        jdbc -> doCopyMissingSystemFabricConstructions(jdbc, sourceTenantId, targetTenantId));
+        jdbc -> doCopyMissingSystemFabricCatalogues(jdbc, sourceTenantId, targetTenantId));
   }
 
-  /** Repairs every live tenant's fabric constructions from the system catalogue source. */
-  public int copyMissingSystemFabricConstructionsToAllTenants(UUID sourceTenantId) {
+  /** Repairs every live tenant's fabric catalogues from the system catalogue source. */
+  public int copyMissingSystemFabricCataloguesToAllTenants(UUID sourceTenantId) {
     if (sourceTenantId == null) {
       return 0;
     }
@@ -251,37 +252,64 @@ public class TenantClonerService {
                 .stream()
                 .filter(tenantId -> !sourceTenantId.equals(tenantId))
                 .mapToInt(
-                    tenantId ->
-                        doCopyMissingSystemFabricConstructions(jdbc, sourceTenantId, tenantId))
+                    tenantId -> doCopyMissingSystemFabricCatalogues(jdbc, sourceTenantId, tenantId))
                 .sum());
   }
 
-  int doCopyMissingSystemFabricConstructions(
+  int doCopyMissingSystemFabricCatalogues(
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
-    return jdbc.update(
-        """
-        INSERT INTO production.prod_fabric_construction (
-            id, tenant_id, uid, code, name, description, display_order, formation, family,
-            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
-        )
-        SELECT
-            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
-            source.description, source.display_order, source.formation, source.family,
-            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
-        FROM production.prod_fabric_construction source
-        WHERE source.tenant_id = ?::uuid
-          AND source.system_defined = TRUE
-          AND source.deleted_at IS NULL
-          AND NOT EXISTS (
-              SELECT 1
-              FROM production.prod_fabric_construction target
-              WHERE target.tenant_id = ?::uuid
-                AND target.code = source.code
-          )
-        """,
-        targetTenantId,
-        sourceTenantId,
-        targetTenantId);
+    int constructions =
+        jdbc.update(
+            """
+            INSERT INTO production.prod_fabric_construction (
+                id, tenant_id, uid, code, name, description, display_order, formation, family,
+                system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+            )
+            SELECT
+                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+                source.description, source.display_order, source.formation, source.family,
+                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+            FROM production.prod_fabric_construction source
+            WHERE source.tenant_id = ?::uuid
+              AND source.system_defined = TRUE
+              AND source.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM production.prod_fabric_construction target
+                  WHERE target.tenant_id = ?::uuid
+                    AND target.code = source.code
+              )
+            """,
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    int finishingProcesses =
+        jdbc.update(
+            """
+            INSERT INTO production.prod_fabric_finishing_process (
+                id, tenant_id, uid, code, name, description, display_order, category,
+                charge_unit, system_defined, is_active, created_at, created_by, updated_at,
+                updated_by, version
+            )
+            SELECT
+                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+                source.description, source.display_order, source.category, source.charge_unit,
+                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+            FROM production.prod_fabric_finishing_process source
+            WHERE source.tenant_id = ?::uuid
+              AND source.system_defined = TRUE
+              AND source.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM production.prod_fabric_finishing_process target
+                  WHERE target.tenant_id = ?::uuid
+                    AND target.code = source.code
+              )
+            """,
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    return constructions + finishingProcesses;
   }
 
   /**
@@ -471,7 +499,7 @@ public class TenantClonerService {
               copyMissingSystemYarnCataloguesInCurrentTransaction(
                   jdbc, goldenTemplateId, targetTenantId);
           tablesCloned +=
-              doCopyMissingSystemFabricConstructions(jdbc, goldenTemplateId, targetTenantId) > 0
+              doCopyMissingSystemFabricCatalogues(jdbc, goldenTemplateId, targetTenantId) > 0
                   ? 1
                   : 0;
           tablesCloned += cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId);
@@ -616,7 +644,7 @@ public class TenantClonerService {
                 doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
                 doCopyMissingSystemPropertyDefinitions(jdbc, goldenTemplateId, newTenantId);
                 doCopyMissingSystemYarnCatalogues(jdbc, goldenTemplateId, newTenantId);
-                doCopyMissingSystemFabricConstructions(jdbc, goldenTemplateId, newTenantId);
+                doCopyMissingSystemFabricCatalogues(jdbc, goldenTemplateId, newTenantId);
                 cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, newTenantId);
               }
 

@@ -873,6 +873,37 @@ CREATE TABLE IF NOT EXISTS production.prod_fabric_construction (
 CREATE INDEX IF NOT EXISTS idx_fabric_construction_tenant_active
     ON production.prod_fabric_construction (tenant_id, is_active);
 
+-- FABRIC-3a: finishing processes a fabric lot can go through, each mapped to one closed category.
+-- Processes are recorded on lots, never on the fabric (FABRIC-ARCHITECTURE F7).
+CREATE TABLE IF NOT EXISTS production.prod_fabric_finishing_process (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    display_order INTEGER,
+    category VARCHAR(30) NOT NULL,
+    charge_unit VARCHAR(10) NOT NULL,
+    system_defined BOOLEAN NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_finishing_process_tenant_code UNIQUE (tenant_id, code),
+    CONSTRAINT ck_fabric_finishing_process_code CHECK (code ~ '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'),
+    CONSTRAINT ck_fabric_finishing_process_category CHECK (category IN (
+        'PRETREATMENT', 'DYEING', 'PRINTING', 'CHEMICAL_FINISH', 'MECHANICAL_FINISH', 'COATING'
+    )),
+    CONSTRAINT ck_fabric_finishing_process_charge_unit CHECK (charge_unit IN ('M', 'KG'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fabric_finishing_process_tenant_active
+    ON production.prod_fabric_finishing_process (tenant_id, is_active);
+
 CREATE TABLE IF NOT EXISTS production.prod_fabric_article (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
@@ -883,7 +914,6 @@ CREATE TABLE IF NOT EXISTS production.prod_fabric_article (
     article_spec_version INTEGER NOT NULL DEFAULT 1,
     formation VARCHAR(20) NOT NULL,
     construction_id UUID,
-    colour_state VARCHAR(20),
     gsm_finished NUMERIC(7,1),
     gsm_greige NUMERIC(7,1),
     nominal_finished_width_cm NUMERIC(6,1),
@@ -905,10 +935,6 @@ CREATE TABLE IF NOT EXISTS production.prod_fabric_article (
         REFERENCES production.prod_fabric_construction (id) ON DELETE RESTRICT,
     CONSTRAINT ck_fabric_article_status CHECK (status IN ('DRAFT', 'ACTIVE', 'OBSOLETE')),
     CONSTRAINT ck_fabric_article_formation CHECK (formation IN ('WOVEN', 'KNITTED', 'NONWOVEN')),
-    CONSTRAINT ck_fabric_article_colour_state CHECK (
-        colour_state IS NULL
-        OR colour_state IN ('GREIGE', 'PFD', 'PIECE_DYED', 'YARN_DYED', 'PRINTED')
-    ),
     CONSTRAINT ck_fabric_article_code_not_blank CHECK (
         article_code IS NULL OR btrim(article_code) <> ''
     ),
@@ -1058,6 +1084,7 @@ DECLARE
 BEGIN
     FOREACH table_name IN ARRAY ARRAY[
         'prod_fabric_construction',
+        'prod_fabric_finishing_process',
         'prod_fabric_article',
         'prod_fabric_woven',
         'prod_fabric_knitted',
