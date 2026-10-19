@@ -17,6 +17,15 @@ class LotHealthSettingsTest {
     assertThat(standard.policyFor(ProductSpeed.SLOWING).minHealthyPieces()).isEqualTo(5);
     assertThat(standard.policyFor(ProductSpeed.STALLED).minHealthyPieces()).isEqualTo(8);
     assertThat(standard.policyFor(ProductSpeed.MOVING)).isEqualTo(LotHealthPolicy.STANDARD);
+    assertThat(standard.fabricRollPolicy())
+        .isEqualTo(new LotHealthPolicy(4, new BigDecimal("0.51")));
+    assertThat(
+            new LotHealthSettings(3, 5, 8, new BigDecimal("0.51"), 9)
+                .fabricRollPolicy()
+                .minHealthyPieces())
+        .isEqualTo(9);
+    assertThatThrownBy(() -> new LotHealthSettings(3, 5, 8, new BigDecimal("0.51"), 3))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

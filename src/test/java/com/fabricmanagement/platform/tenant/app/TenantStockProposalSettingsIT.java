@@ -63,7 +63,8 @@ class TenantStockProposalSettingsIT extends AbstractIntegrationTest {
             new BigDecimal("35"),
             150,
             new BigDecimal("8"),
-            new BigDecimal("12"));
+            new BigDecimal("12"),
+            9);
 
     TenantSettings afterBoth =
         TenantContext.executeInTenantContext(
@@ -83,5 +84,6 @@ class TenantStockProposalSettingsIT extends AbstractIntegrationTest {
     assertThat(afterBoth.getTimezone()).isEqualTo("Europe/Berlin");
     assertThat(afterBoth.getLocale()).isEqualTo("de-DE");
     assertThat(afterBoth.getStockProposal()).isEqualTo(group);
+    assertThat(afterBoth.getStockProposal().fabricRollMinHealthyPieces()).isEqualTo(9);
   }
 }

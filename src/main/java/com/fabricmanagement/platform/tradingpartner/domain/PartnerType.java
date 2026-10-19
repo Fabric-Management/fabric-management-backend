@@ -14,6 +14,7 @@ package com.fabricmanagement.platform.tradingpartner.domain;
  *   <li>{@link #CUSTOMER} - Product buyer
  *   <li>{@link #SUBCONTRACTOR} - Subcontractor (outsourced production)
  *   <li>{@link #SERVICE_PROVIDER} - Service provider (logistics, maintenance, etc.)
+ *   <li>{@link #DELIVERY_PARTNER} - Company that only receives goods for a customer
  *   <li>{@link #BOTH} - Both supplier and customer
  * </ul>
  *
@@ -45,6 +46,18 @@ public enum PartnerType {
 
   /** Service provider (logistics, maintenance, lab, etc.) */
   SERVICE_PROVIDER,
+
+  /**
+   * Delivery partner — a company with no commercial relationship to the tenant that only receives
+   * goods for a customer (garment maker, dyehouse, warehouse, ...). The role it plays for a
+   * customer lives on the partner link, never on this type.
+   *
+   * <p>It is excluded wherever {@link #CUSTOMER}/{@link #BOTH} or {@link #SUPPLIER}/{@link #BOTH}
+   * are used: customer and supplier lists, the order customer picker, sales ownership triage and
+   * reconciliation, invoicing. If it later becomes a customer or supplier, the same record's type
+   * changes and its links and addresses stay.
+   */
+  DELIVERY_PARTNER,
 
   /** Both supplier and customer - bidirectional relationship */
   BOTH,
@@ -89,6 +102,15 @@ public enum PartnerType {
    */
   public boolean isCustomer() {
     return this == CUSTOMER || this == BOTH;
+  }
+
+  /**
+   * Check if this type is a delivery-only company (no commercial relationship with the tenant).
+   *
+   * @return true if DELIVERY_PARTNER
+   */
+  public boolean isDeliveryPartner() {
+    return this == DELIVERY_PARTNER;
   }
 
   /**

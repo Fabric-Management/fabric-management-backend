@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
@@ -8,6 +11,7 @@ import com.fabricmanagement.platform.communication.infra.repository.AddressRepos
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,6 +42,7 @@ public class AddressService {
   private final AddressRepository addressRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
+  private final DeliveryVerificationPolicy verificationPolicy;
 
   /**
    * Create an address from the shared DTO. Single entry point for all address creation (REST and
@@ -143,6 +148,7 @@ public class AddressService {
             .addressType(addressType)
             .label(label)
             .addressLine2(addressLine2)
+            .verification(verificationPolicy.forCurrentActor())
             .build();
 
     return addressRepository.save(address);
@@ -221,8 +227,38 @@ public class AddressService {
     if (contactPerson != null) address.setContactPerson(contactPerson);
     if (contactPhone != null) address.setContactPhone(contactPhone);
     if (contactEmail != null) address.setContactEmail(contactEmail);
+    // An edit is the editor's word: a verifier's stands verified, anyone else's waits (C5).
+    address.setVerification(verificationPolicy.forCurrentActor());
 
     return addressRepository.save(address);
+  }
+
+  /**
+   * Confirm an address card for delivery (CONSIGNEE-1 C8). Does nothing when it already is.
+   *
+   * @return true when the card changed from unverified to verified
+   */
+  @Transactional
+  public boolean verify(UUID addressId, UUID verifier) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Address address =
+        addressRepository
+            .findById(addressId)
+            .filter(found -> found.getTenantId().equals(tenantId))
+            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+    if (address.getVerification().isVerified()) {
+      return false;
+    }
+    address.setVerification(Verification.verifiedBy(verifier, Instant.now()));
+    addressRepository.save(address);
+    log.info("Address verified for delivery: addressId={}, by={}", addressId, verifier);
+    return true;
+  }
+
+  /** The verification state of an address card of this tenant; empty when there is no such card. */
+  @Transactional(readOnly = true)
+  public Optional<DeliveryVerificationStatus> verificationOf(UUID addressId) {
+    return findById(addressId).map(Address::getVerificationStatus);
   }
 
   /**

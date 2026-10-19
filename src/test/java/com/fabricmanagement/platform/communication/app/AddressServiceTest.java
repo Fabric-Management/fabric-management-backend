@@ -2,10 +2,13 @@ package com.fabricmanagement.platform.communication.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
@@ -33,12 +36,14 @@ class AddressServiceTest {
   @Mock private AddressRepository addressRepository;
   @Mock private OrganizationAddressRepository organizationAddressRepository;
   @Mock private UserWorkLocationRepository userWorkLocationRepository;
+  @Mock private DeliveryVerificationPolicy verificationPolicy;
 
   @InjectMocks private AddressService service;
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
+    lenient().when(verificationPolicy.forCurrentActor()).thenReturn(Verification.unverified());
   }
 
   @AfterEach

@@ -28,8 +28,14 @@ final class EvidenceFingerprint {
     StringBuilder text = new StringBuilder();
     text.append(input.canonicalTarget().stripTrailingZeros().toPlainString()).append('|');
     text.append(input.singleLotRequired()).append('|');
+    text.append(input.policyCode()).append('|');
+    text.append(input.agreedToleranceUpPct())
+        .append(':')
+        .append(input.agreedToleranceDownPct())
+        .append('|');
     lots.forEach(
         lot -> {
+          text.append(lot.averageBasis()).append(':').append(lot.inventoryComplete()).append('|');
           text.append(lot.batchId())
               .append('#')
               .append(lot.widthEvidence())
@@ -45,7 +51,13 @@ final class EvidenceFingerprint {
               .sorted(Comparator.comparing(ProposalPiece::stockUnitId))
               .forEach(
                   piece ->
-                      text.append(piece.stockUnitId())
+                      text.append(piece.packageType())
+                          .append(':')
+                          .append(piece.initialCanonicalMeasure())
+                          .append(':')
+                          .append(piece.reason())
+                          .append(':')
+                          .append(piece.stockUnitId())
                           .append(':')
                           .append(piece.version())
                           .append(':')
@@ -92,6 +104,21 @@ final class EvidenceFingerprint {
                                 .toPlainString())
                     .append(':')
                     .append(entry.getValue().intents().size()));
+    input.holds().lotIntents().entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .forEach(
+            entry ->
+                entry.getValue().intents().stream()
+                    .sorted(Comparator.comparing(intent -> intent.holder().quoteLineId()))
+                    .forEach(
+                        intent ->
+                            text.append("IL")
+                                .append(entry.getKey())
+                                .append(':')
+                                .append(intent.holder().quoteLineId())
+                                .append(':')
+                                .append(intent.canonical())
+                                .append(';')));
     // What a lot may keep decides which options exist (2026-10-14): a changed setting makes an
     // earlier proposal stale.
     text.append("K")

@@ -48,14 +48,7 @@ public class OrderIntakeProductSearchService {
       return List.of();
     }
     String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-    List<ProductDto> products =
-        productDefinitions.sellableProducts(tenantId, productType).stream()
-            .filter(product -> matches(product, needle))
-            .sorted(
-                Comparator.comparing(
-                        (ProductDto product) -> label(product).toLowerCase(Locale.ROOT))
-                    .thenComparing(ProductDto::getId))
-            .toList();
+    List<ProductDto> products = productDefinitions.sellableProducts(tenantId, productType);
     if (products.isEmpty()) {
       return List.of();
     }
@@ -69,6 +62,26 @@ public class OrderIntakeProductSearchService {
         products.stream()
             .filter(
                 product -> visible(entries.getOrDefault(product.getId(), List.of()), customerId))
+            .filter(
+                product ->
+                    matches(
+                        product,
+                        label(
+                            product.getDisplayName(),
+                            product.getUid(),
+                            entries.getOrDefault(product.getId(), List.of()),
+                            customerId),
+                        needle))
+            .sorted(
+                Comparator.comparing(
+                        (ProductDto product) ->
+                            label(
+                                    product.getDisplayName(),
+                                    product.getUid(),
+                                    entries.getOrDefault(product.getId(), List.of()),
+                                    customerId)
+                                .toLowerCase(Locale.ROOT))
+                    .thenComparing(ProductDto::getId))
             .limit(MAX_RESULTS)
             .toList();
     Map<UUID, ProductSalesDefinitionDto> definitions =
@@ -103,16 +116,32 @@ public class OrderIntakeProductSearchService {
                         || Objects.equals(entry.getCustomerId(), customerId));
   }
 
-  private static boolean matches(ProductDto product, String needle) {
+  private static boolean matches(ProductDto product, String name, String needle) {
     if (needle.isEmpty()) {
       return true;
     }
-    return label(product).toLowerCase(Locale.ROOT).contains(needle)
+    return name.toLowerCase(Locale.ROOT).contains(needle)
         || (product.getUid() != null && product.getUid().toLowerCase(Locale.ROOT).contains(needle));
   }
 
-  private static String label(ProductDto product) {
-    return product.getDisplayName() != null ? product.getDisplayName() : product.getUid();
+  /** Master data wins; unnamed products may use this customer's visible catalogue snapshot. */
+  private static String label(
+      String displayName, String uid, List<SalesProduct> entries, UUID customerId) {
+    if (displayName != null && !displayName.isBlank() && !displayName.equals(uid)) {
+      return displayName;
+    }
+    return preferredEntry(entries, customerId)
+        .map(SalesProduct::getProductName)
+        .filter(name -> !name.isBlank())
+        .orElse(uid);
+  }
+
+  private static Optional<SalesProduct> preferredEntry(
+      List<SalesProduct> entries, UUID customerId) {
+    return entries.stream()
+        .filter(entry -> customerId != null && customerId.equals(entry.getCustomerId()))
+        .findFirst()
+        .or(() -> entries.stream().filter(entry -> entry.getCustomerId() == null).findFirst());
   }
 
   private static OrderIntakeProductOption toOption(
@@ -124,12 +153,11 @@ public class OrderIntakeProductSearchService {
         entries.stream()
             .filter(entry -> customerId != null && customerId.equals(entry.getCustomerId()))
             .findFirst();
-    Optional<SalesProduct> priceEntry =
-        customerEntry.or(() -> entries.stream().filter(e -> e.getCustomerId() == null).findFirst());
+    Optional<SalesProduct> priceEntry = preferredEntry(entries, customerId);
     return new OrderIntakeProductOption(
         definition.productId(),
         definition.uid(),
-        definition.displayName(),
+        label(definition.displayName(), definition.uid(), entries, customerId),
         definition.productType(),
         definition.baseUnit(),
         definition.allowedUnits(),

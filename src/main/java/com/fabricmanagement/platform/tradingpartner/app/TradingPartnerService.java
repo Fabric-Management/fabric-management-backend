@@ -1,7 +1,9 @@
 package com.fabricmanagement.platform.tradingpartner.app;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
@@ -62,6 +64,7 @@ public class TradingPartnerService {
   private final OrganizationFacade organizationFacade;
   private final DomainEventPublisher eventPublisher;
   private final PartnerContactService partnerContactService;
+  private final DeliveryVerificationPolicy verificationPolicy;
 
   private static final String DEFAULT_COUNTRY = "TUR";
 
@@ -131,7 +134,11 @@ public class TradingPartnerService {
 
     // Create new TradingPartner
     TradingPartner partner =
-        TradingPartner.create(registry, request.getPartnerType(), request.getCustomName());
+        TradingPartner.create(
+            registry,
+            request.getPartnerType(),
+            request.getCustomName(),
+            verificationPolicy.forCurrentActor());
 
     if (request.getRelationshipMeta() != null) {
       partner.setRelationshipMeta(request.getRelationshipMeta());
@@ -196,7 +203,12 @@ public class TradingPartnerService {
       wasCustomer = partner.getPartnerType().isCustomer();
       partner.upgradeToMultiType(PartnerType.CUSTOMER);
     } else {
-      partner = TradingPartner.create(registry, PartnerType.CUSTOMER, request.getCompanyName());
+      partner =
+          TradingPartner.create(
+              registry,
+              PartnerType.CUSTOMER,
+              request.getCompanyName(),
+              verificationPolicy.forCurrentActor());
       created = true;
       wasCustomer = false;
     }
@@ -526,6 +538,23 @@ public class TradingPartnerService {
     partnerRepository.save(partner);
     publishStatusChangedEvent(tenantId, partner, previousStatus);
     log.info("Partner suspended: uid={}", partner.getUid());
+  }
+
+  /**
+   * Confirm a partner as a party to deliver to (CONSIGNEE-1 C8). Does nothing when it already is.
+   *
+   * @return true when the partner changed from unverified to verified
+   */
+  @Transactional
+  public boolean verifyDelivery(UUID tenantId, UUID partnerId, UUID verifier) {
+    TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    if (partner.getVerification().isVerified()) {
+      return false;
+    }
+    partner.setVerification(Verification.verifiedBy(verifier, Instant.now()));
+    partnerRepository.save(partner);
+    log.info("Partner verified for delivery: uid={}, by={}", partner.getUid(), verifier);
+    return true;
   }
 
   /**

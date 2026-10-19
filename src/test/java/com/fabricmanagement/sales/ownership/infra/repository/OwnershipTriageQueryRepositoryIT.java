@@ -150,6 +150,13 @@ class OwnershipTriageQueryRepositoryIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void aDeliveryPartnerIsNeverACustomerForTriage() {
+    insertPartner("DELIVERY_PARTNER", RELATIONSHIP_ESTABLISHED_AT);
+
+    assertThat(repository.findAll(tenantId)).isEmpty();
+  }
+
+  @Test
   void queryUsesGreatestInsteadOfACoalesceFallbackChain() {
     assertThat(OwnershipTriageQueryRepository.DERIVED_TRIAGE_CTE)
         .contains("GREATEST(")
@@ -163,6 +170,10 @@ class OwnershipTriageQueryRepositoryIT extends AbstractIntegrationTest {
   }
 
   private UUID insertCustomer(Instant establishedAt) {
+    return insertPartner("CUSTOMER", establishedAt);
+  }
+
+  private UUID insertPartner(String partnerType, Instant establishedAt) {
     UUID registryId = UUID.randomUUID();
     UUID customerId = UUID.randomUUID();
     jdbc.update(
@@ -178,12 +189,13 @@ class OwnershipTriageQueryRepositoryIT extends AbstractIntegrationTest {
         INSERT INTO common_company.common_trading_partner
             (id, tenant_id, uid, registry_id, custom_name, partner_type, status,
              customer_relationship_established_at)
-        VALUES (?, ?, ?, ?, 'Triage Customer', 'CUSTOMER', 'ACTIVE', ?)
+        VALUES (?, ?, ?, ?, 'Triage Customer', ?, 'ACTIVE', ?)
         """,
         customerId,
         tenantId,
         "TRIAGE-CUSTOMER-" + customerId,
         registryId,
+        partnerType,
         establishedAt == null ? null : Timestamp.from(establishedAt));
     return customerId;
   }

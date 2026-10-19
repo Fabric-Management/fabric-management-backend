@@ -209,6 +209,12 @@ class OrderIntakeStockPreviewControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.evaluation.policyCode").value("FABRIC_ROLL_BASE"))
+        .andExpect(jsonPath("$.data.evaluation.effectiveMinHealthyPieces").value(4))
+        .andExpect(jsonPath("$.data.evaluation.coverage.status").value("NO_APPLICABLE_OPTION"))
+        .andExpect(
+            jsonPath("$.data.evaluation.coverage.coveringOptionKey")
+                .value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.totals.freeComplete").value(true))
         .andExpect(jsonPath("$.data.totals.notCoveredByReadyStock.canonical").value(100))
         .andExpect(jsonPath("$.data.lots").isEmpty());
@@ -245,7 +251,15 @@ class OrderIntakeStockPreviewControllerTest {
             0,
             0,
             List.of(),
-            false),
+            false,
+            com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode
+                .FABRIC_ROLL_BASE,
+            4,
+            new com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage(
+                com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage.Status
+                    .NO_APPLICABLE_OPTION,
+                null,
+                List.of())),
         List.of(),
         new OrderIntakeStockPreviewDto.Totals(
             zero,

@@ -85,6 +85,7 @@ class CustomerApprovalServiceTest {
   @Mock private OrderApprovalInvalidator invalidator;
   @Mock private OrderFlowEventRepository events;
   @Mock private ApproverAuthorities approvers;
+  @Mock private DeliveryVerificationGate deliveryGate;
 
   private static final UUID AUTHORITY = UUID.randomUUID();
 
@@ -115,7 +116,8 @@ class CustomerApprovalServiceTest {
             invalidator,
             new OrderFlowRecorder(events, clock),
             clock,
-            approvers);
+            approvers,
+            deliveryGate);
     order =
         SalesOrder.builder()
             .tradingPartnerId(UUID.randomUUID())
@@ -601,6 +603,48 @@ class CustomerApprovalServiceTest {
               assertThat(view.status()).isEqualTo(CustomerApprovalStatus.SENT);
               assertThat(view.linkExpired()).isFalse();
             });
+  }
+
+  @Test
+  void anOrderWithDeliveriesStillToVerifyIsNotSentForApproval() {
+    when(deliveryGate.sendBlock(order)).thenReturn(DeliveryVerificationGate.NOT_VERIFIED);
+    when(deliveryGate.describe(order)).thenReturn("delivery 2");
+
+    assertThatThrownBy(() -> service.sendForApproval(order.getId(), null, SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception -> {
+              assertThat(exception.getErrorCode()).isEqualTo("DELIVERIES_NOT_VERIFIED");
+              assertThat(exception.getMessage()).contains("delivery 2");
+            });
+    verify(versions, never()).save(any());
+    assertThat(saved).isEmpty();
+  }
+
+  @Test
+  void aSenderWhoMayNotVerifyDeliveriesCannotSendForApproval() {
+    when(deliveryGate.sendBlock(order)).thenReturn(DeliveryVerificationGate.PERMISSION_REQUIRED);
+
+    assertThatThrownBy(() -> service.sendForApproval(order.getId(), null, SALES))
+        .isInstanceOfSatisfying(
+            OrderDomainException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo("VERIFY_DELIVERY_PERMISSION_REQUIRED"));
+    verify(versions, never()).save(any());
+    assertThat(saved).isEmpty();
+  }
+
+  @Test
+  void theStateNamesWhyApprovalCannotBeSentYetWhileTheInformationDraftStaysFree() {
+    when(permissions.can(any(), eq("sales"), eq("write"))).thenReturn(true);
+    when(deliveryGate.sendBlock(order)).thenReturn(DeliveryVerificationGate.NOT_VERIFIED);
+
+    CustomerApprovalDtos.State state = service.state(order.getId(), SALES);
+
+    assertThat(reason(state, CustomerApprovalDtos.Action.SEND_FOR_APPROVAL))
+        .isEqualTo("DELIVERIES_NOT_VERIFIED");
+    assertThat(reason(state, CustomerApprovalDtos.Action.SEND_INFORMATION)).isNull();
   }
 
   @Test

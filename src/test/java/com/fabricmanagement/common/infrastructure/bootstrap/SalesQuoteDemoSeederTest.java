@@ -106,6 +106,7 @@ class SalesQuoteDemoSeederTest {
   @Mock private RoleService roleService;
   @Mock private DepartmentRepository departmentRepository;
   @Mock private OrganizationService organizationService;
+  @Mock private FabricStockDemoSeeder fabricStockDemoSeeder;
 
   private final List<TradingPartnerDto> partners = new ArrayList<>();
   private final Map<String, UUID> batchIdsByCode = new HashMap<>();
@@ -135,6 +136,7 @@ class SalesQuoteDemoSeederTest {
             roleService,
             departmentRepository,
             organizationService,
+            fabricStockDemoSeeder,
             clock);
   }
 
@@ -150,7 +152,8 @@ class SalesQuoteDemoSeederTest {
     seeder.seedFor(TENANT_ID);
     seeder.seedFor(TENANT_ID);
 
-    // Idempotency: the second run must short-circuit on the demo-customer marker.
+    // Existing quote data short-circuits; the independently idempotent fabric examples still run.
+    verify(fabricStockDemoSeeder, times(2)).seedFor(TENANT_ID);
     ArgumentCaptor<CreateTradingPartnerRequest> partnerCaptor =
         ArgumentCaptor.forClass(CreateTradingPartnerRequest.class);
     verify(tradingPartnerService, times(1)).createPartner(partnerCaptor.capture(), eq(EMMA_ID));

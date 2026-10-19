@@ -4,6 +4,8 @@ import com.fabricmanagement.inventory.lothealth.domain.LotHealthPolicy;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.PieceState;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalLot;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.ProposalPiece;
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult.EvaluationStatus;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
@@ -20,38 +22,16 @@ import java.util.UUID;
 import java.util.function.Function;
 
 /**
- * Turns production stock evidence into whole-piece quantity options (SOI R08–R11, A01, A04, IK-07;
- * STOCK-PROPOSAL-2). Pure: no persistence, no clock, no security. The caller converts units and
- * reads what quotes hold.
+ * Pure whole-piece proposal entry point: the caller supplies canonical measurements, package and
+ * product policy evidence, quote holds and both tolerance limits. Unknown evidence stays unknown.
  *
- * <p>No computed option leaves a lot with fewer normal pieces than its lot-health minimum (Fatih,
- * 2026-10-13 and 2026-10-14): a lot is closed or keeps at least that many, three by default; a
- * piece under 51% of the lot's average piece is short and does not count, and short pieces go into
- * an order first. When the line allows several dye lots the customer accepts them and any lots
- * combine; when it requires one, each lot stands alone (Fatih, 2026-10-15). Among candidates the
- * tenant comes first ({@link ProposalRanking}): a remnant lot closed, more lots closed, completing
- * from the lot with fewer pieces, older stock, fewer lots, then closeness.
+ * <p>FABRIC_ROLL_BASE cleans remnant free pools and finds their minimum healthy completion, even
+ * outside tolerance; the greatest legal quantity below the request follows. STANDARD retains the
+ * existing window-based cards for other products. Single-lot is a strict constraint in either
+ * policy. Only manual picks may leave an unhealthy remainder, with acknowledgement.
  *
- * <p>The cards, in this order (Fatih, 2026-10-15), each searched exactly over every combination:
- *
- * <ol>
- *   <li>the best meeting the request within the tolerance (the request up to the upper limit): the
- *       opening;
- *   <li>the most within the upper limit, when it is more: to sell more;
- *   <li>the best short of the request within the lower limit;
- *   <li>only when none of these exists: the nearest above the upper limit, then the nearest below
- *       the lower limit; the first of them opens;
- *   <li>stock others hold, only when free stock cannot reach the lower limit; never applicable.
- * </ol>
- *
- * <p>The salesperson's changed pieces come first, with the opening option's index after them. Both
- * tolerance limits are required: a missing side is missing information, never read as 0%; the
- * caller refuses to evaluate without them.
- *
- * <p>This class is the entry point and the input; the work is split by concern: {@link
- * ProposalEvaluation} searches and lists, {@link OptionBuilder} builds options, {@link
- * HeldStockView} reads holds, {@link ProposalReasons} words the facts and {@link
- * EvidenceFingerprint} fingerprints the evidence.
+ * <p>{@link ProposalEvaluation} searches and places cards; {@link OptionBuilder} describes their
+ * quantities and closure evidence; {@link EvidenceFingerprint} captures the input evidence.
  */
 public final class QuantityEvaluator {
 
@@ -78,9 +58,46 @@ public final class QuantityEvaluator {
       BigDecimal agreedToleranceUpPct,
       BigDecimal agreedToleranceDownPct,
       StockHolds holds,
-      List<UUID> manualPieceIds) {
+      List<UUID> manualPieceIds,
+      ProposalPolicyCode policyCode) {
+
+    public Input(
+        BigDecimal requestedQuantity,
+        String unit,
+        String canonicalUnit,
+        BigDecimal canonicalTarget,
+        Function<BigDecimal, BigDecimal> toLineUnit,
+        List<ProposalLot> lots,
+        List<Set<UUID>> confirmedGroups,
+        List<Set<UUID>> toneAcceptedGroups,
+        boolean singleLotRequired,
+        BigDecimal agreedToleranceUpPct,
+        BigDecimal agreedToleranceDownPct,
+        StockHolds holds,
+        List<UUID> manualPieceIds) {
+      this(
+          requestedQuantity,
+          unit,
+          canonicalUnit,
+          canonicalTarget,
+          toLineUnit,
+          lots,
+          confirmedGroups,
+          toneAcceptedGroups,
+          singleLotRequired,
+          agreedToleranceUpPct,
+          agreedToleranceDownPct,
+          holds,
+          manualPieceIds,
+          ProposalPolicyCode.STANDARD);
+    }
+
+    public boolean fabricRollPolicy() {
+      return policyCode == ProposalPolicyCode.FABRIC_ROLL_BASE;
+    }
 
     public Input {
+      policyCode = policyCode == null ? ProposalPolicyCode.STANDARD : policyCode;
       confirmedGroups = confirmedGroups == null ? List.of() : List.copyOf(confirmedGroups);
       toneAcceptedGroups = toneAcceptedGroups == null ? List.of() : List.copyOf(toneAcceptedGroups);
       holds = holds == null ? StockHolds.NONE : holds;
@@ -156,7 +173,11 @@ public final class QuantityEvaluator {
 
   /** Evaluates with the standard lot-health rule: a lot is closed or keeps three pieces. */
   public static Evaluation evaluate(Input input) {
-    return evaluate(input, LotHealthPolicy.STANDARD);
+    return evaluate(
+        input,
+        input.fabricRollPolicy()
+            ? new LotHealthPolicy(4, LotHealthPolicy.STANDARD.shortPieceRatio())
+            : LotHealthPolicy.STANDARD);
   }
 
   /**
@@ -165,7 +186,8 @@ public final class QuantityEvaluator {
    */
   public static Evaluation evaluate(Input input, LotHealthPolicy lotHealth) {
     Objects.requireNonNull(lotHealth, "lotHealth");
-    List<ProposalLot> lots = orderedLots(input.lots());
+    List<ProposalLot> lots =
+        orderedLots(input.fabricRollPolicy() ? fabricLots(input.lots()) : input.lots());
     String fingerprint = EvidenceFingerprint.of(input, lots, lotHealth);
     Counts counts = Counts.of(lots);
     boolean aged = allDated(lots);
@@ -178,24 +200,87 @@ public final class QuantityEvaluator {
     if (!precise || toUnits(input.canonicalTarget()) <= 0) {
       return new Evaluation(
           result(
-              input,
-              EvaluationStatus.UNKNOWN,
-              List.of(),
-              null,
-              true,
-              counts,
-              List.of("QUANTITY_BELOW_RESOLUTION"),
-              aged),
+                  input,
+                  EvaluationStatus.UNKNOWN,
+                  List.of(),
+                  null,
+                  true,
+                  counts,
+                  List.of("QUANTITY_BELOW_RESOLUTION"),
+                  aged)
+              .withPolicy(
+                  input.policyCode(),
+                  lotHealth.minHealthyPieces(),
+                  new QuantityCoverage(
+                      QuantityCoverage.Status.UNKNOWN,
+                      null,
+                      List.of(QuantityCoverage.Reason.QUANTITY_RESOLUTION_UNSUPPORTED))),
           fingerprint);
     }
-    EvaluationContext context = EvaluationContext.of(input, lots, lotHealth, aged);
-    return new ProposalEvaluation(context, counts, fingerprint).run();
+    try {
+      EvaluationContext context = EvaluationContext.of(input, lots, lotHealth, aged);
+      return new ProposalEvaluation(context, counts, fingerprint).run();
+    } catch (ArithmeticException outsideSearchRange) {
+      return new Evaluation(
+          result(
+                  input,
+                  EvaluationStatus.UNKNOWN,
+                  List.of(),
+                  null,
+                  false,
+                  counts,
+                  List.of("QUANTITY_OUTSIDE_SEARCH_RANGE"),
+                  aged)
+              .withPolicy(
+                  input.policyCode(),
+                  lotHealth.minHealthyPieces(),
+                  new QuantityCoverage(
+                      QuantityCoverage.Status.UNKNOWN,
+                      null,
+                      List.of(QuantityCoverage.Reason.QUANTITY_RESOLUTION_UNSUPPORTED))),
+          fingerprint);
+    }
   }
 
-  /**
-   * Lots by age: known production dates oldest first, lots without a date after them (an unknown
-   * date is never counted as old), then by identity.
-   */
+  /** Package evidence is required; units and barcodes cannot imply a fabric roll. */
+  private static List<ProposalLot> fabricLots(List<ProposalLot> lots) {
+    return lots.stream()
+        .map(
+            lot ->
+                new ProposalLot(
+                    lot.batchId(),
+                    lot.lotNo(),
+                    lot.productionDate(),
+                    lot.measure(),
+                    lot.canonicalUnit(),
+                    lot.widthEvidence(),
+                    lot.pieces().stream()
+                        .map(
+                            piece ->
+                                lot.measure()
+                                            == com.fabricmanagement.production.core.batch.domain
+                                                .PrimaryMeasure.LENGTH
+                                        && piece.packageType()
+                                            == com.fabricmanagement.production.core.stockunit.domain
+                                                .PackageType.ROLL
+                                    ? piece
+                                    : new ProposalPiece(
+                                        piece.stockUnitId(),
+                                        piece.pieceNo(),
+                                        piece.canonicalMeasure(),
+                                        PieceState.EXCLUDED,
+                                        "UNSUPPORTED_PACKAGE",
+                                        piece.version(),
+                                        piece.packageType(),
+                                        piece.initialCanonicalMeasure()))
+                        .toList(),
+                    lot.averagePiece(),
+                    lot.averageBasis(),
+                    lot.inventoryComplete()))
+        .toList();
+  }
+
+  /** Known production dates oldest first; unknown dates last, then stable identity. */
   static List<ProposalLot> orderedLots(List<ProposalLot> lots) {
     Comparator<ProposalLot> order =
         Comparator.comparing(

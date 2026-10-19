@@ -12,9 +12,15 @@ import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeAvailabilityService;
+import com.fabricmanagement.sales.orderintake.app.OrderIntakeProductSearchService;
+import com.fabricmanagement.sales.orderintake.app.OrderIntakeStockPreviewService;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeAvailabilityDto;
+import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest;
 import com.fabricmanagement.testsupport.PostgresImage;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -75,7 +81,8 @@ class SalesQuoteDemoSeedIT {
       stmt.execute(
           "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'app_test'");
       stmt.execute(
-          "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'");
+          "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD"
+              + " 'system_test'");
     } catch (Exception e) {
       throw new IllegalStateException("Failed to create test database roles", e);
     }
@@ -96,6 +103,8 @@ class SalesQuoteDemoSeedIT {
   @Autowired private TenantOnboardingService onboardingService;
   @Autowired private SalesQuoteDemoSeeder salesQuoteDemoSeeder;
   @Autowired private OrderIntakeAvailabilityService availabilityService;
+  @Autowired private OrderIntakeProductSearchService productSearch;
+  @Autowired private OrderIntakeStockPreviewService stockPreview;
   @Autowired private JdbcTemplate jdbc;
 
   @MockitoBean private NotificationService notificationService;
@@ -197,6 +206,8 @@ class SalesQuoteDemoSeedIT {
     assertThat(indigo.unit()).isEqualTo("KG");
     assertThat(indigo.availableQuantity()).isEqualByComparingTo("600");
 
+    assertFabricWidthExamples(tenant);
+
     // Replay: same colours, lots, pieces, partner codes, quotes and reservations.
     Map<String, Long> before = counts(tenant);
     TenantContext.executeInTenantContext(tenant, () -> salesQuoteDemoSeeder.seedFor(tenant));
@@ -210,10 +221,72 @@ class SalesQuoteDemoSeedIT {
     assertThat(colours(trial)).isEmpty();
     assertThat(counts(trial).get("lots")).isZero();
     assertThat(counts(trial).get("partnerRefs")).isZero();
+    assertThat(
+            TenantContext.executeInTenantContext(
+                trial, () -> productSearch.search(null, ProductType.FABRIC, "PM-1454")))
+        .isEmpty();
   }
 
   private UUID signupPlayground() {
     return signup(SignupIntent.PLAYGROUND);
+  }
+
+  private void assertFabricWidthExamples(UUID tenant) {
+    for (var fabric : FabricStockDemoSeeder.FABRICS) {
+      var options =
+          TenantContext.executeInTenantContext(
+              tenant, () -> productSearch.search(null, ProductType.FABRIC, fabric.name()));
+      assertThat(options).hasSize(1);
+      var product = options.getFirst();
+      assertThat(product.displayName()).isEqualTo(fabric.name());
+      assertThat(product.listPrice()).isEqualByComparingTo(fabric.price());
+      assertThat(product.finishedWidths())
+          .extracting(width -> width.value())
+          .containsExactly(new BigDecimal("150.00"), new BigDecimal("160.00"));
+      UUID colour =
+          jdbc.queryForObject(
+              "SELECT id FROM production.color WHERE tenant_id = ? AND code = ?",
+              UUID.class,
+              tenant,
+              fabric.colour());
+      for (int width : FabricStockDemoSeeder.WIDTHS_CM) {
+        var preview =
+            TenantContext.executeInTenantContext(
+                tenant,
+                () ->
+                    stockPreview.preview(
+                        new OrderIntakeStockPreviewRequest(
+                            product.productId(),
+                            colour,
+                            BigDecimal.valueOf(width),
+                            "CM",
+                            null,
+                            new BigDecimal("700"),
+                            "M",
+                            false,
+                            new BigDecimal("5"),
+                            new BigDecimal("5"),
+                            null),
+                        SystemUser.ID));
+        assertThat(preview.lots())
+            .hasSize(2)
+            .allSatisfy(lot -> assertThat(lot.lotNo()).contains("-" + width + "-"));
+        assertThat(preview.totals().free().canonical()).isEqualByComparingTo("1790");
+        assertThat(preview.evaluation().unknownPieces()).isZero();
+        assertThat(preview.evaluation().options())
+            .extracting(option -> option.quantity())
+            .usingElementComparator(BigDecimal::compareTo)
+            .containsExactly(new BigDecimal("790"), new BigDecimal("665"));
+      }
+    }
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.stock_unit s"
+                    + " JOIN production.production_execution_batch b ON b.id = s.batch_id"
+                    + " WHERE s.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'"
+                    + " AND (s.initial_length IS NULL OR s.initial_length <> s.length)",
+                tenant))
+        .isZero();
   }
 
   /**
@@ -323,6 +396,23 @@ class SalesQuoteDemoSeedIT {
     counts.put(
         "pieces", count("SELECT count(*) FROM production.stock_unit WHERE tenant_id = ?", tenant));
     counts.put("quotes", count("SELECT count(*) FROM sales.quote WHERE tenant_id = ?", tenant));
+    counts.put(
+        "catalogue", count("SELECT count(*) FROM sales.sales_product WHERE tenant_id = ?", tenant));
+    counts.put(
+        "widthOptions",
+        count(
+            "SELECT count(*) FROM production.prod_product_finished_width WHERE tenant_id = ?",
+            tenant));
+    counts.put(
+        "widthMeasurements",
+        count(
+            "SELECT count(*) FROM production.batch_finished_width_measurement WHERE tenant_id = ?",
+            tenant));
+    counts.put(
+        "compatibility",
+        count(
+            "SELECT count(*) FROM production.lot_compatibility_confirmation WHERE tenant_id = ?",
+            tenant));
     counts.put(
         "reservations",
         count(

@@ -157,6 +157,15 @@ public class StockUnit extends BaseEntity {
   @Column(name = "length_unit", length = 10)
   private String lengthUnit;
 
+  /** First recorded measured length; never overwritten by remaining-length updates. */
+  @lombok.Setter(lombok.AccessLevel.NONE)
+  @Column(name = "initial_length", precision = 15, scale = 3, updatable = false)
+  private BigDecimal initialLength;
+
+  @lombok.Setter(lombok.AccessLevel.NONE)
+  @Column(name = "initial_length_unit", length = 10, updatable = false)
+  private String initialLengthUnit;
+
   // ── Location ──────────────────────────────────────────────────────────────
 
   /**
@@ -633,6 +642,19 @@ public class StockUnit extends BaseEntity {
         .divide(initialWeight, 2, java.math.RoundingMode.HALF_UP);
   }
 
+  /** Records the birth measurement before persistence; later observations are current only. */
+  public void recordInitialLength(BigDecimal length, String lengthUnit) {
+    if (getId() != null || initialLength != null) {
+      throw new StockUnitDomainException("The initial length can only be recorded once at birth");
+    }
+    if (length == null) {
+      throw new StockUnitDomainException("An initial length requires a measured value");
+    }
+    recordLength(length, lengthUnit);
+    this.initialLength = this.length;
+    this.initialLengthUnit = this.lengthUnit;
+  }
+
   public void recordLength(BigDecimal length, String lengthUnit) {
     if (length != null && length.compareTo(BigDecimal.ZERO) <= 0) {
       throw new StockUnitDomainException("length must be positive when provided");
@@ -642,6 +664,12 @@ public class StockUnit extends BaseEntity {
     }
     if (length != null && (lengthUnit == null || lengthUnit.isBlank())) {
       throw new StockUnitDomainException("lengthUnit must not be blank when length is provided");
+    }
+    if (lengthUnit != null) {
+      lengthUnit = lengthUnit.trim().toUpperCase(java.util.Locale.ROOT);
+      if (!java.util.Set.of("M", "CM", "MM", "KM", "YD", "IN", "FT").contains(lengthUnit)) {
+        throw new StockUnitDomainException("Unsupported length unit: " + lengthUnit);
+      }
     }
     this.length = length;
     this.lengthUnit = lengthUnit;

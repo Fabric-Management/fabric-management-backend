@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.api.facade;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
@@ -8,6 +9,7 @@ import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.communication.mapper.AddressMapper;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -65,5 +67,24 @@ public class AddressFacade {
   @Transactional
   public void deleteAddress(UUID id) {
     addressService.deleteAddress(id);
+  }
+
+  /**
+   * The delivery verification state of an address card of this tenant; empty when there is no such
+   * card.
+   */
+  @Transactional(readOnly = true)
+  public Optional<DeliveryVerificationStatus> deliveryVerificationOf(UUID addressId) {
+    return addressService.verificationOf(addressId);
+  }
+
+  /**
+   * Confirms an address card of this tenant for delivery.
+   *
+   * @return true when the card changed from unverified to verified
+   */
+  @Transactional
+  public boolean verifyForDelivery(UUID addressId, UUID verifier) {
+    return addressService.verify(addressId, verifier);
   }
 }

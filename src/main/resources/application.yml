@@ -371,3 +371,10 @@ costing:
       timeout-seconds: 5
     tcmb:
       enabled: false
+
+# SVG text outlining runs as a bounded subprocess. Missing tools/font faces fail closed.
+branding:
+  outline:
+    python: ${BRANDING_OUTLINE_PYTHON:python3}
+    inkscape: ${BRANDING_OUTLINE_INKSCAPE:inkscape}
+    font-match: ${BRANDING_OUTLINE_FONT_MATCH:fc-match}

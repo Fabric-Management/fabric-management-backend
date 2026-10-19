@@ -29,6 +29,7 @@ import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryServic
 import com.fabricmanagement.production.core.batch.api.query.QuoteHoldQueryService.QuoteHolds;
 import com.fabricmanagement.production.core.batch.app.BatchPrimaryMeasureService;
 import com.fabricmanagement.production.core.batch.domain.PrimaryMeasure;
+import com.fabricmanagement.production.core.stockunit.domain.PackageType;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
 import com.fabricmanagement.sales.orderintake.domain.QuantityProposal;
 import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalReason;
@@ -372,13 +373,14 @@ class OrderIntakeStockPreviewServiceTest {
 
   @Test
   void zeroOnBothSides_makesOnlyTheExactRequestWithinTolerance() {
-    // 100 + 50 leaves three pieces, so it is an option; nothing may leave one or two.
+    // 100 + 50 leaves four normal rolls under the fabric policy.
     stock(
         lot(
             UUID.randomUUID(),
             "LOT-A",
             eligible("100"),
             eligible("50"),
+            eligible("30"),
             eligible("30"),
             eligible("30"),
             eligible("30")));
@@ -485,7 +487,7 @@ class OrderIntakeStockPreviewServiceTest {
               assertThat(option.apply().reason())
                   .isEqualTo(QuantityOption.BlockedReason.HELD_BY_ANOTHER_QUOTE);
               assertThat(option.reasons().getFirst().code())
-                  .isEqualTo(ProposalReason.Code.FREE_STOCK_INSUFFICIENT);
+                  .isEqualTo(ProposalReason.Code.FREE_STOCK_NOT_FOUND);
               assertThat(option.heldStock())
                   .extracting(QuantityProposalDto.HeldStock::kind)
                   .contains(QuantityOption.HeldStockKind.LOT_INTENT);
@@ -549,7 +551,7 @@ class OrderIntakeStockPreviewServiceTest {
     OrderIntakeStockPreviewDto preview =
         service.preview(request("100", "M", false, "0", "0"), actor);
 
-    assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("290");
+    assertThat(lotView(preview, lotA).free().canonical()).isEqualByComparingTo("0");
     assertThat(lotView(preview, lotA).heldPieces())
         .allSatisfy(
             piece -> {
@@ -981,6 +983,122 @@ class OrderIntakeStockPreviewServiceTest {
     verify(quoteHolds, times(1)).find(any());
   }
 
+  @Test
+  void freeSummaryAndEvaluatorSharePinnedIntentArithmetic() {
+    UUID lotId = UUID.randomUUID(), quoteLine = UUID.randomUUID(), quoteId = UUID.randomUUID();
+    ProposalPiece held = eligible("120");
+    stock(lot(lotId, "PINNED", held, eligible("880")));
+    for (String intent : List.of("100", "150")) {
+      when(quoteHolds.find(any()))
+          .thenReturn(
+              holds(
+                  List.of(intent(lotId, quoteId, quoteLine, intent, intent)),
+                  List.of(hold(held.stockUnitId(), lotId, quoteLine))));
+      var preview = service.preview(request("700", "M", false, "5", "5"), actor);
+      assertThat(preview.totals().free().canonical())
+          .isEqualByComparingTo(intent.equals("100") ? "880" : "850");
+      assertThat(preview.evaluation().options())
+          .filteredOn(option -> option.source() == QuantityOption.StockSource.FREE)
+          .allSatisfy(
+              option ->
+                  assertThat(option.quantity())
+                      .isLessThanOrEqualTo(preview.totals().free().canonical()));
+    }
+  }
+
+  @Test
+  void conflictingPieceOwnersAreUnknownAndNeitherNameLeaksEvenWhenBothReadable() {
+    UUID lotId = UUID.randomUUID(), firstLine = UUID.randomUUID(), secondLine = UUID.randomUUID();
+    ProposalPiece piece = eligible("100");
+    stock(lot(lotId, "CONFLICT", piece));
+    when(quoteHolds.find(any()))
+        .thenReturn(
+            holds(
+                List.of(
+                    intent(lotId, UUID.randomUUID(), firstLine, "100", "100"),
+                    intent(lotId, UUID.randomUUID(), secondLine, "100", "100")),
+                List.of(
+                    hold(piece.stockUnitId(), lotId, firstLine),
+                    hold(piece.stockUnitId(), lotId, secondLine))));
+    var preview = service.preview(request("100", "M", false, "5", "5"), actor);
+    assertThat(preview.totals().free()).isNull();
+    assertThat(lotView(preview, lotId).heldPieces())
+        .singleElement()
+        .satisfies(
+            held -> {
+              assertThat(held.holdStatus()).isEqualTo(HoldStatus.UNVERIFIED);
+              assertThat(held.quoteNumber()).isNull();
+              assertThat(held.marketerName()).isNull();
+            });
+    assertThat(preview.evaluation().coverage().status())
+        .isEqualTo(
+            com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage.Status.UNKNOWN);
+  }
+
+  @Test
+  void fabricPolicyDoesNotReadStandingProductSpeedAndPublishesItsOwnMinimum() {
+    stock(lot(UUID.randomUUID(), "ROLLS", eligible("100")));
+    var evaluator =
+        new QuantityEvaluationService(
+            access,
+            productDefinitions,
+            stockQuery,
+            quoteHolds,
+            quoteScopes,
+            toneAcceptances,
+            proposals,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            tenant -> new LotHealthSettings(3, 5, 8, new BigDecimal("0.51"), 6),
+            (tenant, product, color) -> {
+              throw new AssertionError("Base fabric policy must not infer season");
+            });
+    var preview =
+        new OrderIntakeStockPreviewService(evaluator, stockQuery, quoteScopes)
+            .preview(request("100", "M", false, "5", "5"), actor);
+    assertThat(preview.evaluation().effectiveMinHealthyPieces()).isEqualTo(6);
+    assertThat(preview.evaluation().policyCode())
+        .isEqualTo(
+            com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode
+                .FABRIC_ROLL_BASE);
+  }
+
+  @Test
+  void fibreSacksAndYarnBobbinsKeepTheStandardThreePiecePolicy() {
+    for (ProductType type : List.of(ProductType.FIBER, ProductType.YARN)) {
+      when(productDefinitions.find(tenantId, productId)).thenReturn(Optional.of(definition(type)));
+      when(stockQuery.measureFor(type)).thenReturn(Optional.of(PrimaryMeasure.WEIGHT));
+      var pieces =
+          java.util.stream.IntStream.range(0, 7)
+              .mapToObj(
+                  index ->
+                      new ProposalPiece(
+                          UUID.randomUUID(),
+                          "PACKAGE-" + index,
+                          new BigDecimal("100"),
+                          PieceState.ELIGIBLE,
+                          null,
+                          0L,
+                          type == ProductType.FIBER ? PackageType.SACK : PackageType.BOBBIN,
+                          new BigDecimal("100")))
+              .toList();
+      stock(
+          new ProposalLot(
+              UUID.randomUUID(),
+              "WEIGHT",
+              NOW,
+              PrimaryMeasure.WEIGHT,
+              "KG",
+              WidthEvidence.NOT_REQUIRED,
+              pieces));
+      var preview = service.preview(request("400", "KG", false, "5", "5"), actor);
+      assertThat(preview.evaluation().effectiveMinHealthyPieces()).isEqualTo(3);
+      assertThat(preview.evaluation().policyCode())
+          .isEqualTo(
+              com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode.STANDARD);
+      assertThat(main(preview).quantity()).isEqualByComparingTo("400");
+    }
+  }
+
   // ── Fixtures ─────────────────────────────────────────────────────────────
 
   private OrderIntakeStockPreviewDto.Evaluation storedEvaluation(SalesOrderLine line) {
@@ -1095,7 +1213,14 @@ class OrderIntakeStockPreviewServiceTest {
 
   private static ProposalPiece unmeasured() {
     return new ProposalPiece(
-        UUID.randomUUID(), "P-UNMEASURED", null, PieceState.UNKNOWN, "MEASURE_MISSING", 0L);
+        UUID.randomUUID(),
+        "P-UNMEASURED",
+        null,
+        PieceState.UNKNOWN,
+        "MEASURE_MISSING",
+        0L,
+        PackageType.ROLL,
+        null);
   }
 
   private static ProposalPiece eligible(String measure) {
@@ -1110,6 +1235,8 @@ class OrderIntakeStockPreviewServiceTest {
         new BigDecimal(measure),
         state,
         state == PieceState.ELIGIBLE ? null : "TEST",
-        0L);
+        0L,
+        PackageType.ROLL,
+        null);
   }
 }

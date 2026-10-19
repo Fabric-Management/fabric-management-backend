@@ -40,6 +40,21 @@ final class ProposalReasons {
         reasons.add(
             ProposalReason.of(
                 limitExceeded
+                        || context.free().values().stream().anyMatch(free -> !free.known())
+                        || context.lots().stream()
+                            .anyMatch(
+                                lot ->
+                                    !lot.inventoryComplete()
+                                        || lot.pieces().stream()
+                                            .anyMatch(
+                                                piece ->
+                                                    piece.state()
+                                                            == com.fabricmanagement.production.core
+                                                                .batch.api.query
+                                                                .ProposalStockQueryService
+                                                                .PieceState.UNKNOWN
+                                                        || "UNSUPPORTED_PACKAGE"
+                                                            .equals(piece.reason())))
                     ? ProposalReason.Code.FREE_STOCK_NOT_FOUND
                     : ProposalReason.Code.FREE_STOCK_INSUFFICIENT));
       }
@@ -57,7 +72,9 @@ final class ProposalReasons {
       } else if (anyRemnant) {
         reasons.add(ProposalReason.of(ProposalReason.Code.NO_REMNANT));
       }
-      int closed = (int) option.lots().stream().filter(QuantityOption.LotPart::closesLot).count();
+      int closed =
+          (int)
+              option.lots().stream().filter(part -> Boolean.TRUE.equals(part.closesLot())).count();
       if (closed > 0) {
         reasons.add(new ProposalReason(ProposalReason.Code.CLOSES_LOTS, null, closed, null));
       }

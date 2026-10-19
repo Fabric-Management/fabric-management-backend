@@ -72,6 +72,8 @@ final class TablePrivilegeClassification {
     entries.put(
         "production.production_execution_batch_color_archive",
         TablePrivilegeClass.READ_ONLY_ARCHIVE);
+    // Tenant branding slots: the app soft-deletes and reuses a slot; only fabric_system deletes.
+    entries.put("common_tenant.tenant_brand_asset", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("common_tenant.flyway_schema_history", TablePrivilegeClass.NO_RUNTIME_ACCESS);
     entries.put("public.jobrunr_migrations", TablePrivilegeClass.APP_ONLY_MUTABLE);
     entries.put("public.jobrunr_jobs", TablePrivilegeClass.APP_ONLY_MUTABLE);

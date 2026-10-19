@@ -30,15 +30,13 @@ public class OrderIntakeStockPreviewController {
       operationId = "previewOrderIntakeStock",
       summary = "Current stock for an order line that is not saved yet",
       description =
-          "Evaluates the line exactly as a saved line with the same inputs would be evaluated:"
-              + " free stock first, stock other quotes hold only when free stock has no option"
-              + " within the agreed tolerance, options in the decided card order (changed pieces,"
-              + " meets the request, the most within it, short within it; outside the tolerance"
-              + " only when nothing lies within; held) with the main proposal's index. Each"
-              + " option states what other quotes hold that it would take and whether it can be"
-              + " applied; an optional manual pick is evaluated with the"
-              + " same checks. Guidance for the salesperson only: nothing is reserved or"
-              + " recorded. A free quantity that cannot be determined is null with its reasons.")
+          "Evaluates the line exactly as a saved line with the same inputs. The explicit policy"
+              + " determines business order: fabric rolls complete the request with healthy stock"
+              + " and cleanup priority, even outside tolerance, then show the below-request alternative."
+              + " Held stock is informational and appears only when free stock cannot reach the lower"
+              + " tolerance. mainOptionIndex identifies the opening; coverage separately states proven"
+              + " feasibility. Manual picks use the same eligibility, hold and single-lot checks."
+              + " This query reserves and records nothing; unknown free quantities remain null.")
   public ResponseEntity<ApiResponse<OrderIntakeStockPreviewDto>> preview(
       @Valid @RequestBody OrderIntakeStockPreviewRequest request) {
     return ResponseEntity.ok(

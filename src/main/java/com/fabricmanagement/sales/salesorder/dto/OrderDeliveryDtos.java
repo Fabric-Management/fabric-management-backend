@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.sales.salesorder.domain.DefaultSource;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTermSetting;
 import com.fabricmanagement.sales.salesorder.domain.EventComparison;
@@ -19,7 +20,9 @@ import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RequestedDateVie
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,7 +45,31 @@ public final class OrderDeliveryDtos {
           DefaultSource requestedDateSource,
       @Valid RequestedDateInput requestedDate,
       String transportPreference,
-      boolean shipComplete) {}
+      boolean shipComplete,
+      @Schema(
+              description =
+                  "Said in words where the address is not known yet. A delivery with only a note"
+                      + " stays unverified until it has an address (or the term is EXW).",
+              maxLength = OrderDelivery.MAX_NOTE)
+          @Size(max = OrderDelivery.MAX_NOTE)
+          String note) {}
+
+  @Schema(
+      name = "OrderDeliveryCorrection",
+      description =
+          "What a verifier may change while verifying: the consignee, the address and the note."
+              + " All three are replaced by what is sent, so send the current value of a part"
+              + " that stays as it is.")
+  public record DeliveryCorrection(
+      @Valid PartyInput consignee,
+      @Valid AddressInput shipTo,
+      @Size(max = OrderDelivery.MAX_NOTE) String note) {}
+
+  @Schema(name = "VerifyOrderDeliveryRequest")
+  public record VerifyDeliveryRequest(
+      @NotNull Long expectedVersion,
+      @Schema(description = "Omit to verify the delivery as saved") @Valid
+          DeliveryCorrection correction) {}
 
   @Schema(name = "SaveOrderDeliveryRequest")
   public record SaveDeliveryRequest(
@@ -84,7 +111,15 @@ public final class OrderDeliveryDtos {
           EventComparison requestedEventVsTerm,
       String transportPreference,
       boolean shipComplete,
-      List<AllocationView> allocations) {
+      List<AllocationView> allocations,
+      String note,
+      DeliveryVerificationStatus verificationStatus,
+      @Schema(nullable = true) UUID verifiedBy,
+      @Schema(nullable = true) Instant verifiedAt,
+      @Schema(
+              description =
+                  "The address card the address was copied from was verified when it was copied")
+          boolean shipToVerifiedAtCopy) {
 
     public static DeliveryView of(
         SalesOrder order, OrderDelivery delivery, List<OrderLineAllocation> allocations) {
@@ -108,7 +143,12 @@ public final class OrderDeliveryDtos {
           comparison,
           delivery.getTransportPreference(),
           delivery.isShipComplete(),
-          allocations.stream().map(AllocationView::of).toList());
+          allocations.stream().map(AllocationView::of).toList(),
+          delivery.getNote(),
+          delivery.getVerification().getStatus(),
+          delivery.getVerification().getVerifiedBy(),
+          delivery.getVerification().getVerifiedAt(),
+          delivery.isShipToVerifiedAtCopy());
     }
   }
 

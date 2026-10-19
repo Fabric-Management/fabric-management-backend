@@ -59,7 +59,14 @@ public record StockProposalSettingsDto(
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
             description = "The same for a stalled product")
-        BigDecimal lotCloseExtraStalledPct) {
+        BigDecimal lotCloseExtraStalledPct,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            minimum = "4",
+            maximum = "50",
+            description =
+                "Normal fabric rolls kept when a free roll pool is not depleted; base policy")
+        int fabricRollMinHealthyPieces) {
 
   public static StockProposalSettingsDto from(StockProposalSettings settings) {
     return new StockProposalSettingsDto(
@@ -74,6 +81,7 @@ public record StockProposalSettingsDto(
         settings.stalledBelowPct(),
         settings.slowingCoverDays(),
         settings.lotCloseExtraSlowingPct(),
-        settings.lotCloseExtraStalledPct());
+        settings.lotCloseExtraStalledPct(),
+        settings.fabricRollMinHealthyPieces());
   }
 }

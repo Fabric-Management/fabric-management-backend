@@ -69,6 +69,10 @@ public class OpenApiExportIT {
    */
   private static final List<NullableReference> NULLABLE_REFERENCES =
       List.of(
+          new NullableReference("TenantBrandingDto", "logo", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "icon", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "logoDark", "TenantBrandAssetDto"),
+          new NullableReference("TenantBrandingDto", "iconDark", "TenantBrandAssetDto"),
           new NullableReference("DecisionCapability", "reason", "DecisionBlockedReason"),
           new NullableReference("DecisionCapability", "routesTo", "DecisionRouteTarget"),
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
@@ -108,7 +112,11 @@ public class OpenApiExportIT {
               "OrderIntakeStockPreviewQuantity"),
           // STOCK-PROPOSAL-2: an applicable option has no blocked reason.
           new NullableReference(
-              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"));
+              "StockProposalApplyCapability", "reason", "StockProposalBlockedReason"),
+          // CONSIGNEE-1 S1: a quick-create that needs a decision wrote nothing, so it has no
+          // partner and no link yet.
+          new NullableReference("QuickCreatePartnerLinkResponse", "partner", "TradingPartnerDto"),
+          new NullableReference("QuickCreatePartnerLinkResponse", "link", "PartnerLinkDto"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =
@@ -143,6 +151,17 @@ public class OpenApiExportIT {
 
   private record NullableReference(String schema, String property, String target) {}
 
+  private record NullableScalar(String schema, String property, String valueType) {}
+
+  private static final List<NullableScalar> STOCK_NULLABLE_SCALARS =
+      List.of(
+          new NullableScalar("QuantityProposalLot", "closesLot", "boolean"),
+          new NullableScalar("QuantityProposalLot", "depletesFreePool", "boolean"),
+          new NullableScalar("StockProposalCoverage", "coveringOptionKey", "string"),
+          new NullableScalar("QuantityProposal", "effectiveMinHealthyPieces", "integer"),
+          new NullableScalar(
+              "OrderIntakeStockPreviewEvaluation", "effectiveMinHealthyPieces", "integer"));
+
   @Autowired private TestRestTemplate restTemplate;
 
   @Test
@@ -176,6 +195,7 @@ public class OpenApiExportIT {
         .hasMessageContaining("PermissionKey");
 
     assertNullableReferenceRedProbes(generatedSpec);
+    assertStockNullableScalarRedProbes(generatedSpec);
 
     // 2. Define the target spec file location
     File specFile = new File("api/openapi.yaml");
@@ -256,10 +276,22 @@ public class OpenApiExportIT {
         .doesNotContainKey("OrderIntakeStockPreviewOptionCheck");
     // STOCK-PROPOSAL-2: ordered options with the main index; each option carries its capability.
     assertThat(requiredOf(document, "OrderIntakeStockPreviewEvaluation"))
-        .contains("options", "mainOptionIndex", "searchComplete")
+        .contains(
+            "options",
+            "mainOptionIndex",
+            "searchComplete",
+            "policyCode",
+            "effectiveMinHealthyPieces",
+            "coverage")
         .doesNotContain("optionsOutsideAgreedTolerance");
     assertThat(requiredOf(document, "QuantityProposal"))
-        .contains("options", "mainOptionIndex", "searchComplete");
+        .contains(
+            "options",
+            "mainOptionIndex",
+            "searchComplete",
+            "policyCode",
+            "effectiveMinHealthyPieces",
+            "coverage");
     assertThat(requiredOf(document, "QuantityProposalOption"))
         .contains(
             "optionKey",
@@ -274,7 +306,18 @@ public class OpenApiExportIT {
             "apply")
         .doesNotContain("nearest");
     assertThat(requiredOf(document, "QuantityProposalLot"))
-        .contains("closesLot", "remainingPieces", "remainingQuantity", "pieceIds");
+        .contains(
+            "closesLot", "depletesFreePool", "remainingPieces", "remainingQuantity", "pieceIds");
+    assertStockNullableScalars(document);
+    assertThat(requiredOf(document, "StockProposalCoverage"))
+        .containsExactlyInAnyOrder("status", "coveringOptionKey", "reasons");
+    assertThat(mapAt(document, "components", "schemas", "StockProposalCoverageStatus"))
+        .containsEntry(
+            "enum", List.of("COVERABLE", "BELOW_REQUEST_ONLY", "NO_APPLICABLE_OPTION", "UNKNOWN"));
+    assertThat(mapAt(document, "components", "schemas", "StockProposalPolicyCode"))
+        .containsEntry("enum", List.of("STANDARD", "FABRIC_ROLL_BASE", "UNKNOWN"));
+    assertThat(requiredOf(document, "StockProposalSettingsView"))
+        .contains("fabricRollMinHealthyPieces");
     assertThat(requiredOf(document, "StockProposalApplyCapability"))
         .containsExactlyInAnyOrder(
             "action", "allowed", "reason", "routesTo", "needsApproval", "needsConfirmation");
@@ -284,6 +327,53 @@ public class OpenApiExportIT {
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");
     assertThat(mapAt(document, "components", "schemas", "OrderIntakeStockPreviewHoldStatus"))
         .containsEntry("enum", List.of("VERIFIED", "UNVERIFIED"));
+  }
+
+  /** OpenAPI 3.1 scalar nullability is a type union, independent of the array order. */
+  private void assertStockNullableScalars(Map<String, Object> document) {
+    for (NullableScalar field : STOCK_NULLABLE_SCALARS) {
+      String name = field.schema() + "." + field.property();
+      assertThat(requiredOf(document, field.schema()))
+          .as("%s is required", name)
+          .contains(field.property());
+      Object type = schemaProperty(document, field.schema(), field.property()).get("type");
+      assertThat(type).as("%s allows its scalar value and null", name).isInstanceOf(List.class);
+      List<?> types = (List<?>) type;
+      assertThat(types).as("%s has exactly two types", name).hasSize(2);
+      assertThat(new HashSet<>(types))
+          .as("%s preserves both value and null", name)
+          .isEqualTo(Set.of(field.valueType(), "null"));
+    }
+  }
+
+  /** Regression probes alter a separate document, never the exported contract. */
+  private void assertStockNullableScalarRedProbes(String generatedSpec) throws Exception {
+    Map<String, Object> document = parse(generatedSpec);
+    for (NullableScalar field : STOCK_NULLABLE_SCALARS) {
+      String name = field.schema() + "." + field.property();
+      Map<String, Object> property = schemaProperty(document, field.schema(), field.property());
+      Object originalType = property.get("type");
+      // Missing null, missing the value type, and YAML null instead of the type name "null".
+      for (Object invalidType :
+          List.of(field.valueType(), "null", Arrays.asList(field.valueType(), null))) {
+        property.put("type", invalidType);
+        assertThatThrownBy(() -> assertStockNullableScalars(document))
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining(name);
+      }
+      property.put("type", originalType);
+      Map<String, Object> schema = mapAt(document, "components", "schemas", field.schema());
+      Object required = schema.get("required");
+      schema.put(
+          "required",
+          requiredOf(document, field.schema()).stream()
+              .filter(value -> !value.equals(field.property()))
+              .toList());
+      assertThatThrownBy(() -> assertStockNullableScalars(document))
+          .isInstanceOf(AssertionError.class)
+          .hasMessageContaining(name);
+      schema.put("required", required);
+    }
   }
 
   private List<String> requiredOf(Map<String, Object> document, String schemaName) {

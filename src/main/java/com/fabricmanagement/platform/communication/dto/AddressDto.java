@@ -1,7 +1,9 @@
 package com.fabricmanagement.platform.communication.dto;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -39,6 +41,18 @@ public class AddressDto {
   private Instant createdAt;
   private Instant updatedAt;
 
+  @Schema(
+      description =
+          "Whether a delivery verifier confirmed this address card. Not placeId, which only says a"
+              + " map service recognised it.")
+  private DeliveryVerificationStatus verificationStatus;
+
+  @Schema(nullable = true)
+  private UUID verifiedBy;
+
+  @Schema(nullable = true)
+  private Instant verifiedAt;
+
   public static AddressDto from(Address address) {
     return AddressDto.builder()
         .id(address.getId())
@@ -64,6 +78,9 @@ public class AddressDto {
         .isActive(address.getIsActive())
         .createdAt(address.getCreatedAt())
         .updatedAt(address.getUpdatedAt())
+        .verificationStatus(address.getVerificationStatus())
+        .verifiedBy(address.getVerifiedBy())
+        .verifiedAt(address.getVerifiedAt())
         .build();
   }
 }

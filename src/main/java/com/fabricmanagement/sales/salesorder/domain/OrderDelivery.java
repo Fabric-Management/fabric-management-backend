@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import jakarta.persistence.AttributeOverride;
@@ -10,7 +11,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,6 +37,7 @@ import lombok.NoArgsConstructor;
 public class OrderDelivery extends BaseEntity {
 
   public static final int MAX_TRANSPORT_PREFERENCE = 100;
+  public static final int MAX_NOTE = 500;
 
   /** What a delivery holds, as entered; validated by {@link #create} and {@link #revise}. */
   public record Content(
@@ -44,7 +48,61 @@ public class OrderDelivery extends BaseEntity {
       DefaultSource requestedDateSource,
       RequestedDate requestedDate,
       String transportPreference,
-      boolean shipComplete) {}
+      boolean shipComplete,
+      String note) {
+
+    /** A delivery without a note. */
+    public Content(
+        PartyReference consignee,
+        AddressSnapshot shipTo,
+        DefaultSource termSource,
+        DeliveryTermSetting term,
+        DefaultSource requestedDateSource,
+        RequestedDate requestedDate,
+        String transportPreference,
+        boolean shipComplete) {
+      this(
+          consignee,
+          shipTo,
+          termSource,
+          term,
+          requestedDateSource,
+          requestedDate,
+          transportPreference,
+          shipComplete,
+          null);
+    }
+  }
+
+  /** Why a delivery cannot be verified yet; the code is what the client tells apart. */
+  public enum VerificationBlocker {
+    CONSIGNEE_MISSING(
+        "DELIVERY_CONSIGNEE_MISSING", "Choose who receives this delivery before it is verified"),
+    NOTE_ONLY(
+        "DELIVERY_NOTE_ONLY",
+        "This delivery has only a note: give the address, or set the delivery term to EXW (the"
+            + " customer collects)"),
+    ADDRESS_INCOMPLETE(
+        "DELIVERY_ADDRESS_INCOMPLETE",
+        "This delivery needs a complete address (street, city, country), unless the delivery term"
+            + " is EXW (the customer collects)");
+
+    private final String code;
+    private final String message;
+
+    VerificationBlocker(String code, String message) {
+      this.code = code;
+      this.message = message;
+    }
+
+    public String code() {
+      return code;
+    }
+
+    public String message() {
+      return message;
+    }
+  }
 
   @Column(name = "sales_order_id", nullable = false, updatable = false)
   private UUID salesOrderId;
@@ -132,6 +190,20 @@ public class OrderDelivery extends BaseEntity {
   @Column(name = "transport_preference", length = MAX_TRANSPORT_PREFERENCE)
   private String transportPreference;
 
+  /** Said in words where the address is not known yet ("the Merter workshop, Ahmet confirms"). */
+  @Column(name = "note", length = MAX_NOTE)
+  private String note;
+
+  /**
+   * Whether a delivery verifier confirmed the consignee and the place (CONSIGNEE-1 C5). Any change
+   * of what the delivery holds ends it; the application restates it from who made the change.
+   */
+  @Embedded private Verification verification = Verification.unverified();
+
+  /** Whether the address card the address was copied from was verified when it was copied. */
+  @Column(name = "ship_to_verified_at_copy", nullable = false)
+  private boolean shipToVerifiedAtCopy;
+
   /**
    * Ships only when every quantity allocated to it is ready (OD-8); production may be staggered.
    */
@@ -202,6 +274,73 @@ public class OrderDelivery extends BaseEntity {
             MAX_TRANSPORT_PREFERENCE,
             "The transport preference is too long");
     this.shipComplete = content.shipComplete();
+    this.note = Text.limited(Text.trimmed(content.note()), MAX_NOTE, "The note is too long");
+    // What was verified is no longer what is held.
+    this.verification = Verification.unverified();
+    this.shipToVerifiedAtCopy = false;
+  }
+
+  /**
+   * Replaces the consignee, the address and the note only, the three things a verifier may correct
+   * without holding the right to change the order (C8). The delivery is unverified again until
+   * {@link #verify} or {@link #recordVerification} says otherwise.
+   */
+  public void correct(PartyReference consignee, AddressSnapshot shipTo, String note) {
+    PartyReference party = consignee == null ? PartyReference.NONE : consignee;
+    this.consigneeMode = party.mode();
+    this.consigneePartnerId = party.partnerId();
+    this.consigneeParty = party.snapshot();
+    this.shipTo = shipTo;
+    this.note = Text.limited(Text.trimmed(note), MAX_NOTE, "The note is too long");
+    this.verification = Verification.unverified();
+    this.shipToVerifiedAtCopy = false;
+  }
+
+  /**
+   * What stops the delivery from being verified: no decided consignee, or no complete address while
+   * the customer does not collect the goods itself (term EXW). A note is not an address.
+   */
+  public Optional<VerificationBlocker> verificationBlocker(SalesOrder order) {
+    if (!getConsignee().isDecided()) {
+      return Optional.of(VerificationBlocker.CONSIGNEE_MISSING);
+    }
+    if (hasCompleteAddress() || customerCollects(order)) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        note != null ? VerificationBlocker.NOTE_ONLY : VerificationBlocker.ADDRESS_INCOMPLETE);
+  }
+
+  /** Only a note says where it goes: unverified by definition (C7), whoever saved it. */
+  public boolean isNoteOnly() {
+    return note != null && !hasCompleteAddress();
+  }
+
+  /** Confirms the delivery; refused while {@link #verificationBlocker} names something. */
+  public void verify(SalesOrder order, UUID verifier, Instant at) {
+    verificationBlocker(order)
+        .ifPresent(
+            blocker -> {
+              throw OrderDomainException.rule(blocker.code(), blocker.message());
+            });
+    this.verification = Verification.verifiedBy(verifier, at);
+  }
+
+  /** Records the state a save decided, and how the copied address card stood at copy time. */
+  public void recordVerification(Verification verification, boolean shipToVerifiedAtCopy) {
+    if (verification == null) {
+      throw new IllegalArgumentException("Verification is required");
+    }
+    this.verification = verification;
+    this.shipToVerifiedAtCopy = shipToVerifiedAtCopy;
+  }
+
+  private boolean hasCompleteAddress() {
+    return shipTo != null && shipTo.isComplete();
+  }
+
+  private boolean customerCollects(SalesOrder order) {
+    return effectiveTerm(order).terms().term() == DeliveryTerm.EXW;
   }
 
   public PartyReference getConsignee() {

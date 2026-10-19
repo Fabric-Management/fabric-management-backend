@@ -1,9 +1,11 @@
 package com.fabricmanagement.platform.organization.dto;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -47,6 +49,15 @@ public class OrganizationAddressDto {
     private String contactPerson;
     private Double latitude;
     private Double longitude;
+
+    @Schema(description = "Whether a delivery verifier confirmed this address card")
+    private DeliveryVerificationStatus verificationStatus;
+
+    @Schema(nullable = true)
+    private UUID verifiedBy;
+
+    @Schema(nullable = true)
+    private Instant verifiedAt;
   }
 
   public static OrganizationAddressDto from(OrganizationAddress entity) {
@@ -77,6 +88,9 @@ public class OrganizationAddressDto {
               .contactPerson(address.getContactPerson())
               .latitude(address.getLatitude())
               .longitude(address.getLongitude())
+              .verificationStatus(address.getVerificationStatus())
+              .verifiedBy(address.getVerifiedBy())
+              .verifiedAt(address.getVerifiedAt())
               .build());
     }
 

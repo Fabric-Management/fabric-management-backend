@@ -54,7 +54,7 @@ class TenantLotHealthSettingsAdapterTest {
     TenantSettings stored = TenantSettings.defaults();
     stored.setStockProposal(
         new StockProposalSettings(
-            null, null, 4, 6, 10, new BigDecimal("45"), null, null, null, null, null, null));
+            null, null, 4, 6, 10, new BigDecimal("45"), null, null, null, null, null, null, 7));
     when(tenantSystemService.requireSettings(tenantId)).thenReturn(stored);
 
     LotHealthSettings settings = adapter.forTenant(tenantId);
@@ -63,5 +63,7 @@ class TenantLotHealthSettingsAdapterTest {
     assertThat(settings.minHealthyPiecesSlowing()).isEqualTo(6);
     assertThat(settings.minHealthyPiecesStalled()).isEqualTo(10);
     assertThat(settings.shortPieceRatio()).isEqualByComparingTo("0.45");
+    assertThat(settings.fabricRollPolicy())
+        .isEqualTo(new LotHealthPolicy(7, new BigDecimal("0.45")));
   }
 }

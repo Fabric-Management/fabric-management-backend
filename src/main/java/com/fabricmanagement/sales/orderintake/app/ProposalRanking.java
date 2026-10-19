@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.orderintake.app;
 
+import com.fabricmanagement.sales.orderintake.domain.proposal.FabricRollRank;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockSource;
 import com.fabricmanagement.sales.orderintake.domain.proposal.WholePieceSearch;
@@ -40,7 +41,23 @@ final class ProposalRanking {
       List<Integer> partialSizes,
       List<Integer> youngestFirst,
       long units,
-      String pieceKey) {
+      String pieceKey,
+      FabricRollRank fabricRank) {
+
+    Ranked withFabricRank(FabricRollRank rank) {
+      return new Ranked(
+          option,
+          definite,
+          tier,
+          remnantPenalty,
+          remnantClosed,
+          closedLots,
+          partialSizes,
+          youngestFirst,
+          units,
+          pieceKey,
+          rank);
+    }
 
     /** The same ranking facts with another option (a placement or reasons added). */
     Ranked withOption(QuantityOption newOption) {
@@ -54,7 +71,8 @@ final class ProposalRanking {
           partialSizes,
           youngestFirst,
           units,
-          pieceKey);
+          pieceKey,
+          fabricRank);
     }
   }
 
@@ -100,7 +118,8 @@ final class ProposalRanking {
         List.copyOf(partialSizes),
         List.copyOf(youngestFirst),
         takes.stream().mapToLong(WholePieceSearch.LotTake::units).sum(),
-        pieceKey(takes));
+        pieceKey(takes),
+        null);
   }
 
   /** The tenant-first ranking around {@code target} search units. */

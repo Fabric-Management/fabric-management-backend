@@ -189,11 +189,12 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_work_assignment (
     version BIGINT NOT NULL DEFAULT 0,
     sales_order_id UUID NOT NULL,
     work_kind VARCHAR(30) NOT NULL
-        CHECK (work_kind IN ('PLANNING', 'SHIP_READINESS', 'ARRIVAL_ESTIMATE')),
+        CHECK (work_kind IN ('PLANNING', 'SHIP_READINESS', 'ARRIVAL_ESTIMATE', 'DELIVERY_VERIFICATION')),
     department_code VARCHAR(50) NOT NULL,
     routed_at TIMESTAMPTZ NOT NULL,
     assignee_id UUID,
     assigned_at TIMESTAMPTZ,
+    closed_at TIMESTAMPTZ,
     CONSTRAINT fk_order_work_assignment_order FOREIGN KEY (tenant_id, sales_order_id)
         REFERENCES sales_ord.sales_order (tenant_id, id),
     CONSTRAINT chk_order_work_assignment_assignee CHECK ((assignee_id IS NULL) = (assigned_at IS NULL))
@@ -217,8 +218,9 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_work_assignment_event (
     version BIGINT NOT NULL DEFAULT 0,
     sales_order_id UUID NOT NULL,
     work_kind VARCHAR(30) NOT NULL
-        CHECK (work_kind IN ('PLANNING', 'SHIP_READINESS', 'ARRIVAL_ESTIMATE')),
-    event_type VARCHAR(20) NOT NULL CHECK (event_type IN ('ROUTED', 'CLAIMED', 'ASSIGNED', 'RELEASED')),
+        CHECK (work_kind IN ('PLANNING', 'SHIP_READINESS', 'ARRIVAL_ESTIMATE', 'DELIVERY_VERIFICATION')),
+    event_type VARCHAR(20) NOT NULL
+        CHECK (event_type IN ('ROUTED', 'CLAIMED', 'ASSIGNED', 'RELEASED', 'CLOSED')),
     department_code VARCHAR(50) NOT NULL,
     from_assignee_id UUID,
     to_assignee_id UUID,
@@ -466,6 +468,15 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_delivery (
     transport_preference VARCHAR(100),
     -- OD-8: ships only when every quantity allocated to it is ready.
     ship_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    -- CONSIGNEE-1 C7: a note may stand in for the address ("the Merter workshop - Ahmet to confirm").
+    note VARCHAR(500),
+    -- CONSIGNEE-1 C5: confirmed by a holder of sales:verify-delivery; anything not known to be
+    -- verified is not. C10: whether the address card it was copied from was verified at copy time.
+    verification_status VARCHAR(20) NOT NULL DEFAULT 'UNVERIFIED'
+        CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED')),
+    verified_by UUID,
+    verified_at TIMESTAMPTZ,
+    ship_to_verified_at_copy BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT uq_order_delivery_tenant_id UNIQUE (tenant_id, id),
     CONSTRAINT uq_order_delivery_sequence UNIQUE (tenant_id, sales_order_id, sequence_no),
     CONSTRAINT fk_order_delivery_order FOREIGN KEY (tenant_id, sales_order_id)

@@ -1,5 +1,7 @@
 package com.fabricmanagement.sales.orderintake.dto;
 
+import com.fabricmanagement.sales.orderintake.domain.proposal.ProposalPolicyCode;
+import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityCoverage;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityEvaluationResult;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -81,8 +83,7 @@ public record OrderIntakeStockPreviewDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description =
-                  "Ascending quantity; same quantity in the tenant-first ranking, then a"
-                      + " deterministic order. Keep this order")
+                  "Business priority order for the stated policy; preserve it, never sort by quantity")
           List<QuantityProposalDto.Option> options,
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
@@ -109,7 +110,11 @@ public record OrderIntakeStockPreviewDto(
       @Schema(
               requiredMode = Schema.RequiredMode.REQUIRED,
               description = "Every lot with offerable stock has a known production date")
-          boolean agedByProductionDate) {
+          boolean agedByProductionDate,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ProposalPolicyCode policyCode,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+          Integer effectiveMinHealthyPieces,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QuantityCoverage coverage) {
 
     public static Evaluation from(QuantityEvaluationResult result, Set<UUID> readableQuotes) {
       return new Evaluation(
@@ -124,7 +129,10 @@ public record OrderIntakeStockPreviewDto(
           result.unknownPieces(),
           result.excludedPieces(),
           result.unknownReasons(),
-          result.agedByProductionDate());
+          result.agedByProductionDate(),
+          result.policyCode(),
+          result.effectiveMinHealthyPieces(),
+          result.coverage());
     }
   }
 
@@ -168,7 +176,8 @@ public record OrderIntakeStockPreviewDto(
               requiredMode = Schema.RequiredMode.REQUIRED,
               nullable = true,
               description =
-                  "Eligible minus intent-held, never below zero; null when freeComplete is false")
+                  "Unheld eligible stock less each line's intent not covered by its pinned eligible pieces;"
+                      + " never below zero, null when freeComplete is false")
           Quantity free,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean freeComplete,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

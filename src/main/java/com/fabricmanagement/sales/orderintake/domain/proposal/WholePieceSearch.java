@@ -62,7 +62,7 @@ public final class WholePieceSearch {
     }
 
     public long total() {
-      return pieces.stream().mapToLong(Piece::units).sum();
+      return pieces.stream().mapToLong(Piece::units).reduce(0L, Math::addExact);
     }
 
     /** How many of the pieces are normal, not short. */

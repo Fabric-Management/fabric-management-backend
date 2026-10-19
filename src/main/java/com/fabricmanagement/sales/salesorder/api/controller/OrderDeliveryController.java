@@ -6,6 +6,7 @@ import com.fabricmanagement.sales.salesorder.app.OrderDeliveryService;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.DeliveriesView;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.SaveDeliveryRequest;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.SetAllocationsRequest;
+import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.VerifyDeliveryRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -98,6 +99,23 @@ public class OrderDeliveryController {
     return ResponseEntity.ok(
         ApiResponse.success(
             deliveries.setAllocations(orderId, deliveryId, request, actor(authentication))));
+  }
+
+  @PostMapping("/api/v1/sales/orders/{orderId}/deliveries/{deliveryId}/verify")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'verify-delivery')")
+  @Operation(
+      operationId = "verifyOrderDelivery",
+      summary =
+          "Confirm a delivery's consignee and place; the partner and address card it uses are"
+              + " confirmed with it. May carry a corrected consignee, address or note.")
+  public ResponseEntity<ApiResponse<DeliveriesView>> verifyOrderDelivery(
+      @PathVariable UUID orderId,
+      @PathVariable UUID deliveryId,
+      @Valid @RequestBody VerifyDeliveryRequest request,
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            deliveries.verify(orderId, deliveryId, request, actor(authentication))));
   }
 
   private static UUID actor(Authentication authentication) {

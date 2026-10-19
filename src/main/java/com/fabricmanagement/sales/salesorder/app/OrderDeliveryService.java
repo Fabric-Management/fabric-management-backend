@@ -1,11 +1,16 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.domain.AddressSnapshot;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTermSetting;
 import com.fabricmanagement.sales.salesorder.domain.OrderDelivery;
 import com.fabricmanagement.sales.salesorder.domain.OrderLineAllocation;
+import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
+import com.fabricmanagement.sales.salesorder.domain.PartyMode;
 import com.fabricmanagement.sales.salesorder.domain.PartyReference;
 import com.fabricmanagement.sales.salesorder.domain.RequestedDate;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -13,16 +18,19 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.AllocationInput;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.DeliveriesView;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.DeliveryContentInput;
+import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.DeliveryCorrection;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.DeliveryView;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.LineAllocationSummary;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.SaveDeliveryRequest;
 import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.SetAllocationsRequest;
+import com.fabricmanagement.sales.salesorder.dto.OrderDeliveryDtos.VerifyDeliveryRequest;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.DeliveryTermView;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RequestedDateView;
 import com.fabricmanagement.sales.salesorder.infra.repository.OrderDeliveryRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.OrderLineAllocationRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +57,8 @@ public class OrderDeliveryService {
   private final OrderLineAllocationRepository allocations;
   private final SalesOrderLineRepository lines;
   private final SalesOrderRevision revision;
+  private final DeliveryVerificationPolicy verificationPolicy;
+  private final OrderWorkService work;
 
   @Transactional(readOnly = true)
   public DeliveriesView list(UUID orderId, UUID actor) {
@@ -60,7 +70,11 @@ public class OrderDeliveryService {
     SalesOrder order = editable(orderId, request.expectedVersion(), actor);
     int next =
         deliveriesOf(order).stream().mapToInt(OrderDelivery::getSequenceNo).max().orElse(0) + 1;
-    deliveries.save(OrderDelivery.create(order.getId(), next, content(order, request.content())));
+    OrderDelivery created =
+        OrderDelivery.create(order.getId(), next, content(order, request.content()));
+    deliveries.save(created);
+    restate(order, created, actor);
+    syncVerificationWork(order, actor);
     return changed(order);
   }
 
@@ -68,8 +82,56 @@ public class OrderDeliveryService {
   public DeliveriesView update(
       UUID orderId, UUID deliveryId, SaveDeliveryRequest request, UUID actor) {
     SalesOrder order = editable(orderId, request.expectedVersion(), actor);
-    delivery(order, deliveryId).revise(content(order, request.content()));
+    OrderDelivery delivery = delivery(order, deliveryId);
+    delivery.revise(content(order, request.content()));
+    restate(order, delivery, actor);
+    syncVerificationWork(order, actor);
     return changed(order);
+  }
+
+  /**
+   * Confirms a delivery (CONSIGNEE-1 C8). The endpoint has checked {@code sales:verify-delivery};
+   * the order is loaded without the sales scope a verifier may not hold, locked and at the version
+   * the verifier saw. A correction (consignee, address, note) is applied first and moves the order
+   * version like any content change, so it is refused where the content is not editable; a plain
+   * verification changes no order content and leaves the version alone. Verifying also verifies the
+   * partner and the address card the delivery uses, so the next order does not ask again.
+   */
+  @Transactional
+  public DeliveriesView verify(
+      UUID orderId, UUID deliveryId, VerifyDeliveryRequest request, UUID actor) {
+    SalesOrder order = access.verifiable(orderId, request.expectedVersion());
+    OrderDelivery delivery = delivery(order, deliveryId);
+    DeliveryCorrection correction = request.correction();
+    if (correction != null) {
+      order.assertCommercialContentEditable();
+      PartyReference corrected =
+          correction.consignee() == null
+              ? PartyReference.NONE
+              : correction.consignee().toReference(order.getTradingPartnerId(), "consignee");
+      access.requireRegistered(corrected);
+      AddressSnapshot shipTo =
+          correction.shipTo() == null ? null : correction.shipTo().toSnapshot();
+      delivery.correct(corrected, shipTo, correction.note());
+      UUID copiedFrom = sourceCardOf(delivery);
+      delivery.recordVerification(
+          Verification.unverified(), copiedFrom != null && access.cardVerified(copiedFrom));
+    }
+    delivery.verify(order, actor, Instant.now());
+    PartyReference consignee = delivery.getConsignee();
+    if (consignee.mode() == PartyMode.PARTNER) {
+      access.verifyPartner(consignee.partnerId(), actor);
+    }
+    UUID card = sourceCardOf(delivery);
+    if (card != null) {
+      access.verifyCard(card, actor);
+    }
+    syncVerificationWork(order, actor);
+    if (correction != null) {
+      revision.linesChanged(order);
+    }
+    access.flush();
+    return view(order);
   }
 
   @Transactional
@@ -78,6 +140,7 @@ public class OrderDeliveryService {
     OrderDelivery delivery = delivery(order, deliveryId);
     allocations.deleteByDelivery(TenantContext.requireTenantId(), delivery.getId());
     deliveries.delete(delivery);
+    syncVerificationWork(order, actor);
     return changed(order);
   }
 
@@ -148,7 +211,50 @@ public class OrderDeliveryService {
             ? RequestedDate.UNKNOWN
             : input.requestedDate().toRequestedDate(),
         input.transportPreference(),
-        input.shipComplete());
+        input.shipComplete(),
+        input.note());
+  }
+
+  /**
+   * The state a save gives the delivery. Verified only when the saver may verify, the delivery
+   * could be verified (a decided consignee and a complete address, or EXW), it is not note-only,
+   * and the partner and address card it points at are verified: what a verifier types themselves
+   * they own, what comes from a card or partner someone else made waits for the verify step.
+   */
+  private void restate(SalesOrder order, OrderDelivery delivery, UUID actor) {
+    UUID card = sourceCardOf(delivery);
+    boolean cardVerified = card != null && access.cardVerified(card);
+    PartyReference consignee = delivery.getConsignee();
+    boolean partnerVerified =
+        consignee.mode() != PartyMode.PARTNER || access.partnerVerified(consignee.partnerId());
+    boolean confirmed =
+        verificationPolicy.actorMayVerify()
+            && delivery.verificationBlocker(order).isEmpty()
+            && !delivery.isNoteOnly()
+            && partnerVerified
+            && (card == null || cardVerified);
+    delivery.recordVerification(
+        confirmed ? Verification.verifiedBy(actor, Instant.now()) : Verification.unverified(),
+        cardVerified);
+  }
+
+  /**
+   * One piece of verification work per order: open while any delivery waits for verification,
+   * closed when none does. Saving, verifying and removing a delivery all end here, so the work
+   * follows the deliveries however the last change came about.
+   */
+  private void syncVerificationWork(SalesOrder order, UUID actor) {
+    boolean waiting =
+        deliveriesOf(order).stream().anyMatch(value -> !value.getVerification().isVerified());
+    if (waiting) {
+      work.open(order.getId(), OrderWorkKind.DELIVERY_VERIFICATION, actor);
+    } else {
+      work.close(order.getId(), OrderWorkKind.DELIVERY_VERIFICATION, actor);
+    }
+  }
+
+  private static UUID sourceCardOf(OrderDelivery delivery) {
+    return delivery.getShipTo() == null ? null : delivery.getShipTo().getSourceAddressId();
   }
 
   private OrderDelivery delivery(SalesOrder order, UUID deliveryId) {

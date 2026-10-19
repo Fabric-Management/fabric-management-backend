@@ -102,6 +102,8 @@ tags:
   name: FlowBoard — Task
 - description: Audit operations
   name: Audit
+- description: "Companies that receive goods for a customer, linked with a role"
+  name: Partner Links
 - description: WhatsApp Business API webhook endpoints
   name: WhatsApp Webhooks
 - description: User interface preference operations
@@ -10144,6 +10146,397 @@ paths:
           description: Internal Server Error
       tags:
       - Tenant Settings
+  /api/v1/common/tenant/settings/branding:
+    get:
+      operationId: readTenantBranding
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTenantBrandingDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read branding of the authenticated tenant
+      tags:
+      - Tenant Branding
+  /api/v1/common/tenant/settings/branding/assets/{id}:
+    get:
+      operationId: readTenantBrandAssetContent
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: appearance
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandAppearance"
+          default: ORIGINAL
+      responses:
+        "200":
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+          description: Static SVG; monochrome artwork is recoloured for the requested
+            appearance
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read a validated SVG belonging to the current tenant
+      tags:
+      - Tenant Branding
+  /api/v1/common/tenant/settings/branding/preview:
+    post:
+      description: Validates static SVG; outlines local text only when the exact font
+        face and glyphs are available. Missing fonts return TENANT_BRANDING_FONT_UNAVAILABLE
+        without replacing artwork. The caller must obtain visual approval before uploading
+        the returned SVG.
+      operationId: previewTenantBrandAsset
+      parameters:
+      - in: query
+        name: colourMode
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandColourMode"
+          default: ORIGINAL
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SVG with viewBox, optionally containing local text;\
+                    \ maximum 524288 bytes"
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+          description: "Validated outlined SVG, ready for preview and subsequent confirmed\
+            \ upload"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Prepare a tenant SVG preview without saving (administrators only)
+      tags:
+      - Tenant Branding
+  /api/v1/common/tenant/settings/branding/{kind}:
+    delete:
+      operationId: removeTenantBrandAsset
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/BrandAssetKind"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove a tenant brand asset (administrators only)
+      tags:
+      - Tenant Branding
+    post:
+      operationId: uploadTenantBrandAsset
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/BrandAssetKind"
+      - in: query
+        name: colourMode
+        required: false
+        schema:
+          $ref: "#/components/schemas/BrandColourMode"
+          default: ORIGINAL
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Static SVG with viewBox; text must be converted to
+                    outlines. Maximum 524288 bytes.
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTenantBrandAssetDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Upload or replace a tenant SVG (512 KB maximum; administrators only)
+      tags:
+      - Tenant Branding
   /api/v1/common/tenant/settings/stock-proposal:
     get:
       operationId: getStockProposalSettings
@@ -10768,6 +11161,7 @@ paths:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -10833,6 +11227,317 @@ paths:
       summary: List by type
       tags:
       - Trading Partners
+  /api/v1/common/trading-partners/{customerId}/partner-links:
+    get:
+      operationId: listLinks
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListPartnerLinkDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List the companies linked to a customer
+      tags:
+      - Partner Links
+    post:
+      description: Links a tenant partner to the customer in a role. Rejects a link
+        to the customer itself (400) and a repeat of an active link (409).
+      operationId: linkExisting
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePartnerLinkRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePartnerLinkDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Link an existing partner to a customer
+      tags:
+      - Partner Links
+  /api/v1/common/trading-partners/{customerId}/partner-links/quick:
+    post:
+      description: "Answers 201 when the company was linked. When similar tenant partners\
+        \ exist and createAnyway is not true, answers 200 with created=false and the\
+        \ candidates; nothing is written."
+      operationId: quickCreateAndLink
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuickCreatePartnerLinkRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQuickCreatePartnerLinkResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Find or create a delivery partner and link it to a customer
+      tags:
+      - Partner Links
+  /api/v1/common/trading-partners/{customerId}/partner-links/{linkId}:
+    delete:
+      operationId: unlink
+      parameters:
+      - description: Customer partner ID
+        in: path
+        name: customerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Link ID
+        in: path
+        name: linkId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove a link (soft delete)
+      tags:
+      - Partner Links
   /api/v1/common/trading-partners/{id}:
     delete:
       description: Soft-deletes a partner relationship
@@ -45591,12 +46296,13 @@ paths:
       - Order Intake
   /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-proposals:
     post:
-      description: "Free stock first; stock other quotes hold only when free stock\
-        \ has no option within the agreed tolerance. Options come in the decided card\
-        \ order (changed pieces, meets the request, the most within it, short within\
-        \ it; outside the tolerance only when nothing lies within; held) with the\
-        \ main proposal's index. An optional manual pick is evaluated with the same\
-        \ checks."
+      description: "Free stock first, in business priority order under policyCode.\
+        \ Fabric rolls complete the request with cleanup and healthy-remainder rules\
+        \ even outside tolerance, then offer the below-request alternative. Held stock\
+        \ is informational when free stock cannot reach the lower tolerance. mainOptionIndex\
+        \ identifies the opening and coverage states feasibility separately. Manual\
+        \ picks retain eligibility, hold and strict single-lot checks. Records the\
+        \ evaluation; reserves nothing."
       operationId: evaluateLineQuantity
       parameters:
       - in: path
@@ -50056,16 +50762,14 @@ paths:
       - Fulfilment Planning
   /api/v1/sales/order-intake/stock-preview:
     post:
-      description: "Evaluates the line exactly as a saved line with the same inputs\
-        \ would be evaluated: free stock first, stock other quotes hold only when\
-        \ free stock has no option within the agreed tolerance, options in the decided\
-        \ card order (changed pieces, meets the request, the most within it, short\
-        \ within it; outside the tolerance only when nothing lies within; held) with\
-        \ the main proposal's index. Each option states what other quotes hold that\
-        \ it would take and whether it can be applied; an optional manual pick is\
-        \ evaluated with the same checks. Guidance for the salesperson only: nothing\
-        \ is reserved or recorded. A free quantity that cannot be determined is null\
-        \ with its reasons."
+      description: "Evaluates the line exactly as a saved line with the same inputs.\
+        \ The explicit policy determines business order: fabric rolls complete the\
+        \ request with healthy stock and cleanup priority, even outside tolerance,\
+        \ then show the below-request alternative. Held stock is informational and\
+        \ appears only when free stock cannot reach the lower tolerance. mainOptionIndex\
+        \ identifies the opening; coverage separately states proven feasibility. Manual\
+        \ picks use the same eligibility, hold and single-lot checks. This query reserves\
+        \ and records nothing; unknown free quantities remain null."
       operationId: previewOrderIntakeStock
       requestBody:
         content:
@@ -51825,6 +52529,91 @@ paths:
       summary: Replace how much of each line this delivery carries
       tags:
       - Sales Order Deliveries
+  /api/v1/sales/orders/{orderId}/deliveries/{deliveryId}/verify:
+    post:
+      operationId: verifyOrderDelivery
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: deliveryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOrderDeliveryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseOrderDeliveriesView"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Confirm a delivery's consignee and place; the partner and address\
+        \ card it uses are confirmed with it. May carry a corrected consignee, address\
+        \ or note."
+      tags:
+      - Sales Order Deliveries
   /api/v1/sales/orders/{orderId}/delivery-commitments:
     get:
       operationId: getDeliveryCommitments
@@ -53409,6 +54198,78 @@ paths:
       summary: Resolve a triage case by assigning its primary representative
       tags:
       - Sales Ownership Triage
+  /api/v1/sales/partners/{partnerId}/ship-to-suggestion:
+    get:
+      operationId: getShipToSuggestion
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseShipToSuggestion"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The consignee's address card to preselect: most used verified, else\
+        \ shipping, else primary"
+      tags:
+      - Sales Order Deliveries
   /api/v1/sales/products:
     get:
       operationId: listCatalog
@@ -58436,6 +59297,23 @@ components:
         updatedAt:
           type: string
           format: date-time
+        verificationStatus:
+          type: string
+          description: "Whether a delivery verifier confirmed this address card. Not\
+            \ placeId, which only says a map service recognised it."
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     AddressInput:
       type: object
       description: An address as used on the order (a copy). Any part may be missing
@@ -60780,6 +61658,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListPartnerLinkDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerLinkDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListPartnerUserDto:
       type: object
       properties:
@@ -63057,6 +63955,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePartnerLinkDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PartnerLinkDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePartnerUserDto:
       type: object
       properties:
@@ -63494,6 +64410,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/QuantityProposal"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseQuickCreatePartnerLinkResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QuickCreatePartnerLinkResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -63957,6 +64891,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseShipToSuggestion:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ShipToSuggestion"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseShipmentDto:
       type: object
       properties:
@@ -64160,6 +65112,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/TaskResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTenantBrandAssetDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TenantBrandAssetDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTenantBrandingDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TenantBrandingDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -65738,6 +66726,24 @@ components:
         wipLimitDefault:
           type: integer
           format: int32
+    BrandAppearance:
+      type: string
+      enum:
+      - ORIGINAL
+      - LIGHT
+      - DARK
+    BrandAssetKind:
+      type: string
+      enum:
+      - LOGO
+      - ICON
+      - LOGO_DARK
+      - ICON_DARK
+    BrandColourMode:
+      type: string
+      enum:
+      - ORIGINAL
+      - MONOCHROME
     CashFlowBucketDto:
       type: object
       description: A single week's cash-flow projection bucket
@@ -68108,6 +69114,28 @@ components:
       required:
       - name
       - role
+    CreatePartnerLinkRequest:
+      type: object
+      properties:
+        linkedPartnerId:
+          type: string
+          format: uuid
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+      required:
+      - linkedPartnerId
+      - role
     CreatePaymentRequest:
       type: object
       properties:
@@ -69042,6 +70070,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -74614,6 +75643,13 @@ components:
       properties:
         consignee:
           $ref: "#/components/schemas/PartyInput"
+        note:
+          type: string
+          description: Said in words where the address is not known yet. A delivery
+            with only a note stays unverified until it has an address (or the term
+            is EXW).
+          maxLength: 500
+          minLength: 0
         requestedDate:
           $ref: "#/components/schemas/RequestedDateInput"
         requestedDateSource:
@@ -74630,6 +75666,20 @@ components:
           description: ORDER_DEFAULT (default) follows the order's term
         transportPreference:
           type: string
+    OrderDeliveryCorrection:
+      type: object
+      description: "What a verifier may change while verifying: the consignee, the\
+        \ address and the note. All three are replaced by what is sent, so send the\
+        \ current value of a part that stays as it is."
+      properties:
+        consignee:
+          $ref: "#/components/schemas/PartyInput"
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        shipTo:
+          $ref: "#/components/schemas/AddressInput"
     OrderDeliveryOutlook:
       type: object
       properties:
@@ -74674,6 +75724,8 @@ components:
         id:
           type: string
           format: uuid
+        note:
+          type: string
         ownRequestedDate:
           $ref: "#/components/schemas/RequestedDateView"
         ownTerm:
@@ -74694,10 +75746,29 @@ components:
           type: boolean
         shipTo:
           $ref: "#/components/schemas/AddressView"
+        shipToVerifiedAtCopy:
+          type: boolean
+          description: The address card the address was copied from was verified when
+            it was copied
         termSource:
           $ref: "#/components/schemas/DefaultSource"
         transportPreference:
           type: string
+        verificationStatus:
+          type: string
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     OrderFlowEventView:
       type: object
       properties:
@@ -75059,6 +76130,13 @@ components:
           description: Every lot with offerable stock has a known production date
         canonicalUnit:
           type: string
+        coverage:
+          $ref: "#/components/schemas/StockProposalCoverage"
+        effectiveMinHealthyPieces:
+          type:
+          - integer
+          - "null"
+          format: int32
         eligiblePieces:
           type: integer
           format: int32
@@ -75074,10 +76152,12 @@ components:
             in the list. Null when no option can be the main one
         options:
           type: array
-          description: "Ascending quantity; same quantity in the tenant-first ranking,\
-            \ then a deterministic order. Keep this order"
+          description: "Business priority order for the stated policy; preserve it,\
+            \ never sort by quantity"
           items:
             $ref: "#/components/schemas/QuantityProposalOption"
+        policyCode:
+          $ref: "#/components/schemas/StockProposalPolicyCode"
         requestedQuantity:
           type: number
         searchComplete:
@@ -75101,10 +76181,13 @@ components:
       required:
       - agedByProductionDate
       - canonicalUnit
+      - coverage
+      - effectiveMinHealthyPieces
       - eligiblePieces
       - excludedPieces
       - mainOptionIndex
       - options
+      - policyCode
       - requestedQuantity
       - searchComplete
       - status
@@ -75198,7 +76281,8 @@ components:
           anyOf:
           - $ref: "#/components/schemas/OrderIntakeStockPreviewQuantity"
           - type: "null"
-          description: "Eligible minus intent-held, never below zero; null when freeComplete\
+          description: "Unheld eligible stock less each line's intent not covered\
+            \ by its pinned eligible pieces; never below zero, null when freeComplete\
             \ is false"
         freeComplete:
           type: boolean
@@ -75768,6 +76852,7 @@ components:
       - CLAIMED
       - ASSIGNED
       - RELEASED
+      - CLOSED
     OrderWorkEventView:
       type: object
       properties:
@@ -75811,6 +76896,7 @@ components:
       - PLANNING
       - SHIP_READINESS
       - ARRIVAL_ESTIMATE
+      - DELIVERY_VERIFICATION
     OrderWorkView:
       type: object
       properties:
@@ -75884,6 +76970,22 @@ components:
           type: string
         streetAddress:
           type: string
+        verificationStatus:
+          type: string
+          description: Whether a delivery verifier confirmed this address card
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
     OrganizationAddressDto:
       type: object
       properties:
@@ -77140,6 +78242,98 @@ components:
           - OTHER
         whatsappEnabled:
           type: boolean
+    PartnerLinkDto:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        customerPartnerId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        linkedPartnerCountry:
+          type:
+          - string
+          - "null"
+        linkedPartnerId:
+          type: string
+          format: uuid
+        linkedPartnerName:
+          type: string
+        linkedPartnerType:
+          type: string
+          enum:
+          - SUPPLIER
+          - CUSTOMER
+          - SUBCONTRACTOR
+          - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
+          - BOTH
+          - SISTER_COMPANY
+          - SUBSIDIARY
+          - PARENT_COMPANY
+        note:
+          type:
+          - string
+          - "null"
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+      required:
+      - createdAt
+      - customerPartnerId
+      - id
+      - linkedPartnerId
+      - linkedPartnerName
+      - linkedPartnerType
+      - role
+    PartnerMatchDto:
+      type: object
+      properties:
+        country:
+          type:
+          - string
+          - "null"
+        displayName:
+          type: string
+        matchedOn:
+          type: string
+          enum:
+          - TAX_ID
+          - NAME
+        partnerId:
+          type: string
+          format: uuid
+        partnerType:
+          type: string
+          enum:
+          - SUPPLIER
+          - CUSTOMER
+          - SUBCONTRACTOR
+          - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
+          - BOTH
+          - SISTER_COMPANY
+          - SUBSIDIARY
+          - PARENT_COMPANY
+        taxId:
+          type:
+          - string
+          - "null"
+      required:
+      - displayName
+      - matchedOn
+      - partnerId
+      - partnerType
     PartnerUserDto:
       type: object
       properties:
@@ -77573,6 +78767,7 @@ components:
       - sales:grant-approval-authority
       - sales:read
       - sales:ship
+      - sales:verify-delivery
       - sales:write
       - settings:read
       - yarn:read
@@ -79553,6 +80748,15 @@ components:
           description: Every lot with offerable stock has a known production date
         canonicalUnit:
           type: string
+        coverage:
+          $ref: "#/components/schemas/StockProposalCoverage"
+        effectiveMinHealthyPieces:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Effective minimum; null for a stored evaluation without policy
+            evidence
         eligiblePieces:
           type: integer
           format: int32
@@ -79576,10 +80780,12 @@ components:
             in the list. Null when no option can be the main one
         options:
           type: array
-          description: "Ascending quantity; same quantity in the tenant-first ranking,\
-            \ then a deterministic order. Keep this order"
+          description: "Business priority order for the stated policy; preserve it,\
+            \ never sort by quantity"
           items:
             $ref: "#/components/schemas/QuantityProposalOption"
+        policyCode:
+          $ref: "#/components/schemas/StockProposalPolicyCode"
         requestedQuantity:
           type: number
           description: The customer's original request the options are judged against
@@ -79605,6 +80811,8 @@ components:
       required:
       - agedByProductionDate
       - canonicalUnit
+      - coverage
+      - effectiveMinHealthyPieces
       - eligiblePieces
       - evaluatedAt
       - evidenceFingerprint
@@ -79612,6 +80820,7 @@ components:
       - id
       - mainOptionIndex
       - options
+      - policyCode
       - requestedQuantity
       - salesOrderLineId
       - searchComplete
@@ -79676,9 +80885,16 @@ components:
           type: string
           format: uuid
         closesLot:
-          type: boolean
-          description: "Every piece of the lot is taken. Never claimed while held,\
-            \ unknown or otherwise unsuitable pieces stay"
+          type:
+          - boolean
+          - "null"
+          description: "Every physical piece of the lot is taken; null when inventory\
+            \ completeness is unknown. False while held, unknown or excluded physical\
+            \ pieces remain"
+        depletesFreePool:
+          type:
+          - boolean
+          - "null"
         exhausted:
           type: boolean
         lotNo:
@@ -79719,6 +80935,7 @@ components:
       required:
       - batchId
       - closesLot
+      - depletesFreePool
       - exhausted
       - lotNo
       - pieceCount
@@ -79751,8 +80968,8 @@ components:
           $ref: "#/components/schemas/QuantityOptionKind"
         leavesRemnant:
           type: boolean
-          description: "One or two pieces stay in a used lot. Never for a computed\
-            \ option; a manual pick may, with acknowledgement"
+          description: "Fewer normal pieces than the policy minimum stay. Never for\
+            \ a computed option; a manual pick may, with acknowledgement"
         lotCount:
           type: integer
           format: int32
@@ -79878,6 +81095,70 @@ components:
       required:
       - companyName
       - contacts
+    QuickCreatePartnerLinkRequest:
+      type: object
+      properties:
+        city:
+          type: string
+          maxLength: 120
+          minLength: 0
+        companyName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        country:
+          type: string
+          maxLength: 3
+          minLength: 3
+        createAnyway:
+          type: boolean
+          description: Create (or reuse by tax id) even though similar partners were
+            offered
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        role:
+          type: string
+          enum:
+          - GARMENT_MAKER
+          - DYEHOUSE
+          - PRINTER
+          - WAREHOUSE
+          - FORWARDER
+          - OTHER
+        taxId:
+          type: string
+          maxLength: 50
+          minLength: 0
+      required:
+      - companyName
+      - country
+      - role
+    QuickCreatePartnerLinkResponse:
+      type: object
+      properties:
+        created:
+          type: boolean
+        link:
+          anyOf:
+          - $ref: "#/components/schemas/PartnerLinkDto"
+          - type: "null"
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerMatchDto"
+        partner:
+          anyOf:
+          - $ref: "#/components/schemas/TradingPartnerDto"
+          - type: "null"
+      required:
+      - created
+      - matches
     QuoteApprovalTokenDto:
       type: object
       properties:
@@ -84187,6 +85468,24 @@ components:
           - SHADE_APPROVAL
       required:
       - valueType
+    ShipToSuggestion:
+      type: object
+      properties:
+        addressId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The address card to preselect; empty for NONE
+        source:
+          $ref: "#/components/schemas/ShipToSuggestionSource"
+    ShipToSuggestionSource:
+      type: string
+      enum:
+      - MOST_USED
+      - SHIPPING
+      - PRIMARY
+      - NONE
     ShipmentDto:
       type: object
       properties:
@@ -84522,7 +85821,7 @@ components:
         needsConfirmation:
           type: boolean
           description: "Applying asks the salesperson's single confirmation: outside\
-            \ the tolerance and/or a single piece left. A stock choice, never the\
+            \ the tolerance and/or an unhealthy remainder. A stock choice, never the\
             \ customer's acceptance"
         reason:
           anyOf:
@@ -84549,6 +85848,44 @@ components:
       - SINGLE_LOT_REQUIRED
       - HELD_BY_ANOTHER_QUOTE
       - HOLD_UNVERIFIED
+    StockProposalCoverage:
+      type: object
+      properties:
+        coveringOptionKey:
+          type:
+          - string
+          - "null"
+          description: Key of an applicable free option reaching the request; may
+            be manual
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockProposalCoverageReason"
+        status:
+          $ref: "#/components/schemas/StockProposalCoverageStatus"
+      required:
+      - coveringOptionKey
+      - reasons
+      - status
+    StockProposalCoverageReason:
+      type: string
+      enum:
+      - SINGLE_LOT_REQUIRED
+      - HEALTHY_REMAINDER_REQUIRED
+      - MEASUREMENT_OR_ELIGIBILITY_UNKNOWN
+      - UNSUPPORTED_PACKAGE
+      - SEARCH_LIMIT
+      - HELD_STOCK_ONLY
+      - HOLD_EVIDENCE_UNKNOWN
+      - EVIDENCE_INCOMPLETE
+      - QUANTITY_RESOLUTION_UNSUPPORTED
+    StockProposalCoverageStatus:
+      type: string
+      enum:
+      - COVERABLE
+      - BELOW_REQUEST_ONLY
+      - NO_APPLICABLE_OPTION
+      - UNKNOWN
     StockProposalHeldStockKind:
       type: string
       enum:
@@ -84561,6 +85898,12 @@ components:
       - BELOW
       - ABOVE
       - MANUAL
+    StockProposalPolicyCode:
+      type: string
+      enum:
+      - STANDARD
+      - FABRIC_ROLL_BASE
+      - UNKNOWN
     StockProposalReasonCode:
       type: string
       enum:
@@ -84573,6 +85916,9 @@ components:
     StockProposalSettings:
       type: object
       properties:
+        fabricRollMinHealthyPieces:
+          type: integer
+          format: int32
         lotCloseExtraSlowingPct:
           type: number
         lotCloseExtraStalledPct:
@@ -84605,6 +85951,13 @@ components:
     StockProposalSettingsView:
       type: object
       properties:
+        fabricRollMinHealthyPieces:
+          type: integer
+          format: int32
+          description: Normal fabric rolls kept when a free roll pool is not depleted;
+            base policy
+          maximum: 50
+          minimum: 4
         lotCloseExtraSlowingPct:
           type: number
           description: "How far, in percent, a lot-closing option may exceed the upper\
@@ -84648,6 +86001,7 @@ components:
           type: number
           description: "Upper tolerance a new order line starts with, in percent"
       required:
+      - fabricRollMinHealthyPieces
       - lotCloseExtraSlowingPct
       - lotCloseExtraStalledPct
       - minHealthyPiecesMoving
@@ -85618,6 +86972,66 @@ components:
           - CRITICAL
         title:
           type: string
+    TenantBrandAssetDto:
+      type: object
+      description: "A tenant-owned, validated SVG. URLs require the current tenant\
+        \ session."
+      properties:
+        colourMode:
+          $ref: "#/components/schemas/BrandColourMode"
+        fileName:
+          type: string
+          maxLength: 255
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/BrandAssetKind"
+        url:
+          type: string
+        version:
+          type: integer
+          format: int64
+      required:
+      - colourMode
+      - fileName
+      - id
+      - kind
+      - url
+      - version
+    TenantBrandingDto:
+      type: object
+      description: Current tenant branding; absent slots are null. Mutation permission
+        is backend-owned.
+      properties:
+        canManage:
+          type: boolean
+        icon:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        iconDark:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        iconUrl:
+          type:
+          - string
+          - "null"
+        logo:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        logoDark:
+          anyOf:
+          - $ref: "#/components/schemas/TenantBrandAssetDto"
+          - type: "null"
+        logoUrl:
+          type:
+          - string
+          - "null"
+      required:
+      - canManage
     TenantDto:
       type: object
       properties:
@@ -85997,6 +87411,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -86023,6 +87438,23 @@ components:
           type: string
         uid:
           type: string
+        verificationStatus:
+          type: string
+          description: Whether a delivery verifier confirmed this company as a party
+            to deliver to. Not the registry identity check (verifiedStatus).
+          enum:
+          - UNVERIFIED
+          - VERIFIED
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        verifiedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
         verifiedStatus:
           type: string
     TransferBatchRequest:
@@ -86876,6 +88308,13 @@ components:
     UpdateStockProposalSettingsRequest:
       type: object
       properties:
+        fabricRollMinHealthyPieces:
+          type: integer
+          format: int32
+          default: 4
+          example: 4
+          maximum: 50
+          minimum: 4
         lotCloseExtraSlowingPct:
           type: number
           example: 10
@@ -87166,6 +88605,7 @@ components:
           - CUSTOMER
           - SUBCONTRACTOR
           - SERVICE_PROVIDER
+          - DELIVERY_PARTNER
           - BOTH
           - SISTER_COMPANY
           - SUBSIDIARY
@@ -87789,6 +89229,17 @@ components:
       required:
       - code
       - mfaToken
+    VerifyOrderDeliveryRequest:
+      type: object
+      properties:
+        correction:
+          $ref: "#/components/schemas/OrderDeliveryCorrection"
+          description: Omit to verify the delivery as saved
+        expectedVersion:
+          type: integer
+          format: int64
+      required:
+      - expectedVersion
     WarehouseLocationDto:
       type: object
       properties:

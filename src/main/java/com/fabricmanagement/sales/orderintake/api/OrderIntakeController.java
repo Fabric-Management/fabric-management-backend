@@ -48,11 +48,12 @@ public class OrderIntakeController {
       operationId = "evaluateLineQuantity",
       summary = "Evaluate the requested quantity against whole pieces in stock; reserves nothing",
       description =
-          "Free stock first; stock other quotes hold only when free stock has no option within"
-              + " the agreed tolerance. Options come in the decided card order (changed pieces,"
-              + " meets the request, the most within it, short within it; outside the tolerance"
-              + " only when nothing lies within; held) with the main proposal's index. An"
-              + " optional manual pick is evaluated with the same checks.")
+          "Free stock first, in business priority order under policyCode. Fabric rolls complete"
+              + " the request with cleanup and healthy-remainder rules even outside tolerance, then"
+              + " offer the below-request alternative. Held stock is informational when free stock"
+              + " cannot reach the lower tolerance. mainOptionIndex identifies the opening and"
+              + " coverage states feasibility separately. Manual picks retain eligibility, hold and"
+              + " strict single-lot checks. Records the evaluation; reserves nothing.")
   public ResponseEntity<ApiResponse<QuantityProposalDto>> evaluateLineQuantity(
       @PathVariable UUID orderId,
       @PathVariable UUID lineId,

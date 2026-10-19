@@ -14,7 +14,13 @@ public enum OrderWorkKind {
   /** Routed to the warehouse when ship readiness of held stock is asked for. */
   SHIP_READINESS("WAREHOUSE"),
   /** Routed to shipping when the order goes into processing. */
-  ARRIVAL_ESTIMATE("SHIPPING");
+  ARRIVAL_ESTIMATE("SHIPPING"),
+  /**
+   * Routed to the people who verify delivery details when an order is saved with a consignee,
+   * address or note nobody has confirmed (CONSIGNEE-1 C8). It is open while any delivery waits and
+   * closes when the last one is verified; one piece of work per order, not per delivery.
+   */
+  DELIVERY_VERIFICATION("PLANNING");
 
   private final String defaultDepartment;
 

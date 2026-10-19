@@ -75,6 +75,7 @@ public class CustomerApprovalService {
   private final OrderFlowRecorder flow;
   private final Clock clock;
   private final ApproverAuthorities approvers;
+  private final DeliveryVerificationGate deliveryGate;
 
   // ── Sales ──────────────────────────────────────────────────────────────
 
@@ -474,6 +475,10 @@ public class CustomerApprovalService {
     if (openRequests) {
       return "OPEN_CUSTOM_REQUESTS";
     }
+    String deliveryBlock = deliveryGate.sendBlock(order);
+    if (deliveryBlock != null) {
+      return deliveryBlock;
+    }
     return intake.confirmationBlockers(order, orderLines).isEmpty() ? null : "NOT_CONFIRMABLE";
   }
 
@@ -504,6 +509,11 @@ public class CustomerApprovalService {
           case ApproverAuthorities.APPROVER_EMAIL_CHANGED ->
               "The approver's e-mail contact point changed on the customer's card, which ended"
                   + " the authority; grant a new authority at the confirmed address";
+          case DeliveryVerificationGate.PERMISSION_REQUIRED ->
+              "Only someone who may verify delivery details can send the order for approval";
+          case DeliveryVerificationGate.NOT_VERIFIED ->
+              "Verify the delivery details before the customer is asked to approve: "
+                  + deliveryGate.describe(order);
           case "PROPOSAL_MISSING" -> "Planning has not proposed a date";
           case "PROPOSAL_STALE" ->
               "Planning's proposal no longer applies to the order; planning proposes again";

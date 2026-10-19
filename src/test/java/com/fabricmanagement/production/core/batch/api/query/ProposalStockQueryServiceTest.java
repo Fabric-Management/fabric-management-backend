@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.inventory.lothealth.domain.PieceAverageBasis;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
 import com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService.OfferableStockSummary;
@@ -207,25 +208,78 @@ class ProposalStockQueryServiceTest {
   }
 
   @Test
-  @DisplayName(
-      "The lot's average piece is as produced: shipped pieces count, unmeasured ones do not")
-  void averagePieceAsProduced() {
+  void incompleteInitialMeasurementsUseCurrentFallbackNotPartialProductionAverage() {
     Batch lot = lot(COLOR, null);
     StockUnit atHand = piece(lot, "100");
     StockUnit shortAtHand = piece(lot, "40");
     StockUnit shipped =
         piece(lot, "100", StockUnitStatus.DEPLETED, QualityDisposition.RELEASED, false);
-    StockUnit unmeasured = piece(lot, null);
-    stock(lot, atHand, shortAtHand, shipped, unmeasured);
-
+    stock(lot, atHand, shortAtHand, shipped, piece(lot, null));
     ProposalLot found = onlyLot(query(null, null));
-
-    // 100 + 40 + 100 over three pieces: the shipped piece keeps the average where production put
-    // it, so the 40 m piece stays short after the normal ones are sold.
-    assertThat(found.averagePiece()).isEqualByComparingTo("80");
+    assertThat(found.averagePiece()).isEqualByComparingTo("70");
+    assertThat(found.averageBasis()).isEqualTo(PieceAverageBasis.CURRENT_MEASUREMENTS);
     assertThat(found.pieces())
         .extracting(ProposalPiece::stockUnitId)
         .doesNotContain(shipped.getId());
+  }
+
+  @Test
+  void firstMeasurementsSurviveCutAndIncludeDepletedRolls() {
+    Batch lot = lot(COLOR, null);
+    StockUnit cut = measuredAtBirth(lot, "100");
+    cut.recordLength(new BigDecimal("70"), "M");
+    StockUnit shipped = measuredAtBirth(lot, "120", StockUnitStatus.DEPLETED, PackageType.ROLL);
+    stock(lot, cut, shipped);
+    ProposalLot found = onlyLot(query(null, null));
+    assertThat(found.averagePiece()).isEqualByComparingTo("110");
+    assertThat(found.averageBasis()).isEqualTo(PieceAverageBasis.INITIAL_MEASUREMENTS);
+    assertThat(found.pieces())
+        .singleElement()
+        .satisfies(
+            piece -> {
+              assertThat(piece.canonicalMeasure()).isEqualByComparingTo("70");
+              assertThat(piece.initialCanonicalMeasure()).isEqualByComparingTo("100");
+            });
+    when(stockUnitRepository.findBatchIdsWithInactiveStockUnits(eq(TENANT), anyList()))
+        .thenReturn(Set.of(lot.getId()));
+    ProposalLot incomplete = onlyLot(query(null, null));
+    assertThat(incomplete.averageBasis()).isEqualTo(PieceAverageBasis.CURRENT_MEASUREMENTS);
+    assertThat(incomplete.inventoryComplete()).isFalse();
+    assertThat(incomplete.averagePiece()).isEqualByComparingTo("70");
+  }
+
+  @Test
+  void nonRollFabricIsExplicitlyExcludedAndCannotChangeRollAverage() {
+    Batch lot = lot(COLOR, null);
+    StockUnit roll = measuredAtBirth(lot, "100");
+    StockUnit carton = measuredAtBirth(lot, "900", StockUnitStatus.AVAILABLE, PackageType.CARTON);
+    stock(lot, roll, carton);
+    ProposalLot found = onlyLot(query(null, null));
+    assertThat(found.averagePiece()).isEqualByComparingTo("100");
+    assertThat(byId(found).get(carton.getId()).reason()).isEqualTo("UNSUPPORTED_PACKAGE");
+    assertThat(byId(found).get(carton.getId()).packageType()).isEqualTo(PackageType.CARTON);
+  }
+
+  private static StockUnit measuredAtBirth(Batch lot, String length) {
+    return measuredAtBirth(lot, length, StockUnitStatus.AVAILABLE, PackageType.ROLL);
+  }
+
+  private static StockUnit measuredAtBirth(
+      Batch lot, String length, StockUnitStatus status, PackageType type) {
+    StockUnit piece =
+        StockUnit.builder()
+            .batchId(lot.getId())
+            .barcode("R-" + UUID.randomUUID())
+            .productType(ProductType.FABRIC)
+            .packageType(type)
+            .unit("KG")
+            .status(status)
+            .qualityDisposition(QualityDisposition.RELEASED)
+            .build();
+    piece.recordInitialLength(new BigDecimal(length), "M");
+    piece.setId(UUID.randomUUID());
+    piece.setTenantId(TENANT);
+    return piece;
   }
 
   @Test
@@ -412,6 +466,7 @@ class ProposalStockQueryServiceTest {
             .batchId(lot.getId())
             .barcode("R-" + UUID.randomUUID().toString().substring(0, 6))
             .productType(ProductType.FABRIC)
+            .packageType(PackageType.ROLL)
             .unit("KG")
             .length(lengthMetres == null ? null : new BigDecimal(lengthMetres))
             .lengthUnit(lengthMetres == null ? null : "M")

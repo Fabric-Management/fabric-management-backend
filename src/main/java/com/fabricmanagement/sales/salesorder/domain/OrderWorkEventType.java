@@ -11,5 +11,7 @@ public enum OrderWorkEventType {
   /** An authorised person assigned or reassigned it, with a reason. */
   ASSIGNED,
   /** The responsible person or an authorised person gave it back to the queue, with a reason. */
-  RELEASED
+  RELEASED,
+  /** There was nothing left to do and the work was closed; routing it again opens it anew. */
+  CLOSED
 }

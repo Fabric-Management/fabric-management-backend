@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ class StockProposalSettingsTest {
     assertThat(defaults.toleranceDownPct()).isEqualByComparingTo("5");
     assertThat(defaults.toleranceUpPct()).isEqualByComparingTo("5");
     assertThat(defaults.minHealthyPiecesMoving()).isEqualTo(3);
+    assertThat(defaults.fabricRollMinHealthyPieces()).isEqualTo(4);
     assertThat(defaults.minHealthyPiecesSlowing()).isEqualTo(5);
     assertThat(defaults.minHealthyPiecesStalled()).isEqualTo(8);
     assertThat(defaults.shortPiecePct()).isEqualByComparingTo("51");
@@ -52,6 +54,7 @@ class StockProposalSettingsTest {
     assertThat(group.toleranceUpPct()).isEqualByComparingTo("5");
     assertThat(group.minHealthyPiecesMoving()).isEqualTo(4);
     assertThat(group.minHealthyPiecesSlowing()).isEqualTo(5);
+    assertThat(group.fabricRollMinHealthyPieces()).isEqualTo(4);
   }
 
   @Test
@@ -77,5 +80,17 @@ class StockProposalSettingsTest {
 
     assertThat(read.getStockProposal()).isEqualTo(settings.getStockProposal());
     assertThat(written).doesNotContain("stockProposalOrDefaults");
+  }
+
+  @Test
+  void invalidExplicitFabricThresholdDoesNotSilentlyLoadDefault() {
+    for (int invalid : new int[] {0, 3, 51}) {
+      assertThatThrownBy(
+              () ->
+                  json.readValue(
+                      "{\"fabricRollMinHealthyPieces\":" + invalid + "}",
+                      StockProposalSettings.class))
+          .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
   }
 }

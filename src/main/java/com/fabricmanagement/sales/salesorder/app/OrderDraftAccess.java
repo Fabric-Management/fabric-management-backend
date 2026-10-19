@@ -1,7 +1,9 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.platform.communication.api.facade.AddressFacade;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.PartyMode;
@@ -26,6 +28,7 @@ class OrderDraftAccess {
   private final SalesOrderRepository orders;
   private final SalesOrderAccessPolicy accessPolicy;
   private final TradingPartnerService partners;
+  private final AddressFacade addresses;
   private final SalesOrderRevision revision;
 
   SalesOrder readable(UUID orderId, UUID actor) {
@@ -49,12 +52,30 @@ class OrderDraftAccess {
     if (!accessPolicy.canWrite(tenantId, actor, order)) {
       throw new AccessDeniedException("You do not have access to update this sales order.");
     }
+    return lockedAtVersion(order, expectedVersion);
+  }
+
+  /**
+   * The order, locked, for someone who verifies its deliveries (CONSIGNEE-1 C8). A verifier is not
+   * necessarily the order's sales owner and may hold no sales scope at all: what lets them in is
+   * {@code sales:verify-delivery}, checked by the endpoint. The version is still the one they saw.
+   */
+  SalesOrder verifiable(UUID orderId, Long expectedVersion) {
+    SalesOrder order =
+        orders
+            .findByTenantIdAndId(TenantContext.requireTenantId(), orderId)
+            .filter(value -> Boolean.TRUE.equals(value.getIsActive()))
+            .orElseThrow(() -> new NotFoundException("Sales order not found: " + orderId));
+    return lockedAtVersion(order, expectedVersion);
+  }
+
+  private SalesOrder lockedAtVersion(SalesOrder order, Long expectedVersion) {
     revision.lockFresh(order);
     if (!Boolean.TRUE.equals(order.getIsActive())) {
-      throw new NotFoundException("Sales order not found: " + orderId);
+      throw new NotFoundException("Sales order not found: " + order.getId());
     }
     if (expectedVersion == null || !expectedVersion.equals(order.getVersion())) {
-      throw new ObjectOptimisticLockingFailureException(SalesOrder.class, orderId);
+      throw new ObjectOptimisticLockingFailureException(SalesOrder.class, order.getId());
     }
     return order;
   }
@@ -66,6 +87,37 @@ class OrderDraftAccess {
     }
     if (partners.findById(TenantContext.requireTenantId(), party.partnerId()).isEmpty()) {
       throw OrderDomainException.rule("PARTNER_NOT_FOUND", "That partner is not registered");
+    }
+  }
+
+  /** Whether a registered partner is confirmed as a party to deliver to. */
+  boolean partnerVerified(UUID partnerId) {
+    return partners
+        .findById(TenantContext.requireTenantId(), partnerId)
+        .map(partner -> partner.getVerificationStatus().isVerified())
+        .orElse(false);
+  }
+
+  /** Whether the address card is confirmed; false for a card this tenant does not have. */
+  boolean cardVerified(UUID addressId) {
+    return addresses
+        .deliveryVerificationOf(addressId)
+        .map(DeliveryVerificationStatus::isVerified)
+        .orElse(false);
+  }
+
+  /** Confirms the partner a delivery uses; one that is gone is left alone. */
+  void verifyPartner(UUID partnerId, UUID verifier) {
+    UUID tenantId = TenantContext.requireTenantId();
+    if (partners.findById(tenantId, partnerId).isPresent()) {
+      partners.verifyDelivery(tenantId, partnerId, verifier);
+    }
+  }
+
+  /** Confirms the address card a delivery was copied from; a card that is gone is left alone. */
+  void verifyCard(UUID addressId, UUID verifier) {
+    if (addresses.deliveryVerificationOf(addressId).isPresent()) {
+      addresses.verifyForDelivery(addressId, verifier);
     }
   }
 

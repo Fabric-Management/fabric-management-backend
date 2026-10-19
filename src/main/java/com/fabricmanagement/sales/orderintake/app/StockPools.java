@@ -81,7 +81,11 @@ final class StockPools {
   }
 
   static LotFree lotFree(QuantityEvaluator.Input input, ProposalLot lot) {
-    LotIntents intents = input.holds().lotIntents().get(lot.batchId());
+    return lotFree(input.holds(), lot);
+  }
+
+  static LotFree lotFree(QuantityEvaluator.StockHolds holds, ProposalLot lot) {
+    LotIntents intents = holds.lotIntents().get(lot.batchId());
     boolean hasIntents = intents != null && !intents.intents().isEmpty();
     boolean unconvertible =
         hasIntents && intents.intents().stream().anyMatch(intent -> intent.canonical() == null);
@@ -89,7 +93,7 @@ final class StockPools {
         lot.pieces().stream().filter(piece -> piece.state() == PieceState.ELIGIBLE).toList();
     boolean unverified =
         eligible.stream()
-            .map(piece -> input.holds().pieceHolds().get(piece.stockUnitId()))
+            .map(piece -> holds.pieceHolds().get(piece.stockUnitId()))
             .anyMatch(holder -> holder != null && !holder.verified());
     if (unconvertible || unverified) {
       return new LotFree(null, unconvertible, unverified, hasIntents);
@@ -97,7 +101,7 @@ final class StockPools {
     BigDecimal unheld = BigDecimal.ZERO;
     Map<UUID, BigDecimal> pinned = new LinkedHashMap<>();
     for (ProposalPiece piece : eligible) {
-      Holder holder = input.holds().pieceHolds().get(piece.stockUnitId());
+      Holder holder = holds.pieceHolds().get(piece.stockUnitId());
       if (holder == null) {
         unheld = unheld.add(piece.canonicalMeasure());
       } else {
