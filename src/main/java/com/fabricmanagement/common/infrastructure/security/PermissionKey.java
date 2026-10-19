@@ -39,6 +39,8 @@ public enum PermissionKey {
       "costing:write",
       EnforcedBy.ANNOTATION,
       "Mirrors finance:write in FINANCE only (PERM-CAT-1)."),
+  FABRIC_READ("fabric:read", EnforcedBy.ANNOTATION, "Mirrors fiber:read (FABRIC-1)."),
+  FABRIC_WRITE("fabric:write", EnforcedBy.ANNOTATION, "Mirrors fiber:write (FABRIC-1)."),
   FIBER_READ("fiber:read", EnforcedBy.ANNOTATION, ""),
   FIBER_WRITE("fiber:write", EnforcedBy.ANNOTATION, ""),
   FINANCE_MANAGE("finance:manage", EnforcedBy.ANNOTATION, ""),

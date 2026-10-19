@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeAvailabilityService;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeProductSearchService;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeStockPreviewService;
@@ -207,6 +208,7 @@ class SalesQuoteDemoSeedIT {
     assertThat(indigo.availableQuantity()).isEqualByComparingTo("600");
 
     assertFabricWidthExamples(tenant);
+    assertFabricArticles(tenant);
 
     // Replay: same colours, lots, pieces, partner codes, quotes and reservations.
     Map<String, Long> before = counts(tenant);
@@ -258,6 +260,44 @@ class SalesQuoteDemoSeedIT {
       }
     }
     assertRollsAndLots(tenant);
+  }
+
+  /**
+   * FABRIC-1: a new playground gets the construction dictionary from the template, and every demo
+   * fabric (and the Gabardine) is an active article with its construction and gramme weight.
+   */
+  private void assertFabricArticles(UUID tenant) {
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fabric_construction"
+                    + " WHERE tenant_id = ? AND system_defined AND deleted_at IS NULL",
+                tenant))
+        .isEqualTo(FabricCatalogueSeeder.constructions().size());
+    Map<String, String> constructionByArticle = new HashMap<>();
+    for (var row :
+        jdbc.queryForList(
+            "SELECT a.article_code, a.status, a.formation, c.code AS construction, a.gsm_finished,"
+                + " p.name AS product_name FROM production.prod_fabric_article a"
+                + " JOIN production.prod_product p ON p.id = a.product_id"
+                + " LEFT JOIN production.prod_fabric_construction c ON c.id = a.construction_id"
+                + " WHERE a.tenant_id = ? AND a.deleted_at IS NULL",
+            tenant)) {
+      assertThat(row.get("status")).as("%s", row.get("article_code")).isEqualTo("ACTIVE");
+      constructionByArticle.put((String) row.get("article_code"), (String) row.get("construction"));
+    }
+    Map<String, String> expected = new HashMap<>();
+    for (var fabric : FabricStockDemoPlan.FABRICS) {
+      expected.put("PM-" + fabric.code().substring(1), fabric.construction());
+    }
+    expected.put("PM-1453", "GABARDINE");
+    assertThat(constructionByArticle).isEqualTo(expected);
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fabric_knitted k"
+                    + " JOIN production.prod_fabric_article a ON a.id = k.fabric_article_id"
+                    + " WHERE a.tenant_id = ? AND k.machine_gauge = 28",
+                tenant))
+        .isEqualTo(1L);
   }
 
   /** What the order form finds when it picks one fabric, one colour and one width. */

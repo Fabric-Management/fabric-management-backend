@@ -413,6 +413,14 @@ public class PermissionTemplateSeeder {
             PermissionKey.FIBER_WRITE, PermissionKey.YARN_WRITE),
         template -> true);
 
+    // FABRIC-1: fabric master data follows the same fibre grants as yarn.
+    mirrorResourceActions(
+        templates,
+        Map.of(
+            PermissionKey.FIBER_READ, PermissionKey.FABRIC_READ,
+            PermissionKey.FIBER_WRITE, PermissionKey.FABRIC_WRITE),
+        template -> true);
+
     // PERM-CAT-1: preserve every existing row and derive only the six approved missing pairs.
     mirrorResourceActions(
         templates,

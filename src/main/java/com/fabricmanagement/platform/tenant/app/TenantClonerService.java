@@ -226,6 +226,65 @@ public class TenantClonerService {
   }
 
   /**
+   * Copies only missing, system-owned fabric constructions from source to target (FABRIC-1). A
+   * tenant's renamed system row keeps its name; a code the tenant already uses is left alone.
+   */
+  public int copyMissingSystemFabricConstructions(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> doCopyMissingSystemFabricConstructions(jdbc, sourceTenantId, targetTenantId));
+  }
+
+  /** Repairs every live tenant's fabric constructions from the system catalogue source. */
+  public int copyMissingSystemFabricConstructionsToAllTenants(UUID sourceTenantId) {
+    if (sourceTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc ->
+            jdbc
+                .queryForList(
+                    "SELECT id FROM common_tenant.common_tenant WHERE deleted_at IS NULL",
+                    UUID.class)
+                .stream()
+                .filter(tenantId -> !sourceTenantId.equals(tenantId))
+                .mapToInt(
+                    tenantId ->
+                        doCopyMissingSystemFabricConstructions(jdbc, sourceTenantId, tenantId))
+                .sum());
+  }
+
+  int doCopyMissingSystemFabricConstructions(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return jdbc.update(
+        """
+        INSERT INTO production.prod_fabric_construction (
+            id, tenant_id, uid, code, name, description, display_order, formation, family,
+            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+            source.description, source.display_order, source.formation, source.family,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM production.prod_fabric_construction source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_fabric_construction target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """,
+        targetTenantId,
+        sourceTenantId,
+        targetTenantId);
+  }
+
+  /**
    * Repairs all live tenants from the system catalogue source without exposing a second
    * cross-tenant executor caller.
    */
@@ -411,6 +470,10 @@ public class TenantClonerService {
           tablesCloned +=
               copyMissingSystemYarnCataloguesInCurrentTransaction(
                   jdbc, goldenTemplateId, targetTenantId);
+          tablesCloned +=
+              doCopyMissingSystemFabricConstructions(jdbc, goldenTemplateId, targetTenantId) > 0
+                  ? 1
+                  : 0;
           tablesCloned += cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, targetTenantId);
 
           return tablesCloned;
@@ -553,6 +616,7 @@ public class TenantClonerService {
                 doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
                 doCopyMissingSystemPropertyDefinitions(jdbc, goldenTemplateId, newTenantId);
                 doCopyMissingSystemYarnCatalogues(jdbc, goldenTemplateId, newTenantId);
+                doCopyMissingSystemFabricConstructions(jdbc, goldenTemplateId, newTenantId);
                 cloneOwnershipPolicyIfMissing(jdbc, goldenTemplateId, newTenantId);
               }
 

@@ -166,6 +166,11 @@ public class TenantTransactionalPurgeService {
           "production.production_execution_inventory_balance",
           "production.production_execution_batch_lineage",
           "production.production_execution_batch",
+          // FABRIC-1: detail before article, article before its construction and product.
+          "production.prod_fabric_knitted",
+          "production.prod_fabric_woven",
+          "production.prod_fabric_article",
+          "production.prod_fabric_construction",
           "production.prod_yarn_backfill_reconciliation",
           "production.prod_yarn_article_audit",
           "production.prod_yarn_article_twist_stage",

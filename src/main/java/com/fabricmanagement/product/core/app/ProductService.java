@@ -240,6 +240,18 @@ public class ProductService implements ProductFacade {
     return createProductInternal(request);
   }
 
+  /** Renames and re-describes a product of the current tenant (FABRIC-1: fabric editing). */
+  @Transactional
+  public ProductDto describe(UUID productId, String name, String description) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Product product =
+        productRepository
+            .findByTenantIdInAndId(List.of(tenantId), productId)
+            .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+    product.describe(name, description);
+    return ProductDto.from(productRepository.save(product));
+  }
+
   @Transactional(readOnly = true)
   public List<ProductAttributeDto> getAttributes(String scope) {
     if (scope != null) {

@@ -55,6 +55,16 @@ public class Product extends BaseEntity {
         .build();
   }
 
+  /** Renames and re-describes the product; a type that needs its own name keeps one. */
+  public void describe(String name, String description) {
+    String trimmed = trimToNull(name);
+    if (requiresOwnName(productType) && trimmed == null) {
+      throw new IllegalArgumentException("A " + productType + " product needs a name");
+    }
+    this.name = trimmed;
+    this.description = trimToNull(description);
+  }
+
   /**
    * Types whose name lives only on the product: there is no type-specific master record to carry
    * it, so a product of these types cannot be created without one.

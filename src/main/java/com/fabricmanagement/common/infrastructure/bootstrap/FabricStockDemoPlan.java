@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,7 +24,14 @@ final class FabricStockDemoPlan {
 
   /** One fabric with every lot of every colour and width it is stocked in. */
   record Fabric(
-      String code, String name, String description, int gsm, String price, List<Lot> lots) {
+      String code,
+      String name,
+      String description,
+      String construction,
+      FabricFormation formation,
+      int gsm,
+      String price,
+      List<Lot> lots) {
     Fabric {
       lots = List.copyOf(lots);
     }
@@ -69,6 +77,8 @@ final class FabricStockDemoPlan {
               "P1454",
               "PM-1454 Cotton Poplin 120gsm (demo)",
               "Plain-weave cotton poplin with a crisp hand, for shirts and dresses.",
+              "POPLIN",
+              FabricFormation.WOVEN,
               120,
               "8.60",
               List.of(
@@ -81,6 +91,8 @@ final class FabricStockDemoPlan {
               "P1455",
               "PM-1455 Cotton Twill 220gsm (demo)",
               "2/1 cotton twill with a firm diagonal face, for workwear and chinos.",
+              "TWILL_2_1",
+              FabricFormation.WOVEN,
               220,
               "9.20",
               List.of(
@@ -94,6 +106,8 @@ final class FabricStockDemoPlan {
               "P1456",
               "PM-1456 Cotton Satin 160gsm (demo)",
               "Cotton sateen with a soft lustre, for bed linen and light trousers.",
+              "SATEEN",
+              FabricFormation.WOVEN,
               160,
               "11.40",
               List.of(
@@ -107,6 +121,8 @@ final class FabricStockDemoPlan {
               "P1457",
               "PM-1457 Linen Blend 180gsm (demo)",
               "Linen-cotton blend with a dry, textured hand, for summer shirts.",
+              "PLAIN",
+              FabricFormation.WOVEN,
               180,
               "12.80",
               List.of(
@@ -121,6 +137,8 @@ final class FabricStockDemoPlan {
               "P1458",
               "PM-1458 Single Jersey 180gsm (demo)",
               "Cotton single jersey knit, finished open width, for T-shirts.",
+              "SINGLE_JERSEY",
+              FabricFormation.KNITTED,
               180,
               "6.75",
               List.of(

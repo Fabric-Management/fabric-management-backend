@@ -288,6 +288,27 @@ class PermissionTemplateSeederTest {
   }
 
   @Test
+  @DisplayName("FABRIC-1: derives fabric read/write grants from fiber, exactly as yarn")
+  void derivesFabricMatrixFromFiberReadWriteRows() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    Set<String> fiber =
+        saved.stream()
+            .filter(t -> "fiber".equals(t.getResource()))
+            .filter(t -> Set.of("read", "write").contains(t.getAction()))
+            .map(PermissionTemplateSeederTest::matrixKey)
+            .collect(java.util.stream.Collectors.toSet());
+    Set<String> fabric =
+        saved.stream()
+            .filter(t -> "fabric".equals(t.getResource()))
+            .map(PermissionTemplateSeederTest::matrixKey)
+            .collect(java.util.stream.Collectors.toSet());
+
+    assertThat(fabric).isEqualTo(fiber).isNotEmpty();
+  }
+
+  @Test
   void newPermissionsMirrorExactlyTheirApprovedSiblingMatrices() {
     List<PermissionTemplate> rows =
         new PermissionTemplateSeeder(null, null).buildDesiredTemplates();

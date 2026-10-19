@@ -10,6 +10,13 @@ import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.dto.UpdateProductSalesDefinitionRequest;
+import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricColourState;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
+import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
+import com.fabricmanagement.product.fabric.dto.FabricKnittedDto;
+import com.fabricmanagement.product.fabric.dto.FabricWovenDto;
 import com.fabricmanagement.product.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.core.batch.app.BatchService;
 import com.fabricmanagement.production.core.batch.app.LotEvidenceService;
@@ -31,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -65,6 +73,7 @@ public class FabricStockDemoSeeder {
   private final BatchService batches;
   private final LotEvidenceService evidence;
   private final StockUnitService pieces;
+  private final FabricFacade fabrics;
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void seedFor(UUID tenantId) {
@@ -75,6 +84,7 @@ public class FabricStockDemoSeeder {
     Map<String, UUID> colourIds = colourIds();
     for (Fabric fabric : FabricStockDemoPlan.FABRICS) {
       ProductDto product = product(fabric);
+      ensureArticle(fabric, product);
       ensureWidths(product.getId(), WIDTHS_CM);
       Map<String, List<UUID>> combinable = new LinkedHashMap<>();
       for (Lot lot : fabric.lots()) {
@@ -128,6 +138,55 @@ public class FabricStockDemoSeeder {
                       null));
               return created;
             });
+  }
+
+  /**
+   * Gives the demo fabric its master data (FABRIC-1): construction, gramme weight, roll length and
+   * woven or knitted design values. It is active when its construction exists for the tenant;
+   * without one it stays a draft rather than failing the playground.
+   */
+  private void ensureArticle(Fabric fabric, ProductDto product) {
+    Optional<FabricConstructionDto> construction = fabrics.findConstruction(fabric.construction());
+    FabricArticleRequest request =
+        new FabricArticleRequest(
+            fabric.name(),
+            fabric.description(),
+            fabric.formation(),
+            "PM-" + fabric.code().substring(1),
+            construction.map(FabricConstructionDto::id).orElse(null),
+            FabricColourState.PIECE_DYED,
+            BigDecimal.valueOf(fabric.gsm()),
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
+            ARTICLE_NOTE,
+            fabric.formation() == FabricFormation.WOVEN ? WOVEN.get(fabric.code()) : null,
+            fabric.formation() == FabricFormation.KNITTED ? KNITTED.get(fabric.code()) : null);
+    fabrics.ensureArticle(product.getId(), request, construction.isPresent());
+  }
+
+  /** Illustrative woven design values: ends and picks per centimetre and the weave notation. */
+  private static final Map<String, FabricWovenDto> WOVEN =
+      Map.of(
+          "P1454", woven("52.0", "28.0", "1/1"),
+          "P1455", woven("42.0", "24.0", "2/1 Z"),
+          "P1456", woven("60.0", "34.0", "4/1"),
+          "P1457", woven("22.0", "20.0", "1/1"));
+
+  /** Illustrative knitting values: 28 gauge, 30 inch machine, 2.75 mm stitch, 90 feeders. */
+  private static final Map<String, FabricKnittedDto> KNITTED =
+      Map.of(
+          "P1458",
+          new FabricKnittedDto(
+              28, new BigDecimal("30.0"), null, null, new BigDecimal("2.750"), 90));
+
+  static final String ARTICLE_NOTE =
+      "Playground example: illustrative design values, not a real fabric specification.";
+
+  private static FabricWovenDto woven(String ends, String picks, String weave) {
+    return new FabricWovenDto(new BigDecimal(ends), new BigDecimal(picks), null, weave);
   }
 
   private void ensureWidths(UUID productId, List<Integer> required) {
@@ -253,7 +312,10 @@ public class FabricStockDemoSeeder {
             ids, null, "Synthetic playground example: the lots of " + group + " may be combined."));
   }
 
-  /** Existing fictional Gabardine lots also need explicit width records, beyond their name. */
+  /**
+   * The fictional Gabardine gets its fabric article, and its existing lots explicit width records
+   * beyond their name.
+   */
   private void legacyGabardineWidth() {
     var gabardine =
         catalogue.getActiveCatalogForModule("FABRIC").stream()
@@ -262,6 +324,26 @@ public class FabricStockDemoSeeder {
             .findFirst();
     if (gabardine.isEmpty()) return;
     SalesProductDto entry = gabardine.get();
+    Optional<FabricConstructionDto> construction = fabrics.findConstruction("GABARDINE");
+    fabrics.ensureArticle(
+        entry.getProductId(),
+        new FabricArticleRequest(
+            SalesQuoteDemoSeeder.PRODUCT_GABARDINE,
+            SalesQuoteDemoSeeder.PRODUCT_DESCRIPTIONS.get(SalesQuoteDemoSeeder.PRODUCT_GABARDINE),
+            FabricFormation.WOVEN,
+            "PM-1453",
+            construction.map(FabricConstructionDto::id).orElse(null),
+            FabricColourState.PIECE_DYED,
+            new BigDecimal("190"),
+            null,
+            new BigDecimal("155"),
+            null,
+            null,
+            BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
+            ARTICLE_NOTE,
+            woven("40.0", "24.0", "2/1"),
+            null),
+        construction.isPresent());
     ensureWidths(entry.getProductId(), List.of(155));
     for (String code : List.of("LOT-24011", "LOT-24012", "LOT-23087", "LOT-24020", "LOT-23050")) {
       batches

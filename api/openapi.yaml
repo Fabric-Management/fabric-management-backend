@@ -185,6 +185,8 @@ tags:
   name: Partner Users
 - description: Payroll Self Service operations
   name: Payroll Self Service
+- description: Fabric master data and construction dictionary
+  name: Fabric Articles
 - description: Employee Profile operations
   name: Employee Profile
 - description: Goods Receipt operations
@@ -32966,6 +32968,835 @@ paths:
       summary: Reopen the card's shade standard for editing
       tags:
       - Color
+  /api/v1/production/fabrics:
+    get:
+      operationId: listFabricArticles
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - DRAFT
+          - ACTIVE
+          - OBSOLETE
+      - description: Case-insensitive part of the name or article code
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "updatedAt,DESC"
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseFabricArticleListItem"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List and search fabric articles
+      tags:
+      - Fabric Articles
+    post:
+      operationId: createFabricArticle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FabricArticleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Create a draft fabric article and its product
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/constructions:
+    get:
+      operationId: listFabricConstructions
+      parameters:
+      - in: query
+        name: formation
+        required: false
+        schema:
+          type: string
+          enum:
+          - WOVEN
+          - KNITTED
+          - NONWOVEN
+      - in: query
+        name: includeInactive
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListFabricConstruction"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: The construction dictionary
+      tags:
+      - Fabric Articles
+    post:
+      operationId: createFabricConstruction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFabricConstructionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricConstruction"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Add a tenant construction
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/constructions/{id}:
+    put:
+      operationId: updateFabricConstruction
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFabricConstructionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricConstruction"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Rename or retire a construction
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/product/{productId}:
+    get:
+      operationId: getFabricArticleByProduct
+      parameters:
+      - in: path
+        name: productId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a fabric by its product
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/{id}:
+    delete:
+      operationId: deleteFabricArticle
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Delete a draft fabric article; an active one is made obsolete instead
+      tags:
+      - Fabric Articles
+    get:
+      operationId: getFabricArticle
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a fabric article
+      tags:
+      - Fabric Articles
+    put:
+      operationId: updateFabricArticle
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FabricArticleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Replace a fabric article
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/{id}/activate:
+    post:
+      operationId: activateFabricArticle
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The article is not complete; details.problems lists what is
+            missing
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Activate a complete draft
+      tags:
+      - Fabric Articles
+  /api/v1/production/fabrics/{id}/obsolete:
+    post:
+      operationId: obsoleteFabricArticle
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFabricArticle"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Retire an active fabric article
+      tags:
+      - Fabric Articles
   /api/v1/production/fiber-quality-standards:
     get:
       operationId: getAll
@@ -60857,6 +61688,42 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFabricArticle:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FabricArticle"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFabricConstruction:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FabricConstruction"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFiberApplicableQualityStandardsDto:
       type: object
       properties:
@@ -61633,6 +62500,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DepartmentDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListFabricConstruction:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricConstruction"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -63839,6 +64726,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseDecisionQueueItem"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseFabricArticleListItem:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseFabricArticleListItem"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -69066,6 +69971,50 @@ components:
       - firstName
       - lastName
       - organizationId
+    CreateFabricConstructionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          example: TWILL_3_1_S
+          maxLength: 50
+          minLength: 0
+          pattern: "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        displayOrder:
+          type: integer
+          format: int32
+        family:
+          type: string
+          description: The closed family; the formation follows from it
+          enum:
+          - PLAIN
+          - TWILL
+          - SATIN
+          - DOBBY
+          - JACQUARD
+          - LENO
+          - PILE
+          - SINGLE_JERSEY
+          - RIB
+          - INTERLOCK
+          - PIQUE
+          - FLEECE
+          - TERRY
+          - WARP_KNIT
+          - NONWOVEN
+        name:
+          type: string
+          example: 3/1 S twill
+          maxLength: 100
+          minLength: 0
+      required:
+      - code
+      - family
+      - name
     CreateFiberQualityStandardRequest:
       type: object
       properties:
@@ -73084,6 +74033,393 @@ components:
       - baseCurrency
       - rate
       - targetCurrency
+    FabricArticle:
+      type: object
+      description: A fabric article with its product name
+      properties:
+        activationProblems:
+          type: array
+          description: "Stable codes of what still stops activation: CONSTRUCTION_MISSING,\
+            \ COLOUR_STATE_MISSING, GSM_FINISHED_MISSING"
+          items:
+            type: string
+        articleCode:
+          type:
+          - string
+          - "null"
+        articleSpecVersion:
+          type: integer
+          format: int32
+        colourState:
+          type:
+          - string
+          - "null"
+          enum:
+          - GREIGE
+          - PFD
+          - PIECE_DYED
+          - YARN_DYED
+          - PRINTED
+        construction:
+          anyOf:
+          - $ref: "#/components/schemas/FabricConstruction"
+          - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - "null"
+        formation:
+          type: string
+          enum:
+          - WOVEN
+          - KNITTED
+          - NONWOVEN
+        gsmFinished:
+          type:
+          - number
+          - "null"
+        gsmGreige:
+          type:
+          - number
+          - "null"
+        id:
+          type: string
+          format: uuid
+        knitted:
+          anyOf:
+          - $ref: "#/components/schemas/FabricKnitted"
+          - type: "null"
+        name:
+          type: string
+        nominalFinishedWidthCm:
+          type:
+          - number
+          - "null"
+        nominalGreigeWidthCm:
+          type:
+          - number
+          - "null"
+        productId:
+          type: string
+          format: uuid
+        productUid:
+          type: string
+        remarks:
+          type:
+          - string
+          - "null"
+        standardRollLengthM:
+          type:
+          - number
+          - "null"
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - ACTIVE
+          - OBSOLETE
+        updatedAt:
+          type: string
+          format: date-time
+        usableWidthCm:
+          type:
+          - number
+          - "null"
+        woven:
+          anyOf:
+          - $ref: "#/components/schemas/FabricWoven"
+          - type: "null"
+      required:
+      - activationProblems
+      - articleCode
+      - articleSpecVersion
+      - colourState
+      - construction
+      - createdAt
+      - description
+      - formation
+      - gsmFinished
+      - gsmGreige
+      - id
+      - knitted
+      - name
+      - nominalFinishedWidthCm
+      - nominalGreigeWidthCm
+      - productId
+      - productUid
+      - remarks
+      - standardRollLengthM
+      - status
+      - updatedAt
+      - usableWidthCm
+      - woven
+    FabricArticleListItem:
+      type: object
+      properties:
+        articleCode:
+          type:
+          - string
+          - "null"
+        colourState:
+          type:
+          - string
+          - "null"
+          enum:
+          - GREIGE
+          - PFD
+          - PIECE_DYED
+          - YARN_DYED
+          - PRINTED
+        constructionFamily:
+          type:
+          - string
+          - "null"
+          enum:
+          - PLAIN
+          - TWILL
+          - SATIN
+          - DOBBY
+          - JACQUARD
+          - LENO
+          - PILE
+          - SINGLE_JERSEY
+          - RIB
+          - INTERLOCK
+          - PIQUE
+          - FLEECE
+          - TERRY
+          - WARP_KNIT
+          - NONWOVEN
+        constructionName:
+          type:
+          - string
+          - "null"
+        formation:
+          type: string
+          enum:
+          - WOVEN
+          - KNITTED
+          - NONWOVEN
+        gsmFinished:
+          type:
+          - number
+          - "null"
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        nominalFinishedWidthCm:
+          type:
+          - number
+          - "null"
+        productId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - ACTIVE
+          - OBSOLETE
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - articleCode
+      - colourState
+      - constructionFamily
+      - constructionName
+      - formation
+      - gsmFinished
+      - id
+      - name
+      - nominalFinishedWidthCm
+      - productId
+      - status
+      - updatedAt
+    FabricArticleRequest:
+      type: object
+      properties:
+        articleCode:
+          type: string
+          example: PM-1454
+          maxLength: 60
+          minLength: 0
+        colourState:
+          type: string
+          enum:
+          - GREIGE
+          - PFD
+          - PIECE_DYED
+          - YARN_DYED
+          - PRINTED
+        constructionId:
+          type: string
+          format: uuid
+        description:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        formation:
+          type: string
+          enum:
+          - WOVEN
+          - KNITTED
+          - NONWOVEN
+        gsmFinished:
+          type: number
+          example: 120
+          exclusiveMinimum: 0
+        gsmGreige:
+          type: number
+          exclusiveMinimum: 0
+        knitted:
+          anyOf:
+          - $ref: "#/components/schemas/FabricKnitted"
+          - type: "null"
+          description: Knitted fabrics only
+        name:
+          type: string
+          example: Cotton Poplin 120gsm
+          maxLength: 255
+          minLength: 0
+        nominalFinishedWidthCm:
+          type: number
+          example: 150
+          exclusiveMinimum: 0
+        nominalGreigeWidthCm:
+          type: number
+          exclusiveMinimum: 0
+        remarks:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        standardRollLengthM:
+          type: number
+          example: 120
+          exclusiveMinimum: 0
+        usableWidthCm:
+          type: number
+          exclusiveMinimum: 0
+        woven:
+          anyOf:
+          - $ref: "#/components/schemas/FabricWoven"
+          - type: "null"
+          description: Woven fabrics only
+      required:
+      - formation
+      - name
+    FabricConstruction:
+      type: object
+      description: A tenant's fabric construction
+      properties:
+        active:
+          type: boolean
+        code:
+          type: string
+          example: TWILL_3_1
+        description:
+          type:
+          - string
+          - "null"
+        displayOrder:
+          type:
+          - integer
+          - "null"
+          format: int32
+        family:
+          type: string
+          enum:
+          - PLAIN
+          - TWILL
+          - SATIN
+          - DOBBY
+          - JACQUARD
+          - LENO
+          - PILE
+          - SINGLE_JERSEY
+          - RIB
+          - INTERLOCK
+          - PIQUE
+          - FLEECE
+          - TERRY
+          - WARP_KNIT
+          - NONWOVEN
+        formation:
+          type: string
+          enum:
+          - WOVEN
+          - KNITTED
+          - NONWOVEN
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: 3/1 twill
+        systemDefined:
+          type: boolean
+          description: "Provided by FabricOS; renameable, never removed"
+      required:
+      - active
+      - code
+      - description
+      - displayOrder
+      - family
+      - formation
+      - id
+      - name
+      - systemDefined
+    FabricKnitted:
+      type: object
+      description: Nominal knitting machine and stitch values
+      properties:
+        coursesPerCm:
+          type:
+          - number
+          - "null"
+          exclusiveMinimum: 0
+        feeders:
+          type:
+          - integer
+          - "null"
+          format: int32
+          exclusiveMinimum: 0
+        machineDiameterIn:
+          type:
+          - number
+          - "null"
+          example: 30.0
+          exclusiveMinimum: 0
+        machineGauge:
+          type:
+          - integer
+          - "null"
+          format: int32
+          example: 28
+          exclusiveMinimum: 0
+        stitchLengthMm:
+          type:
+          - number
+          - "null"
+          example: 2.75
+          exclusiveMinimum: 0
+        walesPerCm:
+          type:
+          - number
+          - "null"
+          exclusiveMinimum: 0
+      required:
+      - coursesPerCm
+      - feeders
+      - machineDiameterIn
+      - machineGauge
+      - stitchLengthMm
+      - walesPerCm
     FabricPurchaseSpecs:
       allOf:
       - $ref: "#/components/schemas/PurchaseOrderSpecs"
@@ -73180,6 +74516,40 @@ components:
             type: number
             description: Required Fabric width in cm
       description: Fabric-specific RFQ specifications
+    FabricWoven:
+      type: object
+      description: Nominal woven design values
+      properties:
+        endsPerCm:
+          type:
+          - number
+          - "null"
+          example: 52.0
+          exclusiveMinimum: 0
+        picksPerCm:
+          type:
+          - number
+          - "null"
+          example: 28.0
+          exclusiveMinimum: 0
+        reedNotation:
+          type:
+          - string
+          - "null"
+          maxLength: 40
+          minLength: 0
+        weaveNotation:
+          type:
+          - string
+          - "null"
+          example: 3/1 S
+          maxLength: 40
+          minLength: 0
+      required:
+      - endsPerCm
+      - picksPerCm
+      - reedNotation
+      - weaveNotation
     FiberActionCapabilityDto:
       type: object
       properties:
@@ -78247,6 +79617,29 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponseFabricArticleListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FabricArticleListItem"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponseFiberRequestDto:
       type: object
       properties:
@@ -79572,6 +80965,8 @@ components:
       - costing:manage
       - costing:read
       - costing:write
+      - fabric:read
+      - fabric:write
       - fiber:read
       - fiber:write
       - finance:manage
@@ -88600,6 +89995,26 @@ components:
       properties:
         department:
           type: string
+    UpdateFabricConstructionRequest:
+      type: object
+      description: "Code, family and formation never change; articles reason on them"
+      properties:
+        active:
+          type: boolean
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        displayOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - active
+      - name
     UpdateFiberQualityStandardRequest:
       type: object
       properties:
