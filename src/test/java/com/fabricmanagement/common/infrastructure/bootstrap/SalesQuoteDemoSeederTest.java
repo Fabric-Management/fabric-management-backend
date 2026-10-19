@@ -268,7 +268,7 @@ class SalesQuoteDemoSeederTest {
         .containsExactly(PartnerRole.CUSTOMER, PartnerRole.CUSTOMER, PartnerRole.SUPPLIER);
     assertThat(refCaptor.getAllValues())
         .extracting(request -> request.initialPrimaryCode().externalCode())
-        .containsExactly("ALB-NVY-26", "ALB-ECR-26", "AYM-IND-2201");
+        .containsExactly("ALB-NVY-26", "ALB-ECR-26", "PYM-IND-2201");
     assertThat(refCaptor.getAllValues().get(2).partnerId()).isEqualTo(PENNINE_ID);
     verify(colorPartnerRefService, times(1))
         .addCode(

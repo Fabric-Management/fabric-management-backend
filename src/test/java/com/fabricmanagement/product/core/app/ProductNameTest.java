@@ -44,6 +44,8 @@ class ProductNameTest {
   @Mock private YarnFacade yarnFacade;
   @Mock private DomainEventPublisher eventPublisher;
 
+  private static final UUID TENANT_ID = UUID.randomUUID();
+
   private ProductService service;
 
   @BeforeEach
@@ -55,7 +57,8 @@ class ProductNameTest {
 
   @Test
   void aFabricIsCreatedWithItsTrimmedNameAndDescriptionAndShowsTheName() {
-    when(productRepository.save(any(Product.class))).thenAnswer(call -> call.getArgument(0));
+    when(productRepository.save(any(Product.class)))
+        .thenAnswer(call -> persisted(call.getArgument(0)));
 
     ProductDto created =
         service.createProduct(
@@ -69,6 +72,7 @@ class ProductNameTest {
     assertThat(created.getName()).isEqualTo("Cotton Poplin 120gsm");
     assertThat(created.getDescription()).isEqualTo("Plain-weave cotton for shirts.");
     assertThat(created.getDisplayName()).isEqualTo("Cotton Poplin 120gsm");
+    verify(eventPublisher).publish(any());
   }
 
   @Test
@@ -89,7 +93,8 @@ class ProductNameTest {
 
   @Test
   void fibreAndYarnMayBeCreatedWithoutAProductName() {
-    when(productRepository.save(any(Product.class))).thenAnswer(call -> call.getArgument(0));
+    when(productRepository.save(any(Product.class)))
+        .thenAnswer(call -> persisted(call.getArgument(0)));
 
     for (ProductType type : List.of(ProductType.FIBER, ProductType.YARN)) {
       ProductDto created =
@@ -126,6 +131,13 @@ class ProductNameTest {
     assertThat(shown.get(unnamedFabric.getId()).getDisplayName()).isEqualTo("PRD-F2");
     assertThat(shown.get(fibreWithRecord.getId()).getDisplayName()).isEqualTo("Organic cotton");
     assertThat(shown.get(fibreWithoutRecord.getId()).getDisplayName()).isEqualTo("Raw cotton");
+  }
+
+  /** What persisting does that the mocked repository does not: assign the id and the tenant. */
+  private Product persisted(Product product) {
+    ReflectionTestUtils.setField(product, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(product, "tenantId", TENANT_ID);
+    return product;
   }
 
   private Product product(UUID tenantId, ProductType type, String uid, String name) {
