@@ -72,6 +72,8 @@ tags:
   name: Address Validation
 - description: Batch Lineage operations
   name: Batch Lineage
+- description: Short-lived roll ownership before a commercial stock choice
+  name: Draft stock selections
 - description: "Governed pool configuration, eligibility and repair"
   name: FlowBoard Routing
 - description: Address operations
@@ -46061,239 +46063,6 @@ paths:
       summary: Ask production to hold the line's running work; not a stop until confirmed
       tags:
       - Order Intake
-  /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-acceptances:
-    get:
-      operationId: listQuantityAcceptances
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: lineId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseListQuantityAcceptance"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: "Stock choices and acceptances recorded for a line, newest first"
-      tags:
-      - Order Intake
-    post:
-      operationId: recordQuantityAcceptance
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: lineId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RecordQuantityAcceptanceRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseQuantityAcceptance"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Record the stock option a line takes and the customer's acceptance;
-        reserves nothing
-      tags:
-      - Order Intake
-  /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-acceptances/active:
-    delete:
-      operationId: withdrawQuantityAcceptance
-      parameters:
-      - in: path
-        name: orderId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: lineId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Withdraw the line's active stock choice
-      tags:
-      - Order Intake
   /api/v1/sales-orders/{orderId}/intake/lines/{lineId}/quantity-proposals:
     post:
       description: "Free stock first, in business priority order under policyCode.\
@@ -50632,6 +50401,112 @@ paths:
       summary: "Fibre, yarn and fabric products the customer may order"
       tags:
       - Order Intake
+  /api/v1/sales/order-intake/products/{productId}/stock-live-events:
+    get:
+      description: Uses the shared SSE channel. Reads current access and stock revision
+        on each check. Ready/reconnect means read stock again; events carry no owner
+        or lease tokens.
+      operationId: subscribeDraftStockLiveEvents
+      parameters:
+      - in: path
+        name: productId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                anyOf:
+                - $ref: "#/components/schemas/ApiResponseLiveReadyDto"
+                - $ref: "#/components/schemas/ApiResponseLiveInvalidatedDto"
+                - $ref: "#/components/schemas/ApiResponseLiveClosedDto"
+                description: "The JSON on the `data:` line of one frame. The SSE `event:`\
+                  \ line names the frame and its schema (see x-fabric-live-frames):\
+                  \ `ready`: ApiResponseLiveReadyDto, `invalidated`: ApiResponseLiveInvalidatedDto,\
+                  \ `closed`: ApiResponseLiveClosedDto. Lines starting with `:` are\
+                  \ keepalive comments, not data. No `id:` line is sent."
+                x-fabric-live-frames:
+                  closed: "#/components/schemas/ApiResponseLiveClosedDto"
+                  invalidated: "#/components/schemas/ApiResponseLiveInvalidatedDto"
+                  ready: "#/components/schemas/ApiResponseLiveReadyDto"
+          description: Shared live change stream
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Current sales read access refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Product not visible in this tenant
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Shared connection capacity reached; honour Retry-After
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              style: simple
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Live channel temporarily unavailable; honour Retry-After
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              style: simple
+      summary: Subscribe to roll availability and provisional ownership changes
+      tags:
+      - Draft stock selections
+      x-fabric-live-stream:
+        frames: "ready,invalidated,closed"
   /api/v1/sales/order-intake/readiness-requests/production:
     get:
       operationId: listProductionReadinessRequests
@@ -50838,6 +50713,630 @@ paths:
       summary: Current stock for an order line that is not saved yet
       tags:
       - Order Intake
+  /api/v1/sales/order-intake/stock-selections:
+    post:
+      operationId: openDraftStockSelection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenDraftStockSessionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Open the stock session of one unsaved form line
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/orders/{orderId}/lines/{lineId}/apply:
+    post:
+      description: Checks the order version and existing edit-field leases. Salesperson
+        confirmation is not customer consent. New-order creation carries the same
+        proof within its atomic create request.
+      operationId: applyDraftStockSelection
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: lineId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyDraftStockSelectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Apply and transfer a displayed selection to a saved draft order line
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/orders/{orderId}/lines/{lineId}/selection:
+    delete:
+      description: Versioned and idempotent. Uses the existing quantity/whole-line
+        edit lease guard; releases only this order line's permanent holds.
+      operationId: removeAppliedStockSelection
+      parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: lineId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveAppliedStockSelectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove an applied draft stock choice and restore its customer-request
+        quantity
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/{id}:
+    get:
+      operationId: getDraftStockSelection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read this session's ownership and backend policy
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/{id}/acquire:
+    post:
+      description: "Called when the proposal is presented, before Apply. All requested\
+        \ rolls or none. Requires sales write; read-only preview never acquires stock.\
+        \ A retry carries the same operationId and payload."
+      operationId: acquireDraftStockSelection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcquireDraftStockSelectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Acquire or replace the active displayed roll proposal atomically
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/{id}/close:
+    post:
+      operationId: closeDraftStockSelection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseDraftStockSessionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Close this form session and end its current ownership periods
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/{id}/release:
+    post:
+      operationId: releaseDraftStockSelection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftStockSelectionTokensRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Release this preview; repeated or obsolete tokens change nothing
+      tags:
+      - Draft stock selections
+  /api/v1/sales/order-intake/stock-selections/{id}/renew:
+    post:
+      operationId: renewDraftStockSelection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftStockSelectionTokensRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseDraftStockSelection"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: Current sales write permission or object scope refused
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stock, version, session, ownership period or operation conflict;\
+            \ refresh the named line"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Incomplete terms, invalid source or confirmation required"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Renew only this session's current ownership periods
+      tags:
+      - Draft stock selections
   /api/v1/sales/orders:
     get:
       operationId: getAllOrders
@@ -50954,8 +51453,9 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
+                $ref: "#/components/schemas/DraftStockSelectionProblem"
+          description: "Stale stock selection, duplicate fabric distribution or idempotency\
+            \ conflict; no order is created"
         "422":
           content:
             application/problem+json:
@@ -58920,6 +59420,35 @@ paths:
       - Hr Policy Pack
 components:
   schemas:
+    AcquireDraftStockSelectionRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        line:
+          $ref: "#/components/schemas/OrderIntakeStockPreviewRequest"
+        operationId:
+          type: string
+          format: uuid
+        optionKey:
+          type: string
+          maxLength: 40000
+          minLength: 0
+        previousTokens:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
+      required:
+      - expectedRevision
+      - line
+      - operationId
+      - optionKey
+      - previousTokens
     ActiveSessionDto:
       type: object
       properties:
@@ -60243,6 +60772,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/DepartmentDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseDraftStockSelection:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DraftStockSelection"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -61965,26 +62512,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/QualityRelocationTargetDto"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    ApiResponseListQuantityAcceptance:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/QuantityAcceptance"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -64387,24 +64914,6 @@ components:
           type: array
           items:
             type: string
-    ApiResponseQuantityAcceptance:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/QuantityAcceptance"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
     ApiResponseQuantityProposal:
       type: object
       properties:
@@ -65736,6 +66245,22 @@ components:
           type: array
           items:
             type: string
+    ApplyDraftStockSelectionRequest:
+      type: object
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type: string
+          format: uuid
+        selection:
+          $ref: "#/components/schemas/DraftStockSelectionProof"
+      required:
+      - expectedVersion
+      - operationId
+      - selection
     ApprovalAuthorityBasis:
       type: string
       enum:
@@ -66968,6 +67493,23 @@ components:
             $ref: "#/components/schemas/SuggestedAction"
         tokenUsage:
           $ref: "#/components/schemas/TokenUsageDto"
+    CloseDraftStockSessionRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        tokens:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
+      required:
+      - expectedRevision
+      - tokens
     CloseFinancialPeriodResponse:
       type: object
       properties:
@@ -71937,6 +72479,246 @@ components:
           format: int32
           description: Trailing window in days
           example: 90
+    DraftStockSelection:
+      type: object
+      properties:
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftStockSelectionCapability"
+        clientLineId:
+          type: string
+          format: uuid
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        grants:
+          type: array
+          description: Secret periods of this session only; never published in stock
+            listings
+          items:
+            $ref: "#/components/schemas/DraftStockSelectionGrant"
+        option:
+          anyOf:
+          - $ref: "#/components/schemas/QuantityProposalOption"
+          - type: "null"
+        orderVersion:
+          type:
+          - integer
+          - "null"
+          format: int64
+        policy:
+          $ref: "#/components/schemas/DraftStockSelectionPolicy"
+        remainingMs:
+          type: integer
+          format: int64
+          description: Milliseconds remaining by the server clock; zero without live
+            ownership
+        salesOrderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        salesOrderLineId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        selectionId:
+          type: string
+          format: uuid
+        selectionRevision:
+          type: integer
+          format: int64
+        sessionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: No provisional session on a direct quote-to-order transfer
+        state:
+          $ref: "#/components/schemas/DraftStockSelectionState"
+      required:
+      - capabilities
+      - clientLineId
+      - expiresAt
+      - grants
+      - option
+      - orderVersion
+      - policy
+      - remainingMs
+      - salesOrderId
+      - salesOrderLineId
+      - selectionId
+      - selectionRevision
+      - sessionId
+      - state
+    DraftStockSelectionAction:
+      type: string
+      enum:
+      - ACQUIRE
+      - APPLY
+      - RENEW
+      - RELEASE
+      - CLOSE
+    DraftStockSelectionCapability:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/DraftStockSelectionAction"
+        allowed:
+          type: boolean
+        needsApproval:
+          type: boolean
+        needsConfirmation:
+          type: boolean
+        reason:
+          anyOf:
+          - $ref: "#/components/schemas/DraftStockSelectionReason"
+          - type: "null"
+        routesTo:
+          type:
+          - string
+          - "null"
+      required:
+      - action
+      - allowed
+      - needsApproval
+      - needsConfirmation
+      - reason
+      - routesTo
+    DraftStockSelectionGrant:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        stockUnitId:
+          type: string
+          format: uuid
+        token:
+          type: string
+          format: uuid
+      required:
+      - expiresAt
+      - stockUnitId
+      - token
+    DraftStockSelectionPolicy:
+      type: object
+      properties:
+        idleAfterSeconds:
+          type: integer
+          format: int64
+        idleWarningSeconds:
+          type: integer
+          format: int64
+        leaseSeconds:
+          type: integer
+          format: int64
+        maxKeysPerRequest:
+          type: integer
+          format: int32
+        renewAfterSeconds:
+          type: integer
+          format: int64
+      required:
+      - idleAfterSeconds
+      - idleWarningSeconds
+      - leaseSeconds
+      - maxKeysPerRequest
+      - renewAfterSeconds
+    DraftStockSelectionProblem:
+      allOf:
+      - $ref: "#/components/schemas/ApiProblemDetail"
+      - type: object
+        properties:
+          clientLineId:
+            type:
+            - string
+            - "null"
+            format: uuid
+          existingClientLineId:
+            type:
+            - string
+            - "null"
+            format: uuid
+          existingLineId:
+            type:
+            - string
+            - "null"
+            format: uuid
+          existingLineIndex:
+            type:
+            - integer
+            - "null"
+            format: int32
+            description: Zero-based index of the existing fabric distribution
+          selectionId:
+            type:
+            - string
+            - "null"
+            format: uuid
+    DraftStockSelectionProof:
+      type: object
+      properties:
+        confirmed:
+          type: boolean
+          description: Salesperson acknowledgement of backend tolerance/remnant facts;
+            never customer consent
+        selectionId:
+          type: string
+          format: uuid
+        selectionRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        tokens:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
+      required:
+      - selectionId
+      - selectionRevision
+      - tokens
+    DraftStockSelectionReason:
+      type: string
+      enum:
+      - OWNERSHIP_REQUIRED
+      - SELECTION_EXPIRED
+      - SELECTION_ENDED
+    DraftStockSelectionState:
+      type: string
+      enum:
+      - OPEN
+      - HELD
+      - BLOCKED
+      - EXPIRED
+      - RELEASED
+      - TRANSFERRED
+      - CONVERTED
+      - SUPERSEDED
+    DraftStockSelectionTokensRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        tokens:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 0
+      required:
+      - expectedRevision
+      - tokens
     DsoDto:
       type: object
       description: Days sales outstanding metric
@@ -74951,6 +75733,28 @@ components:
           format: date-time
         hasCompletedOnboarding:
           type: boolean
+    OpenDraftStockSessionRequest:
+      type: object
+      properties:
+        clientLineId:
+          type: string
+          format: uuid
+        formInstanceId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        targetLineId:
+          type: string
+          format: uuid
+        targetOrderId:
+          type: string
+          format: uuid
+      required:
+      - clientLineId
+      - formInstanceId
+      - productId
     OpenProductionLotRequest:
       type: object
       properties:
@@ -75855,6 +76659,7 @@ components:
       enum:
       - EVALUATE_QUANTITY
       - RECORD_STOCK_CHOICE
+      - REMOVE_STOCK_CHOICE
       - RECORD_TONE_ACCEPTANCE
       - ADD_CUSTOM_REQUEST
       - RECORD_CUSTOMER_DECISION
@@ -76265,14 +77070,18 @@ components:
           description: Null when the quantity cannot be converted to the canonical
             unit
         expiresAt:
-          type: string
+          type:
+          - string
+          - "null"
           format: date
         marketerName:
           type:
           - string
           - "null"
         quantity:
-          type: number
+          type:
+          - number
+          - "null"
         quoteNumber:
           type:
           - string
@@ -76372,6 +77181,10 @@ components:
       properties:
         held:
           type: boolean
+        ownerType:
+          anyOf:
+          - $ref: "#/components/schemas/StockProposalOwnerType"
+          - type: "null"
         pieceNo:
           type: string
         quantity:
@@ -76381,6 +77194,7 @@ components:
           format: uuid
       required:
       - held
+      - ownerType
       - pieceNo
       - quantity
       - stockUnitId
@@ -76430,6 +77244,10 @@ components:
             format: uuid
           maxItems: 500
           minItems: 0
+        ownStockSelection:
+          $ref: "#/components/schemas/DraftStockSelectionProof"
+          description: Optional current ownership proof; excludes only this authenticated
+            form line's own held rolls
         productId:
           type: string
           format: uuid
@@ -76667,6 +77485,11 @@ components:
           type: string
         quantity:
           type: number
+        requestQuantity:
+          type:
+          - number
+          - "null"
+          description: Original customer request; absent on historical versions
         requestedDeliveryDate:
           type: string
           format: date
@@ -80625,129 +81448,12 @@ components:
       - id
       - name
       - path
-    QuantityAcceptance:
-      type: object
-      properties:
-        acceptedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        acceptedQuantity:
-          type: number
-        basis:
-          $ref: "#/components/schemas/QuantityAcceptanceBasis"
-        batchIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        channel:
-          anyOf:
-          - $ref: "#/components/schemas/IntakeAcceptanceChannel"
-          - type: "null"
-        compatibility:
-          $ref: "#/components/schemas/QuantityOptionCompatibility"
-        compatibilityRequestStatus:
-          type:
-          - string
-          - "null"
-          description: Latest compatibility request status for a conditional acceptance
-        conditional:
-          type: boolean
-        coversCurrentTerms:
-          type: boolean
-        customerContact:
-          type:
-          - string
-          - "null"
-        customerStatementConfirmed:
-          type: boolean
-        evidenceAttachmentId:
-          type:
-          - string
-          - "null"
-          format: uuid
-        evidenceNote:
-          type:
-          - string
-          - "null"
-        id:
-          type: string
-          format: uuid
-        optionKey:
-          type: string
-        optionKind:
-          $ref: "#/components/schemas/QuantityOptionKind"
-        pieceIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        proposalId:
-          type: string
-          format: uuid
-        recordedAt:
-          type: string
-          format: date-time
-        recordedBy:
-          type: string
-          format: uuid
-        remainingNeed:
-          anyOf:
-          - $ref: "#/components/schemas/RemainingNeedDecision"
-          - type: "null"
-        remainingQuantity:
-          type:
-          - number
-          - "null"
-        remnantAcknowledged:
-          type: boolean
-        salesOrderLineId:
-          type: string
-          format: uuid
-        status:
-          $ref: "#/components/schemas/QuantityAcceptanceStatus"
-        unit:
-          type: string
-      required:
-      - acceptedAt
-      - acceptedQuantity
-      - basis
-      - batchIds
-      - channel
-      - compatibility
-      - compatibilityRequestStatus
-      - conditional
-      - coversCurrentTerms
-      - customerContact
-      - customerStatementConfirmed
-      - evidenceAttachmentId
-      - evidenceNote
-      - id
-      - optionKey
-      - optionKind
-      - pieceIds
-      - proposalId
-      - recordedAt
-      - recordedBy
-      - remainingNeed
-      - remainingQuantity
-      - remnantAcknowledged
-      - salesOrderLineId
-      - status
-      - unit
     QuantityAcceptanceBasis:
       type: string
       enum:
       - EXACT_MATCH
+      - STOCK_SELECTED
       - CUSTOMER_ACCEPTED
-    QuantityAcceptanceStatus:
-      type: string
-      enum:
-      - ACTIVE
-      - SUPERSEDED
-      - WITHDRAWN
     QuantityEvaluationStatus:
       type: string
       enum:
@@ -80877,6 +81583,8 @@ components:
           type:
           - string
           - "null"
+        ownerType:
+          $ref: "#/components/schemas/StockProposalOwnerType"
         pieceIds:
           type: array
           items:
@@ -80903,6 +81611,7 @@ components:
       - kind
       - lotNo
       - marketerName
+      - ownerType
       - pieceIds
       - quantity
       - quoteNumber
@@ -82091,50 +82800,6 @@ components:
       required:
       - outcome
       - scope
-    RecordQuantityAcceptanceRequest:
-      type: object
-      properties:
-        acceptedAt:
-          type: string
-          format: date-time
-        channel:
-          $ref: "#/components/schemas/IntakeAcceptanceChannel"
-        customerContact:
-          type: string
-          maxLength: 200
-          minLength: 0
-        customerStatementConfirmed:
-          type: boolean
-          description: '"I received this acceptance from the customer" (SOI A11)'
-        evidenceAttachmentId:
-          type: string
-          format: uuid
-        evidenceNote:
-          type: string
-          maxLength: 2000
-          minLength: 0
-        idempotencyKey:
-          type: string
-          description: Client key; repeating it returns the first result
-          maxLength: 100
-          minLength: 0
-        optionKey:
-          type: string
-          maxLength: 80
-          minLength: 0
-        proposalId:
-          type: string
-          format: uuid
-        remainingNeed:
-          $ref: "#/components/schemas/RemainingNeedDecision"
-          description: Required when the option is below the request
-        remnantAcknowledged:
-          type: boolean
-          description: The recorder confirmed the single-piece remnant warning (SOI
-            A01)
-      required:
-      - optionKey
-      - proposalId
     RecordStockUnitCutRequest:
       type: object
       properties:
@@ -82282,11 +82947,19 @@ components:
           minLength: 0
       required:
       - reason
-    RemainingNeedDecision:
-      type: string
-      enum:
-      - REDUCED_BY_CUSTOMER
-      - REMAINS_OPEN
+    RemoveAppliedStockSelectionRequest:
+      type: object
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type: string
+          format: uuid
+      required:
+      - expectedVersion
+      - operationId
     ReopenFinancialPeriodResponse:
       type: object
       properties:
@@ -84915,6 +85588,11 @@ components:
     SalesOrderLineRequest:
       type: object
       properties:
+        clientLineId:
+          type: string
+          format: uuid
+          description: Stable form line identity; required with a stock-selection
+            proof
         colorId:
           type: string
           format: uuid
@@ -84922,8 +85600,13 @@ components:
         currency:
           type: string
           description: Agreed sales currency of this line (ISO 4217)
-          example: USD
+          example: GBP
           pattern: "[A-Z]{3}"
+        customerRequestQty:
+          type: number
+          description: Customer request preserved separately when the commercial quantity
+            follows a stock choice
+          minimum: 0.001
         discountAmount:
           type: number
           description: Discount on this line in the line currency; needs a unit price
@@ -84949,6 +85632,10 @@ components:
           - YARN
           - FABRIC
           - DYE_FINISHING
+        previewStockSelection:
+          $ref: "#/components/schemas/DraftStockSelectionProof"
+          description: Unapplied preview selection to release after successful order
+            creation; never applied automatically
         productDesc:
           type: string
           description: Optional line note; never a substitute for the product
@@ -84961,6 +85648,8 @@ components:
           description: Customer-requested delivery date of this distribution
         requestedQty:
           type: number
+          description: "Commercial line quantity; after Apply this equals the chosen\
+            \ stock quantity, while customerRequestQty retains the request"
           minimum: 0.001
         requirementProfile:
           $ref: "#/components/schemas/RequirementProfileInput"
@@ -84972,6 +85661,15 @@ components:
         singleLotRequired:
           type: boolean
           description: The customer requires this distribution from a single dye lot
+        sourceQuoteLineId:
+          type: string
+          format: uuid
+          description: Explicit source line when this order converts an approved quote;
+            never inferred by product
+        stockSelection:
+          $ref: "#/components/schemas/DraftStockSelectionProof"
+          description: Applied provisional selection to transfer atomically when the
+            order is created
         taxAmount:
           type: number
           description: Tax on this line in the line currency; needs a unit price
@@ -85008,6 +85706,9 @@ components:
           format: uuid
         currency:
           type: string
+        customerRequestQty:
+          type: number
+          description: Current customer request before applying whole-roll stock
         discountAmount:
           type: number
           description: Discount on this line in the line currency
@@ -85877,6 +86578,8 @@ components:
       - COMPATIBILITY_CONFIRMATION_REQUIRED
       - SINGLE_LOT_REQUIRED
       - HELD_BY_ANOTHER_QUOTE
+      - HELD_BY_ANOTHER_ORDER
+      - HELD_BY_ANOTHER_DRAFT
       - HOLD_UNVERIFIED
     StockProposalCoverage:
       type: object
@@ -85921,6 +86624,13 @@ components:
       enum:
       - PIECE_HOLD
       - LOT_INTENT
+    StockProposalOwnerType:
+      type: string
+      enum:
+      - QUOTE
+      - SALES_ORDER
+      - DRAFT
+      - UNKNOWN
     StockProposalPlacement:
       type: string
       enum:
