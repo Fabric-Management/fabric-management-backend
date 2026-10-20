@@ -1,5 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
+import com.fabricmanagement.common.infrastructure.bootstrap.FabricStockDemoPlan.Fabric;
+import com.fabricmanagement.common.infrastructure.bootstrap.FabricStockDemoPlan.Lot;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.product.color.app.ColorService;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
@@ -8,6 +10,15 @@ import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductDto;
 import com.fabricmanagement.product.core.dto.UpdateProductSalesDefinitionRequest;
+import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
+import com.fabricmanagement.product.fabric.dto.FabricCompositionRequest;
+import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
+import com.fabricmanagement.product.fabric.dto.FabricKnittedDto;
+import com.fabricmanagement.product.fabric.dto.FabricWovenDto;
+import com.fabricmanagement.product.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.product.fiber.dto.FiberCatalogReferenceDto;
 import com.fabricmanagement.product.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.core.batch.app.BatchService;
 import com.fabricmanagement.production.core.batch.app.LotEvidenceService;
@@ -24,8 +35,12 @@ import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -34,25 +49,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Named, coloured fabric examples installed inside the trusted sales playground seed transaction.
- * Product width options and synthetic lot measurements are separate records; a name is never parsed
- * as measurement evidence. No startup, login, reset or ordinary tenant invokes this helper.
+ * What is stocked (fabrics, colours, widths, lots and the length of every roll) is the data in
+ * {@link FabricStockDemoPlan}; this class only writes it. Product width options and synthetic lot
+ * measurements are separate records; a name is never parsed as measurement evidence. No startup,
+ * login, reset or ordinary tenant invokes this helper.
  */
 @Component
 @RequiredArgsConstructor
 public class FabricStockDemoSeeder {
 
-  record Fabric(String code, String name, String colour, int gsm, String price) {}
-
-  static final List<Fabric> FABRICS =
-      List.of(
-          new Fabric("P1454", "PM-1454 Cotton Poplin 120gsm (demo)", "NAVY-01", 120, "8.60"),
-          new Fabric("P1455", "PM-1455 Cotton Twill 220gsm (demo)", "CHAR-03", 220, "9.20"),
-          new Fabric("P1456", "PM-1456 Cotton Satin 160gsm (demo)", "ECRU-02", 160, "11.40"),
-          new Fabric("P1457", "PM-1457 Linen Blend 180gsm (demo)", "RUST-04", 180, "12.80"),
-          new Fabric("P1458", "PM-1458 Single Jersey 180gsm (demo)", "IND-05", 180, "6.75"));
+  /** The finished widths every demo fabric is offered in. */
   static final List<Integer> WIDTHS_CM = List.of(150, 160);
+
   static final String MEASUREMENT_NOTE =
       "Playground example: synthetic finished-width measurement, not a real inspection.";
+
+  /** Rolls shorter than this were cut where a fabric fault was removed, not left as a remainder. */
+  private static final int CUT_ROLL_BELOW_M = 90;
 
   private final ProductFacade products;
   private final SalesProductService catalogue;
@@ -62,6 +75,8 @@ public class FabricStockDemoSeeder {
   private final BatchService batches;
   private final LotEvidenceService evidence;
   private final StockUnitService pieces;
+  private final FabricFacade fabrics;
+  private final FiberFacade fibres;
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void seedFor(UUID tenantId) {
@@ -69,45 +84,30 @@ public class FabricStockDemoSeeder {
       throw new IllegalArgumentException("Fabric fixtures require their own tenant context");
     }
     UUID grade = grades.findByCode(ProductType.FABRIC, "1ST").getId();
-    for (Fabric fabric : FABRICS) {
-      UUID colour =
-          colours.list(true).stream()
-              .filter(card -> fabric.colour().equals(card.getCode()))
-              .findFirst()
-              .orElseThrow(
-                  () -> new IllegalStateException("Demo colour missing: " + fabric.colour()))
-              .getId();
+    Map<String, UUID> colourIds = colourIds();
+    for (Fabric fabric : FabricStockDemoPlan.FABRICS) {
       ProductDto product = product(fabric);
+      ensureArticle(fabric, product);
       ensureWidths(product.getId(), WIDTHS_CM);
-      for (int width : WIDTHS_CM) {
-        BatchDto main =
-            lot(
-                fabric,
-                product,
-                colour,
-                grade,
-                width,
-                "A",
-                java.util.Collections.nCopies(12, "125"));
-        BatchDto remnant =
-            lot(fabric, product, colour, grade, width, "R", List.of("95", "95", "100"));
-        List<UUID> ids = List.of(main.getId(), remnant.getId());
-        if (evidence.compatibilityFor(main.getId()).stream()
-            .noneMatch(
-                confirmation ->
-                    confirmation.customerId() == null
-                        && confirmation.batchIds().containsAll(ids))) {
-          evidence.confirmCompatibility(
-              new LotEvidenceDtos.ConfirmCompatibilityRequest(
-                  ids,
-                  null,
-                  "Synthetic playground example: the two lots at "
-                      + width
-                      + " cm may be combined."));
+      Map<String, List<UUID>> combinable = new LinkedHashMap<>();
+      for (Lot lot : fabric.lots()) {
+        BatchDto batch = lot(fabric, product, colourIds, grade, lot);
+        if (lot.mixable()) {
+          String group = lot.colour() + " at " + lot.widthCm() + " cm";
+          combinable.computeIfAbsent(group, key -> new ArrayList<>()).add(batch.getId());
         }
       }
+      combinable.forEach(this::confirmCombinable);
     }
     legacyGabardineWidth();
+  }
+
+  private Map<String, UUID> colourIds() {
+    Map<String, UUID> ids = new HashMap<>();
+    for (var card : colours.list(true)) {
+      ids.putIfAbsent(card.getCode(), card.getId());
+    }
+    return ids;
   }
 
   private ProductDto product(Fabric fabric) {
@@ -123,6 +123,8 @@ public class FabricStockDemoSeeder {
                       CreateProductRequest.builder()
                           .productType(ProductType.FABRIC)
                           .unit("M")
+                          .name(fabric.name())
+                          .description(fabric.description())
                           .build());
               catalogue.createEntry(
                   new CreateSalesProductRequest(
@@ -139,6 +141,88 @@ public class FabricStockDemoSeeder {
                       null));
               return created;
             });
+  }
+
+  /**
+   * Gives the demo fabric its master data (FABRIC-1): construction, gramme weight, roll length and
+   * woven or knitted design values. It is active when its construction exists for the tenant;
+   * without one it stays a draft rather than failing the playground.
+   */
+  private void ensureArticle(Fabric fabric, ProductDto product) {
+    Optional<FabricConstructionDto> construction = fabrics.findConstruction(fabric.construction());
+    Optional<List<FabricCompositionRequest>> composition =
+        composition(COMPOSITION.getOrDefault(fabric.code(), COTTON));
+    FabricArticleRequest request =
+        new FabricArticleRequest(
+            fabric.name(),
+            fabric.description(),
+            fabric.formation(),
+            "PM-" + fabric.code().substring(1),
+            construction.map(FabricConstructionDto::id).orElse(null),
+            BigDecimal.valueOf(fabric.gsm()),
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
+            ARTICLE_NOTE,
+            fabric.formation() == FabricFormation.WOVEN ? WOVEN.get(fabric.code()) : null,
+            fabric.formation() == FabricFormation.KNITTED ? KNITTED.get(fabric.code()) : null,
+            null,
+            composition.orElse(null));
+    fabrics.ensureArticle(
+        product.getId(), request, construction.isPresent() && composition.isPresent());
+  }
+
+  /** Label compositions by ISO code; a demo fabric not listed is 100% cotton. */
+  private static final Map<String, String> COTTON = Map.of("CO", "100");
+
+  private static final Map<String, Map<String, String>> COMPOSITION =
+      Map.of("P1457", orderedComposition("LI", "55", "CO", "45"));
+
+  private static Map<String, String> orderedComposition(String... isoAndPercent) {
+    Map<String, String> lines = new LinkedHashMap<>();
+    for (int index = 0; index < isoAndPercent.length; index += 2) {
+      lines.put(isoAndPercent[index], isoAndPercent[index + 1]);
+    }
+    return lines;
+  }
+
+  /**
+   * The composition as canonical shared fibres; empty when one of them is missing, so the fabric
+   * stays a draft rather than carrying a wrong label.
+   */
+  private Optional<List<FabricCompositionRequest>> composition(Map<String, String> byIso) {
+    List<FabricCompositionRequest> lines = new ArrayList<>();
+    for (Map.Entry<String, String> line : byIso.entrySet()) {
+      Optional<FiberCatalogReferenceDto> fibre = fibres.findCanonicalByIsoCode(line.getKey());
+      if (fibre.isEmpty()) return Optional.empty();
+      lines.add(
+          new FabricCompositionRequest(fibre.get().fiberId(), new BigDecimal(line.getValue())));
+    }
+    return Optional.of(lines);
+  }
+
+  /** Illustrative woven design values: ends and picks per centimetre and the weave notation. */
+  private static final Map<String, FabricWovenDto> WOVEN =
+      Map.of(
+          "P1454", woven("52.0", "28.0", "1/1"),
+          "P1455", woven("42.0", "24.0", "2/1 Z"),
+          "P1456", woven("60.0", "34.0", "4/1"),
+          "P1457", woven("22.0", "20.0", "1/1"));
+
+  /** Illustrative knitting values: 28 gauge, 30 inch machine, 2.75 mm stitch, 90 feeders. */
+  private static final Map<String, FabricKnittedDto> KNITTED =
+      Map.of(
+          "P1458",
+          new FabricKnittedDto(
+              28, new BigDecimal("30.0"), null, null, new BigDecimal("2.750"), 90));
+
+  static final String ARTICLE_NOTE =
+      "Playground example: illustrative design values, not a real fabric specification.";
+
+  private static FabricWovenDto woven(String ends, String picks, String weave) {
+    return new FabricWovenDto(new BigDecimal(ends), new BigDecimal(picks), null, weave);
   }
 
   private void ensureWidths(UUID productId, List<Integer> required) {
@@ -168,19 +252,16 @@ public class FabricStockDemoSeeder {
     }
   }
 
+  /** One dye lot with its rolls, released from QC; an existing lot is left as it is. */
   private BatchDto lot(
-      Fabric fabric,
-      ProductDto product,
-      UUID colour,
-      UUID grade,
-      int width,
-      String suffix,
-      List<String> lengths) {
-    String code = "PG-FAB-" + fabric.code() + "-" + width + "-" + suffix;
+      Fabric fabric, ProductDto product, Map<String, UUID> colourIds, UUID grade, Lot lot) {
+    UUID colour = colourIds.get(lot.colour());
+    if (colour == null) {
+      throw new IllegalStateException("Demo colour missing: " + lot.colour());
+    }
+    String code = FabricStockDemoPlan.lotCode(fabric, lot);
     var existing = batches.findByBatchCode(code);
     if (existing.isPresent()) return existing.get();
-    BigDecimal total =
-        lengths.stream().map(BigDecimal::new).reduce(BigDecimal.ZERO, BigDecimal::add);
     BatchDto batch =
         batches.create(
             CreateBatchRequest.builder()
@@ -188,22 +269,17 @@ public class FabricStockDemoSeeder {
                 .productType(ProductType.FABRIC)
                 .colorId(colour)
                 .batchCode(code)
-                .quantity(total)
+                .quantity(lot.metresDecimal())
                 .unit("M")
                 .sourceType(BatchSourceType.INITIAL_STOCK)
-                .remarks("Illustrative playground stock; " + width + " cm finished width.")
+                .remarks(remarks(lot))
                 .build());
     evidence.recordFinishedWidth(
         batch.getId(),
         new LotEvidenceDtos.RecordFinishedWidthRequest(
-            BigDecimal.valueOf(width), "CM", MEASUREMENT_NOTE));
-    for (int index = 0; index < lengths.size(); index++) {
-      BigDecimal length = new BigDecimal(lengths.get(index));
-      BigDecimal weight =
-          length
-              .multiply(BigDecimal.valueOf(width))
-              .multiply(BigDecimal.valueOf(fabric.gsm()))
-              .divide(new BigDecimal("100000"), 3, RoundingMode.HALF_UP);
+            BigDecimal.valueOf(lot.widthCm()), "CM", MEASUREMENT_NOTE));
+    for (int index = 0; index < lot.rolls().size(); index++) {
+      BigDecimal length = BigDecimal.valueOf(lot.rolls().get(index));
       var piece =
           pieces.create(
               batch.getId(),
@@ -211,7 +287,7 @@ public class FabricStockDemoSeeder {
               code + "-" + String.format("%02d", index + 1),
               null,
               PackageType.ROLL,
-              weight,
+              weightKg(length, lot.widthCm(), fabric.gsm()),
               null,
               "KG",
               length,
@@ -225,7 +301,57 @@ public class FabricStockDemoSeeder {
     return batch;
   }
 
-  /** Existing fictional Gabardine lots also need explicit width records, beyond their name. */
+  /** Roll weight in kg: metres x width in cm x gsm, as 1 m x 1 cm of 1 gsm weighs 0.00001 kg. */
+  static BigDecimal weightKg(BigDecimal lengthM, int widthCm, int gsm) {
+    return lengthM
+        .multiply(BigDecimal.valueOf(widthCm))
+        .multiply(BigDecimal.valueOf(gsm))
+        .divide(new BigDecimal("100000"), 3, RoundingMode.HALF_UP);
+  }
+
+  private static String remarks(Lot lot) {
+    long remainders =
+        lot.rolls().stream()
+            .filter(length -> length != FabricStockDemoPlan.ROLL_M && length >= CUT_ROLL_BELOW_M)
+            .count();
+    StringBuilder text =
+        new StringBuilder("Illustrative playground stock; ")
+            .append(lot.widthCm())
+            .append(" cm finished width; ")
+            .append(lot.rolls().size())
+            .append(" rolls.");
+    if (remainders > 0) {
+      text.append(" Includes the end-of-lot remainder left after winding ")
+          .append(FabricStockDemoPlan.ROLL_M)
+          .append(" m rolls.");
+    }
+    if (lot.cutRolls() > 0) {
+      text.append(" Includes a roll cut short where a fabric fault was removed in production.");
+    }
+    if (!lot.mixable()) {
+      text.append(" Shade not yet confirmed against the other lots of this colour.");
+    }
+    return text.toString();
+  }
+
+  /** Lots of one colour and width that may be shipped together, confirmed for every customer. */
+  private void confirmCombinable(String group, List<UUID> ids) {
+    if (ids.size() < 2) return;
+    if (evidence.compatibilityFor(ids.getFirst()).stream()
+        .anyMatch(
+            confirmation ->
+                confirmation.customerId() == null && confirmation.batchIds().containsAll(ids))) {
+      return;
+    }
+    evidence.confirmCompatibility(
+        new LotEvidenceDtos.ConfirmCompatibilityRequest(
+            ids, null, "Synthetic playground example: the lots of " + group + " may be combined."));
+  }
+
+  /**
+   * The fictional Gabardine gets its fabric article, and its existing lots explicit width records
+   * beyond their name.
+   */
   private void legacyGabardineWidth() {
     var gabardine =
         catalogue.getActiveCatalogForModule("FABRIC").stream()
@@ -234,6 +360,28 @@ public class FabricStockDemoSeeder {
             .findFirst();
     if (gabardine.isEmpty()) return;
     SalesProductDto entry = gabardine.get();
+    Optional<FabricConstructionDto> construction = fabrics.findConstruction("GABARDINE");
+    Optional<List<FabricCompositionRequest>> composition = composition(COTTON);
+    fabrics.ensureArticle(
+        entry.getProductId(),
+        new FabricArticleRequest(
+            SalesQuoteDemoSeeder.PRODUCT_GABARDINE,
+            SalesQuoteDemoSeeder.PRODUCT_DESCRIPTIONS.get(SalesQuoteDemoSeeder.PRODUCT_GABARDINE),
+            FabricFormation.WOVEN,
+            "PM-1453",
+            construction.map(FabricConstructionDto::id).orElse(null),
+            new BigDecimal("190"),
+            null,
+            new BigDecimal("155"),
+            null,
+            null,
+            BigDecimal.valueOf(FabricStockDemoPlan.ROLL_M),
+            ARTICLE_NOTE,
+            woven("40.0", "24.0", "2/1"),
+            null,
+            null,
+            composition.orElse(null)),
+        construction.isPresent() && composition.isPresent());
     ensureWidths(entry.getProductId(), List.of(155));
     for (String code : List.of("LOT-24011", "LOT-24012", "LOT-23087", "LOT-24020", "LOT-23050")) {
       batches

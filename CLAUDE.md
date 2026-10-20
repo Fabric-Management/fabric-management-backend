@@ -1,5 +1,7 @@
 # Fabric Management Backend Developer Guide
 
+> **READ FIRST:** FabricOS is a UK product — all sample/seed/test data is British, no Turkish names, British English first and Turkish second. Full rule at the top of `../AGENTS.md`.
+
 ## Build & Run Commands
 - Build project (skip tests): `./mvnw clean install -DskipTests`
 - Run local application: `./mvnw spring-boot:run`

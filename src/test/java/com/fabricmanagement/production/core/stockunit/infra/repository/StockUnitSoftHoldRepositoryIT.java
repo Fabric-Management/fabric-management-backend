@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.core.stockunit.infra.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -73,7 +74,6 @@ class StockUnitSoftHoldRepositoryIT extends AbstractIntegrationTest {
     UUID lineY = UUID.randomUUID();
 
     hold(tenantA, lineX, a1);
-    hold(tenantA, lineY, a1); // one piece, two quote lines: both holds are returned
     hold(tenantA, lineX, b1);
     StockUnitSoftHold released = StockUnitSoftHold.place(tenantA, lineX, a2.getId());
     released.release(Instant.parse("2026-10-06T12:00:00Z"));
@@ -92,9 +92,22 @@ class StockUnitSoftHoldRepositoryIT extends AbstractIntegrationTest {
         .extracting(
             HeldPieceRow::getStockUnitId, HeldPieceRow::getBatchId, HeldPieceRow::getQuoteLineId)
         .containsExactlyInAnyOrder(
-            tuple(a1.getId(), lotA.getId(), lineX),
-            tuple(a1.getId(), lotA.getId(), lineY),
-            tuple(b1.getId(), lotB.getId(), lineX));
+            tuple(a1.getId(), lotA.getId(), lineX), tuple(b1.getId(), lotB.getId(), lineX));
+  }
+
+  @Test
+  void theDatabaseRejectsTwoActivePermanentOwnersOfTheSamePhysicalRoll() {
+    var product = product(tenantA);
+    var lot = batch(product, "LOT-EXCLUSIVE", tenantA);
+    var roll = piece(lot, "ROLL-EXCLUSIVE", tenantA, true);
+    hold(tenantA, UUID.randomUUID(), roll);
+    repository.flush();
+    assertThatThrownBy(
+            () ->
+                repository.saveAndFlush(
+                    StockUnitSoftHold.forOrder(
+                        tenantA, UUID.randomUUID(), UUID.randomUUID(), roll.getId())))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
   }
 
   @Test

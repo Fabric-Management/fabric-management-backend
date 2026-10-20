@@ -28,6 +28,9 @@ public class SalesOrderLineResponse {
   @Schema(description = "Quantity first requested by the customer (immutable)")
   BigDecimal initialRequestedQty;
 
+  @Schema(description = "Current customer request before applying whole-roll stock")
+  BigDecimal customerRequestQty;
+
   boolean singleLotRequired;
 
   @Schema(

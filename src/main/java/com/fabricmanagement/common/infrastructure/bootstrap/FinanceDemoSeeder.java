@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Seeds a coherent finance dataset (DEMO-1) on top of {@link DemoTransactionSeeder}: sets the demo
- * tenant's reporting currency to USD, seeds USD↔TRY / USD↔EUR exchange rates, and creates a spread
+ * tenant's reporting currency to USD, seeds USD↔GBP / USD↔EUR exchange rates, and creates a spread
  * of SALES (AR) and PURCHASE (AP) invoices — issued + sent — plus partial/full payments. This makes
  * the real backend compute real numbers for every finance-insights view (DSO/DPO/working-capital,
  * receivables/payables aging, cash-flow, FX-exposure, revenue trends) instead of leaving them
@@ -51,12 +51,12 @@ public class FinanceDemoSeeder {
 
   static final String REPORTING_CURRENCY = "USD";
 
-  // Demo trading partners (idempotency anchor = CUSTOMER_ANADOLU).
+  // Demo trading partners (idempotency anchor = CUSTOMER_CALEDONIAN).
   static final String CUSTOMER_GLOBAL =
       "Global Fashion Wear Corp."; // created by DemoTransactionSeeder
-  static final String CUSTOMER_ANADOLU = "Anadolu Tekstil A.Ş.";
+  static final String CUSTOMER_CALEDONIAN = "Caledonian Outfitters Ltd";
   static final String CUSTOMER_EUROPA = "Europa Mode GmbH";
-  static final String SUPPLIER_EGE = "Ege Pamuk Kooperatifi";
+  static final String SUPPLIER_HUMBER = "Humber Cotton Merchants Ltd";
   static final String SUPPLIER_YARN = "Yarn Source Ltd.";
   static final String SUPPLIER_DYE = "Dye & Chem BV";
 
@@ -68,7 +68,7 @@ public class FinanceDemoSeeder {
    * {@link com.fabricmanagement.common.infrastructure.persistence.TenantContext}.
    */
   public void seedFor(UUID tenantId) {
-    if (!tradingPartnerService.searchByName(tenantId, CUSTOMER_ANADOLU).isEmpty()) {
+    if (!tradingPartnerService.searchByName(tenantId, CUSTOMER_CALEDONIAN).isEmpty()) {
       log.info("Finance demo data already exists for tenant: {}. Skipping.", tenantId);
       return;
     }
@@ -83,31 +83,33 @@ public class FinanceDemoSeeder {
     // Trading partners (reuse the customer created by DemoTransactionSeeder).
     UUID cGlobal =
         ensurePartner(tenantId, CUSTOMER_GLOBAL, "US-GFW-DEMO", "USA", PartnerType.CUSTOMER);
-    UUID cAnadolu =
-        ensurePartner(tenantId, CUSTOMER_ANADOLU, "TR-ANA-DEMO", "TUR", PartnerType.CUSTOMER);
+    UUID cCaledonian =
+        ensurePartner(tenantId, CUSTOMER_CALEDONIAN, "GB-CAL-DEMO", "GBR", PartnerType.CUSTOMER);
     UUID cEuropa =
         ensurePartner(tenantId, CUSTOMER_EUROPA, "DE-EUR-DEMO", "DEU", PartnerType.CUSTOMER);
-    UUID sEge = ensurePartner(tenantId, SUPPLIER_EGE, "TR-EGE-DEMO", "TUR", PartnerType.SUPPLIER);
+    UUID sHumber =
+        ensurePartner(tenantId, SUPPLIER_HUMBER, "GB-HCM-DEMO", "GBR", PartnerType.SUPPLIER);
     UUID sYarn = ensurePartner(tenantId, SUPPLIER_YARN, "US-YRN-DEMO", "USA", PartnerType.SUPPLIER);
     UUID sDye = ensurePartner(tenantId, SUPPLIER_DYE, "NL-DYE-DEMO", "NLD", PartnerType.SUPPLIER);
 
     // ── SALES invoices (AR) — drive DSO, AR aging, cash-flow inflows, revenue trend, FX ──
     InvoiceDto s1 =
-        issuedInvoice(cAnadolu, "SALES", "TRY", today.plusDays(-75), today.plusDays(-45), "850000");
+        issuedInvoice(
+            cCaledonian, "SALES", "GBP", today.plusDays(-75), today.plusDays(-45), "17500");
     issuedInvoice(cGlobal, "SALES", "USD", today.plusDays(-55), today.plusDays(-25), "45000");
     issuedInvoice(cEuropa, "SALES", "EUR", today.plusDays(-30), today.plusDays(5), "60000");
-    issuedInvoice(cAnadolu, "SALES", "TRY", today.plusDays(-10), today.plusDays(20), "320000");
+    issuedInvoice(cCaledonian, "SALES", "GBP", today.plusDays(-10), today.plusDays(20), "6600");
 
     // ── PURCHASE invoices (AP) — drive DPO, AP aging, cash-flow outflows, FX ──
     InvoiceDto p1 =
-        issuedInvoice(sEge, "PURCHASE", "TRY", today.plusDays(-70), today.plusDays(-40), "300000");
+        issuedInvoice(sHumber, "PURCHASE", "GBP", today.plusDays(-70), today.plusDays(-40), "6200");
     issuedInvoice(sYarn, "PURCHASE", "USD", today.plusDays(-45), today.plusDays(-15), "28000");
     InvoiceDto p3 =
         issuedInvoice(sDye, "PURCHASE", "EUR", today.plusDays(-20), today.plusDays(10), "15000");
 
     // ── Payments — partial (S1, P3) + full (P1); same currency as the invoice ──
-    pay(cAnadolu, "INBOUND", "TRY", "400000", today.plusDays(-40), s1.id());
-    pay(sEge, "OUTBOUND", "TRY", "300000", today.plusDays(-38), p1.id());
+    pay(cCaledonian, "INBOUND", "GBP", "8300", today.plusDays(-40), s1.id());
+    pay(sHumber, "OUTBOUND", "GBP", "6200", today.plusDays(-38), p1.id());
     pay(sDye, "OUTBOUND", "EUR", "8000", today.plusDays(-5), p3.id());
 
     log.info("Successfully provisioned finance demo data for tenant: {}", tenantId);
@@ -132,9 +134,9 @@ public class FinanceDemoSeeder {
     LocalDate today = LocalDate.now(clock);
     for (int offset : FX_OFFSETS) {
       LocalDate date = today.plusDays(offset);
-      // saveRate also stores the reverse direction (e.g. TRY→USD), which is what valuation needs.
+      // saveRate also stores the reverse direction (e.g. GBP→USD), which is what valuation needs.
       exchangeRateService.saveRate(
-          REPORTING_CURRENCY, "TRY", new BigDecimal("38.00"), date, ExchangeRateSource.MANUAL);
+          REPORTING_CURRENCY, "GBP", new BigDecimal("0.79"), date, ExchangeRateSource.MANUAL);
       exchangeRateService.saveRate(
           REPORTING_CURRENCY, "EUR", new BigDecimal("0.92"), date, ExchangeRateSource.MANUAL);
     }

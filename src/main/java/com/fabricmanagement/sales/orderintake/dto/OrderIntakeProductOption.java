@@ -13,6 +13,11 @@ public record OrderIntakeProductOption(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID productId,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String uid,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String displayName,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            description = "What the product is, written by the tenant; null when not described")
+        String description,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ProductType productType,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String baseUnit,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> allowedUnits,

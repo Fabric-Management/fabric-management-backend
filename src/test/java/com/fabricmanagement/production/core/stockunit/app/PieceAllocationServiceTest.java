@@ -72,7 +72,9 @@ class PieceAllocationServiceTest {
             allocationRepository,
             cutRepository,
             new BatchPrimaryMeasureService(),
-            Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC),
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort.class));
     lot =
         Batch.builder()
             .productType(ProductType.FABRIC)

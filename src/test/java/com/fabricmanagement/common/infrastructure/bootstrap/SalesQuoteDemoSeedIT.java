@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.product.core.domain.ProductType;
+import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeAvailabilityService;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeProductSearchService;
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeStockPreviewService;
@@ -180,7 +181,7 @@ class SalesQuoteDemoSeedIT {
                 "CUSTOMER|NAVY-01|ALB-NVY-26|true",
                 "CUSTOMER|NAVY-01|SS26-NAVY|false",
                 "CUSTOMER|ECRU-02|ALB-ECR-26|true",
-                "SUPPLIER|IND-05|AYM-IND-2201|true"));
+                "SUPPLIER|IND-05|PYM-IND-2201|true"));
 
     // Stock: fabric lots are booked in metres and the coloured yarn lot exists.
     assertThat(
@@ -207,6 +208,7 @@ class SalesQuoteDemoSeedIT {
     assertThat(indigo.availableQuantity()).isEqualByComparingTo("600");
 
     assertFabricWidthExamples(tenant);
+    assertFabricArticles(tenant);
 
     // Replay: same colours, lots, pieces, partner codes, quotes and reservations.
     Map<String, Long> before = counts(tenant);
@@ -232,59 +234,185 @@ class SalesQuoteDemoSeedIT {
   }
 
   private void assertFabricWidthExamples(UUID tenant) {
-    for (var fabric : FabricStockDemoSeeder.FABRICS) {
+    for (var fabric : FabricStockDemoPlan.FABRICS) {
       var options =
           TenantContext.executeInTenantContext(
               tenant, () -> productSearch.search(null, ProductType.FABRIC, fabric.name()));
       assertThat(options).hasSize(1);
       var product = options.getFirst();
       assertThat(product.displayName()).isEqualTo(fabric.name());
+      assertThat(product.description()).isEqualTo(fabric.description());
       assertThat(product.listPrice()).isEqualByComparingTo(fabric.price());
       assertThat(product.finishedWidths())
           .extracting(width -> width.value())
           .containsExactly(new BigDecimal("150.00"), new BigDecimal("160.00"));
-      UUID colour =
-          jdbc.queryForObject(
-              "SELECT id FROM production.color WHERE tenant_id = ? AND code = ?",
-              UUID.class,
-              tenant,
-              fabric.colour());
-      for (int width : FabricStockDemoSeeder.WIDTHS_CM) {
-        var preview =
-            TenantContext.executeInTenantContext(
+      for (String colourCode :
+          fabric.lots().stream().map(FabricStockDemoPlan.Lot::colour).distinct().toList()) {
+        UUID colour =
+            jdbc.queryForObject(
+                "SELECT id FROM production.color WHERE tenant_id = ? AND code = ?",
+                UUID.class,
                 tenant,
-                () ->
-                    stockPreview.preview(
-                        new OrderIntakeStockPreviewRequest(
-                            product.productId(),
-                            colour,
-                            BigDecimal.valueOf(width),
-                            "CM",
-                            null,
-                            new BigDecimal("700"),
-                            "M",
-                            false,
-                            new BigDecimal("5"),
-                            new BigDecimal("5"),
-                            null),
-                        SystemUser.ID));
-        assertThat(preview.lots())
-            .hasSize(2)
-            .allSatisfy(lot -> assertThat(lot.lotNo()).contains("-" + width + "-"));
-        assertThat(preview.totals().free().canonical()).isEqualByComparingTo("1790");
-        assertThat(preview.evaluation().unknownPieces()).isZero();
-        assertThat(preview.evaluation().options())
-            .extracting(option -> option.quantity())
-            .usingElementComparator(BigDecimal::compareTo)
-            .containsExactly(new BigDecimal("790"), new BigDecimal("665"));
+                colourCode);
+        for (int width : FabricStockDemoSeeder.WIDTHS_CM) {
+          assertColourWidthStock(tenant, fabric, product.productId(), colourCode, colour, width);
+        }
       }
     }
+    assertRollsAndLots(tenant);
+  }
+
+  /**
+   * FABRIC-1: a new playground gets the construction dictionary from the template, and every demo
+   * fabric (and the Gabardine) is an active article with its construction and gramme weight.
+   */
+  private void assertFabricArticles(UUID tenant) {
     assertThat(
             count(
-                "SELECT count(*) FROM production.stock_unit s"
-                    + " JOIN production.production_execution_batch b ON b.id = s.batch_id"
-                    + " WHERE s.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'"
+                "SELECT count(*) FROM production.prod_fabric_construction"
+                    + " WHERE tenant_id = ? AND system_defined AND deleted_at IS NULL",
+                tenant))
+        .isEqualTo(FabricCatalogueSeeder.constructions().size());
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fabric_finishing_process"
+                    + " WHERE tenant_id = ? AND system_defined AND deleted_at IS NULL",
+                tenant))
+        .as("every tenant gets the finishing dictionary")
+        .isEqualTo(FabricCatalogueSeeder.finishingProcesses().size());
+    Map<String, String> constructionByArticle = new HashMap<>();
+    for (var row :
+        jdbc.queryForList(
+            "SELECT a.article_code, a.status, a.formation, c.code AS construction, a.gsm_finished,"
+                + " p.name AS product_name FROM production.prod_fabric_article a"
+                + " JOIN production.prod_product p ON p.id = a.product_id"
+                + " LEFT JOIN production.prod_fabric_construction c ON c.id = a.construction_id"
+                + " WHERE a.tenant_id = ? AND a.deleted_at IS NULL",
+            tenant)) {
+      assertThat(row.get("status")).as("%s", row.get("article_code")).isEqualTo("ACTIVE");
+      constructionByArticle.put((String) row.get("article_code"), (String) row.get("construction"));
+    }
+    Map<String, String> expected = new HashMap<>();
+    for (var fabric : FabricStockDemoPlan.FABRICS) {
+      expected.put("PM-" + fabric.code().substring(1), fabric.construction());
+    }
+    expected.put("PM-1453", "GABARDINE");
+    assertThat(constructionByArticle).isEqualTo(expected);
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.prod_fabric_knitted k"
+                    + " JOIN production.prod_fabric_article a ON a.id = k.fabric_article_id"
+                    + " WHERE a.tenant_id = ? AND k.machine_gauge = 28",
+                tenant))
+        .isEqualTo(1L);
+    Map<String, String> labelByArticle = new HashMap<>();
+    for (var row :
+        jdbc.queryForList(
+            "SELECT a.article_code,"
+                + " string_agg(c.fiber_iso_code || ' ' || c.percentage::text, ', '"
+                + " ORDER BY c.percentage DESC, c.fiber_iso_code) AS label,"
+                + " sum(c.percentage) AS total"
+                + " FROM production.prod_fabric_article a"
+                + " JOIN production.prod_fabric_composition c ON c.fabric_article_id = a.id"
+                + " WHERE a.tenant_id = ? AND a.deleted_at IS NULL GROUP BY a.article_code",
+            tenant)) {
+      assertThat((BigDecimal) row.get("total"))
+          .as("%s composition", row.get("article_code"))
+          .isEqualByComparingTo("100");
+      labelByArticle.put((String) row.get("article_code"), (String) row.get("label"));
+    }
+    assertThat(labelByArticle).hasSize(expected.size());
+    assertThat(labelByArticle).containsEntry("PM-1454", "CO 100.00");
+    assertThat(labelByArticle).containsEntry("PM-1457", "LI 55.00, CO 45.00");
+  }
+
+  /** What the order form finds when it picks one fabric, one colour and one width. */
+  private void assertColourWidthStock(
+      UUID tenant,
+      FabricStockDemoPlan.Fabric fabric,
+      UUID productId,
+      String colourCode,
+      UUID colour,
+      int width) {
+    var lots = FabricStockDemoPlan.lotsOf(fabric, colourCode, width);
+    var preview =
+        TenantContext.executeInTenantContext(
+            tenant,
+            () ->
+                stockPreview.preview(
+                    new OrderIntakeStockPreviewRequest(
+                        productId,
+                        colour,
+                        BigDecimal.valueOf(width),
+                        "CM",
+                        null,
+                        new BigDecimal("700"),
+                        "M",
+                        false,
+                        new BigDecimal("5"),
+                        new BigDecimal("5"),
+                        null),
+                    SystemUser.ID));
+    String where = fabric.name() + " / " + colourCode + " / " + width + " cm";
+    if (lots.isEmpty()) {
+      assertThat(preview.lots()).as("no lot is stocked for %s", where).isEmpty();
+      return;
+    }
+    assertThat(preview.lots())
+        .as("lots found for %s", where)
+        .extracting(lot -> lot.lotNo())
+        .containsExactlyInAnyOrderElementsOf(
+            lots.stream().map(lot -> FabricStockDemoPlan.lotCode(fabric, lot)).toList());
+    BigDecimal metres =
+        lots.stream()
+            .map(FabricStockDemoPlan.Lot::metresDecimal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    assertThat(preview.totals().free().canonical())
+        .as("free metres for %s", where)
+        .isEqualByComparingTo(metres);
+    assertThat(preview.evaluation().unknownPieces()).as(where).isZero();
+  }
+
+  /** Lots and rolls as the database holds them: every roll is a stock unit with its own length. */
+  private void assertRollsAndLots(UUID tenant) {
+    var plan =
+        FabricStockDemoPlan.FABRICS.stream().flatMap(fabric -> fabric.lots().stream()).toList();
+    assertThat(plan.size()).isGreaterThanOrEqualTo(20);
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.production_execution_batch"
+                    + " WHERE tenant_id = ? AND batch_code LIKE 'PG-FAB-%'",
+                tenant))
+        .isEqualTo(plan.size());
+    long rolls = plan.stream().mapToLong(lot -> lot.rolls().size()).sum();
+    String rollsOfPlayground =
+        " FROM production.stock_unit s"
+            + " JOIN production.production_execution_batch b ON b.id = s.batch_id"
+            + " WHERE s.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'";
+    assertThat(count("SELECT count(*)" + rollsOfPlayground, tenant)).isEqualTo(rolls);
+    // The winder cuts 120 m rolls, lot ends leave 90 m and 135 m, and a fault cut leaves less.
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 120", tenant))
+        .isGreaterThan(rolls / 2);
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 90", tenant))
+        .isPositive();
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length = 135", tenant))
+        .isPositive();
+    assertThat(count("SELECT count(*)" + rollsOfPlayground + " AND s.length < 90", tenant))
+        .isPositive();
+    assertThat(
+            count(
+                "SELECT count(*)"
+                    + rollsOfPlayground
                     + " AND (s.initial_length IS NULL OR s.initial_length <> s.length)",
+                tenant))
+        .isZero();
+    // A lot's booked quantity is the sum of its rolls.
+    assertThat(
+            count(
+                "SELECT count(*) FROM production.production_execution_batch b"
+                    + " WHERE b.tenant_id = ? AND b.batch_code LIKE 'PG-FAB-%'"
+                    + " AND b.quantity <> (SELECT COALESCE(SUM(s.length), 0)"
+                    + " FROM production.stock_unit s WHERE s.batch_id = b.id)",
                 tenant))
         .isZero();
   }

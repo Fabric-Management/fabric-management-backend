@@ -97,6 +97,43 @@ public class LiveEditLeaseService {
     }
   }
 
+  /** Serialises a resource's compound business operation on the same connection as its leases. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lock(LiveResource resource) {
+    control.lockResource(TenantContext.requireTenantId(), resource);
+  }
+
+  /**
+   * Replaces one session's complete key set atomically. A refused acquisition leaves its old set
+   * intact. Consumers must not emulate this by releasing first or chunking an aggregate request.
+   */
+  @Transactional
+  public Acquisition replace(
+      LiveResource resource,
+      long generation,
+      UUID sessionId,
+      UUID userId,
+      Collection<LiveLeaseKey> keys) {
+    lock(resource);
+    if (keys.isEmpty() || keys.size() > properties.getMaxKeysPerRequest()) {
+      throw new LiveEditLeaseLimitException(
+          "The complete selection exceeds the published lease limit");
+    }
+    Acquisition outcome = acquire(resource, generation, sessionId, userId, keys);
+    if (outcome instanceof Granted granted) {
+      Set<UUID> retained =
+          granted.leases().stream().map(LiveEditLease::getToken).collect(Collectors.toSet());
+      List<UUID> removed =
+          held(resource, generation).stream()
+              .filter(lease -> lease.getSessionId().equals(sessionId))
+              .map(LiveEditLease::getToken)
+              .filter(token -> !retained.contains(token))
+              .toList();
+      release(resource, sessionId, userId, removed);
+    }
+    return outcome;
+  }
+
   // ── a session's own leases ───────────────────────────────────────────────
 
   /**

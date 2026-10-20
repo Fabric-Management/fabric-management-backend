@@ -74,7 +74,48 @@ public record OrderVersionContent(
               description = "The distribution must come from one dye lot")
           boolean singleLotRequired,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-          LineShipmentPreference shipmentPreference) {}
+          LineShipmentPreference shipmentPreference,
+      @Schema(
+              description = "Original customer request; absent on historical versions",
+              nullable = true)
+          BigDecimal requestQuantity) {
+    public Line(
+        UUID lineId,
+        String product,
+        String colour,
+        BigDecimal finishedWidth,
+        String finishedWidthUnit,
+        BigDecimal quantity,
+        String unit,
+        BigDecimal toleranceUpPct,
+        BigDecimal toleranceDownPct,
+        BigDecimal unitPrice,
+        String currency,
+        BigDecimal discount,
+        BigDecimal tax,
+        LocalDate requestedDeliveryDate,
+        boolean singleLotRequired,
+        LineShipmentPreference shipmentPreference) {
+      this(
+          lineId,
+          product,
+          colour,
+          finishedWidth,
+          finishedWidthUnit,
+          quantity,
+          unit,
+          toleranceUpPct,
+          toleranceDownPct,
+          unitPrice,
+          currency,
+          discount,
+          tax,
+          requestedDeliveryDate,
+          singleLotRequired,
+          shipmentPreference,
+          null);
+    }
+  }
 
   /** What the order amounts to in one agreed currency. */
   @Schema(name = "OrderVersionTotal")

@@ -61,7 +61,16 @@ class QuoteHoldQueryServiceTest {
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT_ID);
     service =
-        new QuoteHoldQueryService(batchRepository, intentRepository, softHoldRepository, measures);
+        new QuoteHoldQueryService(
+            batchRepository,
+            intentRepository,
+            softHoldRepository,
+            measures,
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.class),
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository
+                    .class));
   }
 
   @AfterEach

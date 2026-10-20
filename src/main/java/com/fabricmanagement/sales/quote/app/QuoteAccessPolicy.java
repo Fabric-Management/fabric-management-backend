@@ -27,6 +27,13 @@ public class QuoteAccessPolicy {
     return canAccess(tenantId, userId, quote, "write");
   }
 
+  public boolean canWrite(UUID tenantId, UUID userId, Quote quote, PermissionFreshness freshness) {
+    if (tenantId == null || userId == null || quote == null) return false;
+    return scopeResolver
+        .resolve(tenantId, userId, "write", freshness)
+        .permits(quote.getTenantId(), tenantId, principals(quote));
+  }
+
   public Specification<Quote> readRestriction(UUID tenantId, UUID userId) {
     AccessScope accessScope =
         scopeResolver.resolve(tenantId, userId, "read", PermissionFreshness.CACHED);

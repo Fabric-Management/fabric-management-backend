@@ -45,6 +45,19 @@ public class OrderIntakeAccess {
     return order;
   }
 
+  /** Stock ownership commands re-check the actor's current object scope, not cached grants. */
+  public SalesOrder writableOrderFresh(UUID orderId, UUID actor) {
+    SalesOrder order = readableOrder(orderId, actor);
+    if (!accessPolicy.canWrite(
+        TenantContext.requireTenantId(),
+        actor,
+        order,
+        SalesOrderAccessPolicy.PermissionFreshness.FRESH)) {
+      throw new AccessDeniedException("You do not have access to update this sales order.");
+    }
+    return order;
+  }
+
   /**
    * After the order row was locked and reloaded: an order deactivated meanwhile is reported like a
    * missing one.

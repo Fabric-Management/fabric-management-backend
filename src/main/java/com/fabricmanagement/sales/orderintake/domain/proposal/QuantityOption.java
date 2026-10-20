@@ -156,6 +156,8 @@ public record QuantityOption(
     SINGLE_LOT_REQUIRED,
     /** Another quote holds pieces or quantity the option takes; it must be released first. */
     HELD_BY_ANOTHER_QUOTE,
+    HELD_BY_ANOTHER_ORDER,
+    HELD_BY_ANOTHER_DRAFT,
     /** A hold record whose quote intent cannot be verified covers pieces the option takes. */
     HOLD_UNVERIFIED
   }
@@ -259,6 +261,14 @@ public record QuantityOption(
     }
   }
 
+  @Schema(name = "StockProposalOwnerType", enumAsRef = true)
+  public enum StockOwnerType {
+    QUOTE,
+    SALES_ORDER,
+    DRAFT,
+    UNKNOWN
+  }
+
   /** What kind of hold an option would take from another quote. */
   @Schema(name = "StockProposalHeldStockKind", enumAsRef = true)
   public enum HeldStockKind {
@@ -285,9 +295,38 @@ public record QuantityOption(
       LocalDate expiresAt,
       List<UUID> pieceIds,
       BigDecimal quantity,
-      String unit) {
+      String unit,
+      StockOwnerType ownerType) {
+    public HeldStock(
+        UUID batchId,
+        String lotNo,
+        HeldStockKind kind,
+        boolean verified,
+        UUID quoteId,
+        String quoteNumber,
+        String marketerName,
+        LocalDate expiresAt,
+        List<UUID> pieceIds,
+        BigDecimal quantity,
+        String unit) {
+      this(
+          batchId,
+          lotNo,
+          kind,
+          verified,
+          quoteId,
+          quoteNumber,
+          marketerName,
+          expiresAt,
+          pieceIds,
+          quantity,
+          unit,
+          verified ? StockOwnerType.QUOTE : StockOwnerType.UNKNOWN);
+    }
 
     public HeldStock {
+      ownerType =
+          ownerType == null ? verified ? StockOwnerType.QUOTE : StockOwnerType.UNKNOWN : ownerType;
       pieceIds = pieceIds == null ? List.of() : List.copyOf(pieceIds);
     }
   }

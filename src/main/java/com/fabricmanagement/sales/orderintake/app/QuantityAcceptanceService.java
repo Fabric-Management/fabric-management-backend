@@ -32,10 +32,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Records which whole-piece option a line takes and, when it differs from the request, the
- * customer's acceptance (SOI D3, K08, A01, A11, IK-13). The accepted quantity and the line amount
- * change together; nothing is reserved until confirmation (A05).
+ * Legacy internal compatibility for stored acceptance records and CEDIT regression callers. New
+ * HTTP stock choices use DraftStockSelectionService; this service has no HTTP write route. Records
+ * which whole-piece option a line takes and, when it differs from the request, the customer's
+ * acceptance (SOI D3, K08, A01, A11, IK-13). The accepted quantity and the line amount change
+ * together; nothing is reserved until confirmation (A05).
  */
+@Deprecated(forRemoval = true)
 @Service
 @RequiredArgsConstructor
 public class QuantityAcceptanceService {
@@ -188,7 +191,7 @@ public class QuantityAcceptanceService {
             now,
             request.idempotencyKey());
 
-    line.setRequestedQty(lineQty);
+    line.applyStockQuantity(line.getCustomerRequestQty(), lineQty);
     adjustments.assertFits(line);
     lines.save(line);
     revision.linesChanged(order);

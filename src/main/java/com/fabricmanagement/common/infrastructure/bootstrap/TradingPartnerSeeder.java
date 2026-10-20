@@ -115,7 +115,7 @@ public class TradingPartnerSeeder implements DataSeeder {
             .taxId(taxId)
             .partnerType(type)
             .customName(customName)
-            .country("TR")
+            .country("GB")
             .build();
 
     tradingPartnerService.createPartner(req, null);

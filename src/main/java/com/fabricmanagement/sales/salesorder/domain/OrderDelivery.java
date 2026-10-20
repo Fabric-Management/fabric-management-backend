@@ -190,7 +190,7 @@ public class OrderDelivery extends BaseEntity {
   @Column(name = "transport_preference", length = MAX_TRANSPORT_PREFERENCE)
   private String transportPreference;
 
-  /** Said in words where the address is not known yet ("the Merter workshop, Ahmet confirms"). */
+  /** Said in words where the address is not known yet ("the Hackney workshop, Oliver confirms"). */
   @Column(name = "note", length = MAX_NOTE)
   private String note;
 

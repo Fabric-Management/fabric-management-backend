@@ -73,7 +73,10 @@ class OrderIntakeReadinessServiceTest {
             gate,
             allocation,
             permissions,
-            Clock.fixed(Instant.parse("2026-10-01T12:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-10-01T12:00:00Z"), ZoneOffset.UTC),
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.sales.orderintake.infra.repository
+                    .DraftStockSelectionRepository.class));
   }
 
   @AfterEach

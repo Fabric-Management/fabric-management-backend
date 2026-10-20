@@ -34,8 +34,11 @@ public class SalesOrderRevision {
 
   private final EntityManager entityManager;
   private final SalesOrderLineRepository lines;
+  private final com.fabricmanagement.sales.orderintake.app.StockSelectionLifecycleService
+      stockSelections;
 
   public void linesChanged(SalesOrder order) {
+    stockSelections.releaseChanged(order);
     entityManager.lock(order, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
   }
 
@@ -93,6 +96,7 @@ public class SalesOrderRevision {
    * the transaction will commit. Nothing may change the order row after this call.
    */
   public long advanceOnce(SalesOrder order, long versionBeforeWrites) {
+    stockSelections.releaseChanged(order);
     entityManager.flush();
     if (Objects.equals(order.getVersion(), versionBeforeWrites)) {
       linesChanged(order);

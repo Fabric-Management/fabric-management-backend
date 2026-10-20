@@ -67,7 +67,39 @@ public record OrderIntakeStockPreviewRequest(
                 "Pieces the salesperson picked; evaluated as a MANUAL option beside the computed"
                     + " ones. Pieces that are no longer offerable are refused (409)")
         @Size(max = 500, message = "At most 500 pieces can be picked")
-        List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds) {
+        List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds,
+    @Schema(
+            description =
+                "Optional current ownership proof; excludes only this authenticated form line's own held rolls")
+        @jakarta.validation.Valid
+        DraftStockSelectionRequests.Proof ownStockSelection) {
+
+  public OrderIntakeStockPreviewRequest(
+      UUID productId,
+      UUID colorId,
+      BigDecimal finishedWidth,
+      String finishedWidthUnit,
+      UUID customerId,
+      BigDecimal requestedQty,
+      String unit,
+      Boolean singleLotRequired,
+      BigDecimal toleranceUpPct,
+      BigDecimal toleranceDownPct,
+      List<UUID> manualPieceIds) {
+    this(
+        productId,
+        colorId,
+        finishedWidth,
+        finishedWidthUnit,
+        customerId,
+        requestedQty,
+        unit,
+        singleLotRequired,
+        toleranceUpPct,
+        toleranceDownPct,
+        manualPieceIds,
+        null);
+  }
 
   /** The message of a missing tolerance side; the same as a saved line's. */
   public static final String TOLERANCE_REQUIRED =

@@ -62,21 +62,22 @@ public class WarehouseSeeder implements DataSeeder {
               status -> {
                 seedWarehouse(
                     "RAW_MAT",
-                    "Ana Hammadde Deposu",
-                    "Tüm hammaddeler buraya iner",
+                    "Main Raw Materials Store",
+                    "All raw materials are received here",
                     tenant.getId(),
                     false);
                 seedWarehouse(
                     "SHOP_FL",
-                    "Üretim Sahası",
-                    "İş emirlerinin tüketim yaptığı alan",
+                    "Shop Floor",
+                    "Area where work orders consume material",
                     tenant.getId(),
                     false);
-                seedWarehouse("FIN_MAT", "Mamül Deposu", "Biten mallar", tenant.getId(), false);
+                seedWarehouse(
+                    "FIN_MAT", "Finished Goods Store", "Finished goods", tenant.getId(), false);
                 seedWarehouse(
                     "QC_HOLD",
-                    "Kalite Kontrol ve Karantina Alanı",
-                    "Muayene bekleyen veya karantinadaki fiziksel stok",
+                    "Quality Control and Quarantine Area",
+                    "Physical stock awaiting inspection or in quarantine",
                     tenant.getId(),
                     true);
               });

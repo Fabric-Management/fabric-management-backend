@@ -276,28 +276,28 @@ WHERE NOT EXISTS (SELECT 1 FROM common_communication.common_routing_config WHERE
 -- ===================== FROM: V20260317160000__faz4_costing_module.sql =====================
 INSERT INTO costing.cost_item (id, tenant_id, code, name, scope, calculation_base, display_order)
 VALUES
-    (gen_random_uuid(), NULL, 'RAW_PRODUCT', 'Hammadde',       'GLOBAL', 'PER_KG',   1),
-    (gen_random_uuid(), NULL, 'LABOR',        'İşçilik',         'GLOBAL', 'PER_HOUR',  2),
-    (gen_random_uuid(), NULL, 'MACHINE',      'Makine/Ekipman', 'GLOBAL', 'PER_HOUR',  3),
-    (gen_random_uuid(), NULL, 'ENERGY',       'Enerji',         'GLOBAL', 'PER_KG',   4),
-    (gen_random_uuid(), NULL, 'OVERHEAD',     'Genel Gider',    'GLOBAL', 'PERCENTAGE',5),
-    (gen_random_uuid(), NULL, 'LOGISTICS',    'Nakliye',        'GLOBAL', 'FIXED',     6),
-    (gen_random_uuid(), NULL, 'QUALITY',      'Kalite Kontrol', 'GLOBAL', 'PER_UNIT',  7),
-    (gen_random_uuid(), NULL, 'PACKAGING',    'Paketleme',      'GLOBAL', 'PER_UNIT',  8);
+    (gen_random_uuid(), NULL, 'RAW_PRODUCT', 'Raw material',       'GLOBAL', 'PER_KG',   1),
+    (gen_random_uuid(), NULL, 'LABOR',        'Labour',         'GLOBAL', 'PER_HOUR',  2),
+    (gen_random_uuid(), NULL, 'MACHINE',      'Machinery / equipment', 'GLOBAL', 'PER_HOUR',  3),
+    (gen_random_uuid(), NULL, 'ENERGY',       'Energy',         'GLOBAL', 'PER_KG',   4),
+    (gen_random_uuid(), NULL, 'OVERHEAD',     'Overheads',    'GLOBAL', 'PERCENTAGE',5),
+    (gen_random_uuid(), NULL, 'LOGISTICS',    'Freight',        'GLOBAL', 'FIXED',     6),
+    (gen_random_uuid(), NULL, 'QUALITY',      'Quality control', 'GLOBAL', 'PER_UNIT',  7),
+    (gen_random_uuid(), NULL, 'PACKAGING',    'Packaging',      'GLOBAL', 'PER_UNIT',  8);
 INSERT INTO costing.cost_item (id, tenant_id, code, name, scope, module_type, calculation_base, display_order)
 VALUES
-    (gen_random_uuid(), NULL, 'FIBER_SEPARATION', 'Elyaf Ayırma', 'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 10),
-    (gen_random_uuid(), NULL, 'FIBER_BALING',     'Balyalama',    'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 11),
-    (gen_random_uuid(), NULL, 'FIBER_MOISTURE',   'Nem Ayarı',    'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 12),
-    (gen_random_uuid(), NULL, 'YARN_TWIST',       'Büküm',        'MODULE_SPECIFIC', 'YARN',    'PER_KG', 13),
-    (gen_random_uuid(), NULL, 'YARN_PLY',         'Katlama',      'MODULE_SPECIFIC', 'YARN',    'PER_KG', 14),
-    (gen_random_uuid(), NULL, 'YARN_WINDING',     'Bobin Sarım', 'MODULE_SPECIFIC', 'YARN',    'PER_KG', 15),
-    (gen_random_uuid(), NULL, 'FABRIC_WEAVING',   'Dokuma/Örgü',  'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 16),
-    (gen_random_uuid(), NULL, 'FABRIC_SIZING',    'Haşıl',        'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 17),
-    (gen_random_uuid(), NULL, 'FABRIC_WARPING',   'Çözgü',        'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 18),
-    (gen_random_uuid(), NULL, 'DYE_CHEMICAL',     'Boya Kimyasalı','MODULE_SPECIFIC','DYE',    'PER_KG', 19),
-    (gen_random_uuid(), NULL, 'DYE_WATER',        'Su Tüketimi',   'MODULE_SPECIFIC', 'DYE',    'PER_KG', 20),
-    (gen_random_uuid(), NULL, 'DYE_FINISHING',    'Apre',         'MODULE_SPECIFIC', 'DYE',    'PER_KG', 21);
+    (gen_random_uuid(), NULL, 'FIBER_SEPARATION', 'Fibre separation', 'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 10),
+    (gen_random_uuid(), NULL, 'FIBER_BALING',     'Baling',    'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 11),
+    (gen_random_uuid(), NULL, 'FIBER_MOISTURE',   'Moisture conditioning',    'MODULE_SPECIFIC', 'FIBER',   'PER_KG', 12),
+    (gen_random_uuid(), NULL, 'YARN_TWIST',       'Twisting',        'MODULE_SPECIFIC', 'YARN',    'PER_KG', 13),
+    (gen_random_uuid(), NULL, 'YARN_PLY',         'Plying',      'MODULE_SPECIFIC', 'YARN',    'PER_KG', 14),
+    (gen_random_uuid(), NULL, 'YARN_WINDING',     'Bobbin winding', 'MODULE_SPECIFIC', 'YARN',    'PER_KG', 15),
+    (gen_random_uuid(), NULL, 'FABRIC_WEAVING',   'Weaving / knitting',  'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 16),
+    (gen_random_uuid(), NULL, 'FABRIC_SIZING',    'Sizing',        'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 17),
+    (gen_random_uuid(), NULL, 'FABRIC_WARPING',   'Warping',        'MODULE_SPECIFIC', 'FABRIC',  'PER_KG', 18),
+    (gen_random_uuid(), NULL, 'DYE_CHEMICAL',     'Dye chemicals','MODULE_SPECIFIC','DYE',    'PER_KG', 19),
+    (gen_random_uuid(), NULL, 'DYE_WATER',        'Water consumption',   'MODULE_SPECIFIC', 'DYE',    'PER_KG', 20),
+    (gen_random_uuid(), NULL, 'DYE_FINISHING',    'Finishing',         'MODULE_SPECIFIC', 'DYE',    'PER_KG', 21);
 
 -- ===================== FROM: V20260319100000__faz7_i18n_notification_hub.sql =====================
 INSERT INTO i18n.supported_locale (id, tenant_id, code, name, is_rtl)

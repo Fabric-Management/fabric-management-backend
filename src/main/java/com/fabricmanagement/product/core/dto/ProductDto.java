@@ -21,9 +21,16 @@ public class ProductDto {
   private UUID tenantId;
   private String uid;
 
+  @Schema(description = "The product's own name; null for fibre and yarn, named by their record")
+  private String name;
+
+  @Schema(description = "Free description of the product", nullable = true)
+  private String description;
+
   @Schema(
       description =
-          "Human-readable name resolved from type-specific master data; falls back to uid")
+          "Human-readable name: the fibre or yarn master record's name, else the product's own"
+              + " name, else the uid")
   private String displayName;
 
   private ProductType productType;
@@ -38,6 +45,9 @@ public class ProductDto {
         .id(entity.getId())
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
+        .name(entity.getName())
+        .description(entity.getDescription())
+        .displayName(entity.getName() != null ? entity.getName() : entity.getUid())
         .productType(entity.getProductType())
         .unit(entity.getUnit())
         .version(entity.getVersion())

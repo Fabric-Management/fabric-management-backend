@@ -32,11 +32,14 @@ public class CloneTemplatePropertyDefinitionsStep implements OnboardingStep {
         tenantClonerService.copyMissingSystemPropertyDefinitions(templateTenantId, targetTenantId);
     int yarnCataloguesInserted =
         tenantClonerService.copyMissingSystemYarnCatalogues(templateTenantId, targetTenantId);
+    int fabricCataloguesInserted =
+        tenantClonerService.copyMissingSystemFabricCatalogues(templateTenantId, targetTenantId);
     log.info(
-        "CloneTemplatePropertyDefinitionsStep: inserted {} property definitions and {} yarn "
-            + "catalogue rows into {}.",
+        "CloneTemplatePropertyDefinitionsStep: inserted {} property definitions, {} yarn "
+            + "catalogue rows and {} fabric catalogue rows into {}.",
         inserted,
         yarnCataloguesInserted,
+        fabricCataloguesInserted,
         targetTenantId);
   }
 }

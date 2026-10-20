@@ -266,10 +266,13 @@ public record QuantityProposalDto(
               nullable = true,
               description = "A lot intent's quantity in its own unit; null for a piece hold")
           BigDecimal quantity,
-      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String unit) {
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String unit,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          QuantityOption.StockOwnerType ownerType) {
 
     static HeldStock from(QuantityOption.HeldStock held, Set<UUID> readableQuotes) {
-      boolean named = held.verified() && readableQuotes.contains(held.quoteId());
+      boolean named =
+          held.verified() && held.quoteId() != null && readableQuotes.contains(held.quoteId());
       return new HeldStock(
           held.batchId(),
           held.lotNo(),
@@ -280,7 +283,8 @@ public record QuantityProposalDto(
           held.verified() ? held.expiresAt() : null,
           held.pieceIds(),
           held.quantity(),
-          held.unit());
+          held.unit(),
+          held.ownerType());
     }
   }
 

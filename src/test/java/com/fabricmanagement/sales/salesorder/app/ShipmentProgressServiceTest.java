@@ -57,6 +57,20 @@ class ShipmentProgressServiceTest {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @Test
+  void shippingAllAppliedRollsCompletesTheCommercialQuantityWithoutAnAuditShortfall() {
+    var line =
+        SalesOrderLine.builder().salesOrderId(orderId).requestedQty(new BigDecimal("700")).build();
+    line.applyStockQuantity(new BigDecimal("700"), new BigDecimal("665"));
+    when(salesOrderLineRepository.findByTenantIdAndId(
+            com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
+            lineId))
+        .thenReturn(Optional.of(line));
+    shipmentProgressService.recordLineShipment(lineId, shipmentLineId, new BigDecimal("665"));
+    assertThat(line.getRemainingQty()).isEqualByComparingTo("0");
+    assertThat(line.getCustomerRequestQty()).isEqualByComparingTo("700");
+  }
+
+  @Test
   void recordLineShipment_whenLineExists_updatesShippedQtyAndReturnsOrderId() {
     SalesOrderLine line = mock(SalesOrderLine.class);
     when(line.getSalesOrderId()).thenReturn(orderId);

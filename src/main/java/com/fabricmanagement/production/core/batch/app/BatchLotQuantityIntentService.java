@@ -38,6 +38,9 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
   private final ApplicationEventPublisher eventPublisher;
   private final BatchPrimaryMeasureService primaryMeasureService;
   private final BatchCommitmentQuantityService commitmentQuantityService;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitSoftHoldPort softHolds;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
+  private final jakarta.persistence.EntityManager entityManager;
 
   @Override
   @Transactional(readOnly = true)
@@ -65,6 +68,7 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
       Collection<LotIntentRequest> intents) {
     UUID tenantId = TenantContext.requireTenantId();
     List<LotIntentRequest> requested = normalize(intents);
+    ownership.lockLots(requested.stream().map(LotIntentRequest::batchId).toList());
     Map<UUID, Batch> batches = loadBatches(tenantId, requested);
     requested = canonicalize(batches, requested);
     validateAgainstPhysicalQuantity(batches, requested);
@@ -143,6 +147,7 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
     intentRepository.findByTenantIdAndQuoteLineId(tenantId, quoteLineId).stream()
         .filter(intent -> intent.getStatus() == BatchLotQuantityIntentStatus.ACTIVE)
         .forEach(intent -> release(tenantId, intent, Instant.now()));
+    softHolds.releaseHolds(quoteLineId);
   }
 
   @Override
@@ -163,8 +168,25 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
     List<BatchLotQuantityIntent> expired =
         intentRepository.findByTenantIdAndStatusAndExpiresAtBeforeAndIsActiveTrue(
             tenantId, BatchLotQuantityIntentStatus.ACTIVE, expiredBefore);
-    expired.forEach(intent -> release(intent.getTenantId(), intent, Instant.now()));
-    return expired.size();
+    ownership.lockLots(expired.stream().map(BatchLotQuantityIntent::getBatchId).toList());
+    // A quote may have converted while the expiry scan waited. Re-read under the same ownership
+    // gate before deciding: the order's transferred intent has no quote expiry anymore.
+    expired.forEach(entityManager::refresh);
+    var stillExpired =
+        expired.stream()
+            .filter(
+                intent ->
+                    "QUOTE".equals(intent.getOwnerType())
+                        && intent.getStatus() == BatchLotQuantityIntentStatus.ACTIVE
+                        && intent.getExpiresAt() != null
+                        && intent.getExpiresAt().isBefore(expiredBefore))
+            .toList();
+    stillExpired.forEach(intent -> release(intent.getTenantId(), intent, Instant.now()));
+    stillExpired.stream()
+        .map(BatchLotQuantityIntent::getOwnerLineId)
+        .distinct()
+        .forEach(softHolds::releaseHolds);
+    return stillExpired.size();
   }
 
   private List<LotIntentRequest> normalize(Collection<LotIntentRequest> intents) {

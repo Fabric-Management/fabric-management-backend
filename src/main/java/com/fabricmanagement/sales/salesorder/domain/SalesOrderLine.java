@@ -110,6 +110,39 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
 
+  /** Current customer request; applying whole rolls never overwrites it. */
+  @Column(name = "customer_request_qty", precision = 15, scale = 3)
+  private BigDecimal customerRequestQty;
+
+  public BigDecimal getCustomerRequestQty() {
+    return customerRequestQty != null
+        ? customerRequestQty
+        : initialRequestedQty != null ? initialRequestedQty : requestedQty;
+  }
+
+  /**
+   * A deliberate request edit changes both quantities. Stock apply writes only the commercial one.
+   */
+  public void setRequestedQty(BigDecimal quantity) {
+    // Full-form saves may echo the unchanged commercial quantity during a price/note edit.
+    if (requestedQty == null
+        ? quantity == null
+        : quantity != null && requestedQty.compareTo(quantity) == 0) return;
+    requestedQty = quantity;
+    customerRequestQty = quantity;
+  }
+
+  public void applyStockQuantity(BigDecimal original, BigDecimal selected) {
+    if (original == null || selected == null || original.signum() <= 0 || selected.signum() <= 0)
+      throw new IllegalArgumentException("Both requested and selected quantities must be positive");
+    customerRequestQty = original;
+    requestedQty = selected;
+  }
+
+  public void restoreCustomerRequestQuantity() {
+    requestedQty = getCustomerRequestQty();
+  }
+
   /**
    * Quantity first requested by the customer. Immutable: proposals and accepted quantities are
    * recorded separately and never overwrite it (SOI K08).
@@ -469,7 +502,7 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   /** Records the first requested quantity once; later quantity changes never overwrite it. */
   public void captureInitialRequestIfAbsent() {
     if (initialRequestedQty == null) {
-      initialRequestedQty = requestedQty;
+      initialRequestedQty = getCustomerRequestQty();
     }
   }
 

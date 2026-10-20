@@ -3,6 +3,7 @@ package com.fabricmanagement.product.core.app.adapter;
 import com.fabricmanagement.common.infrastructure.ai.AIQueryNormalizer;
 import com.fabricmanagement.common.infrastructure.ai.AIToolProvider;
 import com.fabricmanagement.product.core.api.facade.ProductFacade;
+import com.fabricmanagement.product.core.domain.Product;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.core.dto.CreateProductRequest;
 import com.fabricmanagement.product.core.dto.ProductDto;
@@ -262,8 +263,19 @@ public class ProductAIToolProvider implements AIToolProvider {
             productTypeStr);
       }
 
+      String name = (String) parameters.get("name");
+      String description = (String) parameters.get("description");
+      if (Product.requiresOwnName(productType) && (name == null || name.isBlank())) {
+        return "❌ Name is required for a " + productType + " product.";
+      }
+
       CreateProductRequest request =
-          CreateProductRequest.builder().productType(productType).unit(unit).build();
+          CreateProductRequest.builder()
+              .productType(productType)
+              .unit(unit)
+              .name(name)
+              .description(description)
+              .build();
 
       ProductDto created = productFacade.createProduct(request);
 
@@ -271,10 +283,15 @@ public class ProductAIToolProvider implements AIToolProvider {
           "✅ Product created successfully!\n\n"
               + "Product ID: %s\n"
               + "UID: %s\n"
+              + "Name: %s\n"
               + "Type: %s\n"
               + "Unit: %s\n"
               + "Status: Active",
-          created.getId(), created.getUid(), created.getProductType(), created.getUnit());
+          created.getId(),
+          created.getUid(),
+          created.getDisplayName(),
+          created.getProductType(),
+          created.getUnit());
     } catch (Exception e) {
       log.error("Error creating product", e);
       return "❌ Error creating product: " + e.getMessage();

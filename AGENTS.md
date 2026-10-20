@@ -1,5 +1,29 @@
 # Fabric Management Backend — AI Coding Standards
 
+> # 🇬🇧 STOP — READ FIRST: FABRICOS IS A UK PRODUCT. EVERYTHING IN IT IS BRITISH.
+>
+> **Decision by Fatih, 2026-10-19. Binding for every agent and every developer (Claude, Codex, humans).**
+> *Türkçe özet: FabricOS UK çıkışlı bir üründür. Örnek/seed/demo/test verisindeki her isim, marka, adres,
+> telefon, para birimi İngiliz olur. Türkçe isim, firma, şehir, +90, TRY, `.com.tr` KULLANILMAZ.*
+>
+> 1. **Sample data is British.** Seeds, demo/playground data, fixtures, mocks, stories, tests, docs
+>    examples, Javadoc/OpenAPI examples and input placeholders use **British** people, companies, brands,
+>    towns, streets, postcodes, `+44` phone numbers, `GBP`, and `.example` / `example.com` e-mail domains.
+>    A foreign counterpart (a German or American customer, an overseas supplier) is allowed **only when the
+>    scenario needs one** — and it must never be Turkish.
+> 2. **NO Turkish sample data. Ever.** No Turkish person names (Ahmet, Ayşe, Yılmaz…), company forms or words
+>    (A.Ş., Ltd. Şti., Tekstil, Konfeksiyon…), places (İstanbul, Bursa, Çorlu, Merter…), `+90` numbers,
+>    `.com.tr` domains, `TRY` or `TR`/`TUR` as a sample customer's country. Invent plausible fictional British
+>    names; do not use real brands.
+>    *Not covered by this ban (these are real functions, not sample data):* the Turkish UI locale, country and
+>    currency code tables, and tests of Turkey-specific behaviour (for example the TCMB rate provider).
+> 3. **Language order.** (1) **British English** is the source language — write `colour`, `organisation`,
+>    `programme`, `centre`, `grey`, `licence` (noun). (2) **Turkish** is the second language. Planned next:
+>    **Italian, French, German, Arabic (right-to-left)**. So: never hard-code user-facing text, keep every
+>    locale file at key parity, and never assume left-to-right layout.
+> 4. **Touching a file with Turkish sample data? Fix it in the same change** (or list it in your hand-off).
+>    New sample data that breaks this rule is a defect.
+
 > **ÖNEMLİ:** Frontend iletişimi, sözleşme sınırları (OpenAPI) ve ortak domain dili gibi global kurallar için öncelikle kök dizindeki `fabric-management/AGENTS.md` dosyasına başvurun.
 
 Bu dosya, projede kod yazan **tüm AI ajanlarının ve geliştiricilerin** uyması gereken backend'e özel (Spring Boot) kanonik kurallar bütünüdür.

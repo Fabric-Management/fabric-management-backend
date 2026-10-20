@@ -5,7 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Product - master data for production products. Types: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE
+ * Product - master data for production products. Types: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE.
+ * The parent of the type-specific master records ({@code prod_fiber}, {@code prod_yarn_article}).
  */
 @Entity
 @Table(
@@ -29,8 +30,53 @@ public class Product extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
+  /**
+   * The product's own name (FABRIC-0). Fibre and yarn names stay authoritative in their master
+   * records ({@code prod_fiber}, {@code prod_yarn_article}); for every other type this is the name
+   * the tenant sees. Never blank: an empty name is stored as {@code null}.
+   */
+  @Column(name = "name", length = 255)
+  private String name;
+
+  /** Free description of the product; never blank, an empty one is stored as {@code null}. */
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
+
   public static Product create(ProductType type, String unit) {
     return Product.builder().productType(type).unit(unit).build();
+  }
+
+  public static Product create(ProductType type, String unit, String name, String description) {
+    return Product.builder()
+        .productType(type)
+        .unit(unit)
+        .name(trimToNull(name))
+        .description(trimToNull(description))
+        .build();
+  }
+
+  /** Renames and re-describes the product; a type that needs its own name keeps one. */
+  public void describe(String name, String description) {
+    String trimmed = trimToNull(name);
+    if (requiresOwnName(productType) && trimmed == null) {
+      throw new IllegalArgumentException("A " + productType + " product needs a name");
+    }
+    this.name = trimmed;
+    this.description = trimToNull(description);
+  }
+
+  /**
+   * Types whose name lives only on the product: there is no type-specific master record to carry
+   * it, so a product of these types cannot be created without one.
+   */
+  public static boolean requiresOwnName(ProductType type) {
+    return type != ProductType.FIBER && type != ProductType.YARN;
+  }
+
+  private static String trimToNull(String value) {
+    if (value == null) return null;
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   @Override

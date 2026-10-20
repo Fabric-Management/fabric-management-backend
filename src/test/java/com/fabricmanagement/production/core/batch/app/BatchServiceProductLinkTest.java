@@ -53,6 +53,7 @@ class BatchServiceProductLinkTest {
 
   private static final UUID TENANT_ID = UUID.randomUUID();
 
+  @Mock private com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
   @Mock private BatchRepository batchRepository;
   @Mock private BatchReservationRepository reservationRepository;
   @Mock private BatchCertificationRepository batchCertificationRepository;

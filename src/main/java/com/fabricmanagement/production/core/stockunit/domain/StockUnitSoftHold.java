@@ -34,8 +34,17 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class StockUnitSoftHold extends BaseEntity {
 
-  @Column(name = "quote_line_id", nullable = false)
+  @Column(name = "quote_line_id")
   private UUID quoteLineId;
+
+  @Column(name = "owner_type", nullable = false)
+  private String ownerType = "QUOTE";
+
+  @Column(name = "owner_id")
+  private UUID ownerId;
+
+  @Column(name = "owner_line_id", nullable = false)
+  private UUID ownerLineId;
 
   @Column(name = "stock_unit_id", nullable = false)
   private UUID stockUnitId;
@@ -51,10 +60,28 @@ public class StockUnitSoftHold extends BaseEntity {
     StockUnitSoftHold hold = new StockUnitSoftHold();
     hold.setTenantId(tenantId);
     hold.quoteLineId = quoteLineId;
+    hold.ownerLineId = quoteLineId;
     hold.stockUnitId = stockUnitId;
     hold.status = StockUnitSoftHoldStatus.ACTIVE;
     hold.onCreate();
     return hold;
+  }
+
+  public static StockUnitSoftHold forOrder(UUID tenantId, UUID orderId, UUID lineId, UUID pieceId) {
+    StockUnitSoftHold hold = place(tenantId, lineId, pieceId);
+    hold.quoteLineId = null;
+    hold.ownerType = "SALES_ORDER";
+    hold.ownerId = orderId;
+    return hold;
+  }
+
+  public void transferToOrder(UUID orderId, UUID lineId) {
+    if (status != StockUnitSoftHoldStatus.ACTIVE || !"QUOTE".equals(ownerType))
+      throw new IllegalStateException("Only a quote's live hold may transfer");
+    ownerType = "SALES_ORDER";
+    ownerId = orderId;
+    ownerLineId = lineId;
+    quoteLineId = null;
   }
 
   public void reactivate() {

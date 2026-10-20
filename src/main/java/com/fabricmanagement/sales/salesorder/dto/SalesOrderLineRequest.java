@@ -54,9 +54,40 @@ public class SalesOrderLineRequest implements CatalogLineInput {
           "How the distribution may ship once ready; omitted means AS_READY (LINE-PREFERENCES-1)")
   private LineShipmentPreference shipmentPreference;
 
+  @Schema(
+      description =
+          "Commercial line quantity; after Apply this equals the chosen stock quantity, while customerRequestQty retains the request")
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be greater than zero")
   private BigDecimal requestedQty;
+
+  @Schema(
+      description =
+          "Customer request preserved separately when the commercial quantity follows a stock choice")
+  @DecimalMin("0.001")
+  private BigDecimal customerRequestQty;
+
+  @Schema(description = "Stable form line identity; required with a stock-selection proof")
+  private UUID clientLineId;
+
+  @Schema(
+      description =
+          "Explicit source line when this order converts an approved quote; never inferred by product")
+  private UUID sourceQuoteLineId;
+
+  @jakarta.validation.Valid
+  @Schema(
+      description =
+          "Applied provisional selection to transfer atomically when the order is created")
+  private com.fabricmanagement.sales.orderintake.dto.DraftStockSelectionRequests.Proof
+      stockSelection;
+
+  @jakarta.validation.Valid
+  @Schema(
+      description =
+          "Unapplied preview selection to release after successful order creation; never applied automatically")
+  private com.fabricmanagement.sales.orderintake.dto.DraftStockSelectionRequests.Proof
+      previewStockSelection;
 
   @NotNull(message = "Unit is required")
   private String unit;
@@ -65,7 +96,7 @@ public class SalesOrderLineRequest implements CatalogLineInput {
   @DecimalMin(value = "0", message = "Unit price cannot be negative")
   private BigDecimal unitPrice;
 
-  @Schema(description = "Agreed sales currency of this line (ISO 4217)", example = "USD")
+  @Schema(description = "Agreed sales currency of this line (ISO 4217)", example = "GBP")
   @jakarta.validation.constraints.Pattern(
       regexp = "[A-Z]{3}",
       message = "Currency must be a 3-letter ISO code")

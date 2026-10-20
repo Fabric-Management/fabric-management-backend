@@ -780,6 +780,10 @@ CREATE TABLE IF NOT EXISTS production.prod_product (
     uid VARCHAR(100) UNIQUE NOT NULL,
     product_type VARCHAR(20) NOT NULL CHECK (product_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
     unit VARCHAR(20) NOT NULL,
+    -- FABRIC-0: the product's own name and description. Fibre and yarn names stay authoritative
+    -- in prod_fiber / prod_yarn_article; for every other type this is the name the tenant sees.
+    name VARCHAR(255),
+    description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -789,9 +793,15 @@ CREATE TABLE IF NOT EXISTS production.prod_product (
     version BIGINT NOT NULL DEFAULT 0
 );
 
+ALTER TABLE production.prod_product
+    ADD CONSTRAINT ck_product_name_not_blank CHECK (name IS NULL OR btrim(name) <> ''),
+    ADD CONSTRAINT ck_product_description_not_blank
+        CHECK (description IS NULL OR btrim(description) <> '');
+
 CREATE INDEX idx_product_tenant_type ON production.prod_product(tenant_id, product_type);
 CREATE INDEX idx_product_active ON production.prod_product(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_product_tenant_active ON production.prod_product(tenant_id, is_active) WHERE is_active = TRUE;
+
 
 -- =====================================================
 -- prod_fiber (final: composition JSONB, no fiber_grade, category/iso NOT NULL)
@@ -823,6 +833,276 @@ CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
 CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
 CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_fiber_composition_gin ON production.prod_fiber USING GIN (composition);
+
+-- =====================================================
+-- FABRIC-1: fabric master data (docs/production/FABRIC-ARCHITECTURE.md)
+-- prod_product (FABRIC) 1:1 prod_fabric_article; woven / knitted detail in their own tables;
+-- constructions are a tenant dictionary, each entry mapped to one closed family.
+-- Colour is never on the article: it belongs to the dye lot (COLOR-ARCHITECTURE D3).
+-- =====================================================
+CREATE TABLE IF NOT EXISTS production.prod_fabric_construction (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    display_order INTEGER,
+    formation VARCHAR(20) NOT NULL,
+    family VARCHAR(30) NOT NULL,
+    system_defined BOOLEAN NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_construction_tenant_code UNIQUE (tenant_id, code),
+    CONSTRAINT ck_fabric_construction_code CHECK (code ~ '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'),
+    CONSTRAINT ck_fabric_construction_family CHECK (
+        (formation = 'WOVEN'
+            AND family IN ('PLAIN', 'TWILL', 'SATIN', 'DOBBY', 'JACQUARD', 'LENO', 'PILE'))
+        OR (formation = 'KNITTED'
+            AND family IN ('SINGLE_JERSEY', 'RIB', 'INTERLOCK', 'PIQUE', 'FLEECE', 'TERRY',
+                           'WARP_KNIT'))
+        OR (formation = 'NONWOVEN' AND family = 'NONWOVEN')
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_fabric_construction_tenant_active
+    ON production.prod_fabric_construction (tenant_id, is_active);
+
+-- FABRIC-3a: finishing processes a fabric lot can go through, each mapped to one closed category.
+-- Processes are recorded on lots, never on the fabric (FABRIC-ARCHITECTURE F7).
+CREATE TABLE IF NOT EXISTS production.prod_fabric_finishing_process (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    display_order INTEGER,
+    category VARCHAR(30) NOT NULL,
+    charge_unit VARCHAR(10) NOT NULL,
+    system_defined BOOLEAN NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_finishing_process_tenant_code UNIQUE (tenant_id, code),
+    CONSTRAINT ck_fabric_finishing_process_code CHECK (code ~ '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'),
+    CONSTRAINT ck_fabric_finishing_process_category CHECK (category IN (
+        'PRETREATMENT', 'DYEING', 'PRINTING', 'CHEMICAL_FINISH', 'MECHANICAL_FINISH', 'COATING'
+    )),
+    CONSTRAINT ck_fabric_finishing_process_charge_unit CHECK (charge_unit IN ('M', 'KG'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fabric_finishing_process_tenant_active
+    ON production.prod_fabric_finishing_process (tenant_id, is_active);
+
+CREATE TABLE IF NOT EXISTS production.prod_fabric_article (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    product_id UUID NOT NULL,
+    article_code VARCHAR(60),
+    status VARCHAR(20) NOT NULL,
+    article_spec_version INTEGER NOT NULL DEFAULT 1,
+    formation VARCHAR(20) NOT NULL,
+    construction_id UUID,
+    gsm_finished NUMERIC(7,1),
+    gsm_greige NUMERIC(7,1),
+    nominal_finished_width_cm NUMERIC(6,1),
+    usable_width_cm NUMERIC(6,1),
+    nominal_greige_width_cm NUMERIC(6,1),
+    standard_roll_length_m NUMERIC(8,2),
+    remarks TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_article_product UNIQUE (product_id),
+    CONSTRAINT fk_fabric_article_product FOREIGN KEY (product_id)
+        REFERENCES production.prod_product (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_fabric_article_construction FOREIGN KEY (construction_id)
+        REFERENCES production.prod_fabric_construction (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_article_status CHECK (status IN ('DRAFT', 'ACTIVE', 'OBSOLETE')),
+    CONSTRAINT ck_fabric_article_formation CHECK (formation IN ('WOVEN', 'KNITTED', 'NONWOVEN')),
+    CONSTRAINT ck_fabric_article_code_not_blank CHECK (
+        article_code IS NULL OR btrim(article_code) <> ''
+    ),
+    CONSTRAINT ck_fabric_article_positive CHECK (
+        (gsm_finished IS NULL OR gsm_finished > 0)
+        AND (gsm_greige IS NULL OR gsm_greige > 0)
+        AND (nominal_finished_width_cm IS NULL OR nominal_finished_width_cm > 0)
+        AND (usable_width_cm IS NULL OR usable_width_cm > 0)
+        AND (nominal_greige_width_cm IS NULL OR nominal_greige_width_cm > 0)
+        AND (standard_roll_length_m IS NULL OR standard_roll_length_m > 0)
+    ),
+    CONSTRAINT ck_fabric_article_usable_width CHECK (
+        usable_width_cm IS NULL OR nominal_finished_width_cm IS NULL
+        OR usable_width_cm <= nominal_finished_width_cm
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fabric_article_tenant_code
+    ON production.prod_fabric_article (tenant_id, article_code)
+    WHERE article_code IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_fabric_article_tenant_status
+    ON production.prod_fabric_article (tenant_id, status) WHERE deleted_at IS NULL;
+
+-- Woven detail: nominal design values; measured values belong to the property registry.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_woven (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    ends_per_cm NUMERIC(6,1),
+    picks_per_cm NUMERIC(6,1),
+    reed_notation VARCHAR(40),
+    weave_notation VARCHAR(40),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_woven_article UNIQUE (fabric_article_id),
+    CONSTRAINT fk_fabric_woven_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT ck_fabric_woven_positive CHECK (
+        (ends_per_cm IS NULL OR ends_per_cm > 0) AND (picks_per_cm IS NULL OR picks_per_cm > 0)
+    )
+);
+
+-- Knitted detail: nominal machine and stitch values.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_knitted (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    machine_gauge INTEGER,
+    machine_diameter_in NUMERIC(5,1),
+    courses_per_cm NUMERIC(6,1),
+    wales_per_cm NUMERIC(6,1),
+    stitch_length_mm NUMERIC(6,3),
+    feeders INTEGER,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_knitted_article UNIQUE (fabric_article_id),
+    CONSTRAINT fk_fabric_knitted_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT ck_fabric_knitted_positive CHECK (
+        (machine_gauge IS NULL OR machine_gauge > 0)
+        AND (machine_diameter_in IS NULL OR machine_diameter_in > 0)
+        AND (courses_per_cm IS NULL OR courses_per_cm > 0)
+        AND (wales_per_cm IS NULL OR wales_per_cm > 0)
+        AND (stitch_length_mm IS NULL OR stitch_length_mm > 0)
+        AND (feeders IS NULL OR feeders > 0)
+    )
+);
+
+-- FABRIC-2: the yarns a fabric is made of. share_percent is the yarn's share of the fabric's
+-- mass; when yarns are given, the shares of an ACTIVE article total 100.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_yarn (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    position SMALLINT NOT NULL,
+    yarn_product_id UUID NOT NULL,
+    share_percent NUMERIC(5,2) NOT NULL,
+    yarn_designation_snapshot VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_fabric_yarn_role_position UNIQUE (fabric_article_id, role, position)
+        DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT fk_fabric_yarn_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fabric_yarn_product FOREIGN KEY (yarn_product_id)
+        REFERENCES production.prod_product (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_yarn_role CHECK (role IN ('WARP', 'WEFT', 'KNIT_FEED', 'PILE', 'GROUND')),
+    CONSTRAINT ck_fabric_yarn_share CHECK (share_percent > 0 AND share_percent <= 100),
+    CONSTRAINT ck_fabric_yarn_position CHECK (position >= 1)
+);
+
+-- FABRIC-2: declared (label) fibre composition; tested composition is a QC result and never
+-- writes here (YARN-ARCHITECTURE Y5 parity). An ACTIVE article's lines total 100.
+CREATE TABLE IF NOT EXISTS production.prod_fabric_composition (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    fabric_article_id UUID NOT NULL,
+    fiber_id UUID NOT NULL,
+    fiber_iso_code VARCHAR(10) NOT NULL,
+    fiber_name VARCHAR(255) NOT NULL,
+    material_source VARCHAR(20),
+    percentage NUMERIC(5,2) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fabric_composition_article FOREIGN KEY (fabric_article_id)
+        REFERENCES production.prod_fabric_article (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fabric_composition_fiber FOREIGN KEY (fiber_id)
+        REFERENCES production.prod_fiber (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_composition_percentage CHECK (percentage > 0 AND percentage <= 100),
+    CONSTRAINT ck_fabric_composition_source CHECK (
+        material_source IS NULL OR material_source IN ('VIRGIN', 'RECYCLED')
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fabric_composition_fiber_source
+    ON production.prod_fabric_composition
+        (fabric_article_id, fiber_id, COALESCE(material_source, ''));
+
+DO $$
+DECLARE
+    table_name TEXT;
+BEGIN
+    FOREACH table_name IN ARRAY ARRAY[
+        'prod_fabric_construction',
+        'prod_fabric_finishing_process',
+        'prod_fabric_article',
+        'prod_fabric_woven',
+        'prod_fabric_knitted',
+        'prod_fabric_yarn',
+        'prod_fabric_composition'
+    ]
+    LOOP
+        EXECUTE format('ALTER TABLE production.%I ENABLE ROW LEVEL SECURITY', table_name);
+        EXECUTE format('ALTER TABLE production.%I FORCE ROW LEVEL SECURITY', table_name);
+        EXECUTE format('DROP POLICY IF EXISTS rls_tenant_isolation ON production.%I', table_name);
+        EXECUTE format(
+            'CREATE POLICY rls_tenant_isolation ON production.%I FOR ALL USING '
+            || '(tenant_id = current_setting(''app.current_tenant'', true)::uuid) WITH CHECK '
+            || '(tenant_id = current_setting(''app.current_tenant'', true)::uuid)',
+            table_name
+        );
+    END LOOP;
+END $$;
 
 -- =====================================================
 -- prod_fiber_quality_standard (V082; replaces prod_fiber_specification)

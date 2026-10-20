@@ -73,6 +73,8 @@ final class QuoteHoldEvidence {
         intent.quoteNumber(),
         intent.marketerName(),
         intent.expiresAt(),
-        true);
+        true,
+        com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+            .valueOf(intent.ownerType()));
   }
 }

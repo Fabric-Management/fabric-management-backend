@@ -53,13 +53,13 @@ public class SalesDemoSeeder {
     ProductDto fiber1 = cotton.get();
     ProductDto fiber2 = polyester.get();
 
-    UUID cAnadolu = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_ANADOLU);
+    UUID cCaledonian = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_CALEDONIAN);
     UUID cEuropa = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_EUROPA);
     UUID cGlobal = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_GLOBAL);
 
     LocalDate today = LocalDate.now(clock);
 
-    confirmedOrder(cAnadolu, "TRY", "SO-DEMO-ANA-001", today, fiber1, "1000", "320.00");
+    confirmedOrder(cCaledonian, "GBP", "SO-DEMO-CAL-001", today, fiber1, "1000", "6.60");
     confirmedOrder(cEuropa, "EUR", "SO-DEMO-EUR-001", today, fiber1, "500", "100.00");
     confirmedOrder(cGlobal, "USD", "SO-DEMO-GFW-001", today, fiber2, "800", "50.00");
 

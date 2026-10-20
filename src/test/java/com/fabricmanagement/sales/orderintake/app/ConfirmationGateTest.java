@@ -17,14 +17,11 @@ import com.fabricmanagement.production.core.batch.api.query.ProposalStockQuerySe
 import com.fabricmanagement.production.core.batch.domain.PrimaryMeasure;
 import com.fabricmanagement.production.core.stockunit.api.PieceAllocationPort;
 import com.fabricmanagement.sales.common.exception.OrderIntakeException;
-import com.fabricmanagement.sales.orderintake.domain.AcceptanceChannel;
-import com.fabricmanagement.sales.orderintake.domain.AcceptanceTerms;
-import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptance;
-import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceBasis;
-import com.fabricmanagement.sales.orderintake.domain.QuantityAcceptanceStatus;
+import com.fabricmanagement.sales.orderintake.domain.DraftStockSelection;
+import com.fabricmanagement.sales.orderintake.domain.StockSelectionTerms;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption;
 import com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOptionFixtures;
-import com.fabricmanagement.sales.orderintake.infra.repository.QuantityAcceptanceRepository;
+import com.fabricmanagement.sales.orderintake.infra.repository.DraftStockSelectionRepository;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import java.math.BigDecimal;
@@ -53,7 +50,7 @@ class ConfirmationGateTest {
   private static final UUID ACTOR = UUID.randomUUID();
   private static final Instant NOW = Instant.parse("2026-09-27T10:00:00Z");
 
-  @Mock private QuantityAcceptanceRepository acceptances;
+  @Mock private DraftStockSelectionRepository acceptances;
   @Mock private QuantityEvaluationService evaluation;
   @Mock private PieceAllocationPort allocation;
   @Mock private CustomRequestGate customRequests;
@@ -70,7 +67,14 @@ class ConfirmationGateTest {
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(TENANT);
-    gate = new ConfirmationGate(acceptances, evaluation, allocation, customRequests);
+    gate =
+        new ConfirmationGate(
+            acceptances,
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.production.core.stockunit.api.StockUnitSoftHoldPort.class),
+            evaluation,
+            allocation,
+            customRequests);
     order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
     line =
@@ -120,13 +124,13 @@ class ConfirmationGateTest {
   @Test
   @DisplayName("S21: a line changed after acceptance cannot be confirmed with it")
   void staleAcceptanceBlocks() {
-    QuantityAcceptance acceptance = acceptance(List.of(lotA), List.of(pieceA));
+    DraftStockSelection acceptance = acceptance(List.of(lotA), List.of(pieceA));
     active(acceptance);
     line.setRequestedQty(new BigDecimal("600"));
 
     assertThat(gate.blocks(order, List.of(line)))
         .extracting(ConfirmationGate.Block::code)
-        .containsExactly("ACCEPTANCE_STALE");
+        .containsExactly("SELECTION_STALE");
   }
 
   @Test
@@ -188,9 +192,9 @@ class ConfirmationGateTest {
         .isEqualTo("ORDER_INTAKE_CUSTOM_REQUEST_OPEN");
   }
 
-  private void active(QuantityAcceptance acceptance) {
-    when(acceptances.findByTenantIdAndSalesOrderLineIdInAndStatus(
-            TENANT, List.of(line.getId()), QuantityAcceptanceStatus.ACTIVE))
+  private void active(DraftStockSelection acceptance) {
+    when(acceptances.findByTenantIdAndSalesOrderLineIdInAndState(
+            TENANT, List.of(line.getId()), DraftStockSelection.State.TRANSFERRED))
         .thenReturn(acceptance == null ? List.of() : List.of(acceptance));
   }
 
@@ -245,7 +249,7 @@ class ConfirmationGateTest {
         .containsExactly("STOCK_CHANGED");
   }
 
-  private QuantityAcceptance acceptance(List<UUID> lots, List<UUID> pieces) {
+  private DraftStockSelection acceptance(List<UUID> lots, List<UUID> pieces) {
     pieces.forEach(
         id ->
             measuredPieces.put(
@@ -276,27 +280,11 @@ class ConfirmationGateTest {
             new BigDecimal("2.8"),
             false,
             parts);
-    QuantityAcceptance acceptance =
-        QuantityAcceptance.record(
-            order.getId(),
-            line.getId(),
-            UUID.randomUUID(),
-            option,
-            lots.size() > 1
-                ? QuantityOption.Compatibility.MULTIPLE_LOTS_ACCEPTED
-                : QuantityOption.Compatibility.SINGLE_LOT,
-            new BigDecimal("514"),
-            "M",
-            QuantityAcceptanceBasis.CUSTOMER_ACCEPTED,
-            false,
-            null,
-            null,
-            new QuantityAcceptance.CustomerEvidence(
-                "Ali", AcceptanceChannel.PHONE, NOW, null, null, true),
-            ACTOR,
-            NOW,
-            null);
-    acceptance.coverTerms(AcceptanceTerms.fingerprint(line));
+    DraftStockSelection acceptance =
+        DraftStockSelection.open(
+            UUID.randomUUID(), line.getId(), line.getProductId(), ACTOR, UUID.randomUUID());
+    acceptance.hold(null, option, List.of(), NOW.plusSeconds(90));
+    acceptance.transfer(order.getId(), line.getId(), StockSelectionTerms.fingerprint(order, line));
     return acceptance;
   }
 

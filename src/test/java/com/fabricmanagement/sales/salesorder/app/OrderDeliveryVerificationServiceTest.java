@@ -154,9 +154,9 @@ class OrderDeliveryVerificationServiceTest {
   void aNoteOnlyDeliveryIsUnverifiedByDefinitionEvenFromAVerifier() {
     when(policy.actorMayVerify()).thenReturn(true);
 
-    OrderDelivery delivery = saved(content(customer(), null, "Merter workshop, Ahmet confirms"));
+    OrderDelivery delivery = saved(content(customer(), null, "Hackney workshop, Oliver confirms"));
 
-    assertThat(delivery.getNote()).isEqualTo("Merter workshop, Ahmet confirms");
+    assertThat(delivery.getNote()).isEqualTo("Hackney workshop, Oliver confirms");
     assertThat(delivery.getVerification().isVerified()).isFalse();
   }
 
@@ -309,7 +309,7 @@ class OrderDeliveryVerificationServiceTest {
 
   @Test
   void aNoteOnlyDeliveryIsRefusedAndNothingIsCascaded() {
-    OrderDelivery delivery = existing(content(partner(), null, "Merter workshop"));
+    OrderDelivery delivery = existing(content(partner(), null, "Hackney workshop"));
 
     assertThatThrownBy(() -> verifyPlain(delivery))
         .isInstanceOfSatisfying(

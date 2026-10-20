@@ -83,6 +83,7 @@ public class StockUnitService {
   private final StockUnitAuditLogRepository auditLogRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final WarehouseLocationPort warehouseLocationPort;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
 
   // ── Creation ─────────────────────────────────────────────────────────────
 
@@ -771,6 +772,7 @@ public class StockUnitService {
   public StockUnit reserve(UUID stockUnitId) {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
+    ownership.assertAvailable(java.util.List.of(stockUnitId), null, null);
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     unit.reserve();
     unit = stockUnitRepository.save(unit);

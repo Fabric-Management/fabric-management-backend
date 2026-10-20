@@ -99,6 +99,7 @@ import org.springframework.security.access.AccessDeniedException;
 @ExtendWith(MockitoExtension.class)
 class QuoteServiceTest {
 
+  @Mock private jakarta.persistence.EntityManager entityManager;
   @Mock private QuoteRepository quoteRepository;
   @Mock private PricingEngineService pricingEngineService;
   @Mock private SalesProductService catalogService;
