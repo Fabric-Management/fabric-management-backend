@@ -67,6 +67,8 @@ class QuoteHoldQueryServiceTest {
             softHoldRepository,
             measures,
             org.mockito.Mockito.mock(
+                com.fabricmanagement.production.core.stockunit.api.StockUnitLeaseOwnerPort.class),
+            org.mockito.Mockito.mock(
                 com.fabricmanagement.platform.realtime.app.LiveEditLeaseService.class),
             org.mockito.Mockito.mock(
                 com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository

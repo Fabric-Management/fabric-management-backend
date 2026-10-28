@@ -2,8 +2,17 @@
   "name" : "salesOrder",
   "template" : "/sales/{orderId}"
 }, {
+  "name" : "salesQuote",
+  "template" : "/sales/quotes/{quoteId}"
+}, {
+  "name" : "stockCutPlan",
+  "template" : "/stock-cut-plans/{planId}"
+}, {
   "name" : "orderCoverDecision",
   "template" : "/decisions/order-cover/{orderId}"
+}, {
+  "name" : "collectionFollowUp",
+  "template" : "/decisions/collection-follow-up/{followUpId}"
 }, {
   "name" : "orderApproval",
   "template" : "/orders/approve/{token}"

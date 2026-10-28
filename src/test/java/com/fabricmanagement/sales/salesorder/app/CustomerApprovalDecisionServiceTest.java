@@ -83,6 +83,7 @@ class CustomerApprovalDecisionServiceTest {
   @Mock private EntityManager entityManager;
   @Mock private OrderFlowEventRepository events;
   @Mock private ApproverAuthorities approvers;
+  @Mock private SalesOrderPaymentPlanService paymentPlans;
 
   /** What each transaction loaded, newest last. */
   private final List<CustomerApproval> loadedApprovals = new ArrayList<>();
@@ -110,7 +111,8 @@ class CustomerApprovalDecisionServiceTest {
             transactions,
             entityManager,
             clock,
-            approvers);
+            approvers,
+            paymentPlans);
     when(transactions.execute(any()))
         .thenAnswer(
             invocation ->
@@ -241,6 +243,88 @@ class CustomerApprovalDecisionServiceTest {
             eq(SystemUser.ID),
             eq(NOW));
     verify(salesOrders).confirmApprovedByCustomer(lastOrder());
+    verify(paymentPlans).agreed(eq(lastOrder()), any(OrderVersion.class), eq(lastApproval()));
+  }
+
+  /** A frozen payment-plan amendment of an order that is already confirmed. */
+  private OrderVersion givenAConfirmedOrderWithAnAmendment() {
+    OrderVersion initial = version();
+    OrderVersion amendment =
+        OrderVersion.freeze(
+            ORDER,
+            initial,
+            OrderVersionKind.PAYMENT_PLAN,
+            1,
+            0,
+            null,
+            new OrderVersionContent(
+                null,
+                "SO-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                0,
+                List.of(),
+                null,
+                new com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent(
+                    UUID.randomUUID(), 1, "a".repeat(64), List.of(), List.of())),
+            "b".repeat(64),
+            UUID.randomUUID(),
+            NOW.minusSeconds(1800));
+    amendment.setId(VERSION);
+    when(versions.findByTenantIdAndId(TENANT, VERSION)).thenReturn(Optional.of(amendment));
+    when(orders.lockByTenantIdAndId(TENANT, ORDER))
+        .thenAnswer(
+            invocation -> {
+              var order = awaitingOrder();
+              order.setStatus(OrderStatus.IN_PROGRESS);
+              ReflectionTestUtils.setField(order, "flowStage", OrderFlowStage.CUSTOMER_APPROVED);
+              loadedOrders.add(order);
+              return Optional.of(order);
+            });
+    return amendment;
+  }
+
+  @Test
+  void paymentAmendmentAgreementDoesNotReconfirmOrMoveProduction() {
+    OrderVersion amendment = givenAConfirmedOrderWithAnAmendment();
+    assertThat(service.approve(APPROVAL, jane(), ANYONE).status())
+        .isEqualTo(CustomerApprovalStatus.APPROVED);
+    verify(paymentPlans).agreed(eq(lastOrder()), eq(amendment), eq(lastApproval()));
+    verify(salesOrders, never()).confirmApprovedByCustomer(any());
+    verify(commitments, never())
+        .recordCustomerApproval(any(), any(), any(), any(), anyInt(), any(), any());
+    assertThat(lastOrder().getStatus()).isEqualTo(OrderStatus.IN_PROGRESS);
+    assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.CUSTOMER_APPROVED);
+  }
+
+  /**
+   * Cash recorded after the sender submitted the amendment lowers an obligation further than they
+   * acknowledged. The customer is not handed a conflict only the sender could resolve: the approval
+   * is kept as "approved, not fulfillable" with the reason, and the confirmed order is untouched.
+   */
+  @Test
+  void anAmendmentThatCashHasOvertakenIsRecordedNotFulfillableAndMovesNothing() {
+    OrderVersion amendment = givenAConfirmedOrderWithAnAmendment();
+    when(paymentPlans.unacknowledgedReduction(any(), eq(amendment)))
+        .thenReturn("Cash was recorded after this revision was submitted");
+
+    CustomerApprovalDecisionService.Outcome outcome = service.approve(APPROVAL, jane(), ANYONE);
+
+    assertThat(outcome.status()).isEqualTo(CustomerApprovalStatus.APPROVED_NOT_FULFILLABLE);
+    assertThat(lastApproval().getDecisionDetail()).contains("Cash was recorded");
+    verify(approvals).save(lastApproval());
+    verify(paymentPlans, never()).agreed(any(), any(), any());
+    verify(salesOrders, never()).confirmApprovedByCustomer(any());
+    assertThat(lastOrder().getStatus()).isEqualTo(OrderStatus.IN_PROGRESS);
+    assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.CUSTOMER_APPROVED);
+    assertThat(lastOrder().getPlanningEvaluation()).isZero();
   }
 
   @Test
@@ -263,6 +347,7 @@ class CustomerApprovalDecisionServiceTest {
     CustomerApprovalDecisionService.Outcome outcome = service.approve(APPROVAL, jane(), ANYONE);
 
     assertThat(outcome.status()).isEqualTo(CustomerApprovalStatus.APPROVED_NOT_FULFILLABLE);
+    verify(paymentPlans, never()).agreed(any(), any(), any());
     assertThat(lastApproval().getDecisionDetail()).isEqualTo("PIECE_TAKEN");
     assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.IN_PLANNING);
     assertThat(lastOrder().getPlanningEvaluation()).isEqualTo(1);
@@ -270,6 +355,22 @@ class CustomerApprovalDecisionServiceTest {
     verify(salesOrders, never()).confirmApprovedByCustomer(any());
     verify(commitments, never())
         .recordCustomerApproval(any(), any(), any(), any(), anyInt(), any(), any());
+  }
+
+  @Test
+  void cashRecordedSinceTheSendersSubmissionSendsTheOrderBackToPlanningNotToAConflict() {
+    when(paymentPlans.unacknowledgedReduction(any(), any()))
+        .thenReturn("Cash was recorded after this revision was submitted");
+    when(intake.confirmationBlockers(any(), any())).thenReturn(List.of("PIECE_TAKEN"));
+
+    CustomerApprovalDecisionService.Outcome outcome = service.approve(APPROVAL, jane(), ANYONE);
+
+    assertThat(outcome.status()).isEqualTo(CustomerApprovalStatus.APPROVED_NOT_FULFILLABLE);
+    assertThat(lastApproval().getDecisionDetail())
+        .isEqualTo("PIECE_TAKEN; Cash was recorded after this revision was submitted");
+    assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.IN_PLANNING);
+    verify(paymentPlans, never()).agreed(any(), any(), any());
+    verify(salesOrders, never()).confirmApprovedByCustomer(any());
   }
 
   @Test
@@ -283,6 +384,7 @@ class CustomerApprovalDecisionServiceTest {
     // The second transaction read the request and the order afresh, as after the rollback.
     assertThat(loadedApprovals).hasSize(2);
     assertThat(outcome.status()).isEqualTo(CustomerApprovalStatus.APPROVED_NOT_FULFILLABLE);
+    verify(paymentPlans, never()).agreed(any(), any(), any());
     assertThat(lastApproval().getDecisionDetail()).isEqualTo("The piece was taken");
     assertThat(lastOrder().getFlowStage()).isEqualTo(OrderFlowStage.IN_PLANNING);
     assertThat(lastOrder().getStatus()).isEqualTo(OrderStatus.DRAFT);

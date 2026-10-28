@@ -1,5 +1,7 @@
 package com.fabricmanagement.common.infrastructure.web.exception;
 
+import com.fabricmanagement.common.infrastructure.logging.LogSafeFailure;
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +33,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.HandlerMapping;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
@@ -59,14 +63,15 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(NotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiProblemDetail handleNotFound(NotFoundException ex, HttpServletRequest req) {
-    log.info("Resource not found: {}", ex.getMessage());
+    log.info("Resource not found: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.NOT_FOUND, "Not Found", "NOT_FOUND", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(DomainException.class)
   public ResponseEntity<ApiProblemDetail> handleDomain(DomainException ex, HttpServletRequest req) {
-    log.info("Domain rule violation [{}]: {}", ex.getErrorCode(), ex.getMessage());
+    log.info(
+        "Domain rule violation [{}]: {}", ex.getErrorCode(), failureForLog(ex, req).getMessage());
     HttpStatus status = HttpStatus.valueOf(ex.getHttpStatus());
     ApiProblemDetail pd =
         buildProblemDetail(
@@ -102,7 +107,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiProblemDetail handleTaxIdAlreadyExists(
       TaxIdAlreadyExistsException ex, HttpServletRequest req) {
-    log.info("Signup conflict (tax ID): {}", ex.getMessage());
+    log.info("Signup conflict (tax ID): {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
@@ -115,7 +120,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiProblemDetail handleContactAlreadyRegistered(
       ContactAlreadyRegisteredException ex, HttpServletRequest req) {
-    log.info("Signup conflict (contact): {}", ex.getMessage());
+    log.info("Signup conflict (contact): {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
@@ -128,7 +133,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiProblemDetail handleEntityNotFound(
       jakarta.persistence.EntityNotFoundException ex, HttpServletRequest req) {
-    log.info("Entity not found: {}", ex.getMessage());
+    log.info("Entity not found: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.NOT_FOUND,
         "Not Found",
@@ -141,7 +146,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiProblemDetail handleIllegalArgument(
       IllegalArgumentException ex, HttpServletRequest req) {
-    log.info("Illegal argument: {}", ex.getMessage());
+    log.info("Illegal argument: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
@@ -153,7 +158,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(IllegalStateException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ApiProblemDetail handleIllegalState(IllegalStateException ex, HttpServletRequest req) {
-    log.info("Illegal state: {}", ex.getMessage());
+    log.info("Illegal state: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.CONFLICT, "Conflict", "ILLEGAL_STATE", ex.getMessage(), req.getRequestURI());
   }
@@ -173,7 +178,9 @@ public class GlobalExceptionHandler {
                             : "",
                     (existing, replacement) -> existing));
 
-    log.info("Validation failed: {}", fieldErrors);
+    log.info(
+        "Validation failed: {}",
+        sensitiveRequest(req) ? failureForLog(ex, req).getMessage() : fieldErrors);
     ApiProblemDetail pd =
         buildProblemDetail(
             HttpStatus.UNPROCESSABLE_ENTITY,
@@ -197,7 +204,9 @@ public class GlobalExceptionHandler {
                     ConstraintViolation::getMessage,
                     (existing, replacement) -> existing));
 
-    log.info("Constraint violation: {}", details);
+    log.info(
+        "Constraint violation: {}",
+        sensitiveRequest(req) ? failureForLog(ex, req).getMessage() : details);
     ApiProblemDetail pd =
         buildProblemDetail(
             HttpStatus.UNPROCESSABLE_ENTITY,
@@ -213,7 +222,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiProblemDetail handleNotReadable(
       HttpMessageNotReadableException ex, HttpServletRequest req) {
-    log.info("Request body not readable: {}", ex.getMessage());
+    log.info("Request body not readable: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
@@ -229,7 +238,10 @@ public class GlobalExceptionHandler {
   })
   @ResponseStatus(HttpStatus.CONFLICT)
   public ApiProblemDetail handleOptimisticLock(Exception ex, HttpServletRequest req) {
-    log.warn("JPA Optimistic lock error on {}: {}", req.getRequestURI(), ex.getMessage());
+    log.warn(
+        "JPA Optimistic lock error on {}: {}",
+        req.getRequestURI(),
+        failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.CONFLICT,
         "Conflict",
@@ -241,19 +253,40 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public ApiProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
-    log.warn("Access denied: {} — {}", req.getRequestURI(), ex.getMessage());
+    log.warn("Access denied: {} — {}", req.getRequestURI(), failureForLog(ex, req).getMessage());
     meterRegistryProvider.ifAvailable(
         registry ->
             registry.counter("security.access.denied", "uri", req.getRequestURI()).increment());
-    return buildProblemDetail(
-        HttpStatus.FORBIDDEN, "Forbidden", "ACCESS_DENIED", ex.getMessage(), req.getRequestURI());
+    // A role may allow the action while the organisation's packages do not include the module;
+    // saying so lets a client explain the refusal instead of showing a generic "forbidden".
+    return com.fabricmanagement.common.infrastructure.security.PackageAccessDenial.resourceIn(req)
+        .map(
+            resource -> {
+              ApiProblemDetail pd =
+                  buildProblemDetail(
+                      HttpStatus.FORBIDDEN,
+                      "Forbidden",
+                      "PACKAGE_NOT_ENABLED",
+                      "The " + resource + " module is not part of this organisation's packages",
+                      req.getRequestURI());
+              pd.setArgs(new Object[] {resource});
+              return pd;
+            })
+        .orElseGet(
+            () ->
+                buildProblemDetail(
+                    HttpStatus.FORBIDDEN,
+                    "Forbidden",
+                    "ACCESS_DENIED",
+                    ex.getMessage(),
+                    req.getRequestURI()));
   }
 
   @ExceptionHandler(TooManyRequestsException.class)
   @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
   public ApiProblemDetail handleTooManyRequests(
       TooManyRequestsException ex, HttpServletRequest req) {
-    log.warn("Rate limit exceeded: {}", ex.getMessage());
+    log.warn("Rate limit exceeded: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.TOO_MANY_REQUESTS,
         "Too Many Requests",
@@ -266,7 +299,8 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.CONFLICT)
   public ApiProblemDetail handleIntegrity(
       DataIntegrityViolationException ex, HttpServletRequest req) {
-    log.error("Data integrity violation: {}", ex.getMessage(), ex);
+    Throwable safe = failureForLog(ex, req);
+    log.error("Data integrity violation: {}", safe.getMessage(), safe);
     String msg = "Data conflict (unique or FK constraint).";
     return buildProblemDetail(
         HttpStatus.CONFLICT, "Conflict", "DATA_INTEGRITY", msg, req.getRequestURI());
@@ -286,7 +320,11 @@ public class GlobalExceptionHandler {
         rawValue != null
             ? rawValue.toString().substring(0, Math.min(rawValue.toString().length(), 36))
             : "null";
-    log.info("Type mismatch: param={}, required={}, value={}", paramName, requiredType, safeValue);
+    log.info(
+        "Type mismatch: param={}, required={}, value={}",
+        paramName,
+        requiredType,
+        sensitiveRequest(req) ? "[omitted]" : safeValue);
 
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST, "Bad Request", "TYPE_MISMATCH", message, req.getRequestURI());
@@ -325,7 +363,11 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiProblemDetail> handleServiceUnavailable(
       Exception ex, HttpServletRequest req) {
     String traceId = currentTraceId();
-    log.error("Service temporarily unavailable: {} [traceId={}]", req.getRequestURI(), traceId, ex);
+    log.error(
+        "Service temporarily unavailable: {} [traceId={}]",
+        req.getRequestURI(),
+        traceId,
+        failureForLog(ex, req));
     ApiProblemDetail problemDetail =
         buildProblemDetail(
             HttpStatus.SERVICE_UNAVAILABLE,
@@ -343,7 +385,11 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public ApiProblemDetail handleGeneric(Exception ex, HttpServletRequest req) {
     String traceId = currentTraceId();
-    log.error("Unexpected error occurred: {} [traceId={}]", req.getRequestURI(), traceId, ex);
+    log.error(
+        "Unexpected error occurred: {} [traceId={}]",
+        req.getRequestURI(),
+        traceId,
+        failureForLog(ex, req));
     ApiProblemDetail problemDetail =
         buildProblemDetail(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -353,6 +399,17 @@ public class GlobalExceptionHandler {
             req.getRequestURI());
     problemDetail.setTraceId(traceId);
     return problemDetail;
+  }
+
+  /** Restrict payload-free exception logging to explicitly marked credential handlers. */
+  private static boolean sensitiveRequest(HttpServletRequest request) {
+    Object handler = request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE);
+    return handler instanceof HandlerMethod method
+        && method.hasMethodAnnotation(SensitiveLogData.class);
+  }
+
+  private static Throwable failureForLog(Throwable failure, HttpServletRequest request) {
+    return sensitiveRequest(request) ? LogSafeFailure.snapshot(failure) : failure;
   }
 
   /**

@@ -3,6 +3,7 @@ package com.fabricmanagement.finance.payment.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
+import com.fabricmanagement.finance.payment.domain.exception.PaymentReversalException;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.AttributeOverrides;
@@ -89,6 +90,18 @@ public class Payment extends BaseEntity {
   @Column(name = "metadata", columnDefinition = "jsonb")
   private Map<String, Object> metadata;
 
+  /** Set on a reversal row: the payment it cancels. */
+  @Column(name = "reverses_payment_id")
+  private UUID reversesPaymentId;
+
+  /** Set on the original once it has been reversed: its single reversal. */
+  @Column(name = "reversed_by_payment_id")
+  private UUID reversedByPaymentId;
+
+  /** Set on a reversal row: why the payment was cancelled. */
+  @Column(name = "reversal_reason", length = 1000)
+  private String reversalReason;
+
   @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
   @JoinColumn(name = "payment_id", nullable = false)
   @Builder.Default
@@ -117,11 +130,26 @@ public class Payment extends BaseEntity {
     return amount.subtract(getAllocatedAmount());
   }
 
+  @Transient
+  public boolean isReversal() {
+    return reversesPaymentId != null;
+  }
+
+  @Transient
+  public boolean isReversed() {
+    return reversedByPaymentId != null;
+  }
+
   public PaymentAllocation allocate(
       UUID invoiceId, Money allocationAmount, Money invoiceOpenBalance, String invoiceCurrency) {
 
     if (this.status == PaymentStatus.VOIDED) {
       throw new FinanceDomainException("Cannot allocate a voided payment");
+    }
+
+    if (isReversal() || isReversed()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_REVERSED", "Cannot allocate a reversed payment or a reversal");
     }
 
     if (!getCurrency().equals(invoiceCurrency)) {
@@ -168,20 +196,108 @@ public class Payment extends BaseEntity {
     return allocation;
   }
 
-  public List<PaymentAllocation> voidPayment() {
+  /**
+   * Cancels a payment that nothing was applied to. A payment with invoice allocations is not
+   * rewritten in place: it is reversed instead, so the allocations are released on a dated,
+   * traceable posting.
+   */
+  public void voidPayment() {
     if (this.status == PaymentStatus.VOIDED) {
       throw new FinanceDomainException("Payment is already voided");
     }
 
-    this.status = PaymentStatus.VOIDED;
+    if (isReversal()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_REVERSAL_IMMUTABLE", "A reversal cannot be voided");
+    }
 
-    List<PaymentAllocation> reversedAllocations = new ArrayList<>();
+    if (isReversed()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_ALREADY_REVERSED", "A reversed payment cannot be voided");
+    }
+
+    if (hasActiveAllocation()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_VOID_HAS_ALLOCATIONS",
+          "A payment with invoice allocations cannot be voided; reverse it instead");
+    }
+
+    this.status = PaymentStatus.VOIDED;
+  }
+
+  private boolean hasActiveAllocation() {
+    return this.allocations.stream().anyMatch(a -> Boolean.TRUE.equals(a.getIsActive()));
+  }
+
+  /** The opposite payment, and the invoice allocations that were released to post it. */
+  public record Reversal(Payment payment, List<PaymentAllocation> releasedAllocations) {}
+
+  /**
+   * Builds the opposite-direction payment that cancels this one, whatever its method, and releases
+   * the invoice allocations it carried so the caller can undo them on the invoices. The payment
+   * itself stays as recorded; the caller persists the result and then links it with {@link
+   * #markReversedBy(UUID)}.
+   */
+  public Reversal reverse(String reversalNumber, LocalDate reversalDate, String reason) {
+    if (getId() == null) {
+      throw new IllegalStateException("Only a persisted payment can be reversed");
+    }
+    if (this.status == PaymentStatus.VOIDED) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_VOIDED", "A voided payment cannot be reversed");
+    }
+    if (isReversal()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_REVERSAL_NOT_REVERSIBLE", "A reversal cannot itself be reversed");
+    }
+    if (isReversed()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_ALREADY_REVERSED", "This payment is already reversed");
+    }
+    if (reversalDate == null) {
+      throw PaymentReversalException.invalid("A reversal needs an accounting date");
+    }
+    if (reason == null || reason.isBlank()) {
+      throw PaymentReversalException.invalid("A reversal needs a reason");
+    }
+    if (reversalDate.isBefore(this.paymentDate)) {
+      throw PaymentReversalException.invalid("A reversal cannot precede the payment date");
+    }
+
+    List<PaymentAllocation> released = new ArrayList<>();
     for (PaymentAllocation allocation : this.allocations) {
-      if (allocation.getIsActive()) {
+      if (Boolean.TRUE.equals(allocation.getIsActive())) {
         allocation.delete();
-        reversedAllocations.add(allocation);
+        released.add(allocation);
       }
     }
-    return reversedAllocations;
+
+    Payment opposite =
+        Payment.builder()
+            .tradingPartnerId(this.tradingPartnerId)
+            .paymentNumber(reversalNumber)
+            .direction(
+                this.direction == PaymentDirection.INBOUND
+                    ? PaymentDirection.OUTBOUND
+                    : PaymentDirection.INBOUND)
+            .method(this.method)
+            .amount(Money.of(this.amount.getAmount(), getCurrency()))
+            .paymentDate(reversalDate)
+            .notes(reason.trim())
+            .reversesPaymentId(getId())
+            .reversalReason(reason.trim())
+            .build();
+    return new Reversal(opposite, List.copyOf(released));
+  }
+
+  public void markReversedBy(UUID reversalPaymentId) {
+    if (reversalPaymentId == null) {
+      throw new IllegalArgumentException("The reversal payment id is required");
+    }
+    if (isReversed()) {
+      throw PaymentReversalException.conflict(
+          "PAYMENT_ALREADY_REVERSED", "This payment is already reversed");
+    }
+    this.reversedByPaymentId = reversalPaymentId;
   }
 }

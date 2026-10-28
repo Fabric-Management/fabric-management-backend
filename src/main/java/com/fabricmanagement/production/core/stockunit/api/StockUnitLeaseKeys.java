@@ -8,9 +8,15 @@ import java.util.UUID;
 public final class StockUnitLeaseKeys {
   public static final String RESOURCE_TYPE = "stock-product";
   public static final long GENERATION = 1;
+  public static final String LIVE_EVENTS_TEMPLATE =
+      "/api/v1/sales/order-intake/products/{productId}/stock-live-events";
   private static final String PREFIX = "stock-unit:";
 
   private StockUnitLeaseKeys() {}
+
+  public static String liveEventsPath(UUID productId) {
+    return LIVE_EVENTS_TEMPLATE.replace("{productId}", productId.toString());
+  }
 
   public static LiveResource resource(UUID productId) {
     return new LiveResource(RESOURCE_TYPE, productId);

@@ -136,14 +136,75 @@ class TablePrivilegeClassIT {
   }
 
   @Test
-  void pinnedTargetReportsThreeHistoricalPrivilegeSurpluses() throws SQLException {
+  void pinnedTargetReportsFourHistoricalPrivilegeSurpluses() throws SQLException {
     try (Connection connection = ownerConnection(BASELINE_POSTGRES)) {
       assertThat(pinnedBaselineDifferences(connection))
           .containsExactly(
+              // The lead table still lets the app delete rows at this pin; the retained-onboarding
+              // migration revokes that, because a lead is evidence and is only purged by
+              // fabric_system.
+              difference("common_company.common_lead", "fabric_app", "surplus: DELETE"),
               difference("sales.customer_commercial_assignment", "fabric_app", "surplus: DELETE"),
               difference(
                   "sales.customer_commercial_assignment", "fabric_system", "surplus: UPDATE"),
               difference("sales_ord.order_cover_evidence_stream", "fabric_app", "surplus: DELETE"));
+    }
+  }
+
+  @Test
+  void systemEvaluationCatalogueIsReadableButNotWritableAndPrivateDefinitionsStayPrivate()
+      throws SQLException {
+    String shared = java.util.UUID.randomUUID().toString();
+    String customer = java.util.UUID.randomUUID().toString();
+    try (Connection owner = ownerConnection(FULL_POSTGRES);
+        Statement statement = owner.createStatement()) {
+      statement.executeUpdate(
+          """
+          INSERT INTO common_company.common_os_definition
+            (id, tenant_id, uid, os_code, os_name, available_tiers, default_tier)
+          VALUES ('%s', '00000000-0000-0000-0000-000000000000', 'CAT-%s', 'CAT-%s', 'Shared catalogue', '["Base"]', 'Base'),
+            ('%s', '%s', 'CAT-%s', 'CAT-%s', 'Private catalogue', '["Base"]', 'Base')
+          """
+              .formatted(shared, shared, shared, customer, OTHER_TENANT, customer, customer));
+    }
+    try {
+      try (Connection app = appConnection();
+          Statement statement = app.createStatement()) {
+        app.setAutoCommit(false);
+        try (ResultSet rows =
+            statement.executeQuery(
+                "SELECT id FROM common_company.common_os_definition WHERE id IN ('"
+                    + shared
+                    + "', '"
+                    + customer
+                    + "')")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getString(1)).isEqualTo(shared);
+          assertThat(rows.next()).isFalse();
+        }
+        assertThat(
+                statement.executeUpdate(
+                    "UPDATE common_company.common_os_definition SET evaluation_available = false WHERE id = '"
+                        + shared
+                        + "'"))
+            .isZero();
+        try (ResultSet rows =
+            statement.executeQuery("SELECT 1 FROM pg_advisory_xact_lock(20261025, 130000)")) {
+          assertThat(rows.next()).isTrue();
+        }
+        app.rollback();
+      }
+      assertAppSqlState("SELECT common_company.repair_playground_evaluation_packages()", "42501");
+    } finally {
+      try (Connection owner = ownerConnection(FULL_POSTGRES);
+          Statement statement = owner.createStatement()) {
+        statement.executeUpdate(
+            "DELETE FROM common_company.common_os_definition WHERE id IN ('"
+                + shared
+                + "', '"
+                + customer
+                + "')");
+      }
     }
   }
 
@@ -1047,6 +1108,82 @@ class TablePrivilegeClassIT {
       configuration.target(target);
     }
     configuration.load().migrate();
+  }
+
+  @Test
+  void onboardingEvidenceIsImmutableForRuntimeRolesAndProgressForcesTenantScope()
+      throws SQLException {
+    String lead = java.util.UUID.randomUUID().toString();
+    String journey = java.util.UUID.randomUUID().toString();
+    try (Connection admin = adminConnection(FULL_POSTGRES);
+        Statement statement = admin.createStatement()) {
+      statement.executeUpdate(
+          "INSERT INTO common_company.common_lead(id,uid,company_name,tax_id,organization_type,first_name,last_name,work_email,signup_intent,signup_snapshot) VALUES ('"
+              + lead
+              + "','LEAD-"
+              + lead
+              + "','Hawthorn Weaving Ltd','GB123456789','WEAVER','Eleanor','Hughes','eleanor.hughes@example.com','PLAYGROUND','{}')");
+      statement.executeUpdate(
+          "INSERT INTO common_company.lead_profile_snapshot(lead_id,revision,source,evidence) VALUES ('"
+              + lead
+              + "',0,'SIGNUP','{}')");
+      admin.setAutoCommit(false);
+      try {
+        statement.execute("SET LOCAL session_replication_role = replica");
+        statement.executeUpdate(
+            "INSERT INTO common_user.onboarding_journey(id,tenant_id,owner_user_id,kind) VALUES ('"
+                + journey
+                + "','"
+                + TENANT
+                + "',gen_random_uuid(),'PERSONAL')");
+        admin.commit();
+      } finally {
+        admin.rollback();
+      }
+    }
+    try {
+      assertAppSqlState(
+          "UPDATE common_company.common_lead SET company_name = 'Willow Cloth Ltd' WHERE id = '"
+              + lead
+              + "'",
+          "42501");
+      assertAppSqlState(
+          "UPDATE common_company.lead_profile_snapshot SET evidence = '{}' WHERE lead_id = '"
+              + lead
+              + "'",
+          "42501");
+      assertAppSqlState(
+          "DELETE FROM common_company.common_lead WHERE id = '" + lead + "'", "42501");
+      assertAppSqlState("SELECT * FROM common_company.onboarding_link_issue", "42501");
+      assertAppSqlState("SELECT common_company.backfill_onboarding_evidence()", "42501");
+      try (Connection app = appConnection();
+          Statement statement = app.createStatement()) {
+        try (ResultSet own =
+            statement.executeQuery(
+                "SELECT count(*) FROM common_user.onboarding_journey WHERE id = '"
+                    + journey
+                    + "'")) {
+          assertThat(own.next()).isTrue();
+          assertThat(own.getInt(1)).isEqualTo(1);
+        }
+        statement.execute("SELECT set_config('app.current_tenant','" + OTHER_TENANT + "',false)");
+        try (ResultSet other =
+            statement.executeQuery(
+                "SELECT count(*) FROM common_user.onboarding_journey WHERE id = '"
+                    + journey
+                    + "'")) {
+          assertThat(other.next()).isTrue();
+          assertThat(other.getInt(1)).isZero();
+        }
+      }
+    } finally {
+      try (Connection owner = ownerConnection(FULL_POSTGRES);
+          Statement statement = owner.createStatement()) {
+        statement.executeUpdate(
+            "DELETE FROM common_user.onboarding_journey WHERE id = '" + journey + "'");
+        statement.executeUpdate("DELETE FROM common_company.common_lead WHERE id = '" + lead + "'");
+      }
+    }
   }
 
   private static void seedFullMigrationFixtures() throws SQLException {

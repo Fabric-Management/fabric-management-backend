@@ -99,10 +99,7 @@ public class PasswordSetupService {
    */
   @Transactional
   public LoginResponse setupPassword(PasswordSetupRequest request, String ipAddress) {
-    log.info(
-        "Password setup initiated: token={}..., tokenType={}",
-        request.getToken().substring(0, Math.min(8, request.getToken().length())),
-        "checking...");
+    log.info("Password setup initiated");
 
     // RLS: common_registration_token is tenant-scoped, but password setup is anonymous (no tenant
     // context yet), so the RLS-bound reads below can't see the token. Resolve the token's tenant
@@ -122,12 +119,12 @@ public class PasswordSetupService {
             .orElseThrow(() -> new IllegalArgumentException("Invalid registration token"));
 
     if (!token.isValid()) {
-      log.warn("Token invalid or expired: token={}", request.getToken().substring(0, 8) + "...");
+      log.warn("Password setup rejected: tenantId={}, reason=AUTH_TOKEN_INVALID", tokenTenantId);
       throw new PlatformDomainException(
           "Registration token is invalid or expired", "AUTH_TOKEN_INVALID", 400);
     }
 
-    log.debug("Token type: {}", token.getTokenType());
+    log.debug("Password setup tenant resolved: tenantId={}", tokenTenantId);
 
     // Email is verified when user completes password setup (link click + password set).
     // ensureAuthenticationContact below verifies the contact for this flow.
@@ -284,8 +281,9 @@ public class PasswordSetupService {
     }
 
     log.info(
-        "✅ Password setup completed: user={}, needsOnboarding={}",
-        PiiMaskingUtil.maskEmail(contactValue),
+        "Password setup completed: tenantId={}, userId={}, needsOnboarding={}",
+        user.getTenantId(),
+        user.getId(),
         needsOnboarding);
 
     return LoginResponse.builder()

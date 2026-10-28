@@ -15,6 +15,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
 
+  @org.junit.jupiter.api.BeforeEach
+  void requireMigrationCatalogue(
+      @org.springframework.beans.factory.annotation.Autowired
+          org.springframework.jdbc.core.JdbcTemplate jdbc) {
+    EvaluationCatalogueGuard.requireMigrationCatalogue(jdbc);
+  }
+
   @SuppressWarnings("resource")
   protected static final PostgreSQLContainer<?> postgres =
       PostgresImage.container()

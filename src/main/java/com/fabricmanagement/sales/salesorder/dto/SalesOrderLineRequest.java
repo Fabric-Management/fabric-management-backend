@@ -56,14 +56,26 @@ public class SalesOrderLineRequest implements CatalogLineInput {
 
   @Schema(
       description =
-          "Commercial line quantity; after Apply this equals the chosen stock quantity, while customerRequestQty retains the request")
+          "Commercial line quantity; after Apply this equals the chosen stock quantity, while"
+              + " customerRequestQty retains the request")
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be greater than zero")
   private BigDecimal requestedQty;
 
   @Schema(
       description =
-          "Customer request preserved separately when the commercial quantity follows a stock choice")
+          "Explicit quantity decision; omission preserves an existing decision or means UNRECORDED"
+              + " on creation")
+  private com.fabricmanagement.sales.common.domain.SalesQuantityPolicy quantityPolicy;
+
+  @Schema(description = "Reason for a new or changed quantity decision", maxLength = 500)
+  @jakarta.validation.constraints.Size(max = 500)
+  private String quantityPolicyReason;
+
+  @Schema(
+      description =
+          "Customer request preserved separately when the commercial quantity follows a stock"
+              + " choice")
   @DecimalMin("0.001")
   private BigDecimal customerRequestQty;
 
@@ -72,7 +84,8 @@ public class SalesOrderLineRequest implements CatalogLineInput {
 
   @Schema(
       description =
-          "Explicit source line when this order converts an approved quote; never inferred by product")
+          "Explicit source line when this order converts an approved quote; never inferred by"
+              + " product")
   private UUID sourceQuoteLineId;
 
   @jakarta.validation.Valid
@@ -85,7 +98,8 @@ public class SalesOrderLineRequest implements CatalogLineInput {
   @jakarta.validation.Valid
   @Schema(
       description =
-          "Unapplied preview selection to release after successful order creation; never applied automatically")
+          "Unapplied preview selection to release after successful order creation; never applied"
+              + " automatically")
   private com.fabricmanagement.sales.orderintake.dto.DraftStockSelectionRequests.Proof
       previewStockSelection;
 

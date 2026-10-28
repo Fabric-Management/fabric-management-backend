@@ -52,6 +52,7 @@ class StockUnitServiceQualityGateTest {
   @Mock private StockUnitAuditLogRepository auditLogRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private WarehouseLocationPort warehouseLocationPort;
+  @Mock private com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
   @InjectMocks private StockUnitService service;
 
   @BeforeEach

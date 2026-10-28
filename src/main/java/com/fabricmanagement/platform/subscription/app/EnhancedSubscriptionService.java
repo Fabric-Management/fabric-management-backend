@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,7 +72,6 @@ public class EnhancedSubscriptionService {
    * @param osCode the OS code (e.g., "YarnOS")
    * @return true if active subscription exists
    */
-  @Cacheable(value = "subscription-check", key = "#tenantId + ':' + #osCode")
   @Transactional(readOnly = true)
   public boolean hasActiveSubscription(UUID tenantId, String osCode) {
     log.debug("[Layer 1] Checking OS subscription: tenantId={}, osCode={}", tenantId, osCode);
@@ -96,13 +94,17 @@ public class EnhancedSubscriptionService {
    * @param featureId the feature ID (e.g., "yarn.blend.management")
    * @return true if feature is available
    */
-  @Cacheable(value = "feature-check", key = "#tenantId + ':' + #featureId")
   @Transactional(readOnly = true)
   public boolean hasFeature(UUID tenantId, String featureId) {
     log.debug(
         "[Layer 2] Checking feature entitlement: tenantId={}, featureId={}", tenantId, featureId);
 
-    String osCode = extractOsCode(featureId);
+    Optional<FeatureCatalog> feature =
+        featureCatalogRepository
+            .findByFeatureId(featureId)
+            .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && f.getDeletedAt() == null);
+    if (feature.isEmpty()) return false;
+    String osCode = feature.get().getOsCode();
 
     Optional<Subscription> subscription =
         subscriptionRepository.findActiveSubscriptionByOsCode(tenantId, osCode, Instant.now());
@@ -112,14 +114,16 @@ public class EnhancedSubscriptionService {
       return false;
     }
 
-    Optional<FeatureCatalog> feature = featureCatalogRepository.findByFeatureId(featureId);
+    if (feature.get().getRequiresOs() != null
+        && !hasActiveSubscription(tenantId, feature.get().getRequiresOs())) return false;
 
-    if (feature.isEmpty()) {
-      log.warn("[Layer 2] Feature not found in catalog: {}", featureId);
-      return false;
-    }
-
-    boolean hasFeature = feature.get().isAvailableInTier(subscription.get().getPricingTier());
+    // Evaluation exposes package features without assigning a fictional paid maximum tier.
+    // Quotas and the policy engine's user permissions are still checked independently.
+    boolean hasFeature =
+        (subscription.get().isEvaluationManaged()
+                && subscription.get().getStatus()
+                    == com.fabricmanagement.platform.subscription.domain.SubscriptionStatus.TRIAL)
+            || feature.get().isAvailableInTier(subscription.get().getPricingTier());
 
     log.debug(
         "[Layer 2] Result: {} - Tier: {}, Required: {}",
@@ -183,7 +187,15 @@ public class EnhancedSubscriptionService {
     log.info("[Entitlement Check] featureId={}, quotaType={}", featureId, quotaType);
 
     // Layer 1: OS Subscription
-    String osCode = extractOsCode(featureId);
+    String osCode =
+        featureCatalogRepository
+            .findByFeatureId(featureId)
+            .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && f.getDeletedAt() == null)
+            .map(FeatureCatalog::getOsCode)
+            .orElseThrow(
+                () ->
+                    new FeatureNotAvailableException(
+                        "Feature is unavailable in the catalogue", featureId, null));
     if (!hasActiveSubscription(tenantId, osCode)) {
       log.warn("[Entitlement Check] DENIED - No active subscription to {}", osCode);
       throw new SubscriptionRequiredException(
@@ -267,36 +279,5 @@ public class EnhancedSubscriptionService {
     } else {
       log.debug("No quota configured for {} - skipping increment", quotaType);
     }
-  }
-
-  /**
-   * Extract OS code from feature ID.
-   *
-   * <p>Feature ID format: {os_prefix}.{module}.{feature_name}
-   *
-   * <p>Example: "yarn.blend.management" → "YarnOS"
-   *
-   * @param featureId the feature ID
-   * @return OS code
-   */
-  private String extractOsCode(String featureId) {
-    if (featureId == null || !featureId.contains(".")) {
-      throw new IllegalArgumentException("Invalid feature ID format: " + featureId);
-    }
-
-    String prefix = featureId.split("\\.")[0];
-
-    return switch (prefix.toLowerCase()) {
-      case "yarn" -> "YarnOS";
-      case "weaving", "loom" -> "LoomOS";
-      case "knit" -> "KnitOS";
-      case "dye", "finish" -> "DyeOS";
-      case "analytics" -> "AnalyticsOS";
-      case "intelligence", "ai" -> "IntelligenceOS";
-      case "edge", "iot" -> "EdgeOS";
-      case "account", "accounting" -> "AccountOS";
-      case "custom", "integration" -> "CustomOS";
-      default -> "FabricOS"; // Fallback to base OS
-    };
   }
 }

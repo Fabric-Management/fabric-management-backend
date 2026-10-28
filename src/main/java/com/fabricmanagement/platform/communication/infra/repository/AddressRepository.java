@@ -13,6 +13,18 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AddressRepository extends JpaRepository<Address, UUID> {
 
+  /** Personal address cards and another organisation's cards cannot be edited via onboarding. */
+  @Query(
+      "SELECT COUNT(a) FROM Address a WHERE a.tenantId = :tenantId AND a.id = :addressId"
+          + " AND (EXISTS (SELECT oa FROM OrganizationAddress oa WHERE oa.addressId = a.id"
+          + " AND oa.tenantId = :tenantId AND oa.organizationId <> :organizationId AND oa.isActive = true)"
+          + " OR EXISTS (SELECT ua FROM UserAddress ua WHERE ua.tenantId = :tenantId"
+          + " AND ua.addressId = a.id AND ua.isActive = true))")
+  long countSharedOnboardingAddress(
+      @Param("tenantId") UUID tenantId,
+      @Param("addressId") UUID addressId,
+      @Param("organizationId") UUID organizationId);
+
   /** Find all active addresses by type within tenant. */
   @Query(
       "SELECT a FROM Address a WHERE a.tenantId = :tenantId "

@@ -264,6 +264,44 @@ class ProposalStockQueryServiceTest {
     return measuredAtBirth(lot, length, StockUnitStatus.AVAILABLE, PackageType.ROLL);
   }
 
+  @Test
+  void splitChildrenDoNotBecomeNewProductionMeasurements() {
+    Batch lot = lot(COLOR, null);
+    StockUnit original = measuredAtBirth(lot, "125", StockUnitStatus.DEPLETED, PackageType.ROLL);
+    StockUnit delivered = splitChild(lot, original, "50");
+    StockUnit remainder = splitChild(lot, original, "75");
+    stock(lot, original, delivered, remainder);
+    ProposalLot found = onlyLot(query(null, null));
+    assertThat(found.averageBasis()).isEqualTo(PieceAverageBasis.INITIAL_MEASUREMENTS);
+    assertThat(found.averagePiece()).isEqualByComparingTo("125");
+    assertThat(found.pieces())
+        .extracting(ProposalPiece::stockUnitId)
+        .containsExactlyInAnyOrder(delivered.getId(), remainder.getId());
+    assertThat(found.pieces())
+        .extracting(piece -> piece.canonicalMeasure().stripTrailingZeros().toPlainString())
+        .containsExactlyInAnyOrder("50", "75");
+  }
+
+  private static StockUnit splitChild(Batch lot, StockUnit parent, String length) {
+    StockUnit child =
+        StockUnit.builder()
+            .batchId(lot.getId())
+            .barcode("CUT-" + UUID.randomUUID())
+            .productType(ProductType.FABRIC)
+            .packageType(PackageType.ROLL)
+            .unit("KG")
+            .sourceType(
+                com.fabricmanagement.production.core.stockunit.domain.StockUnitSourceType.SPLIT)
+            .sourceId(parent.getId())
+            .status(StockUnitStatus.AVAILABLE)
+            .qualityDisposition(QualityDisposition.RELEASED)
+            .build();
+    child.recordInitialLength(new BigDecimal(length), "M");
+    child.setId(UUID.randomUUID());
+    child.setTenantId(TENANT);
+    return child;
+  }
+
   private static StockUnit measuredAtBirth(
       Batch lot, String length, StockUnitStatus status, PackageType type) {
     StockUnit piece =

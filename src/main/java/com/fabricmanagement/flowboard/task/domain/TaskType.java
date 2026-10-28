@@ -30,6 +30,8 @@ public enum TaskType {
   MAINTENANCE,
   /** Decide how a confirmed SalesOrder is covered. */
   ORDER_COVER,
+  /** Follow up an accepted collection obligation without posting money. */
+  COLLECTION_FOLLOW_UP,
   /** General work without a narrower type. */
   GENERAL
 }

@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.user.dto;
 
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -26,6 +28,14 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(
+    description =
+        "Atomic onboarding profile patch. Absent or null fields leave saved data unchanged."
+            + " Blank strings explicitly clear only legalName, registrationNumber, industry, website, description,"
+            + " addressLine2, state, district and postalCode. Identity, street, city, country, addressLabel and"
+            + " contact fields reject blank values. A new headquarters requires street, city and country together."
+            + " Replays reuse headquarters and contacts and emit no second completion event."
+            + " selectedOS retains evaluation choices; package defaults and access activation belong to the subscription workflow.")
 public class CompleteOnboardingRequest {
 
   // ── Organization identity ───────────────────────────────────────────────────
@@ -88,7 +98,7 @@ public class CompleteOnboardingRequest {
   @Size(max = 100, message = "State must not exceed 100 characters")
   private String state;
 
-  /** District / sub-administrative area (e.g. ilçe). */
+  /** District or local administrative area. */
   @Size(max = 100, message = "District must not exceed 100 characters")
   private String district;
 
@@ -102,7 +112,7 @@ public class CompleteOnboardingRequest {
 
   /**
    * Location name / label for the headquarters address (e.g. "Headquarters", "Production Plant").
-   * If blank or null, backend defaults to "Headquarters".
+   * Null preserves the existing label (new address defaults to "Headquarters"); blank is invalid.
    */
   @Size(max = 100, message = "Address label must not exceed 100 characters")
   private String addressLabel;
@@ -114,7 +124,7 @@ public class CompleteOnboardingRequest {
   @Size(max = 254, message = "Email must not exceed 254 characters")
   private String companyEmail;
 
-  /** Company phone number (E.164 recommended). */
+  /** Company international telephone; numbering metadata distinguishes mobile and landline. */
   @Size(max = 20, message = "Phone must not exceed 20 characters")
   private String companyPhone;
 
@@ -127,4 +137,30 @@ public class CompleteOnboardingRequest {
 
   /** Selected OS module codes (e.g. ["FabricOS", "LogiOS"]). */
   private List<String> selectedOS;
+
+  /** Only personal mobile is self-service; even blank company values require authorisation. */
+  @JsonIgnore
+  public boolean hasCompanyChanges() {
+    return java.util.stream.Stream.of(
+            organizationName,
+            organizationType,
+            taxId,
+            legalName,
+            registrationNumber,
+            industry,
+            website,
+            description,
+            addressLine1,
+            addressLine2,
+            city,
+            state,
+            district,
+            postalCode,
+            country,
+            addressLabel,
+            companyEmail,
+            companyPhone,
+            selectedOS)
+        .anyMatch(java.util.Objects::nonNull);
+  }
 }

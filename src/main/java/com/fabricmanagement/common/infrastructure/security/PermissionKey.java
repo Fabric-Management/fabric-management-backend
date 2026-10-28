@@ -45,6 +45,12 @@ public enum PermissionKey {
   FIBER_WRITE("fiber:write", EnforcedBy.ANNOTATION, ""),
   FINANCE_MANAGE("finance:manage", EnforcedBy.ANNOTATION, ""),
   FINANCE_READ("finance:read", EnforcedBy.ANNOTATION, ""),
+  FINANCE_REVERSE(
+      "finance:reverse",
+      EnforcedBy.ANNOTATION,
+      "Reverse or void a posted payment. Separate from finance:write so the person who enters a"
+          + " payment is not the one who corrects the ledger; finance supervisors and managers"
+          + " hold it by default."),
   FINANCE_WRITE("finance:write", EnforcedBy.ANNOTATION, ""),
   FLOWBOARD_READ("flowboard:read", EnforcedBy.ANNOTATION, ""),
   FLOWBOARD_MANAGE_ROUTING(
@@ -74,6 +80,11 @@ public enum PermissionKey {
   MEMBERS_MANAGE("members:manage", EnforcedBy.JAVA, ""),
   MEMBERS_READ("members:read", EnforcedBy.JAVA, ""),
   MEMBERS_WRITE("members:write", EnforcedBy.JAVA, ""),
+  ORGANIZATION_CONFIGURE(
+      "organization:configure",
+      EnforcedBy.JAVA,
+      "Configure the tenant's company during onboarding. Seeded for ADMIN only; delegated"
+          + " administrators require an explicit organisation-wide grant."),
   PROCUREMENT_READ("procurement:read", EnforcedBy.ANNOTATION, ""),
   PROCUREMENT_WRITE("procurement:write", EnforcedBy.ANNOTATION, ""),
   PRODUCTION_ASSIGN(

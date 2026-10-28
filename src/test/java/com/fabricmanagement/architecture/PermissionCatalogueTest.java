@@ -82,14 +82,14 @@ class PermissionCatalogueTest {
     Set<String> enforced =
         scan.sites().stream().map(PermissionSourceScanner.Site::key).collect(Collectors.toSet());
     Set<String> seeded = grantKeys(grants);
-    assertThat(catalogued).hasSize(53);
+    assertThat(catalogued).hasSize(55);
     assertSameKeys("catalogue", catalogued, "enforcement", enforced);
     Set<String> defaultKeys =
         Arrays.stream(PermissionKey.values())
             .filter(key -> key.distribution() == PermissionKey.Distribution.SEEDED_BY_DEFAULT)
             .map(PermissionKey::key)
             .collect(Collectors.toSet());
-    assertThat(defaultKeys).hasSize(51);
+    assertThat(defaultKeys).hasSize(53);
     assertSameKeys("seeded-by-default catalogue", defaultKeys, "seed", seeded);
   }
 

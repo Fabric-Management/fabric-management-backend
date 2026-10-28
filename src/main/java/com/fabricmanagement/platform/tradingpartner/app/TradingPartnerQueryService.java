@@ -17,6 +17,13 @@ public class TradingPartnerQueryService {
 
   private final TradingPartnerRepository tradingPartnerRepository;
 
+  /** Minimal tenant-scoped name for already authorised document/work composition; no contacts. */
+  public Optional<String> findDisplayName(UUID tenantId, UUID partnerId) {
+    return tradingPartnerRepository
+        .findByTenantIdAndId(tenantId, partnerId)
+        .map(com.fabricmanagement.platform.tradingpartner.domain.TradingPartner::getDisplayName);
+  }
+
   public Optional<PartnerClassification> findClassification(UUID tenantId, UUID partnerId) {
     return tradingPartnerRepository
         .findByTenantIdAndId(tenantId, partnerId)

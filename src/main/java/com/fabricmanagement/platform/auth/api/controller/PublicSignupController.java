@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
@@ -64,20 +64,19 @@ public class PublicSignupController {
       description = "Registration initiated; user should check email for setup link",
       content = @Content(mediaType = "application/json"))
   @PostMapping("/signup")
+  @SensitiveLogData
   public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
 
-    log.info(
-        "Public signup request: organizationName={}, email={}",
-        request.getOrganizationName(),
-        PiiMaskingUtil.maskEmail(request.getEmail()));
+    log.info("Public signup requested");
 
     // Orchestrator handles data setup and publishes the post-commit signup email event.
     TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
 
     log.info(
-        "Self-service signup completed: organizationUid={}, setupUrl={}",
-        response.getOrganizationUid(),
-        response.getSetupUrl());
+        "Self-service signup completed: tenantId={}, organizationId={}, userId={}",
+        response.getTenantId(),
+        response.getOrganizationId(),
+        response.getAdminUserId());
 
     return ResponseEntity.ok(
         ApiResponse.success(

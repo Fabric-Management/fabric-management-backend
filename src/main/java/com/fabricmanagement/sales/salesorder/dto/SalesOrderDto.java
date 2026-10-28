@@ -63,6 +63,13 @@ public class SalesOrderDto {
   /** Agreed payment terms. */
   private String paymentTerms;
 
+  private boolean paymentPlanManaged;
+  private String paymentNote;
+
+  @Schema(
+      description = "Structured plan on create/detail; null for legacy orders and list responses")
+  private SalesOrderPaymentPlanDtos.View paymentPlan;
+
   /** Where the conversation that led to the order took place; context, not acceptance. */
   private AgreementContext agreementContext;
 
@@ -158,6 +165,8 @@ public class SalesOrderDto {
         .deliveryEvent(order.getDeliveryEvent())
         .actualDeliveryDate(order.getActualDeliveryDate())
         .paymentTerms(order.getPaymentTerms())
+        .paymentPlanManaged(order.isPaymentPlanManaged())
+        .paymentNote(order.getPaymentNote())
         .agreementContext(order.getAgreementContext())
         .agreementContextNote(order.getAgreementContextNote())
         .contactName(order.getContactName())

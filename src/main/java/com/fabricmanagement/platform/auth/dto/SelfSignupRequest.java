@@ -40,6 +40,12 @@ public class SelfSignupRequest {
   @Email(message = "Invalid email format")
   private String email;
 
+  @io.swagger.v3.oas.annotations.media.Schema(
+      description =
+          "PLAYGROUND initial access is server-owned: all eligible catalogue packages are allocated,"
+              + " including when this legacy field contains FabricOS only. The raw field is retained"
+              + " as registration evidence. Make explicit selections in the versioned modules step."
+              + " TRIAL retains its explicit selection, defaulting to FabricOS when omitted.")
   private List<String> selectedOS;
 
   @Builder.Default private SignupIntent intent = SignupIntent.PLAYGROUND;

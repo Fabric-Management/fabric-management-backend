@@ -22,6 +22,7 @@ import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderReposito
 import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,7 @@ public class CustomerApprovalDecisionService {
   private final EntityManager entityManager;
   private final Clock clock;
   private final ApproverAuthorities approvers;
+  private final SalesOrderPaymentPlanService paymentPlans;
 
   /** A decision from a customer account, refused until person and authority are matched. */
   public static final String ACCOUNT_CHANNEL_NOT_AVAILABLE = "ACCOUNT_CHANNEL_NOT_AVAILABLE";
@@ -107,6 +109,13 @@ public class CustomerApprovalDecisionService {
           approval.requireOpen(now);
           approvers.holdValid(approval, now);
           authority.check(approval, now);
+          if (versionOf(approval).getKind()
+              == com.fabricmanagement.sales.salesorder.domain.OrderVersionKind.PAYMENT_PLAN) {
+            paymentPlans.assertApprovalCurrent(order, versionOf(approval));
+            approval.changesRequested(decider, note, now);
+            approvals.save(approval);
+            return outcome(approval);
+          }
           requireAwaiting(order);
           approval.changesRequested(decider, note, now);
           approvals.save(approval);
@@ -145,15 +154,41 @@ public class CustomerApprovalDecisionService {
     approval.requireOpen(now);
     approvers.holdValid(approval, now);
     authority.check(approval, now);
-    requireAwaiting(order);
     OrderVersion version = versionOf(approval);
+    if (version.getKind()
+        == com.fabricmanagement.sales.salesorder.domain.OrderVersionKind.PAYMENT_PLAN) {
+      if (order.getStatus() == OrderStatus.DRAFT || !SalesOrderPaymentPlanService.editable(order))
+        throw OrderDomainException.conflict(
+            "PAYMENT_PLAN_CLOSED", "This order cannot agree revised payment terms");
+      paymentPlans.assertApprovalCurrent(order, version);
+      String reduction = paymentPlans.unacknowledgedReduction(order, version);
+      if (reduction != null) {
+        // Cash was recorded after the sender submitted this plan, so it now lowers an obligation
+        // further than they acknowledged: it cannot be agreed behind their back. The customer's
+        // approval is kept and says why, which the sender sees; nothing of the confirmed order
+        // moves, and the customer is not handed a conflict only the sender could resolve.
+        approval.approvedNotFulfillable(decider, reduction, now);
+        approvals.save(approval);
+        return outcome(approval);
+      }
+      approval.approved(decider, now);
+      paymentPlans.agreed(order, version, approval);
+      approvals.save(approval);
+      return outcome(approval);
+    }
+    requireAwaiting(order);
+    paymentPlans.assertApprovalCurrent(order, version);
     if (!version.restsOn(order)) {
       throw OrderDomainException.stage(
           "VERSION_STALE", "The order changed after this version was sent");
     }
     List<SalesOrderLine> orderLines =
         lines.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
-    List<String> blockers = intake.confirmationBlockers(order, orderLines);
+    List<String> blockers = new ArrayList<>(intake.confirmationBlockers(order, orderLines));
+    // The same cash rule as the plan's own agreement, asked first so it is a recorded outcome the
+    // sender sees and the order goes back to planning, not a conflict on the customer's link.
+    String reduction = paymentPlans.unacknowledgedReduction(order, version);
+    if (reduction != null) blockers.add(reduction);
     if (!blockers.isEmpty()) {
       return notFulfillable(approval, order, decider, String.join("; ", blockers), now);
     }
@@ -182,6 +217,7 @@ public class CustomerApprovalDecisionService {
       // The pieces or the plan changed in the meantime: nothing of this transaction stays.
       throw new NotFulfillable(e.getMessage(), e);
     }
+    paymentPlans.agreed(order, version, approval);
     return outcome(approval);
   }
 

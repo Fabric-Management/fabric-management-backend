@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
+import com.fabricmanagement.flowboard.collection.app.port.CollectionFollowUpPort;
 import com.fabricmanagement.flowboard.routing.domain.RoutingReason;
 import com.fabricmanagement.flowboard.routing.domain.port.out.*;
 import com.fabricmanagement.platform.user.domain.DataScope;
@@ -16,7 +17,8 @@ class RoutingEligibilityTest {
       order = UUID.randomUUID();
   private final SalesOrderWriteScopePort scope = mock(SalesOrderWriteScopePort.class);
   private final RoutingEligibilityService eligibility =
-      new RoutingEligibilityService(mock(RoutingUserQueryPort.class), scope);
+      new RoutingEligibilityService(
+          mock(RoutingUserQueryPort.class), scope, mock(CollectionFollowUpPort.class));
 
   private RoutingUserQueryPort.UserPermissions identity(
       UUID tenantId, boolean active, boolean flowboard, boolean sales, boolean admin) {

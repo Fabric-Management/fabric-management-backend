@@ -8,5 +8,5 @@ import java.util.List;
 public record RoutingPoolResponse(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) RoutingPoolKey poolKey,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean configured,
-    @Schema(description = "Null when never configured") Long revision,
+    @Schema(nullable = true, description = "Null when never configured") Long revision,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<RoutingMemberResponse> members) {}

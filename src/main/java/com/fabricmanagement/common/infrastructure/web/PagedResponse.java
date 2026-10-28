@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.web;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,12 +41,25 @@ import org.springframework.data.domain.Page;
 @AllArgsConstructor
 public class PagedResponse<T> {
 
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private List<T> content;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private int page;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private int size;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private long totalElements;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private int totalPages;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private boolean first;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   private boolean last;
 
   public static <T, E> PagedResponse<T> from(

@@ -288,6 +288,7 @@ class ConstitutionArchTest {
       //   - QualityDecisionUnit     : Append-only population snapshot with a composite primary key
       //   - Lead                    : Tenant-independent marketing record; linked via nullable
       //                               trialTenantId and must survive tenant lifecycle events
+      //   - LeadProfileSnapshot     : Append-only Lead-owned evidence; no tenant/soft-delete scope
       //   - UserDepartment          : Junction table with composite @IdClass key; incompatible with
       //                               BaseEntity @Id
       //   - DocumentNumberCounter   : Counter singleton; BaseEntity tenant/id semantics N/A
@@ -322,6 +323,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("QualityDecisionUnit")
               .and()
               .doNotHaveSimpleName("Lead")
+              .and()
+              .doNotHaveSimpleName("LeadProfileSnapshot")
               .and()
               .doNotHaveSimpleName("ProcessedEventEntry")
               .and()

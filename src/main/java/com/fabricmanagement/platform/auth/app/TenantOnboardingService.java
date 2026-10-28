@@ -65,6 +65,7 @@ public class TenantOnboardingService {
     context.setAdminFirstName(request.getAdminFirstName());
     context.setAdminLastName(request.getAdminLastName());
     context.setAdminContact(request.getAdminContact());
+    context.setSignupSelectedOS(request.getSelectedOS());
     context.setSelectedOS(
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
@@ -100,6 +101,7 @@ public class TenantOnboardingService {
     context.setAdminFirstName(request.getFirstName());
     context.setAdminLastName(request.getLastName());
     context.setAdminContact(request.getEmail());
+    context.setSignupSelectedOS(request.getSelectedOS());
     // Use admin email as billing email for self-service (no separate organization email
     // provided)
     context.setOrganizationEmail(request.getEmail());
@@ -108,6 +110,7 @@ public class TenantOnboardingService {
             ? request.getSelectedOS()
             : List.of("FabricOS"));
     context.setSignupIntent(request.getIntent().name());
+    context.setTermsAcceptedAt(java.time.Instant.now());
     context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);
     context.setDemoMode(request.getIntent() != SignupIntent.TRIAL);

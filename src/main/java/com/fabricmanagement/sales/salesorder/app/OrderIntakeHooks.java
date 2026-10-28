@@ -28,6 +28,21 @@ public class OrderIntakeHooks {
   private final com.fabricmanagement.sales.salesorder.domain.port.QuoteStockOwnershipTransferPort
       quoteStock;
 
+  public void prepareSourceLines(
+      SalesOrder order,
+      List<SalesOrderLine> lines,
+      List<com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest> requests,
+      UUID actor) {
+    for (int index = 0; index < requests.size(); index++) {
+      var source = requests.get(index).getSourceQuoteLineId();
+      if (source == null) continue;
+      if (order.getQuoteId() == null)
+        throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+            "QUOTE_STOCK_SOURCE_INVALID", "Quote source is required");
+      quoteStock.prepareLine(order, lines.get(index), source, actor);
+    }
+  }
+
   public void transferOnCreation(
       SalesOrder order,
       List<SalesOrderLine> lines,

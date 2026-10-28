@@ -70,9 +70,44 @@ public record OrderIntakeStockPreviewRequest(
         List<@NotNull(message = "A picked piece is required") UUID> manualPieceIds,
     @Schema(
             description =
-                "Optional current ownership proof; excludes only this authenticated form line's own held rolls")
+                "Optional current ownership proof; excludes only this authenticated form line's own"
+                    + " held rolls")
         @jakarta.validation.Valid
-        DraftStockSelectionRequests.Proof ownStockSelection) {
+        DraftStockSelectionRequests.Proof ownStockSelection,
+    @Schema(
+            nullable = true,
+            description =
+                "Quantity choice on the unsaved form; saved targets always use their persisted"
+                    + " decision")
+        com.fabricmanagement.sales.common.domain.SalesQuantityPolicy quantityPolicy) {
+  public OrderIntakeStockPreviewRequest(
+      UUID productId,
+      UUID colorId,
+      BigDecimal finishedWidth,
+      String finishedWidthUnit,
+      UUID customerId,
+      BigDecimal requestedQty,
+      String unit,
+      Boolean singleLotRequired,
+      BigDecimal toleranceUpPct,
+      BigDecimal toleranceDownPct,
+      List<UUID> manualPieceIds,
+      DraftStockSelectionRequests.Proof ownStockSelection) {
+    this(
+        productId,
+        colorId,
+        finishedWidth,
+        finishedWidthUnit,
+        customerId,
+        requestedQty,
+        unit,
+        singleLotRequired,
+        toleranceUpPct,
+        toleranceDownPct,
+        manualPieceIds,
+        ownStockSelection,
+        null);
+  }
 
   public OrderIntakeStockPreviewRequest(
       UUID productId,

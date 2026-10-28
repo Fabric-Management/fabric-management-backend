@@ -34,19 +34,22 @@ public class EventRouterService {
   private final TaskService taskService;
   private final BoardRepository boardRepo;
   private final TaskLabelService taskLabelService;
+  private final SalesStockPlanningTaskService stockPlanning;
 
   public EventRouterService(
       List<DomainEventAdapter<?>> adapters,
       TaskTemplateRepository templateRepo,
       TaskService taskService,
       BoardRepository boardRepo,
-      TaskLabelService taskLabelService) {
+      TaskLabelService taskLabelService,
+      SalesStockPlanningTaskService stockPlanning) {
     this.adapterMap =
         adapters.stream().collect(toMap(DomainEventAdapter::getSupportedEventType, identity()));
     this.templateRepo = templateRepo;
     this.taskService = taskService;
     this.boardRepo = boardRepo;
     this.taskLabelService = taskLabelService;
+    this.stockPlanning = stockPlanning;
   }
 
   @SuppressWarnings("unchecked")
@@ -101,10 +104,14 @@ public class EventRouterService {
     if (ctx.entityId() == null) {
       throw new IllegalArgumentException(
           String.format(
-              "SmartTaskGenerator: entityId cannot be null for eventType=%s. Idempotency is required.",
+              "SmartTaskGenerator: entityId cannot be null for eventType=%s. Idempotency is"
+                  + " required.",
               template.getEventType()));
     }
 
+    if (template.getTaskType() == TaskType.PLANNING
+        && "SALES_ORDER".equals(ctx.entityType())
+        && stockPlanning.synchronizeIfFabric(ctx.entityId())) return;
     UUID boardId = resolveBoardId(template, ctx.tenantId());
     if (boardId == null) {
       log.warn("No matching board for template={} — task not created", template.getId());

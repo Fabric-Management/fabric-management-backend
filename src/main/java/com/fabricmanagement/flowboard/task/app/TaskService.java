@@ -62,6 +62,11 @@ public class TaskService {
    */
   @Transactional
   public Task createTask(CreateTaskRequest req) {
+    if (req.taskType() == TaskType.COLLECTION_FOLLOW_UP)
+      throw new FlowBoardDomainException(
+          "Collection work can only be provisioned from a collection obligation",
+          "COLLECTION_TASK_MANUAL_CREATE_FORBIDDEN",
+          409);
     if (!workflowRegistry.allowsManualCreation(req.taskType())) {
       throw new FlowBoardDomainException(
           "Order-cover work can only be created by its domain provisioning path",
@@ -348,6 +353,8 @@ public class TaskService {
             .findByIdForAssignmentUpdate(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
 
+    rejectCollectionAssignmentBypass(task);
+
     var assignee = TaskAssignee.assignToUser(taskId, userId, assignedBy);
     TaskAssignee savedAssignee = assigneeRepo.save(assignee);
 
@@ -414,6 +421,8 @@ public class TaskService {
         taskRepo
             .findByIdForAssignmentUpdate(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
+
+    rejectCollectionAssignmentBypass(task);
 
     TaskAssignee assignee =
         assigneeRepo
@@ -486,10 +495,21 @@ public class TaskService {
     }
   }
 
-  private void rejectGovernedStatusBypass(Task task) {
-    if (workflowRegistry.isGoverned(task.getWorkflowDefinitionId(), task.getWorkflowVersion())) {
+  private void rejectCollectionAssignmentBypass(Task task) {
+    if (task.getTaskType() == TaskType.COLLECTION_FOLLOW_UP)
       throw new FlowBoardDomainException(
-          "Order-cover status changes require a typed domain action",
+          "Collection appointments require the governed routing action",
+          "COLLECTION_ASSIGNMENT_BYPASS",
+          409);
+  }
+
+  private void rejectGovernedStatusBypass(Task task) {
+    if (task.getTaskType() == TaskType.COLLECTION_FOLLOW_UP
+        || workflowRegistry.isGoverned(task.getWorkflowDefinitionId(), task.getWorkflowVersion())) {
+      throw new FlowBoardDomainException(
+          task.getTaskType() == TaskType.COLLECTION_FOLLOW_UP
+              ? "Collection status changes require a typed domain action"
+              : "Order-cover status changes require a typed domain action",
           "FLOWBOARD_GOVERNED_STATUS_BYPASS",
           409,
           new Object[] {task.getId()});

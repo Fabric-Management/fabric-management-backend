@@ -29,12 +29,23 @@ public interface PieceAllocationPort {
   /** Releases every active allocation of the line; returns how many pieces were released. */
   int releaseForLine(UUID tenantId, UUID salesOrderLineId, UUID actorId, String reason);
 
+  /** applyingSessionId may only come from the caller's verified provisional ownership proof. */
   record AllocationRequest(
       UUID tenantId,
       UUID salesOrderId,
       UUID salesOrderLineId,
       UUID actorId,
-      List<PieceRef> pieces) {}
+      List<PieceRef> pieces,
+      UUID applyingSessionId) {
+    public AllocationRequest(
+        UUID tenantId,
+        UUID salesOrderId,
+        UUID salesOrderLineId,
+        UUID actorId,
+        List<PieceRef> pieces) {
+      this(tenantId, salesOrderId, salesOrderLineId, actorId, pieces, null);
+    }
+  }
 
   /** A piece and the version it had when the proposal was built. */
   record PieceRef(UUID stockUnitId, UUID batchId, Long expectedVersion) {}

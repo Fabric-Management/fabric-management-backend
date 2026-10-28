@@ -10,6 +10,7 @@ import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -173,6 +174,11 @@ public class UserService implements UserFacade {
   @Transactional(readOnly = true)
   public boolean hasCompletedOnboarding(UUID userId) {
     return userOnboardingService.hasCompletedOnboarding(userId);
+  }
+
+  @Transactional(readOnly = true)
+  public OnboardingStatusResponse getOnboardingStatus(UUID userId) {
+    return userOnboardingService.getStatus(userId);
   }
 
   @Transactional

@@ -197,7 +197,9 @@ public class CustomerApproval extends BaseEntity {
       Integer linkValidHours,
       UUID requestedBy,
       Instant now) {
-    if (version == null || version.getKind() != OrderVersionKind.APPROVAL) {
+    if (version == null
+        || (version.getKind() != OrderVersionKind.APPROVAL
+            && version.getKind() != OrderVersionKind.PAYMENT_PLAN)) {
       throw new IllegalArgumentException("Only a version for approval is approved");
     }
     if (requestedBy == null || now == null || proposalValidUntil == null) {

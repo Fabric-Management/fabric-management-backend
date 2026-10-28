@@ -33,11 +33,34 @@ final class QuoteHoldEvidence {
               .findFirst();
       QuantityEvaluator.Holder holder =
           backing.map(QuoteHoldEvidence::holder).orElseGet(QuantityEvaluator.Holder::unverified);
+      if (hold.provisionalSessionId() != null && holder.verified())
+        holder =
+            new QuantityEvaluator.Holder(
+                null,
+                hold.quoteLineId(),
+                null,
+                null,
+                null,
+                true,
+                com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption.StockOwnerType
+                    .DRAFT);
       // Conflicting owners invalidate the evidence; duplicate rows for the same owner do not.
       pieceHolds.merge(
           hold.stockUnitId(),
           holder,
-          (left, right) -> left.equals(right) ? left : QuantityEvaluator.Holder.unverified());
+          (left, right) -> {
+            if (left.equals(right)) return left;
+            if (left.verified()
+                && right.verified()
+                && left.quoteLineId() != null
+                && left.quoteLineId().equals(right.quoteLineId()))
+              return left.ownerType()
+                      == com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption
+                          .StockOwnerType.DRAFT
+                  ? right
+                  : left;
+            return QuantityEvaluator.Holder.unverified();
+          });
     }
     Map<UUID, QuantityEvaluator.LotIntents> lotIntents = new LinkedHashMap<>();
     intentsByLot.forEach(

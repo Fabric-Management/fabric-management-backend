@@ -155,7 +155,23 @@ public class SalesLotService {
             .map(pieceId -> snapshotPiece(pieceId, piecesById.get(pieceId), existingPieces))
             .toList();
     BigDecimal derivedQuantity =
-        selection.quantity() != null ? selection.quantity() : derivedQuantity(lot, pieces);
+        !pieces.isEmpty()
+            ? derivedQuantity(lot, pieces)
+            : selection.quantity() != null ? selection.quantity() : derivedQuantity(lot, pieces);
+    if (!pieces.isEmpty()
+        && (pieces.stream()
+            .anyMatch(
+                piece ->
+                    piece.measure() == null
+                        || piece.measure().signum() <= 0
+                        || !Objects.equals(piece.unit(), lot.unit()))))
+      throw SalesDomainException.lotIntentQuantityMismatch(
+          "Named rolls need complete measurements in the lot unit");
+    if (!pieces.isEmpty()
+        && selection.quantity() != null
+        && selection.quantity().compareTo(derivedQuantity) != 0)
+      throw SalesDomainException.lotIntentQuantityMismatch(
+          "The selected roll quantities must match their measured total");
     return new QuoteLineLotSnapshot(
         lot.id(),
         lot.lotNo(),

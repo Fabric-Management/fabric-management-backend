@@ -60,11 +60,12 @@ public class TenantOnboardingOrchestrator {
           log.debug("Onboarding step {}/{} completed: {}", i + 1, steps.size(), stepName);
         } catch (Exception e) {
           log.error(
-              "Onboarding step {}/{} failed: {} - {}",
+              "Onboarding step {}/{} failed: {}, tenantId={}, failureType={}",
               i + 1,
               steps.size(),
               stepName,
-              e.getMessage());
+              context.getTenantId(),
+              e.getClass().getName());
           throw e;
         }
       }

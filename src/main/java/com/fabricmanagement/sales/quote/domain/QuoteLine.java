@@ -120,10 +120,71 @@ public class QuoteLine extends BaseEntity {
     return offeredPrice.multiply(requestedQty);
   }
 
+  @Column(name = "finished_width", precision = 8, scale = 2)
+  private BigDecimal finishedWidth;
+
+  @Column(name = "finished_width_unit", length = 10)
+  private String finishedWidthUnit;
+
+  @Column(name = "single_lot_required", nullable = false)
+  private boolean singleLotRequired;
+
+  @Column(name = "tolerance_up_pct", precision = 5, scale = 2)
+  private BigDecimal toleranceUpPct;
+
+  @Column(name = "tolerance_down_pct", precision = 5, scale = 2)
+  private BigDecimal toleranceDownPct;
+
+  @Column(name = "customer_request_qty", precision = 15, scale = 3)
+  private BigDecimal customerRequestQty;
+
+  @Column(name = "initial_requested_qty", precision = 15, scale = 3, updatable = false)
+  private BigDecimal initialRequestedQty;
+
+  @jakarta.persistence.Embedded
+  private com.fabricmanagement.sales.common.domain.SalesQuantityTerms quantityTerms =
+      new com.fabricmanagement.sales.common.domain.SalesQuantityTerms();
+
+  public com.fabricmanagement.sales.common.domain.SalesQuantityPolicy getQuantityPolicy() {
+    return quantityTerms == null
+        ? com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED
+        : quantityTerms.getPolicy();
+  }
+
+  public void captureCustomerRequest(BigDecimal quantity) {
+    customerRequestQty = quantity;
+    if (initialRequestedQty == null) initialRequestedQty = quantity;
+  }
+
+  public void applyStockQuantity(BigDecimal original, BigDecimal selected) {
+    getQuantityPolicy().assertQuantity(original, selected);
+    customerRequestQty = original;
+    requestedQty = selected;
+  }
+
+  public void recordQuantityPolicy(
+      com.fabricmanagement.sales.common.domain.SalesQuantityPolicy policy,
+      UUID actor,
+      java.time.Instant at,
+      String reason) {
+    if (quantityTerms == null)
+      quantityTerms = new com.fabricmanagement.sales.common.domain.SalesQuantityTerms();
+    if (policy != null) policy.assertQuantity(customerRequestQty, requestedQty);
+    quantityTerms.record(policy, actor, at, reason);
+  }
+
   public void updateEditableFields(BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
+    if (this.requestedQty != null && this.requestedQty.compareTo(requestedQty) != 0)
+      captureCustomerRequest(requestedQty);
     this.requestedQty = requestedQty;
     this.unit = unit;
     this.offeredPrice = offeredPrice;
+  }
+
+  @jakarta.persistence.PrePersist
+  @jakarta.persistence.PreUpdate
+  void validateQuantityTerms() {
+    getQuantityPolicy().assertQuantity(customerRequestQty, requestedQty);
   }
 
   public void applyQualityGrade(

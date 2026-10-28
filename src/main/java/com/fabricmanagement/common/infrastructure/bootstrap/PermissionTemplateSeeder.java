@@ -146,6 +146,7 @@ public class PermissionTemplateSeeder {
             // writes the template tenant. ADMIN is listed for parity with that migration
             // even though PermissionEvaluator short-circuits ADMIN before consulting rows.
             new GrantRule("ADMIN", PermissionKey.SALES_APPROVE, DataScope.GLOBAL),
+            new GrantRule("ADMIN", PermissionKey.ORGANIZATION_CONFIGURE, DataScope.ORGANIZATION),
             new GrantRule("ADMIN", PermissionKey.SALES_ASSIGN_OWNER, DataScope.GLOBAL),
             new GrantRule("ADMIN", PermissionKey.SALES_VERIFY_DELIVERY, DataScope.GLOBAL),
             new GrantRule("MANAGER", PermissionKey.SALES_APPROVE, DataScope.ORGANIZATION),
@@ -355,8 +356,10 @@ public class PermissionTemplateSeeder {
             new GrantRule("WORKER", PermissionKey.FINANCE_WRITE, DataScope.OWN),
             new GrantRule("SUPERVISOR", PermissionKey.FINANCE_READ, DataScope.DEPARTMENT),
             new GrantRule("SUPERVISOR", PermissionKey.FINANCE_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("SUPERVISOR", PermissionKey.FINANCE_REVERSE, DataScope.DEPARTMENT),
             new GrantRule("MANAGER", PermissionKey.FINANCE_READ, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.FINANCE_WRITE, DataScope.DEPARTMENT),
+            new GrantRule("MANAGER", PermissionKey.FINANCE_REVERSE, DataScope.ORGANIZATION),
             new GrantRule("MANAGER", PermissionKey.FINANCE_MANAGE, DataScope.ORGANIZATION)));
 
     // 7. HR

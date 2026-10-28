@@ -2,14 +2,19 @@ package com.fabricmanagement.production.core.stockunit.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.realtime.app.LiveEditLeaseService;
+import com.fabricmanagement.production.core.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.core.stockunit.api.StockUnitLeaseKeys;
 import com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnitAllocationStatus;
+import com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.core.stockunit.domain.exception.StockUnitHeldException;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitAllocationRepository;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitSoftHoldRepository;
+import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -30,7 +35,8 @@ public class StockUnitOwnershipService implements StockUnitOwnershipPort {
   private final StockUnitRepository pieces;
   private final StockUnitSoftHoldRepository holds;
   private final StockUnitAllocationRepository allocations;
-  private final jakarta.persistence.EntityManager entityManager;
+  private final BatchReservationRepository reservations;
+  private final EntityManager entityManager;
 
   @Override
   @Transactional(readOnly = true)
@@ -100,7 +106,30 @@ public class StockUnitOwnershipService implements StockUnitOwnershipPort {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void assertAvailable(Collection<UUID> pieceIds, UUID ownLineId, UUID ownSessionId) {
-    if (pieceIds.isEmpty()) return;
+    assertOwnership(pieceIds, ownLineId, ownSessionId, false);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void assertReservedConsumption(UUID pieceId, UUID workOrderId) {
+    var units = assertOwnership(List.of(pieceId), null, null, true);
+    if (workOrderId == null) throw new StockUnitHeldException();
+    var unit = units.getFirst();
+    var reservation =
+        reservations
+            .findFirstByTenantIdAndBatchIdAndReferenceIdAndStatusInAndIsActiveTrue(
+                TenantContext.requireTenantId(),
+                unit.getBatchId(),
+                workOrderId,
+                Set.of(ReservationStatus.ACTIVE, ReservationStatus.PARTIALLY_CONSUMED))
+            .filter(row -> "WORK_ORDER".equals(row.getReferenceType()))
+            .filter(row -> row.getRemainingQuantity().signum() > 0);
+    if (reservation.isEmpty()) throw new StockUnitHeldException();
+  }
+
+  private List<StockUnit> assertOwnership(
+      Collection<UUID> pieceIds, UUID ownLineId, UUID ownSessionId, boolean reservedConsumption) {
+    if (pieceIds.isEmpty()) return List.of();
     UUID tenant = TenantContext.requireTenantId();
     var units = pieces.findByTenantIdAndIdInAndIsActiveTrue(tenant, pieceIds);
     if (units.size() != Set.copyOf(pieceIds).size()) throw new StockUnitHeldException();
@@ -127,17 +156,15 @@ public class StockUnitOwnershipService implements StockUnitOwnershipPort {
         units.stream()
             .anyMatch(
                 unit ->
-                    unit.getStatus()
-                            != com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus
-                                .AVAILABLE
-                        && unit.getStatus()
-                            != com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus
-                                .PARTIAL
+                    unit.getStatus() != StockUnitStatus.AVAILABLE
+                        && unit.getStatus() != StockUnitStatus.PARTIAL
+                        && !(reservedConsumption && unit.getStatus() == StockUnitStatus.RESERVED)
                         && hard.stream()
                             .noneMatch(
                                 row ->
                                     row.getStockUnitId().equals(unit.getId())
                                         && Objects.equals(row.getSalesOrderLineId(), ownLineId)));
     if (leased || held || allocated || physicallyUnavailable) throw new StockUnitHeldException();
+    return units;
   }
 }

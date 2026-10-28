@@ -4,11 +4,16 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.CommonDomainException;
 import com.fabricmanagement.common.util.PhoneValidationUtil;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.communication.domain.event.ContactPointChangedEvent;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
+import com.google.i18n.phonenumbers.NumberParseException;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -43,6 +48,56 @@ public class ContactService {
 
   private final ContactRepository contactRepository;
   private final DomainEventPublisher eventPublisher;
+
+  public record OnboardingContact(String value, ContactType type) {}
+
+  @Transactional
+  public Contact reuseOrCreateOnboardingContact(OnboardingContact prepared) {
+    if (prepared.type() == ContactType.EMAIL) {
+      var existing =
+          contactRepository
+              .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+                  TenantContext.requireTenantId(), ContactType.EMAIL, prepared.value())
+              .stream()
+              .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+              .findFirst();
+      if (existing.isPresent()) return existing.get();
+    }
+    return createContact(prepared.value(), prepared.type(), "Organisation", false, null);
+  }
+
+  /** Validate without writes; telephone type comes from numbering metadata, not E.164 alone. */
+  public OnboardingContact prepareOnboardingContact(String value, ContactType requestedType) {
+    if (value == null) return null;
+    String normalised =
+        normalizeContactValue(
+            value, requestedType == ContactType.EMAIL ? ContactType.EMAIL : ContactType.LANDLINE);
+    ContactType type = requestedType;
+    if (type == ContactType.EMAIL) {
+      normalised = normalised.toLowerCase(Locale.ROOT);
+    } else if (type == null) {
+      var phones = PhoneNumberUtil.getInstance();
+      try {
+        var parsed = phones.parse(normalised, "ZZ");
+        type =
+            switch (phones.getNumberType(parsed)) {
+              case MOBILE -> ContactType.MOBILE;
+              case FIXED_LINE, FIXED_LINE_OR_MOBILE -> ContactType.LANDLINE;
+              default ->
+                  throw new PlatformDomainException(
+                      "Company telephone requires a supported international number",
+                      "ONBOARDING_PHONE_INVALID",
+                      422);
+            };
+        normalised = phones.format(parsed, PhoneNumberFormat.E164);
+      } catch (NumberParseException failure) {
+        throw new PlatformDomainException(
+            "Invalid company telephone", "ONBOARDING_PHONE_INVALID", 422);
+      }
+    }
+    validateContactValue(normalised, type);
+    return new OnboardingContact(normalised, type);
+  }
 
   @Transactional
   public Contact createContact(

@@ -65,6 +65,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SalesQuoteDemoSeedIT {
 
+  @org.junit.jupiter.api.BeforeEach
+  void requireMigrationCatalogue() {
+    com.fabricmanagement.testsupport.EvaluationCatalogueGuard.requireMigrationCatalogue(jdbc);
+  }
+
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =

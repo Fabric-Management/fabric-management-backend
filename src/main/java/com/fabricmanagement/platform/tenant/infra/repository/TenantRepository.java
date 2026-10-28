@@ -33,6 +33,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("select t from Tenant t where t.id = :id")
+  Optional<Tenant> lockEvaluationTenant(@Param("id") UUID id);
+
   // ========================================
   // LOOKUP QUERIES
   // ========================================

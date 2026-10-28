@@ -35,6 +35,7 @@ public class RoutingEvaluationService implements GovernedTaskRoutingPort {
     if (!tenantId.equals(TenantContext.requireTenantId())) {
       throw new RoutingException("Task not found", "ROUTING_TASK_NOT_FOUND", 404);
     }
+    if (poolKey == RoutingPoolKey.COLLECTION_FOLLOW_UP) eligibility.lockCollection();
     repository.lockPool(tenantId, poolKey, false);
     repository.lockState(tenantId, taskId, poolKey);
     Pool pool = repository.pool(tenantId, poolKey).orElse(null);
@@ -46,7 +47,10 @@ public class RoutingEvaluationService implements GovernedTaskRoutingPort {
                 () -> new RoutingException("Task not found", "ROUTING_TASK_NOT_FOUND", 404));
     if (!task.getTaskType().name().equals(poolKey.name())
         || task.getWorkflowDefinitionId() == null
-        || !"SALES_ORDER".equals(task.getEntityType())
+        || !(poolKey == RoutingPoolKey.COLLECTION_FOLLOW_UP
+                ? "COLLECTION_OBLIGATION"
+                : "SALES_ORDER")
+            .equals(task.getEntityType())
         || task.getEntityId() == null) {
       throw new RoutingException(
           "Task is not governed by this routing pool", "ROUTING_TASK_NOT_GOVERNED", 422);
@@ -65,7 +69,10 @@ public class RoutingEvaluationService implements GovernedTaskRoutingPort {
       if (members.isEmpty()) conditions.add(new Condition(RoutingFailureReason.POOL_EMPTY, null));
       for (var member : members) {
         var user = eligibility.user(tenantId, member.userId());
-        if (eligibility.eligibility(tenantId, task.getEntityId(), user, true).isEmpty()) {
+        if ((poolKey == RoutingPoolKey.ORDER_COVER
+                ? eligibility.eligibility(tenantId, task.getEntityId(), user, true)
+                : eligibility.eligibility(tenantId, task.getEntityId(), user, true, poolKey))
+            .isEmpty()) {
           desired.add(member.userId());
         } else {
           conditions.add(new Condition(RoutingFailureReason.RECIPIENT_INVALID, member.userId()));
@@ -76,6 +83,23 @@ public class RoutingEvaluationService implements GovernedTaskRoutingPort {
     }
     var active = assignees.findAllByTaskIdAndIsActiveTrue(taskId);
     Set<UUID> current = active.stream().map(TaskAssignee::getUserId).collect(Collectors.toSet());
+    if (poolKey == RoutingPoolKey.COLLECTION_FOLLOW_UP && !desired.isEmpty()) {
+      // Keep the valid appointed owner; otherwise appoint one stable eligible pool member.
+      UUID selected =
+          current.stream()
+              .filter(desired::contains)
+              .sorted(java.util.Comparator.comparing(UUID::toString))
+              .findFirst()
+              .orElseGet(
+                  () ->
+                      desired.stream()
+                          .sorted(java.util.Comparator.comparing(UUID::toString))
+                          .findFirst()
+                          .orElseThrow());
+      desired.retainAll(Set.of(selected));
+    }
+    if (poolKey == RoutingPoolKey.COLLECTION_FOLLOW_UP)
+      eligibility.assignCollection(task.getEntityId(), desired.stream().findFirst().orElse(null));
     boolean changed = !current.equals(desired);
     if (changed) {
       taskVersionLocks.forceIncrement(task);

@@ -13,6 +13,12 @@ public class FabricDomainException extends ProductDomainException {
     this.problems = List.of();
   }
 
+  /** A refusal the client tells apart by its code, e.g. a duplicate price (409). */
+  public FabricDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+    this.problems = List.of();
+  }
+
   public FabricDomainException(List<String> problems, String message) {
     super(message, "FABRIC_ARTICLE_INCOMPLETE", 409);
     this.problems = List.copyOf(problems);

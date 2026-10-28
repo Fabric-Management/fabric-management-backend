@@ -32,7 +32,8 @@ public record DecisionQueueItem(
 
   @Schema(name = "DecisionKind")
   public enum Kind {
-    ORDER_COVER
+    ORDER_COVER,
+    COLLECTION_FOLLOW_UP
   }
 
   @Schema(name = "DecisionState")

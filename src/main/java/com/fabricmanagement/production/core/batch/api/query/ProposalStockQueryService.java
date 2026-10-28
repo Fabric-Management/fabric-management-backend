@@ -345,8 +345,18 @@ public class ProposalStockQueryService {
                 unit ->
                     measure != PrimaryMeasure.LENGTH || unit.getPackageType() == PackageType.ROLL)
             .toList();
-    List<BigDecimal> initial =
+    // Split children are measured physical outputs, not newly produced rolls. Their original
+    // root remains in this history even after depletion, so cutting cannot shrink the baseline.
+    var original =
         measuredKind.stream()
+            .filter(
+                unit ->
+                    unit.getSourceType()
+                        != com.fabricmanagement.production.core.stockunit.domain.StockUnitSourceType
+                            .SPLIT)
+            .toList();
+    List<BigDecimal> initial =
+        original.stream()
             .map(
                 unit ->
                     measure == PrimaryMeasure.LENGTH
@@ -357,7 +367,7 @@ public class ProposalStockQueryService {
             .flatMap(Optional::stream)
             .filter(value -> value.signum() > 0)
             .toList();
-    if (inventoryComplete && !initial.isEmpty() && initial.size() == measuredKind.size()) {
+    if (inventoryComplete && !initial.isEmpty() && initial.size() == original.size()) {
       return new AverageMeasurement(average(initial), PieceAverageBasis.INITIAL_MEASUREMENTS);
     }
     List<BigDecimal> current =

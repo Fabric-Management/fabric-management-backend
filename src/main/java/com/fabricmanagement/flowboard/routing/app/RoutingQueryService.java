@@ -32,26 +32,34 @@ public class RoutingQueryService {
             true,
             pool.revision(),
             repository.members(tenant, pool.id()).stream()
-                .map(m -> member(tenant, m.userId(), m.active()))
+                .map(m -> member(tenant, m.userId(), m.active(), key))
                 .toList());
   }
 
-  private RoutingMemberResponse member(UUID tenant, UUID id, boolean active) {
+  private RoutingMemberResponse member(UUID tenant, UUID id, boolean active, RoutingPoolKey key) {
     var user = eligibility.user(tenant, id);
-    var reasons = eligibility.candidacy(tenant, user);
+    var reasons =
+        key == RoutingPoolKey.ORDER_COVER
+            ? eligibility.candidacy(tenant, user)
+            : eligibility.candidacy(tenant, user, key);
     return new RoutingMemberResponse(id, user.displayName(), active, reasons.isEmpty(), reasons);
   }
 
   public Page<RoutingMemberResponse> candidates(
       UUID tenant, RoutingPoolKey key, String search, Pageable page) {
     Set<UUID> flowboard = users.findUsersWithAction(tenant, PermissionKey.FLOWBOARD_WRITE);
-    Set<UUID> sales = users.findUsersWithAction(tenant, PermissionKey.SALES_WRITE);
+    Set<UUID> sales =
+        users.findUsersWithAction(
+            tenant,
+            key == RoutingPoolKey.COLLECTION_FOLLOW_UP
+                ? PermissionKey.FINANCE_READ
+                : PermissionKey.SALES_WRITE);
     String term = search == null ? "" : search.strip().toLowerCase(Locale.ROOT);
     var candidates =
         flowboard.stream()
             .filter(sales::contains)
             .sorted()
-            .map(id -> member(tenant, id, true))
+            .map(id -> member(tenant, id, true, key))
             .filter(RoutingMemberResponse::candidate)
             .filter(
                 m ->
@@ -69,13 +77,18 @@ public class RoutingQueryService {
             .filter(
                 t ->
                     tenant.equals(t.getTenantId())
-                        && t.getTaskType().name().equals(RoutingPoolKey.ORDER_COVER.name())
+                        && (t.getTaskType().name().equals(RoutingPoolKey.ORDER_COVER.name())
+                            || t.getTaskType()
+                                .name()
+                                .equals(RoutingPoolKey.COLLECTION_FOLLOW_UP.name()))
                         && t.getWorkflowDefinitionId() != null
-                        && "SALES_ORDER".equals(t.getEntityType()))
+                        && ("SALES_ORDER".equals(t.getEntityType())
+                            || "COLLECTION_OBLIGATION".equals(t.getEntityType())))
             .orElseThrow(
                 () ->
                     new RoutingException("Governed task not found", "ROUTING_TASK_NOT_FOUND", 404));
-    var pool = repository.pool(tenant, RoutingPoolKey.ORDER_COVER).orElse(null);
+    var key = RoutingPoolKey.valueOf(task.getTaskType().name());
+    var pool = repository.pool(tenant, key).orElse(null);
     var members = pool == null ? List.<Member>of() : repository.members(tenant, pool.id());
     return new RoutingEligibilityResponse(
         taskId,
@@ -83,11 +96,18 @@ public class RoutingQueryService {
             .map(
                 m -> {
                   var reasons =
-                      eligibility.eligibility(
-                          tenant,
-                          task.getEntityId(),
-                          eligibility.user(tenant, m.userId()),
-                          m.active());
+                      key == RoutingPoolKey.ORDER_COVER
+                          ? eligibility.eligibility(
+                              tenant,
+                              task.getEntityId(),
+                              eligibility.user(tenant, m.userId()),
+                              m.active())
+                          : eligibility.eligibility(
+                              tenant,
+                              task.getEntityId(),
+                              eligibility.user(tenant, m.userId()),
+                              m.active(),
+                              key);
                   return new RoutingMemberEligibilityResponse(
                       m.userId(), reasons.isEmpty(), reasons);
                 })

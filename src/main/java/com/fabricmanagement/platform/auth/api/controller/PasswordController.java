@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.util.WebRequestUtils;
@@ -35,13 +36,12 @@ public class PasswordController {
   private final AuthCookieSupport authCookieSupport;
 
   @PostMapping("/setup-password")
+  @SensitiveLogData
   public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
       @Valid @RequestBody PasswordSetupRequest request,
       HttpServletRequest httpRequest,
       HttpServletResponse httpResponse) {
-    log.info(
-        "Password setup request: token={}...",
-        request.getToken().substring(0, Math.min(8, request.getToken().length())));
+    log.info("Password setup requested");
     String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
     LoginResponse response = passwordSetupService.setupPassword(request, ipAddress);
 

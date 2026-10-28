@@ -131,6 +131,39 @@ public class CustomerApprovalMailer {
           date(content.proposal().proposedOn()) + " (" + event(content.proposal().event()) + ")");
     }
     row(html, "Payment terms", content.paymentTerms());
+    row(html, "Payment note", content.paymentNote());
+    if (content.paymentPlan() != null) {
+      for (var group : content.paymentPlan().currencyGroups()) {
+        for (var payment : group.lines()) {
+          String expected =
+              payment.dateTrigger()
+                      == com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes
+                          .DateTrigger.ON_ORDER_CONFIRMATION
+                  ? "After order confirmation"
+                  : payment.expectedDate() == null ? "Date pending" : date(payment.expectedDate());
+          row(
+              html,
+              (payment.kind()
+                          == com.fabricmanagement.sales.salesorder.domain.paymentplan
+                              .PaymentPlanTypes.Kind.DOWN_PAYMENT
+                      ? "Down payment"
+                      : "Instalment " + payment.ordinal())
+                  + " ("
+                  + group.currency()
+                  + ")",
+              (payment.amount() == null ? "Amount pending" : payment.amount().toPlainString())
+                  + " · "
+                  + (payment.method() == null
+                      ? "Method pending"
+                      : payment.method().name().replace('_', ' ').toLowerCase(Locale.UK))
+                  + " · "
+                  + expected
+                  + (payment.chequePaymentDate() == null
+                      ? ""
+                      : " · Cheque payment date: " + date(payment.chequePaymentDate())));
+        }
+      }
+    }
     html.append("</table>");
     if (!content.lines().isEmpty()) {
       html.append(

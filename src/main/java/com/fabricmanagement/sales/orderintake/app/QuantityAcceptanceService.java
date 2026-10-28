@@ -105,6 +105,8 @@ public class QuantityAcceptanceService {
                 () ->
                     OrderIntakeException.rule(
                         "OPTION_NOT_FOUND", "The option is not part of this proposal"));
+    line.getQuantityPolicy()
+        .assertQuantity(line.getRecordedCustomerRequestQty(), option.quantity());
 
     QuantityEvaluationService.LineStock stock =
         evaluation
@@ -144,7 +146,8 @@ public class QuantityAcceptanceService {
     if (option.needsRemnantAcknowledgement() && !request.remnantAcknowledged()) {
       throw OrderIntakeException.rule(
           "REMNANT_NOT_ACKNOWLEDGED",
-          "This option leaves, or may leave, a single piece in a lot; acknowledge the warning to continue");
+          "This option leaves, or may leave, a single piece in a lot; acknowledge the warning to"
+              + " continue");
     }
     RemainingNeed remainingNeed = null;
     BigDecimal remainingQty = null;

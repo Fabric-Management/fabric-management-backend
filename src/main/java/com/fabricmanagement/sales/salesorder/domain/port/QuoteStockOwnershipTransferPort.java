@@ -10,5 +10,7 @@ import java.util.UUID;
 public interface QuoteStockOwnershipTransferPort {
   void prepare(SalesOrder order, UUID actor);
 
+  void prepareLine(SalesOrder order, SalesOrderLine target, UUID sourceQuoteLineId, UUID actor);
+
   void transfer(SalesOrder order, SalesOrderLine target, UUID sourceQuoteLineId, UUID actor);
 }

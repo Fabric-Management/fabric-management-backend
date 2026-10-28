@@ -74,6 +74,12 @@ public class OpenApiExportIT {
   private static final List<NullableReference> NULLABLE_REFERENCES =
       List.of(
           new NullableReference("DraftStockSelection", "option", "QuantityProposalOption"),
+          new NullableReference("DraftStockSelection", "target", "DraftStockTarget"),
+          new NullableReference(
+              "OrderIntakeStockPreviewRequest", "quantityPolicy", "SalesQuantityPolicy"),
+          new NullableReference("OrderVersionLine", "quantityPolicy", "SalesQuantityPolicy"),
+          new NullableReference(
+              "SalesStockPlanningCapability", "reason", "SalesStockPlanningReason"),
           new NullableReference(
               "DraftStockSelectionCapability", "reason", "DraftStockSelectionReason"),
           new NullableReference(
@@ -82,6 +88,18 @@ public class OpenApiExportIT {
           new NullableReference("TenantBrandingDto", "icon", "TenantBrandAssetDto"),
           new NullableReference("TenantBrandingDto", "logoDark", "TenantBrandAssetDto"),
           new NullableReference("TenantBrandingDto", "iconDark", "TenantBrandAssetDto"),
+          new NullableReference(
+              "OnboardingJourneyResponse", "firstIncompleteStep", "OnboardingStepId"),
+          new NullableReference(
+              "OnboardingJourneyResponse", "acceptedValues", "OnboardingAcceptedCompanyEvidence"),
+          new NullableReference(
+              "OnboardingJourneyResponse", "packages", "EvaluationPackageSelection"),
+          new NullableReference(
+              "OnboardingAcceptedCompanyEvidence",
+              "headquarters",
+              "OnboardingHeadquartersEvidence"),
+          new NullableReference(
+              "OnboardingAcceptedCompanyEvidence", "contacts", "OnboardingCompanyContactEvidence"),
           new NullableReference("DecisionCapability", "reason", "DecisionBlockedReason"),
           new NullableReference("DecisionCapability", "routesTo", "DecisionRouteTarget"),
           new NullableReference("DecisionReasonParameters", "requiredPermission", "PermissionKey"),
@@ -128,6 +146,13 @@ public class OpenApiExportIT {
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =
       new NullableReference("OrderCoverDetail", "case", "OrderCoverCase");
+
+  /**
+   * Discriminated components that are not closed unions yet: WorkOrderProductionSpecs takes its
+   * members from the process-module registry at runtime, not from {@code @JsonSubTypes}, and is
+   * still published by ProcessModuleRegistry as {@code allOf} the base (OPENAPI-UNION-1 step 5).
+   */
+  private static final Set<String> OPEN_DISCRIMINATORS = Set.of("WorkOrderProductionSpecs");
 
   private static final Set<String> HTTP_METHODS =
       Set.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
@@ -187,11 +212,17 @@ public class OpenApiExportIT {
         new YAMLMapper().readValue(generatedSpec, new TypeReference<Map<String, Object>>() {});
     assertValidationContracts(generatedDocument);
     assertPermissionCatalogueContract(generatedDocument);
+    assertOnboardingCompanyAuthorityContract(generatedDocument);
     assertNavPreferencesImportContract(generatedDocument);
     assertOrderIntakeStockPreviewContract(generatedDocument);
     assertDraftStockSelectionContract(generatedDocument);
+    assertMetreOrderStockContract(generatedDocument);
+    assertStockCutPlanContract(generatedDocument);
     assertNoNullTypedReferences(generatedDocument);
     assertNullableReferenceContract(generatedDocument);
+    assertDiscriminatedUnionsAreClosed(generatedDocument);
+    assertPagedResponsesAreComplete(generatedDocument);
+    assertCollectionReportNullsAreRequired(generatedDocument);
 
     // Red probe uses a separate copy: the actual export must never contain the mutated value.
     Map<String, Object> corruptedDocument =
@@ -203,6 +234,8 @@ public class OpenApiExportIT {
         .hasMessageContaining("PermissionKey");
 
     assertNullableReferenceRedProbes(generatedSpec);
+    assertDiscriminatedUnionRedProbe(generatedSpec);
+    assertCompletenessRedProbes(generatedSpec);
     assertStockNullableScalarRedProbes(generatedSpec);
     assertRetiredQuantityAcceptanceRedProbe(generatedSpec);
 
@@ -228,6 +261,162 @@ public class OpenApiExportIT {
                   + " -Dit.test=OpenApiExportIT' to accept changes and commit.")
           .isEqualTo(existingSpec);
     }
+  }
+
+  /**
+   * OPENAPI-UNION-1: every discriminated component is a closed union. The root is only {@code
+   * oneOf} its members with a mapping that names each member; each member is its own object (no
+   * {@code allOf} back to the root) whose discriminator property is required and pinned to the
+   * member's type names. Generic over the whole document, so a new union cannot regress.
+   */
+  private void assertDiscriminatedUnionsAreClosed(Map<String, Object> document) {
+    Map<String, Object> schemas = mapAt(document, "components", "schemas");
+    List<String> unions = new ArrayList<>();
+    for (Map.Entry<String, Object> entry : schemas.entrySet()) {
+      String name = entry.getKey();
+      @SuppressWarnings("unchecked")
+      Map<String, Object> root = (Map<String, Object>) entry.getValue();
+      if (!root.containsKey("discriminator") || OPEN_DISCRIMINATORS.contains(name)) {
+        continue;
+      }
+      unions.add(name);
+      assertThat(root).as("%s root", name).doesNotContainKeys("allOf", "properties");
+      String property = String.valueOf(mapAt(root, "discriminator").get("propertyName"));
+      Map<String, Object> mapping = mapAt(root, "discriminator", "mapping");
+      assertThat(root.get("oneOf")).as("%s.oneOf", name).isInstanceOf(List.class);
+      List<String> members =
+          ((List<?>) root.get("oneOf"))
+              .stream().map(item -> String.valueOf(((Map<?, ?>) item).get("$ref"))).toList();
+      Set<String> mapped = new HashSet<>();
+      mapping.values().forEach(ref -> mapped.add(String.valueOf(ref)));
+      assertThat(mapped)
+          .as("%s mapping names exactly its oneOf members", name)
+          .isEqualTo(new HashSet<>(members));
+
+      for (String memberRef : members) {
+        String member = memberRef.substring(SCHEMA_REF_PREFIX.length());
+        Map<String, Object> memberSchema = mapAt(schemas, member);
+        Object allOf = memberSchema.get("allOf");
+        if (allOf != null) {
+          assertThat((List<?>) allOf)
+              .as("%s must not compose its union root %s", member, name)
+              .noneMatch(part -> (SCHEMA_REF_PREFIX + name).equals(((Map<?, ?>) part).get("$ref")));
+        }
+        List<String> typeNames =
+            mapping.entrySet().stream()
+                .filter(typeName -> memberRef.equals(typeName.getValue()))
+                .map(Map.Entry::getKey)
+                .toList();
+        assertThat(schemaProperty(document, member, property).get("enum"))
+            .as("%s.%s pinned to its type names", member, property)
+            .asList()
+            .containsExactlyInAnyOrderElementsOf(typeNames);
+        assertThat(requiredOf(document, member)).as("%s required", member).contains(property);
+      }
+    }
+    assertThat(unions)
+        .as("published discriminated unions")
+        .contains(
+            "OnboardingStepPayload",
+            "PurchaseOrderSpecs",
+            "SupplierQuoteSpecs",
+            "SupplierRFQSpecs",
+            "RequirementFacetValue");
+  }
+
+  private static final List<String> PAGED_RESPONSE_FIELDS =
+      List.of("content", "page", "size", "totalElements", "totalPages", "first", "last");
+
+  private static final List<String> COLLECTION_REPORT_SCHEMAS =
+      List.of(
+          "FinanceCollectionReport",
+          "FinanceCollectionReportCurrency",
+          "FinanceCollectionReportRow");
+
+  /**
+   * PAGED-REQUIRED-1: {@code PagedResponse.from} writes all seven fields on every page, so every
+   * generated {@code PagedResponse*} schema requires all of them. Without it clients must treat
+   * {@code content} as possibly missing.
+   */
+  private void assertPagedResponsesAreComplete(Map<String, Object> document) {
+    List<String> paged =
+        mapAt(document, "components", "schemas").keySet().stream()
+            .filter(name -> name.startsWith("PagedResponse"))
+            .toList();
+    assertThat(paged).as("generated PagedResponse schemas").hasSizeGreaterThan(20);
+    for (String name : paged) {
+      assertThat(requiredOf(document, name))
+          .as("%s requires every page field", name)
+          .containsAll(PAGED_RESPONSE_FIELDS);
+    }
+  }
+
+  /**
+   * COLLECTION-REPORT-1: a nullable report field is written as null, never omitted, so it is both
+   * nullable and required. Null means the balance is unknown; absent would be a third state.
+   */
+  private void assertCollectionReportNullsAreRequired(Map<String, Object> document) {
+    for (String schema : COLLECTION_REPORT_SCHEMAS) {
+      List<String> required = requiredOf(document, schema);
+      Map<String, Object> properties =
+          mapAt(document, "components", "schemas", schema, "properties");
+      int nullable = 0;
+      for (String property : properties.keySet()) {
+        if (allowsNull(schemaProperty(document, schema, property))) {
+          nullable++;
+          assertThat(required)
+              .as("%s.%s is nullable, so required", schema, property)
+              .contains(property);
+        }
+      }
+      assertThat(nullable).as("%s nullable fields", schema).isPositive();
+    }
+  }
+
+  private static boolean allowsNull(Map<String, Object> property) {
+    if (property.get("type") instanceof List<?> types && types.contains("null")) {
+      return true;
+    }
+    return property.get("anyOf") instanceof List<?> arms
+        && arms.stream()
+            .anyMatch(
+                arm ->
+                    arm instanceof Map<?, ?> armMap
+                        && ("null".equals(armMap.get("type"))
+                            || (armMap.get("type") instanceof List<?> armTypes
+                                && armTypes.contains("null"))));
+  }
+
+  /** Both completeness guards reject the original defect: a field dropped from required. */
+  private void assertCompletenessRedProbes(String generatedSpec) throws Exception {
+    Map<String, Object> pagedProbe = parse(generatedSpec);
+    String paged =
+        mapAt(pagedProbe, "components", "schemas").keySet().stream()
+            .filter(name -> name.startsWith("PagedResponse"))
+            .findFirst()
+            .orElseThrow();
+    mapAt(pagedProbe, "components", "schemas", paged).put("required", List.of("page"));
+    assertThatThrownBy(() -> assertPagedResponsesAreComplete(pagedProbe))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("requires every page field");
+
+    Map<String, Object> reportProbe = parse(generatedSpec);
+    mapAt(reportProbe, "components", "schemas", "FinanceCollectionReportRow")
+        .put("required", List.of("id"));
+    assertThatThrownBy(() -> assertCollectionReportNullsAreRequired(reportProbe))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("is nullable, so required");
+  }
+
+  /** The union guard rejects a member that composes its root again (the original defect). */
+  private void assertDiscriminatedUnionRedProbe(String generatedSpec) throws Exception {
+    Map<String, Object> corrupted =
+        new YAMLMapper().readValue(generatedSpec, new TypeReference<Map<String, Object>>() {});
+    Map<String, Object> review = mapAt(corrupted, "components", "schemas", "OnboardingReviewStep");
+    review.put("allOf", List.of(Map.of("$ref", SCHEMA_REF_PREFIX + "OnboardingStepPayload")));
+    assertThatThrownBy(() -> assertDiscriminatedUnionsAreClosed(corrupted))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("OnboardingReviewStep must not compose its union root");
   }
 
   private void assertNavPreferencesImportContract(Map<String, Object> document) {
@@ -336,6 +525,98 @@ public class OpenApiExportIT {
         .containsEntry("$ref", "#/components/schemas/OrderIntakeStockPreviewHoldStatus");
     assertThat(mapAt(document, "components", "schemas", "OrderIntakeStockPreviewHoldStatus"))
         .containsEntry("enum", List.of("VERIFIED", "UNVERIFIED"));
+  }
+
+  /** DRAFT-HOLD-BE-2: optional top-level stock work never makes a proof mandatory for a line. */
+  private void assertMetreOrderStockContract(Map<String, Object> document) {
+    String quotes = "/api/v1/sales/quotes/{quoteId}";
+    assertThat(mapAt(document, "paths", quotes + "/lines/{lineId}/stock-selection", "post"))
+        .containsEntry("operationId", "applyQuoteRollSelection");
+    assertThat(mapAt(document, "paths", quotes + "/lines/{lineId}/stock-selection", "delete"))
+        .containsEntry("operationId", "removeQuoteRollSelection");
+    assertThat(mapAt(document, "paths", quotes + "/stock-lines", "post"))
+        .containsEntry("operationId", "createQuoteStockLine");
+    assertThat(mapAt(document, "paths", quotes + "/lines/{lineId}/quantity-policy", "post"))
+        .containsEntry("operationId", "recordQuoteQuantityPolicy");
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                "/api/v1/sales/order-intake/stock-selections/{id}/preview",
+                "post"))
+        .containsEntry("operationId", "previewDraftStockTarget");
+    assertThat(requiredOf(document, "SalesOrderLineRequest"))
+        .doesNotContain("stockSelection", "previewStockSelection", "sourceQuoteLineId");
+    assertThat(requiredOf(document, "AddQuoteLineRequest"))
+        .doesNotContain("selectedLots", "stockSelection");
+    assertThat(mapAt(document, "components", "schemas", "SalesQuantityPolicy").get("enum"))
+        .isEqualTo(List.of("UNRECORDED", "BY_AGREEMENT", "EXACT"));
+    assertThat(requiredOf(document, "ApplyQuoteRollSelectionRequest"))
+        .containsExactlyInAnyOrder("operationId", "expectedVersion", "selection");
+    assertThat(requiredOf(document, "SalesStockPlanning"))
+        .contains(
+            "assignment",
+            "review",
+            "cutAssessment",
+            "heldPieceIds",
+            "allocatedPieceIds",
+            "capabilities");
+    assertThat(mapAt(document, "components", "schemas", "SalesStockAssignment").get("enum"))
+        .isEqualTo(
+            List.of("UNASSIGNED", "LOT_QUANTITY_INTENT", "ROLLS_PRE_RESERVED", "ROLLS_ALLOCATED"));
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                "/api/v1/sales/order-intake/orders/{orderId}/lines/{lineId}/quantity-policy",
+                "post"))
+        .containsEntry("operationId", "recordOrderQuantityPolicy");
+    assertThat(mapAt(document, "components", "schemas", "SalesStockPlanningAction").get("enum"))
+        .isEqualTo(List.of("SELECT_ROLLS", "RECORD_QUANTITY_POLICY", "APPLY_CUT_PLAN"));
+  }
+
+  /** DRAFT-HOLD-BE-3: an explicit cut command retains distinct source and delivery evidence. */
+  private void assertStockCutPlanContract(Map<String, Object> document) {
+    String root = "/api/v1/production/stock-cut-plans";
+    for (String action : List.of("approve", "record", "correct", "verify", "cancel")) {
+      assertThat(mapAt(document, "paths", root + "/{id}/" + action, "post"))
+          .containsKey("operationId");
+    }
+    assertThat(mapAt(document, "paths", "/api/v1/production/stock-cut-sessions/{id}/apply", "post"))
+        .containsKey("operationId");
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                "/api/v1/sales/order-intake/stock-selections/{id}/cut-evaluation",
+                "post"))
+        .containsKey("operationId");
+    assertThat(requiredOf(document, "StockUnitCutPlanView"))
+        .contains(
+            "sourceQuantity",
+            "deliveryQuantity",
+            "remainderQuantity",
+            "sources",
+            "physicalDispositionPending",
+            "capabilities");
+    assertThat(requiredOf(document, "StockUnitCutPlanSource"))
+        .contains("measurementVersion", "stockVersion", "cutSource", "weight", "length");
+    assertThat(requiredOf(document, "StockUnitCutActualMeasurements"))
+        .contains(
+            "deliveryLength",
+            "remainderLength",
+            "lossLength",
+            "deliveryWeight",
+            "remainderWeight",
+            "lossWeight");
+    assertThat(requiredOf(document, "StockUnitCutPlanCapability"))
+        .contains("action", "allowed", "reason", "routesTo", "needsApproval");
+    assertThat(requiredOf(document, "StockUnitCutPlanCommand"))
+        .contains("operationId", "expectedVersion");
+    assertThat(mapAt(document, "components", "schemas", "StockUnitCutPlanState").get("enum"))
+        .isEqualTo(
+            List.of("PREPARED", "APPROVED", "RECORDED", "DISPUTED", "COMPLETED", "CANCELLED"));
+    assertThat(schemaProperty(document, "SalesStockPlanning", "cutPlan")).isNotEmpty();
   }
 
   /** DRAFT-HOLD-BE-1: published ownership, capabilities and command identity. */
@@ -500,6 +781,88 @@ public class OpenApiExportIT {
     Object required = mapAt(document, "components", "schemas", schemaName).get("required");
     assertThat(required).as("%s required", schemaName).isInstanceOf(List.class);
     return ((List<?>) required).stream().map(Object::toString).toList();
+  }
+
+  private void assertOnboardingCompanyAuthorityContract(Map<String, Object> document) {
+    assertThat(schemaProperty(document, "OnboardingStatusResponse", "companySetup"))
+        .containsEntry("$ref", "#/components/schemas/OnboardingCompanyCapability");
+    assertThat(schemaProperty(document, "OnboardingCompanyCapability", "action"))
+        .containsEntry("$ref", "#/components/schemas/PermissionKey");
+    assertThat(requiredOf(document, "OnboardingCompanyCapability"))
+        .contains("action", "allowed", "reason", "routesTo", "needsApproval");
+    assertThat(mapAt(document, "components", "schemas", "PermissionKey").get("enum"))
+        .asList()
+        .contains("organization:configure");
+    assertThat(
+            mapAt(
+                document,
+                "paths",
+                "/api/v1/common/users/me/onboarding/complete",
+                "post",
+                "responses"))
+        .containsKeys("200", "401", "403", "409", "422");
+    assertThat(
+            mapAt(document, "components", "schemas", "CompleteOnboardingRequest")
+                .get("description")
+                .toString())
+        .contains("Absent or null", "explicitly clear", "reject blank", "Replays reuse");
+    String journeyRoot = "/api/v1/common/users/me/onboarding";
+    for (String path :
+        List.of(
+            journeyRoot + "/journey",
+            journeyRoot + "/steps/{stepId}",
+            journeyRoot + "/journey/complete")) {
+      assertThat(mapAt(document, "paths")).containsKey(path);
+    }
+    assertThat(mapAt(document, "paths", journeyRoot + "/steps/{stepId}", "put", "responses"))
+        .containsKeys("200", "400", "401", "403", "409", "422");
+    assertThat(mapAt(document, "components", "schemas", "OnboardingStepPayload").get("oneOf"))
+        .asList()
+        .hasSize(6);
+    assertThat(mapAt(document, "components", "schemas", "OnboardingStepPayload", "discriminator"))
+        .containsEntry("propertyName", "stepId");
+    // Ordered, so a failure always names the same step first.
+    List.of(
+            Map.entry("OnboardingOrganizationStep", "ORGANIZATION_DETAILS"),
+            Map.entry("OnboardingAddressStep", "ADDRESS"),
+            Map.entry("OnboardingPersonalStep", "YOUR_DETAILS"),
+            Map.entry("OnboardingContactStep", "ORGANIZATION_CONTACTS"),
+            Map.entry("OnboardingModulesStep", "PLATFORM_MODULES"),
+            Map.entry("OnboardingReviewStep", "REVIEW"))
+        .forEach(
+            step -> {
+              assertThat(
+                      mapAt(
+                          document,
+                          "components",
+                          "schemas",
+                          "OnboardingStepPayload",
+                          "discriminator",
+                          "mapping"))
+                  .containsEntry(step.getValue(), SCHEMA_REF_PREFIX + step.getKey());
+              assertThat(requiredOf(document, step.getKey())).contains("stepId");
+              assertThat(schemaProperty(document, step.getKey(), "stepId").get("enum"))
+                  .asList()
+                  .containsExactly(step.getValue());
+            });
+    assertThat(requiredOf(document, "SaveOnboardingStepRequest"))
+        .contains("expectedVersion", "operationId", "payload");
+    assertThat(mapAt(document, "components", "schemas", "OnboardingJourneyResponse", "properties"))
+        .containsKeys(
+            "kind",
+            "version",
+            "steps",
+            "firstIncompleteStep",
+            "acceptedValues",
+            "requiresReconfirmation",
+            "packages",
+            "selectModules",
+            "complete");
+    assertThat(
+            (List<?>)
+                mapAt(document, "components", "schemas", "OnboardingModulesStep").get("required"))
+        .extracting(Object::toString)
+        .contains("catalogueVersion");
   }
 
   private void assertPermissionCatalogueContract(Map<String, Object> document) {

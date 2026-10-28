@@ -400,4 +400,15 @@ public class Task extends BaseEntity {
   // =========================================================================
   // PRIVATE HELPERS
   // =========================================================================
+  /** The same generated planning work follows the quote when it becomes an order. */
+  public void synchronizeSalesStockSubject(
+      String entityType, UUID entityId, String reference, String description) {
+    if (!"SALES_STOCK_PLANNING".equals(sourceType))
+      throw new IllegalStateException(
+          "Only generated stock-planning work may follow its commercial source");
+    this.entityType = entityType;
+    this.entityId = entityId;
+    this.title = reference;
+    this.description = description;
+  }
 }

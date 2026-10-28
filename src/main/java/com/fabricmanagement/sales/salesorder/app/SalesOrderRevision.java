@@ -33,6 +33,7 @@ import org.springframework.stereotype.Component;
 public class SalesOrderRevision {
 
   private final EntityManager entityManager;
+  private final org.springframework.context.ApplicationEventPublisher events;
   private final SalesOrderLineRepository lines;
   private final com.fabricmanagement.sales.orderintake.app.StockSelectionLifecycleService
       stockSelections;
@@ -40,6 +41,9 @@ public class SalesOrderRevision {
   public void linesChanged(SalesOrder order) {
     stockSelections.releaseChanged(order);
     entityManager.lock(order, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
+    events.publishEvent(
+        new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+            TenantContext.requireTenantId(), order.getId(), false));
   }
 
   /**
@@ -100,6 +104,10 @@ public class SalesOrderRevision {
     entityManager.flush();
     if (Objects.equals(order.getVersion(), versionBeforeWrites)) {
       linesChanged(order);
+    } else {
+      events.publishEvent(
+          new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+              TenantContext.requireTenantId(), order.getId(), false));
     }
     return order.getVersion();
   }

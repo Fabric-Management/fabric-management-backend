@@ -157,6 +157,11 @@ public class StockUnit extends BaseEntity {
   @Column(name = "length_unit", length = 10)
   private String lengthUnit;
 
+  /** Database-owned revision of physical/quality evidence, independent of reservation status. */
+  @Builder.Default
+  @Column(name = "measurement_revision", nullable = false, insertable = false, updatable = false)
+  private Long measurementRevision = 0L;
+
   /** First recorded measured length; never overwritten by remaining-length updates. */
   @lombok.Setter(lombok.AccessLevel.NONE)
   @Column(name = "initial_length", precision = 15, scale = 3, updatable = false)
@@ -570,6 +575,28 @@ public class StockUnit extends BaseEntity {
   public void reserve() {
     assertQualityReleased();
     transitionStatus(StockUnitStatus.RESERVED);
+  }
+
+  /** A verified split replaces this physical package; its original measurements remain evidence. */
+  public void completePlannedSplit() {
+    if (!Set.of(
+            StockUnitStatus.RESERVED,
+            StockUnitStatus.AVAILABLE,
+            StockUnitStatus.ON_HOLD,
+            StockUnitStatus.QUARANTINE)
+        .contains(status))
+      throw new StockUnitDomainException(
+          "Only the controlled source of a verified cut can be split");
+    currentWeight = BigDecimal.ZERO;
+    status = StockUnitStatus.DEPLETED;
+    onUpdate();
+  }
+
+  /** Split children inherit the accepted source grade, not an invented new QC decision. */
+  public void inheritSplitGrade(UUID gradeId) {
+    if (sourceType != StockUnitSourceType.SPLIT || getId() != null)
+      throw new StockUnitDomainException("Split provenance is recorded only at child creation");
+    qualityGradeId = gradeId;
   }
 
   /** Enforces the quality acceptance invariant independently from operational status. */

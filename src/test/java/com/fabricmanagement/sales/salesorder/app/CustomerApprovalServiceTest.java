@@ -86,6 +86,7 @@ class CustomerApprovalServiceTest {
   @Mock private OrderFlowEventRepository events;
   @Mock private ApproverAuthorities approvers;
   @Mock private DeliveryVerificationGate deliveryGate;
+  @Mock private SalesOrderPaymentPlanService paymentPlans;
 
   private static final UUID AUTHORITY = UUID.randomUUID();
 
@@ -117,7 +118,8 @@ class CustomerApprovalServiceTest {
             new OrderFlowRecorder(events, clock),
             clock,
             approvers,
-            deliveryGate);
+            deliveryGate,
+            paymentPlans);
     order =
         SalesOrder.builder()
             .tradingPartnerId(UUID.randomUUID())
@@ -249,6 +251,38 @@ class CustomerApprovalServiceTest {
   private CustomerApproval only() {
     assertThat(saved).hasSize(1);
     return saved.getFirst();
+  }
+
+  @Test
+  void retryingASubmittedRevisionDoesNotSendAnotherMailOrRepeatInternalApproval() {
+    var revision =
+        com.fabricmanagement.sales.salesorder.domain.paymentplan.OrderPaymentPlanRevision.create(
+            UUID.randomUUID(),
+            1,
+            0,
+            "a".repeat(64),
+            UUID.randomUUID(),
+            "b".repeat(64),
+            SALES,
+            "Initial plan",
+            List.of());
+    revision.propose(UUID.randomUUID());
+    var request =
+        new com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Submit(
+            0L, 0L, 48, null);
+    UUID revisionId = UUID.randomUUID();
+    when(paymentPlans.requireSubmission(order.getId(), revisionId, request, SALES))
+        .thenReturn(revision);
+    service.submitPaymentPlan(order.getId(), revisionId, request, SALES);
+    org.mockito.Mockito.verifyNoInteractions(mailer, approvalPort);
+  }
+
+  @Test
+  void informationMailNeverAgreesThePaymentPlan() {
+    ReflectionTestUtils.setField(order, "flowStage", OrderFlowStage.DRAFT);
+    service.sendInformation(order.getId(), SALES);
+    verify(paymentPlans, never()).proposed(any(), any());
+    verify(paymentPlans, never()).agreed(any(), any(), any());
   }
 
   @Test

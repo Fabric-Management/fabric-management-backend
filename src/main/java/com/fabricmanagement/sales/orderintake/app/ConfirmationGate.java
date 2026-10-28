@@ -33,6 +33,7 @@ public class ConfirmationGate {
   private final QuantityEvaluationService evaluation;
   private final PieceAllocationPort allocation;
   private final CustomRequestGate customRequests;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort cutPlans;
 
   /** A reason a line (or, with a null line, the order) cannot be confirmed now. */
   public record Block(UUID lineId, String code, String message, List<UUID> pieceIds) {}
@@ -78,9 +79,11 @@ public class ConfirmationGate {
                 "Pieces were taken or changed while confirming (" + outcome.failureCode() + ")",
                 outcome.unavailablePieceIds()));
       }
-      holds.releaseHolds(plan.line().getId());
-      plan.selection().converted();
-      selections.save(plan.selection());
+      if (plan.selection() != null) {
+        holds.releaseHolds(plan.line().getId());
+        plan.selection().converted();
+        selections.save(plan.selection());
+      } else holds.consumeAtConfirmation(plan.line().getId());
     }
   }
 
@@ -116,7 +119,45 @@ public class ConfirmationGate {
                 Collectors.toMap(DraftStockSelection::getSalesOrderLineId, Function.identity()));
     List<LinePlan> plans = new ArrayList<>();
     for (SalesOrderLine line : lines) {
+      if (line.getQuantityPolicy()
+              == com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT
+          && line.getCustomerRequestQty().compareTo(line.getRequestedQty()) != 0) {
+        blocks.add(
+            new Block(
+                line.getId(),
+                "EXACT_QUANTITY_REQUIRED",
+                "The exact customer quantity must be retained",
+                List.of()));
+        continue;
+      }
       DraftStockSelection selection = active.get(line.getId());
+      var cutSources =
+          cutPlans.confirmationSources(line.getId(), StockSelectionTerms.fingerprint(order, line));
+      if (!cutSources.isEmpty()) {
+        var refs =
+            cutSources.stream()
+                .map(
+                    source ->
+                        new PieceAllocationPort.PieceRef(
+                            source.stockUnitId(), source.batchId(), source.version()))
+                .toList();
+        plans.add(
+            new LinePlan(
+                line,
+                null,
+                new AcceptedStockCheck.Result(
+                    cutSources.stream()
+                        .map(
+                            com.fabricmanagement.production.core.stockunit.domain.StockUnitCutPlan
+                                    .Source
+                                ::length)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add),
+                    List.of(),
+                    com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption
+                        .Compatibility.CONFIRMED,
+                    refs)));
+        continue;
+      }
       if (selection == null) {
         evaluation
             .currentStock(order, line)
@@ -135,7 +176,8 @@ public class ConfirmationGate {
                         new Block(
                             line.getId(),
                             "STOCK_CHOICE_MISSING",
-                            "Available finished stock needs an explicit stock choice before confirmation",
+                            "Available finished stock needs an explicit stock choice before"
+                                + " confirmation",
                             List.of()));
                   }
                 });
@@ -169,6 +211,17 @@ public class ConfirmationGate {
                 "STOCK_CHANGED",
                 "Accepted pieces are no longer available; evaluate the line again",
                 check.unavailablePieces()));
+        continue;
+      }
+      if (line.getQuantityPolicy()
+              == com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT
+          && selection.getOption().quantity().compareTo(line.getCustomerRequestQty()) != 0) {
+        blocks.add(
+            new Block(
+                line.getId(),
+                "EXACT_QUANTITY_REQUIRED",
+                "Whole-roll allocation differs from the exact quantity; plan a cut",
+                List.of()));
         continue;
       }
       if (!check.compatibilityResolved()) {

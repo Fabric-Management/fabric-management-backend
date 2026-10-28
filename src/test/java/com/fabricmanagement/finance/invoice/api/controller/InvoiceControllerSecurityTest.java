@@ -33,6 +33,7 @@ class InvoiceControllerSecurityTest {
 
   @MockitoBean private InvoiceService invoiceService;
   @MockitoBean private PaymentService paymentService;
+  @MockitoBean private com.fabricmanagement.finance.common.app.FinancePostingDates postingDates;
   @MockitoBean private CreditNoteApplicationService creditNoteApplicationService;
   @MockitoBean private com.fabricmanagement.platform.auth.app.JwtService jwtService;
 

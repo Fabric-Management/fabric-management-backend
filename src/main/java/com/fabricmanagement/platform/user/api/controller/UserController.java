@@ -20,9 +20,12 @@ import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CurrentUserResponse;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
+import com.fabricmanagement.platform.user.dto.UpdateUserLanguagePreferenceRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
+import com.fabricmanagement.platform.user.dto.UpdateUserTimezonePreferenceRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -50,6 +53,7 @@ public class UserController {
   private final UserLocaleService userLocaleService;
   private final PermissionEvaluator permissionEvaluator;
   private final TenantService tenantService;
+  private final com.fabricmanagement.common.infrastructure.tenant.PackageAccessPort packageAccess;
 
   private PermissionResult getPermissions(UUID requesterId) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -285,8 +289,46 @@ public class UserController {
     user.setPermissions(permResult.permissions());
     user.setSuperAdmin(permResult.isSuperAdmin());
 
+    CurrentUserResponse response = CurrentUserResponse.from(user, tenantService.getMyTenant());
+    // Platform staff are not bound by a tenant's packages; everyone else is, administrators too.
+    if (!"PLATFORM_ADMIN".equals(user.getRoleCode())) {
+      response.setClosedResources(List.copyOf(packageAccess.closedResources(tenantId)));
+    }
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  @PatchMapping("/me/timezone")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Update the authenticated user's timezone",
+      description =
+          "Changes only the timezone preference. The currently saved language is preserved,"
+              + " including changes made from another tab or device.")
+  public ResponseEntity<ApiResponse<UserDto>> updateMyTimezonePreference(
+      @Valid @RequestBody UpdateUserTimezonePreferenceRequest request) {
+    UUID userId = TenantContext.getCurrentUserId();
+    if (userId == null) {
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
+    }
     return ResponseEntity.ok(
-        ApiResponse.success(CurrentUserResponse.from(user, tenantService.getMyTenant())));
+        ApiResponse.success(userLocaleService.updateTimezonePreference(userId, request)));
+  }
+
+  @PatchMapping("/me/language")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Update the authenticated user's language",
+      description =
+          "Changes only the language preference. The currently saved timezone is preserved,"
+              + " including changes made from another tab or device.")
+  public ResponseEntity<ApiResponse<UserDto>> updateMyLanguagePreference(
+      @Valid @RequestBody UpdateUserLanguagePreferenceRequest request) {
+    UUID userId = TenantContext.getCurrentUserId();
+    if (userId == null) {
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
+    }
+    return ResponseEntity.ok(
+        ApiResponse.success(userLocaleService.updateLanguagePreference(userId, request)));
   }
 
   /**

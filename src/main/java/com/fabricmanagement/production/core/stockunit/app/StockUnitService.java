@@ -224,6 +224,7 @@ public class StockUnitService {
   public StockUnit consume(UUID stockUnitId, BigDecimal amount) {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
+    ownership.assertAvailable(List.of(stockUnitId), null, null);
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
@@ -299,6 +300,7 @@ public class StockUnitService {
   public StockUnit consumeReserved(UUID stockUnitId, BigDecimal amount, UUID workOrderId) {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
+    ownership.assertReservedConsumption(stockUnitId, workOrderId);
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 

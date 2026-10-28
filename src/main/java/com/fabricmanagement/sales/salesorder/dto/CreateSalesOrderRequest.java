@@ -82,6 +82,19 @@ public class CreateSalesOrderRequest {
   @jakarta.validation.constraints.Size(max = 200, message = "Payment terms are too long")
   private String paymentTerms;
 
+  @Valid
+  @Schema(
+      description =
+          "Optional structured payment plan; draft content is saved atomically with the order")
+  @com.fasterxml.jackson.annotation.JsonInclude(
+      com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  private com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanInput paymentPlan;
+
+  @Size(max = 2000)
+  @com.fasterxml.jackson.annotation.JsonInclude(
+      com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  private String paymentNote;
+
   @Schema(description = "Where the conversation that led to the order took place")
   private AgreementContext agreementContext;
 
@@ -151,7 +164,7 @@ public class CreateSalesOrderRequest {
   @Size(max = 100)
   @Schema(
       description =
-          "Optional customer requests saved in the same transaction as the draft. "
-              + "They remain requests until evaluated and approved; they are not unbound order lines.")
+          "Optional customer requests saved in the same transaction as the draft. They remain"
+              + " requests until evaluated and approved; they are not unbound order lines.")
   private List<CustomerRequestDtos.@NotNull RequestInput> customRequests = new ArrayList<>();
 }

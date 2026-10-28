@@ -23,6 +23,13 @@ public class QuoteAccessPolicy {
     return canAccess(tenantId, userId, quote, "read");
   }
 
+  public boolean canRead(UUID tenantId, UUID userId, Quote quote, PermissionFreshness freshness) {
+    if (tenantId == null || userId == null || quote == null) return false;
+    return scopeResolver
+        .resolve(tenantId, userId, "read", freshness)
+        .permits(quote.getTenantId(), tenantId, principals(quote));
+  }
+
   public boolean canWrite(UUID tenantId, UUID userId, Quote quote) {
     return canAccess(tenantId, userId, quote, "write");
   }

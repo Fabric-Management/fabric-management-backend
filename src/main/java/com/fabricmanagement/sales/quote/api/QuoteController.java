@@ -65,7 +65,8 @@ public class QuoteController {
           QuoteStatus status,
       @Parameter(
               description =
-                  "Literal quote-number or customer-name search; trimmed values shorter than two characters are ignored")
+                  "Literal quote-number or customer-name search; trimmed values shorter than two"
+                      + " characters are ignored")
           @RequestParam(required = false)
           String q,
       @PageableDefault(size = 20, sort = "createdAt") Pageable pageable,
@@ -115,6 +116,10 @@ public class QuoteController {
       @PathVariable UUID quoteId,
       @Valid @RequestBody AddQuoteLineRequest req,
       Authentication authentication) {
+    if (req.getStockSelection() != null)
+      throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+          "VERSIONED_STOCK_COMMAND_REQUIRED",
+          "Use the versioned stock-lines command to transfer a provisional selection");
     QuoteResponse response =
         quoteService.toResponse(
             quoteService.addQuoteLine(quoteId, req, currentUserId(authentication)));
@@ -142,6 +147,12 @@ public class QuoteController {
       @PathVariable UUID lineId,
       @Valid @RequestBody UpdateQuoteLineRequest req,
       Authentication authentication) {
+    if (req.getStockSelection() != null)
+      throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+          "VERSIONED_STOCK_COMMAND_REQUIRED", "Use the versioned stock-selection command");
+    if (req.getQuantityPolicy() != null)
+      throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+          "VERSIONED_QUANTITY_COMMAND_REQUIRED", "Use the versioned quantity-policy command");
     QuoteResponse response =
         quoteService.toResponse(
             quoteService.updateQuoteLine(quoteId, lineId, req, currentUserId(authentication)));

@@ -44,7 +44,11 @@ public class DomainEventPublisher {
    * @param event the domain event to publish
    */
   public void publish(DomainEvent event) {
-    log.debug("Publishing domain event: {}", event);
+    log.debug(
+        "Publishing domain event: eventId={}, tenantId={}, eventType={}",
+        event.getEventId(),
+        event.getTenantId(),
+        event.getEventType());
     applicationEventPublisher.publishEvent(event);
   }
 

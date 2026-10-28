@@ -69,7 +69,15 @@ class QuoteStockOwnershipTransferServiceTest {
     target.setId(UUID.randomUUID());
     service =
         new QuoteStockOwnershipTransferService(
-            quotes, access, holds, evaluation, selections, entityManager, clock);
+            quotes,
+            access,
+            holds,
+            evaluation,
+            selections,
+            entityManager,
+            clock,
+            mock(com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort.class),
+            mock(com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.class));
     when(quotes.findByTenantIdAndIdAndIsActiveTrue(tenant, quote.getId()))
         .thenReturn(Optional.of(quote));
     when(access.canWrite(tenant, actor, quote, SalesAccessScopeResolver.PermissionFreshness.FRESH))

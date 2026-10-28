@@ -904,6 +904,44 @@ CREATE TABLE IF NOT EXISTS production.prod_fabric_finishing_process (
 CREATE INDEX IF NOT EXISTS idx_fabric_finishing_process_tenant_active
     ON production.prod_fabric_finishing_process (tenant_id, is_active);
 
+-- FABRIC-3c: what a finishing process costs per metre or kilogram, in general (partner_id empty) or
+-- at one firm, from a date. A row is never edited: a new price is a new row with a later
+-- valid_from, and a row entered by mistake is soft-deleted. partner_id names a trading partner
+-- without a foreign key, as the lot's finishing steps do (the partner lives in the platform module).
+CREATE TABLE IF NOT EXISTS production.prod_fabric_finishing_price (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    process_id UUID NOT NULL,
+    partner_id UUID,
+    unit VARCHAR(10) NOT NULL,
+    unit_price NUMERIC(15, 4) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    valid_from DATE NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fabric_finishing_price_process FOREIGN KEY (process_id)
+        REFERENCES production.prod_fabric_finishing_process(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_fabric_finishing_price_unit CHECK (unit IN ('M', 'KG')),
+    CONSTRAINT ck_fabric_finishing_price_amount CHECK (unit_price >= 0),
+    CONSTRAINT ck_fabric_finishing_price_currency CHECK (currency ~ '^[A-Z]{3}$')
+);
+
+-- One live price per process, firm (or none) and start date.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fabric_finishing_price_live
+    ON production.prod_fabric_finishing_price
+        (tenant_id, process_id, COALESCE(partner_id, '00000000-0000-0000-0000-000000000000'::uuid),
+         valid_from)
+    WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_fabric_finishing_price_lookup
+    ON production.prod_fabric_finishing_price (tenant_id, process_id, valid_from)
+    WHERE deleted_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS production.prod_fabric_article (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
@@ -1085,6 +1123,7 @@ BEGIN
     FOREACH table_name IN ARRAY ARRAY[
         'prod_fabric_construction',
         'prod_fabric_finishing_process',
+        'prod_fabric_finishing_price',
         'prod_fabric_article',
         'prod_fabric_woven',
         'prod_fabric_knitted',
@@ -2291,6 +2330,78 @@ CREATE TABLE IF NOT EXISTS production.production_execution_batch_lineage (
 CREATE INDEX idx_lineage_parent ON production.production_execution_batch_lineage(parent_batch_id);
 CREATE INDEX idx_lineage_child ON production.production_execution_batch_lineage(child_batch_id);
 CREATE INDEX idx_lineage_consumed_at ON production.production_execution_batch_lineage(consumed_at);
+
+-- ============================================================================
+-- 3b. batch_finishing_step (FABRIC-3b — what was done to a lot, in order)
+-- ============================================================================
+-- A lot stays one lot while finishing steps accumulate on it (FABRIC-ARCHITECTURE §1f). A step
+-- is SENT while the lot is out, DONE once it is back (or when a finished history is entered for a
+-- lot bought in that state) and CANCELLED when it was entered by mistake. The lot's current colour
+-- follows its latest colour-giving DONE step; earlier colours stay readable here.
+CREATE TABLE IF NOT EXISTS production.batch_finishing_step (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
+    batch_id UUID NOT NULL,
+    sequence INTEGER NOT NULL,
+    process_id UUID NOT NULL,
+    partner_id UUID,
+    firm_job_number VARCHAR(100),
+    status VARCHAR(20) NOT NULL,
+    sent_metres NUMERIC(15, 3) NOT NULL,
+    sent_on DATE NOT NULL,
+    returned_metres NUMERIC(15, 3),
+    returned_on DATE,
+    colour_id UUID,
+    cost_amount NUMERIC(15, 2),
+    cost_currency VARCHAR(3),
+    note TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_finishing_step_batch FOREIGN KEY (batch_id)
+        REFERENCES production.production_execution_batch(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_finishing_step_process FOREIGN KEY (process_id)
+        REFERENCES production.prod_fabric_finishing_process(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_finishing_step_batch_sequence UNIQUE (tenant_id, batch_id, sequence),
+    CONSTRAINT ck_finishing_step_status CHECK (status IN ('SENT', 'DONE', 'CANCELLED')),
+    CONSTRAINT ck_finishing_step_sent_metres CHECK (sent_metres > 0),
+    CONSTRAINT ck_finishing_step_returned CHECK (
+        (status = 'DONE' AND returned_metres IS NOT NULL AND returned_metres > 0
+            AND returned_on IS NOT NULL AND returned_on >= sent_on)
+        OR (status <> 'DONE' AND returned_metres IS NULL AND returned_on IS NULL)),
+    CONSTRAINT ck_finishing_step_cost CHECK (
+        (cost_amount IS NULL AND cost_currency IS NULL)
+        OR (cost_amount IS NOT NULL AND cost_amount >= 0
+            AND cost_currency IS NOT NULL AND cost_currency ~ '^[A-Z]{3}$'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_finishing_step_batch
+    ON production.batch_finishing_step (tenant_id, batch_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_finishing_step_partner_status
+    ON production.batch_finishing_step (tenant_id, partner_id, status);
+CREATE INDEX IF NOT EXISTS idx_finishing_step_job_number
+    ON production.batch_finishing_step (tenant_id, firm_job_number)
+    WHERE firm_job_number IS NOT NULL;
+-- A lot is out at one place at a time.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finishing_step_one_open_per_batch
+    ON production.batch_finishing_step (tenant_id, batch_id)
+    WHERE status = 'SENT';
+
+ALTER TABLE production.batch_finishing_step ENABLE ROW LEVEL SECURITY;
+ALTER TABLE production.batch_finishing_step FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON production.batch_finishing_step;
+CREATE POLICY rls_tenant_isolation ON production.batch_finishing_step
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+COMMENT ON TABLE production.batch_finishing_step IS
+    'A finishing process done to a lot, at an own site or a subcontractor, with the firm''s job number (FABRIC-3b).';
 
 -- ============================================================================
 -- 4. production_execution_inventory_transaction (V058+V059+V060+V062+V064)

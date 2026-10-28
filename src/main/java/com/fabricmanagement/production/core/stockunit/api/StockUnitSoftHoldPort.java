@@ -7,7 +7,17 @@ public interface StockUnitSoftHoldPort {
 
   void replaceHolds(UUID quoteLineId, Collection<UUID> stockUnitIds);
 
+  /** Transfers an authenticated provisional period without a release/reacquire gap. */
+  void replaceQuoteHolds(UUID quoteLineId, Collection<UUID> stockUnitIds, UUID ownSessionId);
+
   void releaseHolds(UUID quoteLineId);
+
+  /** Hard ownership replaced these soft rows; the cut plan itself remains active. */
+  void consumeAtConfirmation(UUID ownerLineId, UUID applyingSessionId);
+
+  default void consumeAtConfirmation(UUID ownerLineId) {
+    consumeAtConfirmation(ownerLineId, null);
+  }
 
   java.util.List<UUID> heldPieceIds(UUID ownerLineId);
 

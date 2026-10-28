@@ -58,11 +58,16 @@ public class OrderIntakeStockPreviewService {
   private final DraftStockReadContext ownStock;
 
   public OrderIntakeStockPreviewDto preview(OrderIntakeStockPreviewRequest request, UUID actor) {
-    UUID tenantId = TenantContext.requireTenantId();
     var own =
         request.ownStockSelection() == null
             ? null
             : ownStock.verify(request.productId(), request.ownStockSelection(), actor);
+    return preview(request, actor, own);
+  }
+
+  OrderIntakeStockPreviewDto preview(
+      OrderIntakeStockPreviewRequest request, UUID actor, DraftStockReadContext.Own own) {
+    UUID tenantId = TenantContext.requireTenantId();
     QuantityEvaluationService.EvaluationRun run =
         evaluations.run(
             new QuantityEvaluationService.EvaluationRequest(
@@ -164,11 +169,20 @@ public class OrderIntakeStockPreviewService {
                         facts.heldPieceIds().contains(piece.stockUnitId()),
                         facts.holds().stream()
                             .filter(hold -> hold.stockUnitId().equals(piece.stockUnitId()))
-                            .flatMap(hold -> facts.backingIntent(hold).stream())
                             .map(
-                                intent ->
-                                    com.fabricmanagement.sales.orderintake.domain.proposal
-                                        .QuantityOption.StockOwnerType.valueOf(intent.ownerType()))
+                                hold ->
+                                    hold.provisionalSessionId() != null
+                                        ? com.fabricmanagement.sales.orderintake.domain.proposal
+                                            .QuantityOption.StockOwnerType.DRAFT
+                                        : facts
+                                            .backingIntent(hold)
+                                            .map(
+                                                intent ->
+                                                    com.fabricmanagement.sales.orderintake.domain
+                                                        .proposal.QuantityOption.StockOwnerType
+                                                        .valueOf(intent.ownerType()))
+                                            .orElse(null))
+                            .filter(Objects::nonNull)
                             .findFirst()
                             .orElse(null)))
             .toList());
@@ -187,14 +201,17 @@ public class OrderIntakeStockPreviewService {
           hold.stockUnitId(), pieceNo, HoldStatus.UNVERIFIED, null, null, null);
     }
     LotIntentView intent = backing.get();
-    boolean readable = (intent.quoteId() != null && readableQuotes.contains(intent.quoteId()));
+    boolean readable =
+        hold.provisionalSessionId() == null
+            && intent.quoteId() != null
+            && readableQuotes.contains(intent.quoteId());
     return new OrderIntakeStockPreviewDto.HeldPiece(
         hold.stockUnitId(),
         pieceNo,
         HoldStatus.VERIFIED,
         readable ? intent.quoteNumber() : null,
         readable ? intent.marketerName() : null,
-        intent.expiresAt());
+        hold.provisionalSessionId() == null ? intent.expiresAt() : null);
   }
 
   private OrderIntakeStockPreviewDto.Totals totals(

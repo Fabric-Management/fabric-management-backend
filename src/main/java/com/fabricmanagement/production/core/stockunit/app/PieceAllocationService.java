@@ -57,6 +57,7 @@ public class PieceAllocationService implements PieceAllocationPort {
   private final BatchPrimaryMeasureService measureService;
   private final Clock clock;
   private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
+  private final StockUnitCutPlanGuard cutPlans;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -78,7 +79,7 @@ public class PieceAllocationService implements PieceAllocationPort {
     ownership.assertAvailable(
         request.pieces().stream().map(PieceRef::stockUnitId).toList(),
         request.salesOrderLineId(),
-        null);
+        request.applyingSessionId());
     Map<UUID, List<PieceRef>> byLot = new TreeMap<>();
     request
         .pieces()
@@ -230,9 +231,14 @@ public class PieceAllocationService implements PieceAllocationPort {
   @Override
   @Transactional
   public int releaseForLine(UUID tenantId, UUID salesOrderLineId, UUID actorId, String reason) {
+    var protectedSources = cutPlans.physicallyCutSources(salesOrderLineId);
     List<StockUnitAllocation> active =
-        allocationRepository.findByTenantIdAndSalesOrderLineIdAndStatusOrderByAllocatedAtAscIdAsc(
-            tenantId, salesOrderLineId, StockUnitAllocationStatus.ACTIVE);
+        allocationRepository
+            .findByTenantIdAndSalesOrderLineIdAndStatusOrderByAllocatedAtAscIdAsc(
+                tenantId, salesOrderLineId, StockUnitAllocationStatus.ACTIVE)
+            .stream()
+            .filter(row -> !protectedSources.contains(row.getStockUnitId()))
+            .toList();
     if (active.isEmpty()) {
       return 0;
     }
@@ -249,7 +255,18 @@ public class PieceAllocationService implements PieceAllocationPort {
               reservation ->
                   reservation.getStatus() == ReservationStatus.ACTIVE
                       || reservation.getStatus() == ReservationStatus.PARTIALLY_CONSUMED)
-          .ifPresent(reservation -> cancelReservation(tenantId, reservation));
+          .ifPresent(
+              reservation -> {
+                var released =
+                    entry.getValue().stream()
+                        .map(StockUnitAllocation::getQuantity)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (released.compareTo(reservation.getRemainingQuantity()) == 0) {
+                  cancelReservation(tenantId, reservation);
+                } else {
+                  releaseReservationPart(tenantId, reservation, released);
+                }
+              });
       for (StockUnitAllocation allocation : entry.getValue()) {
         stockUnitRepository
             .findByIdAndTenantIdAndIsActiveTrue(allocation.getStockUnitId(), tenantId)
@@ -284,6 +301,27 @@ public class PieceAllocationService implements PieceAllocationPort {
                         lot.release(quantity);
                         batchRepository.save(lot);
                       });
+            });
+  }
+
+  private void releaseReservationPart(
+      UUID tenantId, BatchReservation reservation, BigDecimal amount) {
+    reservation.releasePart(amount);
+    reservationRepository.save(reservation);
+    batchRepository
+        .findByIdAndTenantIdForUpdate(reservation.getBatchId(), tenantId)
+        .ifPresent(
+            lot -> {
+              var dimension = measureService.resolve(lot).primaryMeasure();
+              var quantity =
+                  measureService
+                      .fromCanonical(amount, lot.getUnit(), dimension)
+                      .orElseThrow(
+                          () ->
+                              new com.fabricmanagement.production.core.stockunit.domain.exception
+                                  .StockUnitDomainException("The reserved lot measure changed"));
+              lot.release(quantity);
+              batchRepository.save(lot);
             });
   }
 

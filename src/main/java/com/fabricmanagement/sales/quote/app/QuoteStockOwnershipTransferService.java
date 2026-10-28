@@ -40,6 +40,9 @@ public class QuoteStockOwnershipTransferService implements QuoteStockOwnershipTr
   private final DraftStockSelectionRepository selections;
   private final EntityManager entityManager;
   private final Clock clock;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort cutPlans;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort
+      cutTargets;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -57,6 +60,33 @@ public class QuoteStockOwnershipTransferService implements QuoteStockOwnershipTr
                             .PermissionFreshness.FRESH))
             .orElseThrow(() -> OrderIntakeException.notFound("Source quote", order.getQuoteId()));
     entityManager.refresh(quote, LockModeType.PESSIMISTIC_WRITE);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareLine(SalesOrder order, SalesOrderLine target, UUID sourceLineId, UUID actor) {
+    prepare(order, actor);
+    var quote =
+        quotes
+            .findByTenantIdAndIdAndIsActiveTrue(TenantContext.requireTenantId(), order.getQuoteId())
+            .orElseThrow();
+    var source =
+        quote
+            .findLine(sourceLineId)
+            .filter(com.fabricmanagement.sales.quote.domain.QuoteLine::isActive)
+            .orElseThrow(() -> OrderIntakeException.notFound("Source quote line", sourceLineId));
+    if (quote.getStatus() != QuoteStatus.APPROVED
+        || !Objects.equals(quote.getCustomerId(), order.getTradingPartnerId())
+        || !Objects.equals(source.getProductId(), target.getProductId())
+        || !Objects.equals(source.getColorId(), target.getColorId())
+        || !source.getUnit().equalsIgnoreCase(target.getUnit())
+        || source.getRequestedQty().compareTo(target.getRequestedQty()) != 0
+        || target.getQuantityPolicy()
+                != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED
+            && target.getQuantityPolicy() != source.getQuantityPolicy())
+      throw OrderIntakeException.conflict(
+          "QUOTE_LINE_CHANGED", "The distribution differs from its approved source quote");
+    target.inheritQuantityTerms(source.getQuantityTerms(), source.getCustomerRequestQty());
   }
 
   @Override
@@ -94,8 +124,33 @@ public class QuoteStockOwnershipTransferService implements QuoteStockOwnershipTr
         || source.getRequestedQty().compareTo(target.getRequestedQty()) != 0)
       throw OrderIntakeException.conflict(
           "QUOTE_LINE_CHANGED", "The target distribution differs from the source quote line");
+    if (target.getQuantityPolicy()
+            != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED
+        && target.getQuantityPolicy() != source.getQuantityPolicy())
+      throw OrderIntakeException.conflict(
+          "QUOTE_LINE_CHANGED", "The quantity decision differs from the source quote");
+    target.inheritQuantityTerms(source.getQuantityTerms(), source.getCustomerRequestQty());
     var ids = holds.heldPieceIds(sourceLineId);
-    if (!ids.isEmpty()) {
+    var cut = cutPlans.currentForLine(sourceLineId);
+    if (cut.isPresent()) {
+      var sourceTarget =
+          new com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.Target(
+              com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.TargetType
+                  .QUOTE,
+              quote.getId(),
+              sourceLineId);
+      var context = cutTargets.resolve(sourceTarget, actor, false);
+      var planned = cutPlans.confirmationSources(sourceLineId, context.fingerprint());
+      if (!Set.copyOf(ids)
+          .equals(
+              planned.stream()
+                  .map(
+                      com.fabricmanagement.production.core.stockunit.domain.StockUnitCutPlan.Source
+                          ::stockUnitId)
+                  .collect(java.util.stream.Collectors.toSet())))
+        throw OrderIntakeException.conflict(
+            "QUOTE_STOCK_CHANGED", "The cut plan source ownership changed before conversion");
+    } else if (!ids.isEmpty()) {
       var request =
           new OrderIntakeStockPreviewRequest(
               target.getProductId(),
@@ -150,5 +205,17 @@ public class QuoteStockOwnershipTransferService implements QuoteStockOwnershipTr
     }
     holds.transferQuoteHolds(
         order.getQuoteId(), sourceLineId, order.getId(), order.getOrderNumber(), target.getId());
+    if (cut.isPresent()) {
+      var context =
+          cutTargets.resolve(
+              new com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.Target(
+                  com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort
+                      .TargetType.SALES_ORDER,
+                  order.getId(),
+                  target.getId()),
+              actor,
+              true);
+      cutPlans.transfer(sourceLineId, context);
+    }
   }
 }

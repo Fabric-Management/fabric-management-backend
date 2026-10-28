@@ -28,7 +28,7 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
   @Query(
       value =
           """
-      select md5(concat_ws(':', count(s.id), coalesce(sum(s.version), 0), max(s.updated_at),
+      select md5(concat_ws(':', count(s.id), coalesce(sum(s.version), 0), coalesce(sum(s.measurement_revision), 0), max(s.updated_at),
         (select concat_ws(':', count(h.id), coalesce(sum(h.version), 0), max(h.updated_at))
          from production.stock_unit_soft_hold h join production.stock_unit u on u.id = h.stock_unit_id and u.tenant_id = h.tenant_id
          join production.production_execution_batch hb on hb.id = u.batch_id and hb.tenant_id = u.tenant_id
@@ -40,7 +40,9 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
          where i.tenant_id = :tenant and ib.product_id = :product),
         (select concat_ws(':', count(w.id), coalesce(sum(w.version), 0), max(w.updated_at))
          from production.batch_finished_width_measurement w join production.production_execution_batch wb on wb.id = w.batch_id and wb.tenant_id = w.tenant_id
-         where w.tenant_id = :tenant and wb.product_id = :product)))
+         where w.tenant_id = :tenant and wb.product_id = :product),
+        (select concat_ws(':', count(cp.id), coalesce(sum(cp.version), 0), max(cp.updated_at))
+         from production.stock_unit_cut_plan cp where cp.tenant_id = :tenant and cp.product_id = :product)))
       from production.stock_unit s join production.production_execution_batch b on b.id = s.batch_id and b.tenant_id = s.tenant_id
       where s.tenant_id = :tenant and b.product_id = :product
       """,

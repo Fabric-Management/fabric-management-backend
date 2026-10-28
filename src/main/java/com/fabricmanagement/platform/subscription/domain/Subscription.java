@@ -100,16 +100,59 @@ public class Subscription extends BaseEntity {
   @Column(name = "pricing_tier", length = 50)
   private String pricingTier;
 
+  @Column(name = "evaluation_managed", nullable = false)
+  private boolean evaluationManaged;
+
+  @Column(name = "learning_access", nullable = false)
+  private boolean learningAccess;
+
+  @Column(name = "evaluation_selection_source", length = 30)
+  private String evaluationSelectionSource;
+
+  /** Evaluation selection never calls activate(), which means paid access. */
+  public void selectEvaluation(boolean learning, Instant deadline, String source) {
+    if (status == SubscriptionStatus.ACTIVE
+        || status == SubscriptionStatus.CANCELLED
+        || (status == SubscriptionStatus.SUSPENDED && !evaluationManaged)) {
+      throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+          "Existing subscription cannot be changed through evaluation onboarding",
+          "ONBOARDING_SUBSCRIPTION_CONFLICT",
+          409);
+    }
+    if (!learning && (deadline == null || !deadline.isAfter(Instant.now()))) {
+      throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+          "An active real trial window is required", "ONBOARDING_EVALUATION_UNAVAILABLE", 409);
+    }
+    evaluationManaged = true;
+    learningAccess = learning;
+    evaluationSelectionSource = source;
+    status = SubscriptionStatus.TRIAL;
+    trialEndsAt = learning ? null : deadline;
+    expiryDate = null;
+  }
+
+  public void deselectEvaluation() {
+    if (!evaluationManaged || status != SubscriptionStatus.TRIAL) return;
+    status = SubscriptionStatus.SUSPENDED;
+    learningAccess = false;
+    evaluationSelectionSource = "OWNER";
+  }
+
   public boolean isActive() {
+    return isActiveAt(Instant.now());
+  }
+
+  public boolean isActiveAt(Instant now) {
+    if (!Boolean.TRUE.equals(getIsActive()) || getDeletedAt() != null) return false;
     if (this.status == SubscriptionStatus.ACTIVE) {
       if (this.expiryDate == null) {
         return true;
       }
-      return this.expiryDate.isAfter(Instant.now());
+      return this.expiryDate.isAfter(now);
     }
 
     if (this.status == SubscriptionStatus.TRIAL) {
-      return this.trialEndsAt != null && this.trialEndsAt.isAfter(Instant.now());
+      return learningAccess || (this.trialEndsAt != null && this.trialEndsAt.isAfter(now));
     }
 
     return false;
@@ -118,27 +161,40 @@ public class Subscription extends BaseEntity {
   public boolean isExpired() {
     return this.status == SubscriptionStatus.EXPIRED
         || (this.expiryDate != null && this.expiryDate.isBefore(Instant.now()))
-        || (this.trialEndsAt != null && this.trialEndsAt.isBefore(Instant.now()));
+        || (!learningAccess
+            && this.status == SubscriptionStatus.TRIAL
+            && this.trialEndsAt != null
+            && this.trialEndsAt.isBefore(Instant.now()));
   }
 
   public void activate() {
     this.status = SubscriptionStatus.ACTIVE;
+    this.learningAccess = false;
+    this.evaluationManaged = false;
+    this.trialEndsAt = null;
   }
 
   public void expire() {
+    this.learningAccess = false;
     this.status = SubscriptionStatus.EXPIRED;
   }
 
   public void cancel() {
+    this.learningAccess = false;
     this.status = SubscriptionStatus.CANCELLED;
   }
 
   public void suspend() {
+    this.learningAccess = false;
     this.status = SubscriptionStatus.SUSPENDED;
   }
 
   public void resume() {
     if (this.status == SubscriptionStatus.SUSPENDED) {
+      if (evaluationManaged) {
+        throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+            "Use the versioned evaluation modules step", "ONBOARDING_MODULES_STEP_REQUIRED", 409);
+      }
       this.status = SubscriptionStatus.ACTIVE;
     }
   }

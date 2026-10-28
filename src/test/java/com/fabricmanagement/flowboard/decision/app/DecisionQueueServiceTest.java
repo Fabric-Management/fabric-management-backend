@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
+import com.fabricmanagement.flowboard.collection.app.CollectionFollowUpHealthService;
+import com.fabricmanagement.flowboard.collection.app.port.CollectionFollowUpPort;
 import com.fabricmanagement.flowboard.decision.domain.DecisionQueueBucket;
 import com.fabricmanagement.flowboard.decision.infra.repository.DecisionQueueRepository;
 import com.fabricmanagement.flowboard.routing.app.RoutingEligibilityService;
@@ -38,7 +40,16 @@ class DecisionQueueServiceTest {
   private final Clock clock = Clock.fixed(Instant.parse("2026-09-21T10:00:00Z"), ZoneOffset.UTC);
   private final DecisionQueueService service =
       new DecisionQueueService(
-          repository, reads, writes, users, eligibility, routing, rebuild, clock);
+          repository,
+          reads,
+          writes,
+          users,
+          eligibility,
+          routing,
+          rebuild,
+          clock,
+          mock(CollectionFollowUpPort.class),
+          mock(CollectionFollowUpHealthService.class));
 
   @Test
   void inactiveCallerIsRejectedBeforeAnyScopeOrCountQuery() {
@@ -69,7 +80,7 @@ class DecisionQueueServiceTest {
     List<DecisionQueueRepository.Row> rows =
         IntStream.range(0, 100).mapToObj(index -> row()).toList();
     when(repository.page(
-            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(100)))
+            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(100), any()))
         .thenReturn(new DecisionQueueRepository.PageSlice(rows, rows.size()));
     when(routing.isActiveMember(tenant, RoutingPoolKey.ORDER_COVER, caller)).thenReturn(false);
 
@@ -83,7 +94,7 @@ class DecisionQueueServiceTest {
   @Test
   void summaryFailurePropagatesAndNeverBecomesAZero() {
     arrangeCaller();
-    when(repository.count(any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE)))
+    when(repository.count(any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), any()))
         .thenThrow(new IllegalStateException("database unavailable"));
     assertThatThrownBy(() -> service.summary(tenant, caller))
         .isInstanceOf(IllegalStateException.class)
@@ -93,11 +104,11 @@ class DecisionQueueServiceTest {
   @Test
   void unassignedCountIsNullWithoutManageRoutingPermission() {
     arrangeCaller();
-    when(repository.count(any(), any(), anySet(), any(), any())).thenReturn(3L);
+    when(repository.count(any(), any(), anySet(), any(), any(), any())).thenReturn(3L);
     var summary = service.summary(tenant, caller);
     assertThat(summary.unassignedCount()).isNull();
     verify(repository, never())
-        .count(any(), any(), anySet(), any(), eq(DecisionQueueBucket.UNASSIGNED));
+        .count(any(), any(), anySet(), any(), eq(DecisionQueueBucket.UNASSIGNED), any());
     assertThat(summary.computedAt()).isEqualTo(clock.instant());
   }
 
@@ -131,14 +142,15 @@ class DecisionQueueServiceTest {
     assertThat(summary.departmentCount()).isZero();
     assertThat(summary.waitingCount()).isZero();
     assertThat(summary.unassignedCount()).isNull();
-    verify(repository, never()).page(any(), any(), anySet(), any(), any(), anyInt(), anyInt());
-    verify(repository, never()).count(any(), any(), anySet(), any(), any());
+    verify(repository, never())
+        .page(any(), any(), anySet(), any(), any(), anyInt(), anyInt(), any());
+    verify(repository, never()).count(any(), any(), anySet(), any(), any(), any());
   }
 
   @Test
   void summaryIsStaleWhileARebuildIsRunning() {
     arrangeCaller();
-    when(repository.count(any(), any(), anySet(), any(), any())).thenReturn(0L);
+    when(repository.count(any(), any(), anySet(), any(), any(), any())).thenReturn(0L);
     when(repository.hasOverduePublication(tenant, DecisionQueueFreshness.LISTENERS))
         .thenReturn(false);
     rebuild.started(tenant);
@@ -155,7 +167,7 @@ class DecisionQueueServiceTest {
     when(routing.isActiveMember(tenant, RoutingPoolKey.ORDER_COVER, caller)).thenReturn(true);
     DecisionQueueRepository.Row row = row();
     when(repository.page(
-            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(20)))
+            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(20), any()))
         .thenReturn(new DecisionQueueRepository.PageSlice(List.of(row), 1));
     when(writes.allowedOrderIds(tenant, caller, List.of(row.orderId())))
         .thenReturn(Set.of(row.orderId()));
@@ -180,6 +192,9 @@ class DecisionQueueServiceTest {
                 .map(listener -> listener.getName())
                 .collect(java.util.stream.Collectors.toSet());
     derived.add(OrderCoverCaseOpenedListener.class.getName());
+    derived.add(
+        com.fabricmanagement.flowboard.collection.app.listener.CollectionFollowUpListener.class
+            .getName());
 
     assertThat(DecisionQueueFreshness.LISTENERS).isEqualTo(derived);
   }
@@ -190,7 +205,14 @@ class DecisionQueueServiceTest {
     List<DecisionQueueRepository.Row> rows =
         IntStream.range(0, numberOfRows).mapToObj(index -> row()).toList();
     when(repository.page(
-            any(), any(), anySet(), any(), eq(DecisionQueueBucket.MINE), eq(0), eq(numberOfRows)))
+            any(),
+            any(),
+            anySet(),
+            any(),
+            eq(DecisionQueueBucket.MINE),
+            eq(0),
+            eq(numberOfRows),
+            any()))
         .thenReturn(new DecisionQueueRepository.PageSlice(rows, rows.size()));
     when(writes.allowedOrderIds(eq(tenant), eq(caller), anyCollection()))
         .thenAnswer(call -> Set.copyOf(call.<Collection<UUID>>getArgument(2)));
@@ -209,7 +231,7 @@ class DecisionQueueServiceTest {
     var permissions =
         new PermissionResult(
             Map.of(
-                "flowboard", Map.of("write", DataScope.OWN),
+                "flowboard", Map.of("read", DataScope.OWN, "write", DataScope.OWN),
                 "sales", Map.of("write", DataScope.OWN)),
             false);
     var user = new UserPermissions(tenant, caller, "Caller", true, permissions);

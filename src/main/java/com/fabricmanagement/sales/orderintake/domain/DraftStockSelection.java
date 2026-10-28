@@ -64,6 +64,10 @@ public class DraftStockSelection extends BaseEntity {
   private Long orderVersion;
   private UUID targetOrderId;
   private UUID targetLineId;
+  private UUID targetQuoteId;
+  private UUID targetQuoteLineId;
+  private UUID transferredQuoteId;
+  private UUID transferredQuoteLineId;
   private UUID sourceQuoteId;
   private UUID sourceQuoteLineId;
 
@@ -81,6 +85,22 @@ public class DraftStockSelection extends BaseEntity {
   public void sourceQuote(UUID quoteId, UUID quoteLineId) {
     this.sourceQuoteId = quoteId;
     this.sourceQuoteLineId = quoteLineId;
+  }
+
+  public UUID ownLineId() {
+    return targetQuoteLineId != null ? targetQuoteLineId : targetLineId;
+  }
+
+  public void bindQuoteTarget(UUID quoteId, UUID lineId) {
+    this.targetQuoteId = quoteId;
+    this.targetQuoteLineId = lineId;
+  }
+
+  public void transferQuote(UUID quoteId, UUID lineId) {
+    this.transferredQuoteId = quoteId;
+    this.transferredQuoteLineId = lineId;
+    this.state = State.TRANSFERRED;
+    this.tokens = List.of();
   }
 
   public void bindTarget(UUID orderId, UUID lineId) {

@@ -46,7 +46,8 @@ public class ShipmentProgressService {
 
     if (shipmentApplied && line.isOverShipped()) {
       log.warn(
-          "Over-shipment detected for SalesOrderLine {}. shipmentLineId={}, requestedQty={}, shippedQty={}, remainingQty={}",
+          "Over-shipment detected for SalesOrderLine {}. shipmentLineId={}, requestedQty={},"
+              + " shippedQty={}, remainingQty={}",
           line.getId(),
           shipmentLineId,
           line.getRequestedQty(),
@@ -88,7 +89,11 @@ public class ShipmentProgressService {
                     l ->
                         l.getRequestedQty() != null
                             && l.getShippedQty() != null
-                            && l.getShippedQty().compareTo(l.getRequestedQty()) >= 0);
+                            && (l.getQuantityPolicy()
+                                    == com.fabricmanagement.sales.common.domain.SalesQuantityPolicy
+                                        .EXACT
+                                ? l.getShippedQty().compareTo(l.getRequestedQty()) == 0
+                                : l.getShippedQty().compareTo(l.getRequestedQty()) >= 0));
 
     // 3. Header status güncelle
     UUID tenantId =

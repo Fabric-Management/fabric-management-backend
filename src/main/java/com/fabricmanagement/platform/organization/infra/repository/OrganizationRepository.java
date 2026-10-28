@@ -2,10 +2,12 @@ package com.fabricmanagement.platform.organization.infra.repository;
 
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +19,14 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
+
+  /** Company-wide command boundary, also serialising different administrators. */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "SELECT o FROM Organization o WHERE o.tenantId = :tenantId"
+          + " AND o.parentOrganizationId IS NULL AND o.isActive = true"
+          + " AND o.organizationType != com.fabricmanagement.platform.organization.domain.OrganizationType.EXTERNAL_PARTNER")
+  Optional<Organization> lockRootForOnboarding(@Param("tenantId") UUID tenantId);
 
   /**
    * Find organization by tenant and ID.

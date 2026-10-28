@@ -32,7 +32,6 @@ import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -72,6 +71,11 @@ public class DraftStockSelectionService {
   private final EntityManager entityManager;
   private final ObjectMapper mapper;
   private final Clock clock;
+  private final OrderIntakeStockPreviewService previews;
+  private final com.fabricmanagement.sales.quote.app.QuoteStockTargetAccess quoteTargets;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort cutPlans;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort
+      cutTargets;
 
   @Transactional
   public DraftStockSelectionDto open(DraftStockSelectionRequests.Open request, UUID actor) {
@@ -81,6 +85,20 @@ public class DraftStockSelectionService {
             .find(TenantContext.requireTenantId(), request.productId())
             .filter(value -> value.active() && value.productType() == ProductType.FABRIC)
             .orElseThrow(() -> OrderIntakeException.productNotAvailable(request.productId()));
+    if (request.targetQuoteLineId() != null && request.targetQuoteId() == null
+        || request.targetQuoteId() != null
+            && (request.targetOrderId() != null || request.targetLineId() != null))
+      throw OrderIntakeException.rule(
+          "STOCK_TARGET_INCOMPLETE", "Choose one complete order or quote target");
+    if (request.targetQuoteId() != null) {
+      var quote = quoteTargets.writable(request.targetQuoteId(), actor);
+      if (request.targetQuoteLineId() != null
+          && !quoteTargets
+              .line(quote, request.targetQuoteLineId())
+              .getProductId()
+              .equals(request.productId()))
+        throw OrderIntakeException.productNotAvailable(request.productId());
+    }
     if ((request.targetOrderId() == null) != (request.targetLineId() == null))
       throw OrderIntakeException.rule(
           "STOCK_TARGET_INCOMPLETE", "Name both the saved order and its line");
@@ -106,7 +124,9 @@ public class DraftStockSelectionService {
             .withDetail("clientLineId", request.clientLineId())
             .withDetail("selectionId", previous.get().getId());
       if (!Objects.equals(previous.get().getTargetOrderId(), request.targetOrderId())
-          || !Objects.equals(previous.get().getTargetLineId(), request.targetLineId()))
+          || !Objects.equals(previous.get().getTargetLineId(), request.targetLineId())
+          || !Objects.equals(previous.get().getTargetQuoteId(), request.targetQuoteId())
+          || !Objects.equals(previous.get().getTargetQuoteLineId(), request.targetQuoteLineId()))
         throw OrderIntakeException.conflict(
             "STOCK_TARGET_CHANGED", "This form session belongs to another saved line");
       return dto(previous.get());
@@ -120,7 +140,28 @@ public class DraftStockSelectionService {
             actor,
             session.getId());
     row.bindTarget(request.targetOrderId(), request.targetLineId());
+    row.bindQuoteTarget(request.targetQuoteId(), request.targetQuoteLineId());
     return dto(selections.saveAndFlush(row));
+  }
+
+  @Transactional
+  public com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto preview(
+      UUID selectionId, OrderIntakeStockPreviewRequest request, UUID actor) {
+    requireWrite(actor);
+    var row = load(selectionId, actor);
+    requireMutable(row);
+    requireTargetEditable(row, actor);
+    if (!row.getProductId().equals(request.productId())) throw stale(row);
+    validateCatalogue(request);
+    if (row.getTargetQuoteId() != null)
+      quoteTargets.assertTerms(
+          quoteTargets.writable(row.getTargetQuoteId(), actor),
+          row.getTargetQuoteLineId(),
+          row.getProductId(),
+          request);
+    // The actor and saved target were verified even before a first ownership period exists.
+    return previews.preview(
+        request, actor, new DraftStockReadContext.Own(row.getSessionId(), row.ownLineId()));
   }
 
   @Transactional
@@ -164,6 +205,12 @@ public class DraftStockSelectionService {
         .noneMatch(session -> session.getId().equals(row.getSessionId())))
       row.reopenSession(sessions.open(resource, actor).getId());
     else sessions.renew(resource, row.getSessionId(), actor);
+    if (row.getTargetQuoteId() != null)
+      quoteTargets.assertTerms(
+          quoteTargets.writable(row.getTargetQuoteId(), actor),
+          row.getTargetQuoteLineId(),
+          row.getProductId(),
+          request.line());
     var run = evaluation.run(input(row, request.line()));
     QuantityOption option =
         run.evaluation().result().options().stream()
@@ -173,7 +220,7 @@ public class DraftStockSelectionService {
     if (!option.applicable())
       throw OrderIntakeException.conflict(
           "OPTION_NOT_APPLICABLE", "Selected stock is not free for this draft line");
-    ownership.assertAvailable(option.pieceIds(), row.getTargetLineId(), row.getSessionId());
+    ownership.assertAvailable(option.pieceIds(), row.ownLineId(), row.getSessionId());
     var granted =
         leases.replace(
             StockUnitLeaseKeys.resource(row.getProductId()),
@@ -266,9 +313,11 @@ public class DraftStockSelectionService {
       UUID clientLineId,
       UUID actor) {
     requireWrite(actor);
+    requireOrderTarget(proof.selectionId(), order.getId(), line.getId(), actor);
     var selected = load(proof.selectionId(), actor);
     if (selected.getOption() == null
-        || line.getRequestedQty().compareTo(selected.getOption().quantity()) != 0)
+        || proof.cutSourceId() == null
+            && line.getRequestedQty().compareTo(selected.getOption().quantity()) != 0)
       throw stale(selected);
     transfer(order, line, proof, clientLineId, actor);
   }
@@ -284,6 +333,7 @@ public class DraftStockSelectionService {
       UUID clientLineId,
       UUID actor) {
     requireWrite(actor);
+    requireOrderTarget(proof.selectionId(), order.getId(), line.getId(), actor);
     var row = load(proof.selectionId(), actor);
     requireMutable(row);
     requireRevision(row, proof.selectionRevision());
@@ -292,6 +342,42 @@ public class DraftStockSelectionService {
       throw stale(row);
     verify(row, proof.tokens());
     QuantityOption option = currentOption(row);
+    if (proof.cutSourceId() != null) {
+      if (line.getQuantityPolicy()
+              != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT
+          || line.getRequestedQty().compareTo(row.getRequest().requestedQty()) != 0)
+        throw stale(row);
+      var context =
+          cutTargets.resolve(
+              new com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.Target(
+                  com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort
+                      .TargetType.SALES_ORDER,
+                  order.getId(),
+                  line.getId()),
+              actor,
+              true);
+      var operation =
+          UUID.nameUUIDFromBytes(
+              (row.getId() + ":CUT:" + line.getId())
+                  .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      cutPlans.apply(
+          context,
+          option.pieceIds(),
+          proof.cutSourceId(),
+          row.getSessionId(),
+          operation,
+          actor,
+          fingerprint(java.util.List.of("CREATE_CUT", row.getId(), line.getId(), proof)));
+      leases.release(
+          StockUnitLeaseKeys.resource(row.getProductId()),
+          row.getSessionId(),
+          actor,
+          proof.tokens());
+      row.transfer(order.getId(), line.getId(), StockSelectionTerms.fingerprint(order, line));
+      row.orderVersion(order.getVersion());
+      selections.saveAndFlush(row);
+      return;
+    }
     if ((option.outsideAgreedTolerance() || option.needsRemnantAcknowledgement())
         && !proof.confirmed()) {
       throw OrderIntakeException.rule(
@@ -326,6 +412,7 @@ public class DraftStockSelectionService {
   public DraftStockSelectionDto apply(
       UUID orderId, UUID lineId, DraftStockSelectionRequests.Apply request, UUID actor) {
     requireWrite(actor);
+    requireOrderTarget(request.selection().selectionId(), orderId, lineId, actor);
     SalesOrder order = access.writableOrderFresh(orderId, actor);
     revision.lockFresh(order);
     access.requireActive(order);
@@ -391,7 +478,6 @@ public class DraftStockSelectionService {
             .stream()
             .findFirst()
             .orElseThrow(() -> OrderIntakeException.notFound("Applied stock choice", lineId));
-    line.restoreCustomerRequestQuantity();
     adjustments.assertFits(line);
     holds.releaseHolds(lineId);
     selected.release();
@@ -419,6 +505,134 @@ public class DraftStockSelectionService {
       row.release();
       selections.save(row);
     }
+  }
+
+  public record QuoteClaim(DraftStockSelection selection, QuantityOption option, UUID cutSourceId) {
+    public QuoteClaim(DraftStockSelection selection, QuantityOption option) {
+      this(selection, option, null);
+    }
+  }
+
+  @Transactional
+  public QuoteClaim claimForQuote(
+      UUID quoteId,
+      UUID targetLineId,
+      UUID clientLineId,
+      DraftStockSelectionRequests.Proof proof,
+      UUID actor) {
+    requireWrite(actor);
+    var quote = quoteTargets.writable(quoteId, actor);
+    // Reject a foreign target before taking another commercial root's lock.
+    var metadata =
+        selections
+            .findByTenantIdAndId(TenantContext.requireTenantId(), proof.selectionId())
+            .filter(
+                value ->
+                    value.getActorId().equals(actor)
+                        && Objects.equals(value.getTargetQuoteId(), quoteId)
+                        && Objects.equals(value.getTargetQuoteLineId(), targetLineId)
+                        && (targetLineId != null && clientLineId == null
+                            || value.getClientLineId().equals(clientLineId)))
+            .orElseThrow(
+                () ->
+                    OrderIntakeException.conflict(
+                        "STOCK_TARGET_CHANGED",
+                        "The provisional selection belongs to a different quote target"));
+    var row = load(metadata.getId(), actor);
+    requireMutable(row);
+    requireRevision(row, proof.selectionRevision());
+    requireTokens(row, proof.tokens());
+    if (!Objects.equals(row.getTargetQuoteId(), quoteId)
+        || !Objects.equals(row.getTargetQuoteLineId(), targetLineId)
+        || clientLineId != null && !row.getClientLineId().equals(clientLineId)) throw stale(row);
+    quoteTargets.assertTerms(quote, targetLineId, row.getProductId(), row.getRequest());
+    verify(row, proof.tokens());
+    var option = currentOption(row);
+    if (proof.cutSourceId() == null
+        && (option.outsideAgreedTolerance() || option.needsRemnantAcknowledgement())
+        && !proof.confirmed())
+      throw OrderIntakeException.rule(
+          "CONFIRMATION_REQUIRED",
+          "Confirm the agreed quantity or remaining stock before applying");
+    if (targetLineId != null && proof.cutSourceId() == null)
+      quoteTargets
+          .line(quote, targetLineId)
+          .getQuantityPolicy()
+          .assertQuantity(row.getRequest().requestedQty(), option.quantity());
+    ownership.assertAvailable(option.pieceIds(), targetLineId, row.getSessionId());
+    if (proof.cutSourceId() != null
+        && row.getRequest().quantityPolicy()
+            != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT) throw stale(row);
+    return new QuoteClaim(row, option, proof.cutSourceId());
+  }
+
+  @Transactional
+  public com.fabricmanagement.production.core.stockunit.dto.StockUnitCutPlanDtos.View previewCut(
+      UUID id, DraftStockSelectionRequests.Proof proof, UUID actor) {
+    requireWrite(actor);
+    if (!id.equals(proof.selectionId()))
+      throw OrderIntakeException.conflict(
+          "STOCK_TARGET_CHANGED", "The proof belongs to a different selection");
+    var row = load(id, actor);
+    requireMutable(row);
+    requireRevision(row, proof.selectionRevision());
+    requireTokens(row, proof.tokens());
+    requireTargetEditable(row, actor);
+    if (row.getRequest().quantityPolicy()
+        != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT) throw stale(row);
+    verify(row, proof.tokens());
+    var option = currentOption(row);
+    return cutPlans.evaluateDraft(
+        new com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort.DraftInput(
+            row.getFormInstanceId(),
+            row.getClientLineId(),
+            row.getProductId(),
+            row.getRequest().requestedQty(),
+            row.getRequest().unit(),
+            row.ownLineId(),
+            row.getSessionId(),
+            option.pieceIds(),
+            proof.cutSourceId()),
+        actor);
+  }
+
+  @Transactional
+  public void attachQuoteCut(QuoteClaim claim, UUID quoteId, UUID lineId, UUID actor) {
+    var row = claim.selection();
+    var target =
+        new com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.Target(
+            com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.TargetType
+                .QUOTE,
+            quoteId,
+            lineId);
+    var context = cutTargets.resolve(target, actor, true);
+    var operation =
+        UUID.nameUUIDFromBytes(
+            (row.getId() + ":QUOTE_CUT:" + lineId)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    cutPlans.apply(
+        context,
+        claim.option().pieceIds(),
+        claim.cutSourceId(),
+        row.getSessionId(),
+        operation,
+        actor,
+        fingerprint(
+            java.util.List.of(
+                "QUOTE_CUT", quoteId, lineId, row.getId(), row.getVersion(), claim.cutSourceId())));
+    completeQuoteTransfer(claim, quoteId, lineId, actor);
+  }
+
+  @Transactional
+  public void completeQuoteTransfer(QuoteClaim claim, UUID quoteId, UUID lineId, UUID actor) {
+    var row = claim.selection();
+    leases.release(
+        StockUnitLeaseKeys.resource(row.getProductId()),
+        row.getSessionId(),
+        actor,
+        row.getTokens());
+    row.transferQuote(quoteId, lineId);
+    selections.saveAndFlush(row);
   }
 
   private QuantityOption currentOption(DraftStockSelection row) {
@@ -451,7 +665,7 @@ public class DraftStockSelectionService {
   private QuantityEvaluationService.EvaluationRequest input(
       DraftStockSelection row, OrderIntakeStockPreviewRequest request) {
     return new QuantityEvaluationService.EvaluationRequest(
-        row.getTargetLineId(),
+        row.ownLineId(),
         request.productId(),
         request.colorId(),
         request.finishedWidth(),
@@ -481,28 +695,11 @@ public class DraftStockSelectionService {
 
   private boolean sameLine(DraftStockSelection row, SalesOrder order, SalesOrderLine line) {
     var request = row.getRequest();
+    if (row.getTargetQuoteId() != null) return false;
     if (row.getTargetOrderId() != null
         && (!row.getTargetOrderId().equals(order.getId())
             || !row.getTargetLineId().equals(line.getId()))) return false;
-    return request != null
-        && row.getProductId().equals(line.getProductId())
-        && Objects.equals(request.colorId(), line.getColorId())
-        && equalDecimal(request.finishedWidth(), line.getFinishedWidth())
-        && Objects.equals(upper(request.finishedWidthUnit()), upper(line.getFinishedWidthUnit()))
-        && Objects.equals(request.customerId(), order.getTradingPartnerId())
-        && Objects.equals(upper(request.unit()), upper(line.getUnit()))
-        && equalDecimal(request.requestedQty(), line.getCustomerRequestQty())
-        && equalDecimal(request.toleranceUpPct(), line.getToleranceUpPct())
-        && equalDecimal(request.toleranceDownPct(), line.getToleranceDownPct())
-        && Boolean.TRUE.equals(request.singleLotRequired()) == line.isSingleLotRequired();
-  }
-
-  private static String upper(String value) {
-    return value == null ? null : value.trim().toUpperCase(java.util.Locale.ROOT);
-  }
-
-  private static boolean equalDecimal(BigDecimal left, BigDecimal right) {
-    return left == null ? right == null : right != null && left.compareTo(right) == 0;
+    return StockSelectionTerms.matchesRequest(order, line, request);
   }
 
   private void verify(DraftStockSelection row, List<UUID> tokens) {
@@ -527,12 +724,31 @@ public class DraftStockSelectionService {
             .findByTenantIdAndId(TenantContext.requireTenantId(), id)
             .filter(value -> value.getActorId().equals(actor))
             .orElseThrow(() -> OrderIntakeException.notFound("Draft stock selection", id));
+    if (row.getTargetQuoteId() != null) quoteTargets.lock(row.getTargetQuoteId(), actor);
     ownership.lockProduct(row.getProductId());
     entityManager.refresh(row);
     return row;
   }
 
+  private void requireOrderTarget(UUID selectionId, UUID orderId, UUID lineId, UUID actor) {
+    var row =
+        selections
+            .findByTenantIdAndId(TenantContext.requireTenantId(), selectionId)
+            .filter(value -> value.getActorId().equals(actor))
+            .orElseThrow(() -> OrderIntakeException.notFound("Draft stock selection", selectionId));
+    if (row.getTargetQuoteId() != null
+        || row.getTargetOrderId() != null
+            && (!Objects.equals(row.getTargetOrderId(), orderId)
+                || !Objects.equals(row.getTargetLineId(), lineId)))
+      throw OrderIntakeException.conflict(
+          "STOCK_TARGET_CHANGED", "The provisional selection belongs to a different target");
+  }
+
   private void requireTargetEditable(DraftStockSelection row, UUID actor) {
+    if (row.getTargetQuoteId() != null) {
+      quoteTargets.writable(row.getTargetQuoteId(), actor);
+      return;
+    }
     if (row.getTargetOrderId() == null) return;
     var order = access.writableOrderFresh(row.getTargetOrderId(), actor);
     access.line(order, row.getTargetLineId());
@@ -555,6 +771,7 @@ public class DraftStockSelectionService {
 
   private void requireMutable(DraftStockSelection row) {
     if (row.getSalesOrderId() != null
+        || row.getTransferredQuoteId() != null
         || (row.getState() != DraftStockSelection.State.OPEN
             && row.getState() != DraftStockSelection.State.HELD
             && row.getState() != DraftStockSelection.State.RELEASED)) throw stale(row);
@@ -649,10 +866,32 @@ public class DraftStockSelectionService {
     long remaining = held ? Math.max(0, Duration.between(clock.instant(), expiry).toMillis()) : 0;
     boolean canAcquire =
         row.getSalesOrderId() == null
+            && row.getTransferredQuoteId() == null
             && (state == DraftStockSelectionDto.State.OPEN
                 || held
                 || state == DraftStockSelectionDto.State.RELEASED
                 || state == DraftStockSelectionDto.State.EXPIRED);
+    boolean exactMismatch = false;
+    if (held) {
+      var quantityPolicy = row.getRequest().quantityPolicy();
+      if (row.getTargetQuoteId() != null && row.getTargetQuoteLineId() != null)
+        quantityPolicy =
+            quoteTargets
+                .line(
+                    quoteTargets.lock(row.getTargetQuoteId(), row.getActorId()),
+                    row.getTargetQuoteLineId())
+                .getQuantityPolicy();
+      else if (row.getTargetOrderId() != null)
+        quantityPolicy =
+            access
+                .line(
+                    access.writableOrderFresh(row.getTargetOrderId(), row.getActorId()),
+                    row.getTargetLineId())
+                .getQuantityPolicy();
+      exactMismatch =
+          quantityPolicy == com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.EXACT
+              && row.getRequest().requestedQty().compareTo(row.getOption().quantity()) != 0;
+    }
     var capabilities =
         List.of(
             new DraftStockSelectionDto.Capability(
@@ -664,8 +903,10 @@ public class DraftStockSelectionService {
                 false),
             new DraftStockSelectionDto.Capability(
                 DraftStockSelectionDto.Action.APPLY,
-                held,
-                held ? null : DraftStockSelectionDto.Reason.OWNERSHIP_REQUIRED,
+                held && !exactMismatch,
+                !held
+                    ? DraftStockSelectionDto.Reason.OWNERSHIP_REQUIRED
+                    : exactMismatch ? DraftStockSelectionDto.Reason.EXACT_QUANTITY_REQUIRED : null,
                 null,
                 false,
                 row.getOption() != null
@@ -723,7 +964,17 @@ public class DraftStockSelectionService {
         capabilities,
         row.getSalesOrderId(),
         row.getSalesOrderLineId(),
-        row.getOrderVersion());
+        row.getOrderVersion(),
+        new DraftStockSelectionDto.Target(
+            row.getTargetQuoteId() != null
+                ? row.getTargetQuoteLineId() == null
+                    ? DraftStockSelectionDto.TargetKind.QUOTE_NEW_LINE
+                    : DraftStockSelectionDto.TargetKind.QUOTE_LINE
+                : row.getTargetOrderId() != null
+                    ? DraftStockSelectionDto.TargetKind.ORDER_LINE
+                    : DraftStockSelectionDto.TargetKind.FORM,
+            row.getTargetQuoteId() != null ? row.getTargetQuoteId() : row.getTargetOrderId(),
+            row.ownLineId()));
   }
 
   private void supersede(UUID lineId) {

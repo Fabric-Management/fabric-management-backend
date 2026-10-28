@@ -44,6 +44,8 @@ public class QuoteHoldQueryService {
   private final BatchLotQuantityIntentRepository intentRepository;
   private final StockUnitSoftHoldRepository softHoldRepository;
   private final BatchPrimaryMeasureService primaryMeasureService;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitLeaseOwnerPort
+      leaseOwners;
   private final com.fabricmanagement.platform.realtime.app.LiveEditLeaseService leases;
   private final com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository
       stockUnits;
@@ -106,8 +108,12 @@ public class QuoteHoldQueryService {
               .collect(
                   Collectors.groupingBy(
                       com.fabricmanagement.platform.realtime.domain.LiveEditLease::getSessionId));
+      var lineOwners = leaseOwners.lineOwners(productId, bySession.keySet());
       bySession.forEach(
           (session, rows) -> {
+            UUID linked = lineOwners.get(session);
+            // A different session of the same target is still a competing provisional owner.
+            UUID owner = linked == null || Objects.equals(linked, ownLineId) ? session : linked;
             var byLot =
                 rows.stream()
                     .collect(
@@ -139,9 +145,13 @@ public class QuoteHoldQueryService {
                       lengths.size() == heldRows.size()
                           ? lengths.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
                           : null;
-                  intents.add(
-                      new LotIntentView(
-                          lotId, null, session, null, null, total, "M", total, null, "DRAFT"));
+                  if (intents.stream()
+                      .noneMatch(
+                          intent ->
+                              intent.batchId().equals(lotId) && intent.quoteLineId().equals(owner)))
+                    intents.add(
+                        new LotIntentView(
+                            lotId, null, owner, null, null, total, "M", total, null, "DRAFT"));
                   heldRows.forEach(
                       lease ->
                           heldPieces.add(
@@ -149,6 +159,7 @@ public class QuoteHoldQueryService {
                                   com.fabricmanagement.production.core.stockunit.api
                                       .StockUnitLeaseKeys.pieceId(lease.key()),
                                   lotId,
+                                  owner,
                                   session)));
                 });
           });
@@ -254,5 +265,10 @@ public class QuoteHoldQueryService {
    * One active piece hold. It names only the quote line; whether a live quote intent backs it is
    * for the reader to establish (an intent of the same quote line on the same lot).
    */
-  public record HeldPieceView(UUID stockUnitId, UUID batchId, UUID quoteLineId) {}
+  public record HeldPieceView(
+      UUID stockUnitId, UUID batchId, UUID quoteLineId, UUID provisionalSessionId) {
+    public HeldPieceView(UUID stockUnitId, UUID batchId, UUID quoteLineId) {
+      this(stockUnitId, batchId, quoteLineId, null);
+    }
+  }
 }

@@ -92,6 +92,9 @@ public class OrderVersion extends BaseEntity {
     if ((kind == OrderVersionKind.APPROVAL) != (deliveryProposalId != null)) {
       throw new IllegalArgumentException("Only a version for approval offers planning's proposal");
     }
+    if (kind == OrderVersionKind.PAYMENT_PLAN && content.paymentPlan() == null) {
+      throw new IllegalArgumentException("A payment amendment must freeze its structured plan");
+    }
     OrderVersion value = new OrderVersion();
     value.salesOrderId = salesOrderId;
     value.versionNo = previous == null ? 1 : previous.versionNo + 1;

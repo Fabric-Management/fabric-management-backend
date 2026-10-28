@@ -67,6 +67,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @DisplayName("JWT round-trip integration")
 class JwtRoundTripIntegrationTest {
 
+  @org.junit.jupiter.api.BeforeEach
+  void requireMigrationCatalogue(
+      @org.springframework.beans.factory.annotation.Autowired
+          org.springframework.jdbc.core.JdbcTemplate jdbc) {
+    com.fabricmanagement.testsupport.EvaluationCatalogueGuard.requireMigrationCatalogue(jdbc);
+  }
+
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =

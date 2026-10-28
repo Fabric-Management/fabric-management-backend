@@ -13,15 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
   @Type(value = DyePurchaseSpecs.class, name = "DYE_FINISHING"),
   @Type(value = GenericPurchaseSpecs.class, name = "GENERIC")
 })
-@Schema(
-    description = "Module-specific purchase order specs, discriminated by specType",
-    oneOf = {
-      FiberPurchaseSpecs.class,
-      YarnPurchaseSpecs.class,
-      FabricPurchaseSpecs.class,
-      DyePurchaseSpecs.class,
-      GenericPurchaseSpecs.class
-    })
+@Schema(description = "Module-specific purchase order specs, discriminated by specType")
 public sealed interface PurchaseOrderSpecs
     permits FiberPurchaseSpecs,
         YarnPurchaseSpecs,

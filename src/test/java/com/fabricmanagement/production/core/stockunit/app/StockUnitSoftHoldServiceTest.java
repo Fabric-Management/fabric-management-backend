@@ -26,8 +26,11 @@ import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class StockUnitSoftHoldServiceTest {
+  @org.mockito.Mock
+  com.fabricmanagement.production.core.stockunit.api.StockUnitProvisionalReleasePort provisional;
 
   @Mock private StockUnitSoftHoldRepository repository;
+  @Mock private StockUnitCutPlanGuard cutPlans;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @Mock

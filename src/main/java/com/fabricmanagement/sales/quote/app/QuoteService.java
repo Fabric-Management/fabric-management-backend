@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -97,6 +96,11 @@ public class QuoteService {
   private final BatchLotQuantityIntentPort batchLotQuantityIntentPort;
   private final DefaultOwnerPolicy defaultOwnerPolicy;
   private final QuoteAccessPolicy accessPolicy;
+  private final com.fabricmanagement.sales.orderintake.app.ProvisionalStockLifecycleService
+      provisionalLifecycle;
+  private final com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService
+      stockMeasures;
+  private final com.fabricmanagement.sales.orderintake.app.DraftStockSelectionService draftStock;
 
   /** Test-support entry retained for the legacy service suite; production HTTP reads are scoped. */
   @Transactional(readOnly = true)
@@ -270,6 +274,7 @@ public class QuoteService {
   @Transactional
   Quote addQuoteLine(UUID quoteId, AddQuoteLineRequest req) {
     Quote quote = getActiveQuote(quoteId);
+    Long versionBefore = quote.getVersion();
 
     assertEditable(quote, "add lines to");
 
@@ -280,10 +285,38 @@ public class QuoteService {
         salesQualityGradeService.resolveSnapshot(req.getQualityGradeId());
     SalesColorSnapshot colorSnapshot =
         salesColorService.resolveNewSelectionSnapshot(req.getColorId());
+    com.fabricmanagement.sales.orderintake.app.DraftStockSelectionService.QuoteClaim stockClaim =
+        null;
+    if (req.getStockSelection() != null) {
+      stockClaim =
+          draftStock.claimForQuote(
+              quoteId,
+              null,
+              req.getClientLineId(),
+              req.getStockSelection(),
+              requireCurrentUserId());
+      if ((stockClaim.cutSourceId() == null
+                  ? stockClaim.option().quantity()
+                  : stockClaim.selection().getRequest().requestedQty())
+              .compareTo(req.getRequestedQty())
+          != 0)
+        throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+            "STOCK_TARGET_CHANGED", "Save the quantity shown by Apply");
+      var terms = stockClaim.selection().getRequest();
+      if (!Objects.equals(req.getProductId(), terms.productId())
+          || !Objects.equals(req.getColorId(), terms.colorId())
+          || !req.getUnit().equalsIgnoreCase(terms.unit())
+          || terms.quantityPolicy() != null && terms.quantityPolicy() != req.getQuantityPolicy())
+        throw com.fabricmanagement.sales.common.exception.OrderIntakeException.rule(
+            "STOCK_TARGET_CHANGED", "The line differs from its stock proposal");
+    }
     List<QuoteLineLotSnapshot> lotSnapshots =
-        salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots());
-    List<LotIntentRequest> lotIntents = buildLotIntentRequests(req.getSelectedLots(), lotSnapshots);
-    validateLotIntentTotal(lotIntents, req.getRequestedQty());
+        salesLotService.resolveNewSelectionSnapshots(
+            stockClaim == null
+                ? req.getSelectedLots()
+                : stockClaim.cutSourceId() != null ? List.of() : stockLots(stockClaim.option()));
+    List<LotIntentRequest> lotIntents = buildLotIntentRequestsFromSnapshots(lotSnapshots);
+    validateLotIntentTotal(lotIntents, req.getRequestedQty(), req.getUnit(), lotSnapshots);
     DeliveryDecision delivery =
         resolveDelivery(
             lotIntents,
@@ -304,6 +337,16 @@ public class QuoteService {
     line.setTenantId(quote.getTenantId());
     line.setProductId(productId);
     line.setRequestedQty(req.getRequestedQty());
+    line.captureCustomerRequest(
+        stockClaim == null
+            ? req.getRequestedQty()
+            : stockClaim.selection().getRequest().requestedQty());
+    line.recordQuantityPolicy(
+        req.getQuantityPolicy(),
+        TenantContext.getCurrentUserId(),
+        Instant.now(),
+        req.getQuantityPolicyReason());
+    if (stockClaim != null) captureStockTerms(line, stockClaim.selection().getRequest());
     line.setUnit(req.getUnit());
     line.setListPrice(catalogItem.getListPrice());
     line.setOfferedPrice(req.getOfferedPrice());
@@ -317,12 +360,25 @@ public class QuoteService {
     line.setProfitMargin(pricing.getProfitMargin());
     line.setPriceZone(pricing.getPriceZone());
 
+    int lineIndex = quote.getLines().size();
     quote.addLine(line);
     // Any future line-mutating path must recompute totals before saving.
     recomputeTotals(quote);
     Quote saved = quoteRepository.save(quote);
-    replaceSoftHolds(line, lotSnapshots);
-    replaceLotIntents(saved, line, lotIntents);
+    // save() merges a loaded quote: the new line is persisted as a managed copy, so the local
+    // instance never receives an id. Holds and intents must be keyed by the persisted line.
+    line = saved.getLines().get(lineIndex);
+    if (stockClaim != null && stockClaim.cutSourceId() != null)
+      draftStock.attachQuoteCut(stockClaim, quoteId, line.getId(), requireCurrentUserId());
+    else if (stockClaim == null) replaceSoftHolds(line, lotSnapshots);
+    else {
+      stockUnitSoftHoldPort.replaceQuoteHolds(
+          line.getId(), stockClaim.option().pieceIds(), stockClaim.selection().getSessionId());
+      draftStock.completeQuoteTransfer(stockClaim, quoteId, line.getId(), requireCurrentUserId());
+    }
+    if (stockClaim == null || stockClaim.cutSourceId() == null)
+      replaceLotIntents(saved, line, lotIntents);
+    advanceStockRevision(saved, versionBefore);
     return saved;
   }
 
@@ -345,11 +401,14 @@ public class QuoteService {
     assertEditable(quote, "edit");
 
     LocalDate previousValidUntil = quote.getValidUntil();
+    UUID previousCustomer = quote.getCustomerId();
     quote.updateDraftIdentity(req.getCustomerId(), req.getCurrency());
     quote.updateHeader(
         req.getValidUntil(), req.getPaymentTerms(), req.getLeadTimeDays(), req.getNotes());
     recomputeTotals(quote);
     Quote saved = quoteRepository.save(quote);
+    if (!Objects.equals(previousCustomer, saved.getCustomerId()))
+      provisionalLifecycle.quote(quoteId);
     if (!Objects.equals(previousValidUntil, saved.getValidUntil())) {
       // Lot-quantity intents snapshot the quote's valid-until as their advisory expiry; keep
       // them in sync so extended quotes don't lose their intents early (QLINE-ATP-1b).
@@ -366,20 +425,36 @@ public class QuoteService {
 
   @Transactional
   Quote updateQuoteLine(UUID quoteId, UUID lineId, UpdateQuoteLineRequest req) {
+    return updateQuoteLineWithStock(quoteId, lineId, req, null);
+  }
+
+  Quote updateQuoteLineWithStock(
+      UUID quoteId,
+      UUID lineId,
+      UpdateQuoteLineRequest req,
+      com.fabricmanagement.sales.orderintake.app.DraftStockSelectionService.QuoteClaim stockClaim) {
     Quote quote = getActiveQuote(quoteId);
+    Long versionBefore = quote.getVersion();
     assertEditable(quote, "edit lines on");
 
     QuoteLine line = getQuoteLine(quote, lineId);
+    String previousTerms = stockTerms(line);
     PricingResult pricing = evaluateLinePrice(quote, line, req.getOfferedPrice());
     SalesQualityGradeSnapshot qualitySnapshot =
         salesQualityGradeService.resolveUpdateSnapshot(req.getQualityGradeId(), line);
     SalesColorSnapshot colorSnapshot =
         salesColorService.resolveUpdateSnapshot(req.getColorId(), line);
+    // Omitted lots mean "unchanged" (an echo or a price-only edit); an explicit empty list clears.
+    boolean lotsUnchanged = stockClaim == null && req.getSelectedLots() == null;
     List<QuoteLineLotSnapshot> lotSnapshots =
-        salesLotService.resolveUpdateSelectionSnapshots(
-            req.getSelectedLots(), line.getLotSnapshot());
-    List<LotIntentRequest> lotIntents = buildLotIntentRequests(req.getSelectedLots(), lotSnapshots);
-    validateLotIntentTotal(lotIntents, req.getRequestedQty());
+        stockClaim != null && stockClaim.cutSourceId() != null
+            ? List.of()
+            : lotsUnchanged
+                ? QuoteLineLotSnapshotCodec.fromJson(line.getLotSnapshot())
+                : salesLotService.resolveUpdateSelectionSnapshots(
+                    req.getSelectedLots(), line.getLotSnapshot());
+    List<LotIntentRequest> lotIntents = buildLotIntentRequestsFromSnapshots(lotSnapshots);
+    validateLotIntentTotal(lotIntents, req.getRequestedQty(), req.getUnit(), lotSnapshots);
     DeliveryDecision delivery =
         resolveDelivery(
             lotIntents,
@@ -387,7 +462,22 @@ public class QuoteService {
             req.getDeliveryStatus(),
             req.getDeliveryDate());
 
-    line.updateEditableFields(req.getRequestedQty(), req.getUnit(), req.getOfferedPrice());
+    if (stockClaim == null)
+      line.updateEditableFields(req.getRequestedQty(), req.getUnit(), req.getOfferedPrice());
+    else {
+      line.applyStockQuantity(
+          stockClaim.selection().getRequest().requestedQty(),
+          stockClaim.cutSourceId() == null
+              ? stockClaim.option().quantity()
+              : stockClaim.selection().getRequest().requestedQty());
+      captureStockTerms(line, stockClaim.selection().getRequest());
+    }
+    line.recordQuantityPolicy(
+        req.getQuantityPolicy(),
+        TenantContext.getCurrentUserId(),
+        Instant.now(),
+        req.getQuantityPolicyReason());
+    line.getQuantityPolicy().assertQuantity(line.getCustomerRequestQty(), line.getRequestedQty());
     applyQualitySnapshot(line, qualitySnapshot);
     applyColorSnapshot(line, colorSnapshot);
     applyLotSnapshots(line, lotSnapshots);
@@ -396,8 +486,20 @@ public class QuoteService {
     line.applyPricing(pricing.getDiscountRate(), pricing.getProfitMargin(), pricing.getPriceZone());
     recomputeTotals(quote);
     Quote saved = quoteRepository.save(quote);
-    replaceSoftHolds(line, lotSnapshots);
-    replaceLotIntents(saved, line, lotIntents);
+    if (stockClaim != null && stockClaim.cutSourceId() != null) {
+      draftStock.attachQuoteCut(stockClaim, quoteId, line.getId(), requireCurrentUserId());
+    } else if (stockClaim != null) {
+      stockUnitSoftHoldPort.replaceQuoteHolds(
+          line.getId(), stockClaim.option().pieceIds(), stockClaim.selection().getSessionId());
+      draftStock.completeQuoteTransfer(stockClaim, quoteId, line.getId(), requireCurrentUserId());
+    } else if (!lotsUnchanged) replaceSoftHolds(line, lotSnapshots);
+    // Unchanged lots keep their holds and intents as they are, including stock-applied rolls.
+    if (!lotsUnchanged && (stockClaim == null || stockClaim.cutSourceId() == null))
+      replaceLotIntents(saved, line, lotIntents);
+    if (!previousTerms.equals(stockTerms(line))
+        && (stockClaim == null || stockClaim.cutSourceId() == null))
+      provisionalLifecycle.ownerLine(lineId);
+    advanceStockRevision(saved, versionBefore);
     return saved;
   }
 
@@ -411,6 +513,7 @@ public class QuoteService {
   @Transactional
   Quote removeQuoteLine(UUID quoteId, UUID lineId) {
     Quote quote = getActiveQuote(quoteId);
+    Long versionBefore = quote.getVersion();
     assertEditable(quote, "remove lines from");
 
     QuoteLine line = getQuoteLine(quote, lineId);
@@ -418,7 +521,9 @@ public class QuoteService {
     batchLotQuantityIntentPort.releaseIntents(line.getId());
     quote.removeLine(lineId);
     recomputeTotals(quote);
-    return quoteRepository.save(quote);
+    quoteRepository.save(quote);
+    advanceStockRevision(quote, versionBefore);
+    return quote;
   }
 
   @Transactional
@@ -564,6 +669,7 @@ public class QuoteService {
   @Transactional
   Quote reviseQuote(UUID quoteId) {
     Quote oldQuote = getActiveQuote(quoteId);
+    Long oldVersion = oldQuote.getVersion();
 
     // Fix #4: Only allow revision from terminal or approval-pending states
     if (oldQuote.getStatus() == QuoteStatus.DRAFT
@@ -615,6 +721,15 @@ public class QuoteService {
       newLine.setProductId(oldLine.getProductId());
       newLine.setProductDesc(oldLine.getProductDesc());
       newLine.setRequestedQty(oldLine.getRequestedQty());
+      newLine.setCustomerRequestQty(oldLine.getCustomerRequestQty());
+      newLine.setInitialRequestedQty(oldLine.getInitialRequestedQty());
+      newLine.setQuantityTerms(
+          oldLine.getQuantityTerms() == null ? null : oldLine.getQuantityTerms().copy());
+      newLine.setFinishedWidth(oldLine.getFinishedWidth());
+      newLine.setFinishedWidthUnit(oldLine.getFinishedWidthUnit());
+      newLine.setSingleLotRequired(oldLine.isSingleLotRequired());
+      newLine.setToleranceUpPct(oldLine.getToleranceUpPct());
+      newLine.setToleranceDownPct(oldLine.getToleranceDownPct());
       newLine.setUnit(oldLine.getUnit());
       newLine.setListPrice(oldLine.getListPrice());
       newLine.setOfferedPrice(oldLine.getOfferedPrice());
@@ -640,6 +755,7 @@ public class QuoteService {
       newQuote.addLine(newLine);
     }
 
+    provisionalLifecycle.quote(quoteId);
     recomputeTotals(newQuote);
     Quote savedRevision = quoteRepository.save(newQuote);
     savedRevision
@@ -651,6 +767,10 @@ public class QuoteService {
                     line,
                     buildLotIntentRequestsFromSnapshots(
                         QuoteLineLotSnapshotCodec.fromJson(line.getLotSnapshot()))));
+    advanceStockRevision(oldQuote, oldVersion);
+    eventPublisher.publishEvent(
+        new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+            savedRevision.getTenantId(), savedRevision.getId(), true));
     return savedRevision;
   }
 
@@ -894,6 +1014,55 @@ public class QuoteService {
             quote.getTenantId(), nativeTotal, headerCurrency, reportingCurrency, documentDate));
   }
 
+  static List<QuoteLineLotSelectionRequest> stockLots(
+      com.fabricmanagement.sales.orderintake.domain.proposal.QuantityOption option) {
+    return option.lots().stream()
+        .map(lot -> new QuoteLineLotSelectionRequest(lot.batchId(), lot.pieceIds(), null))
+        .toList();
+  }
+
+  private void captureStockTerms(
+      QuoteLine line,
+      com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest request) {
+    line.setFinishedWidth(request.finishedWidth());
+    line.setFinishedWidthUnit(request.finishedWidthUnit());
+    line.setSingleLotRequired(Boolean.TRUE.equals(request.singleLotRequired()));
+    line.setToleranceUpPct(request.toleranceUpPct());
+    line.setToleranceDownPct(request.toleranceDownPct());
+  }
+
+  static String stockTerms(QuoteLine line) {
+    return java.util.Arrays.asList(
+            line.getColorId(),
+            canonicalUnit(line.getUnit()),
+            canonicalAmount(line.getCustomerRequestQty()),
+            canonicalAmount(line.getRequestedQty()),
+            canonicalAmount(line.getFinishedWidth()),
+            canonicalUnit(line.getFinishedWidthUnit()),
+            line.isSingleLotRequired(),
+            line.getQuantityPolicy(),
+            canonicalAmount(line.getToleranceUpPct()),
+            canonicalAmount(line.getToleranceDownPct()))
+        .toString();
+  }
+
+  private static String canonicalUnit(String value) {
+    return value == null ? null : value.trim().toUpperCase(java.util.Locale.ROOT);
+  }
+
+  private static BigDecimal canonicalAmount(BigDecimal value) {
+    return value == null ? null : value.stripTrailingZeros();
+  }
+
+  void advanceStockRevision(Quote quote, Long before) {
+    entityManager.flush();
+    if (Objects.equals(before, quote.getVersion()))
+      entityManager.lock(quote, jakarta.persistence.LockModeType.PESSIMISTIC_FORCE_INCREMENT);
+    eventPublisher.publishEvent(
+        new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+            quote.getTenantId(), quote.getId(), true));
+  }
+
   private void replaceSoftHolds(QuoteLine line, List<QuoteLineLotSnapshot> lotSnapshots) {
     if (line.getId() == null) {
       return;
@@ -909,33 +1078,6 @@ public class QuoteService {
     stockUnitSoftHoldPort.replaceHolds(line.getId(), stockUnitIds);
   }
 
-  private List<LotIntentRequest> buildLotIntentRequests(
-      List<QuoteLineLotSelectionRequest> selections, List<QuoteLineLotSnapshot> lotSnapshots) {
-    if (selections == null || selections.isEmpty()) {
-      return List.of();
-    }
-    Map<UUID, QuoteLineLotSelectionRequest> selectionsByLot =
-        selections.stream()
-            .filter(selection -> selection.lotId() != null)
-            .collect(
-                Collectors.toMap(
-                    QuoteLineLotSelectionRequest::lotId,
-                    selection -> selection,
-                    (left, right) -> right));
-    return (lotSnapshots == null ? List.<QuoteLineLotSnapshot>of() : lotSnapshots)
-        .stream()
-            .map(
-                snapshot -> {
-                  QuoteLineLotSelectionRequest selection = selectionsByLot.get(snapshot.lotId());
-                  BigDecimal quantity =
-                      selection != null && selection.quantity() != null
-                          ? selection.quantity()
-                          : snapshot.derivedQuantity();
-                  return new LotIntentRequest(snapshot.lotId(), quantity, snapshot.unit());
-                })
-            .toList();
-  }
-
   private List<LotIntentRequest> buildLotIntentRequestsFromSnapshots(
       List<QuoteLineLotSnapshot> lotSnapshots) {
     return (lotSnapshots == null ? List.<QuoteLineLotSnapshot>of() : lotSnapshots)
@@ -948,16 +1090,39 @@ public class QuoteService {
   }
 
   private void validateLotIntentTotal(
-      List<LotIntentRequest> lotIntents, BigDecimal requestedQuantity) {
+      List<LotIntentRequest> lotIntents,
+      BigDecimal requestedQuantity,
+      String lineUnit,
+      List<QuoteLineLotSnapshot> snapshots) {
     if (lotIntents == null || lotIntents.isEmpty()) {
       return;
     }
     BigDecimal total =
         lotIntents.stream()
-            .map(LotIntentRequest::quantity)
+            .map(
+                intent -> {
+                  if (intent.unit().equalsIgnoreCase(lineUnit)) return intent.quantity();
+                  var dimension =
+                      snapshots.stream()
+                          .filter(lot -> lot.lotId().equals(intent.batchId()))
+                          .map(
+                              lot ->
+                                  com.fabricmanagement.production.core.batch.domain.PrimaryMeasure
+                                      .valueOf(lot.primaryMeasure()))
+                          .findFirst()
+                          .orElseThrow();
+                  return stockMeasures
+                      .toCanonical(intent.quantity(), intent.unit(), dimension)
+                      .flatMap(value -> stockMeasures.fromCanonical(value, lineUnit, dimension))
+                      .orElseThrow(
+                          () ->
+                              SalesDomainException.lotIntentQuantityMismatch(
+                                  "The selected roll measurements cannot be converted to the line"
+                                      + " unit"));
+                })
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-    if (total.compareTo(requestedQuantity) != 0) {
+    if (total.setScale(3, java.math.RoundingMode.HALF_UP).compareTo(requestedQuantity) != 0) {
       throw SalesDomainException.lotIntentQuantityMismatch(
           "Selected lot quantities must equal the quote line requested quantity.");
     }
@@ -985,7 +1150,8 @@ public class QuoteService {
     }
     if (!covered && status == QuoteLineDeliveryStatus.FROM_STOCK) {
       throw SalesDomainException.deliveryStatusRequired(
-          "Delivery status must be TO_BE_CONFIRMED, FROM_PRODUCTION, or STOCK_OVERRIDE when selected lot free stock does not cover the line.");
+          "Delivery status must be TO_BE_CONFIRMED, FROM_PRODUCTION, or STOCK_OVERRIDE when"
+              + " selected lot free stock does not cover the line.");
     }
     if (covered && status == null && deliveryDate != null) {
       status = QuoteLineDeliveryStatus.FROM_STOCK;

@@ -74,6 +74,7 @@ public class SalesOrderService {
   private final CustomerRequestService customerRequestService;
   private final OrderApprovalInvalidator approvalInvalidator;
   private final OrderCreationReplay creationReplay;
+  private final SalesOrderPaymentPlanService paymentPlans;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -149,6 +150,7 @@ public class SalesOrderService {
             .creationKey(request.getIdempotencyKey())
             .creationRequestHash(creationFingerprint)
             .paymentTerms(request.getPaymentTerms())
+            .paymentNote(request.getPaymentNote())
             .contactName(blankToNull(request.getContactName()))
             .contactEmail(blankToNull(request.getContactEmail()))
             .contactPhone(blankToNull(request.getContactPhone()))
@@ -183,6 +185,8 @@ public class SalesOrderService {
                     return mapLineRequestToEntity(lineReq, saved.getId());
                   })
               .toList();
+      orderIntakeHooks.prepareSourceLines(
+          saved, lines, request.getLines(), TenantContext.getCurrentUserId());
       savedLines = lineRepository.saveAll(lines);
       for (int index = 0; index < savedLines.size(); index++) {
         SalesOrderLineRequest lineRequest = request.getLines().get(index);
@@ -195,8 +199,19 @@ public class SalesOrderService {
       }
     }
 
+    if (request.getPaymentPlan() != null)
+      paymentPlans.create(
+          saved,
+          request.getPaymentPlan(),
+          request.getIdempotencyKey(),
+          TenantContext.getCurrentUserId());
+
     orderIntakeHooks.transferOnCreation(
         saved, savedLines, request.getLines(), TenantContext.getCurrentUserId());
+
+    domainEventPublisher.publish(
+        new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+            tenantId, saved.getId(), false));
 
     // Joining the create transaction prevents an order being left behind if a request is invalid.
     if (request.getCustomRequests() != null) {
@@ -219,7 +234,10 @@ public class SalesOrderService {
         saved.getUid(),
         tradingPartnerId,
         lineResponses.size());
-    return SalesOrderDto.from(saved, partner, lineResponses, OrderCurrencyTotals.of(savedLines));
+    SalesOrderDto created =
+        SalesOrderDto.from(saved, partner, lineResponses, OrderCurrencyTotals.of(savedLines));
+    if (request.getPaymentPlan() != null) created.setPaymentPlan(paymentPlans.createdView(saved));
+    return created;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -248,11 +266,13 @@ public class SalesOrderService {
     }
     if (requestedProfile == null) {
       throw new OrderDomainException(
-          "Changing a profiled line's product or module type requires a new requirement profile basis");
+          "Changing a profiled line's product or module type requires a new requirement profile"
+              + " basis");
     }
     if (current.basis().equals(requestedProfile.basis())) {
       throw new OrderDomainException(
-          "Changing a profiled line's product or module type requires full re-resolution from a new basis");
+          "Changing a profiled line's product or module type requires full re-resolution from a new"
+              + " basis");
     }
   }
 
@@ -290,11 +310,15 @@ public class SalesOrderService {
                   lineRepository
                       .findByTenantIdAndSalesOrderIdAndIsActiveTrueOrderByCreatedAtAscIdAsc(
                           tenantId, order.getId());
-              return SalesOrderDto.from(
-                  order,
-                  partner,
-                  lines.stream().map(this::mapLineToResponse).toList(),
-                  OrderCurrencyTotals.of(lines));
+              SalesOrderDto detail =
+                  SalesOrderDto.from(
+                      order,
+                      partner,
+                      lines.stream().map(this::mapLineToResponse).toList(),
+                      OrderCurrencyTotals.of(lines));
+              if (order.isPaymentPlanManaged())
+                detail.setPaymentPlan(paymentPlans.read(orderId, currentUserId));
+              return detail;
             });
   }
 
@@ -609,6 +633,7 @@ public class SalesOrderService {
             .toList();
 
     order.cancel();
+    if (order.isPaymentPlanManaged()) paymentPlans.cancel(order);
     SalesOrder saved = orderRepository.save(order);
     orderIntakeHooks.releaseOnCancellation(activeLineIds, currentUserId);
     // A link out with the customer, or a version waiting for an internal approval, stops counting.
@@ -709,6 +734,9 @@ public class SalesOrderService {
     order.delete();
     orderRepository.save(order);
 
+    domainEventPublisher.publish(
+        new com.fabricmanagement.sales.orderintake.domain.event.SalesStockPlanningChangedEvent(
+            TenantContext.requireTenantId(), orderId, false));
     log.info("Sales order deleted (soft): uid={}", order.getUid());
   }
 
@@ -848,6 +876,11 @@ public class SalesOrderService {
             .shipmentPreference(shipmentPreferenceOrDefault(req.getShipmentPreference()))
             .lineStatus(SalesOrderLineStatus.PENDING)
             .build();
+    line.recordQuantityPolicy(
+        req.getQuantityPolicy(),
+        TenantContext.getCurrentUserId(),
+        java.time.Instant.now(),
+        req.getQuantityPolicyReason());
     recordTolerance(line, req.getToleranceUpPct(), req.getToleranceDownPct());
     return line;
   }
@@ -869,7 +902,10 @@ public class SalesOrderService {
         .finishedWidthUnit(line.getFinishedWidthUnit())
         .requestedDeliveryDate(line.getRequestedDeliveryDate())
         .initialRequestedQty(line.getInitialRequestedQty())
-        .customerRequestQty(line.getCustomerRequestQty())
+        .customerRequestQty(line.getRecordedCustomerRequestQty())
+        .quantityTerms(
+            com.fabricmanagement.sales.common.dto.SalesQuantityTermsDto.from(
+                line.getQuantityTerms()))
         .singleLotRequired(line.isSingleLotRequired())
         .shipmentPreference(line.getShipmentPreference())
         .requestedQty(line.getRequestedQty())

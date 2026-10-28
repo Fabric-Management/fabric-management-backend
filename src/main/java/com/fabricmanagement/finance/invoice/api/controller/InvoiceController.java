@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.invoice.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.finance.common.app.FinancePostingDates;
 import com.fabricmanagement.finance.invoice.app.CreditNoteApplicationService;
 import com.fabricmanagement.finance.invoice.app.InvoiceService;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
@@ -11,7 +12,6 @@ import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
 import com.fabricmanagement.finance.payment.dto.CreatePaymentRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +30,7 @@ public class InvoiceController {
 
   private final InvoiceService invoiceService;
   private final PaymentService paymentService;
+  private final FinancePostingDates postingDates;
   private final CreditNoteApplicationService creditNoteApplicationService;
 
   @GetMapping
@@ -87,7 +88,7 @@ public class InvoiceController {
             "OTHER",
             request.amount(),
             invoice.currency(),
-            LocalDate.now(),
+            postingDates.today(),
             "Legacy API",
             "Auto-generated from deprecated /payment endpoint",
             List.of(new CreateAllocationRequest(id, request.amount())));

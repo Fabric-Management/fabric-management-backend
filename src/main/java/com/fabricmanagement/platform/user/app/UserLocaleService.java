@@ -1,8 +1,11 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.user.domain.port.UserLocaleConfigPort;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
+import com.fabricmanagement.platform.user.dto.UpdateUserLanguagePreferenceRequest;
+import com.fabricmanagement.platform.user.dto.UpdateUserTimezonePreferenceRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.UUID;
@@ -64,6 +67,41 @@ public class UserLocaleService {
     return userQueryService.findById(tenantId, saved.getId()).orElseThrow();
   }
 
+  /**
+   * Update only language, reading timezone from the current persisted user rather than a browser
+   * snapshot. BaseEntity's optimistic version rejects concurrent writes instead of losing them.
+   */
+  @Transactional
+  public UserDto updateLanguagePreference(
+      UUID userId, UpdateUserLanguagePreferenceRequest request) {
+    UUID tenantId = TenantContext.requireTenantId();
+    var user =
+        userRepository
+            .findByTenantIdAndId(tenantId, userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
+    user.updateLanguagePreference(request.preferredLocale());
+    var saved = userRepository.save(user);
+    syncUserLocaleConfig(
+        tenantId, userId, saved.getPreferredLocale(), saved.getPreferredTimezone());
+    return userQueryService.findById(tenantId, saved.getId()).orElseThrow();
+  }
+
+  /** Update only timezone, preserving the language currently persisted for this tenant's user. */
+  @Transactional
+  public UserDto updateTimezonePreference(
+      UUID userId, UpdateUserTimezonePreferenceRequest request) {
+    UUID tenantId = TenantContext.requireTenantId();
+    var user =
+        userRepository
+            .findByTenantIdAndId(tenantId, userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
+    user.updateTimezonePreference(request.preferredTimezone());
+    var saved = userRepository.save(user);
+    syncUserLocaleConfig(
+        tenantId, userId, saved.getPreferredLocale(), saved.getPreferredTimezone());
+    return userQueryService.findById(tenantId, saved.getId()).orElseThrow();
+  }
+
   // ============================================================
   // PRIVATE HELPERS
   // ============================================================
@@ -83,13 +121,13 @@ public class UserLocaleService {
       return;
     }
 
-    // Normalize locale to uppercase 2-char code for i18n module (it uses e.g. "TR", "EN")
+    // Normalize locale to uppercase 2-char code for i18n module (it uses e.g. "EN")
     // If locale is null, passing null to port lets the adapter retain the old locale
     String normalizedLocale = locale != null ? extractLanguageCode(locale) : null;
     userLocaleConfigPort.saveOrUpdate(tenantId, userId, normalizedLocale, timezone);
   }
 
-  /** Extracts the primary language subtag from a BCP 47 tag (e.g. "tr-TR" → "TR"). */
+  /** Extracts the primary language subtag from a BCP 47 tag (e.g. "en-GB" → "EN"). */
   private static String extractLanguageCode(String bcp47Tag) {
     if (bcp47Tag == null) return "EN";
     String lang = bcp47Tag.split("[-_]")[0].toUpperCase();

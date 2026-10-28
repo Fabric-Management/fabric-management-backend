@@ -16,7 +16,15 @@ public final class DraftStockSelectionRequests {
       @NotNull UUID clientLineId,
       @NotNull UUID productId,
       UUID targetOrderId,
-      UUID targetLineId) {
+      UUID targetLineId,
+      @Schema(description = "Editable quote target; mutually exclusive with targetOrderId")
+          UUID targetQuoteId,
+      @Schema(description = "Null for a new quote line; otherwise the saved quote line")
+          UUID targetQuoteLineId) {
+    public Open(UUID form, UUID line, UUID product, UUID order, UUID orderLine) {
+      this(form, line, product, order, orderLine, null, null);
+    }
+
     public Open(UUID form, UUID line, UUID product) {
       this(form, line, product, null, null);
     }
@@ -56,6 +64,16 @@ public final class DraftStockSelectionRequests {
       @NotEmpty @Size(max = 500) List<@NotNull UUID> tokens,
       @Schema(
               description =
-                  "Salesperson acknowledgement of backend tolerance/remnant facts; never customer consent")
-          boolean confirmed) {}
+                  "Salesperson acknowledgement of backend tolerance/remnant facts; never customer"
+                      + " consent")
+          boolean confirmed,
+      @Schema(
+              nullable = true,
+              description =
+                  "Explicit server-evaluated cut source; commercial quantity remains the exact requested length")
+          UUID cutSourceId) {
+    public Proof(UUID selection, Long revision, List<UUID> tokens, boolean confirmed) {
+      this(selection, revision, tokens, confirmed, null);
+    }
+  }
 }

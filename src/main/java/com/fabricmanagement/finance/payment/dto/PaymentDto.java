@@ -22,6 +22,9 @@ public record PaymentDto(
     String bankReference,
     String notes,
     Map<String, Object> metadata,
+    UUID reversesPaymentId,
+    UUID reversedByPaymentId,
+    String reversalReason,
     List<PaymentAllocationDto> allocations,
     Instant createdAt,
     Instant updatedAt) {}
