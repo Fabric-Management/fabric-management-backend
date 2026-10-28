@@ -1,7 +1,10 @@
 package com.fabricmanagement.platform.subscription.app.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -37,7 +40,7 @@ class PackageAccessAdapterTest {
     adapter = new PackageAccessAdapter(definitions, subscriptions, tenantAccess);
     lenient().when(tenantAccess.isWritable(TENANT)).thenReturn(true);
     lenient()
-        .when(definitions.findByIsActiveTrue())
+        .when(definitions.findByTenantId(TenantContext.SYSTEM_TENANT_ID))
         .thenReturn(
             List.of(
                 definition("FabricOS", "sales", "products"),
@@ -115,14 +118,48 @@ class PackageAccessAdapterTest {
   }
 
   @Test
-  void tenantPrivateDefinitionsNeverClaimResources() {
-    OSDefinition privateOne = definition("CustomOS", "finance");
-    privateOne.setTenantId(UUID.randomUUID());
-    when(definitions.findByIsActiveTrue())
-        .thenReturn(List.of(definition("FabricOS", "sales"), privateOne));
+  void onlyTheSystemCatalogueClaimsResources() {
     when(subscriptions.findByTenantId(TENANT)).thenReturn(List.of(learning("FabricOS")));
 
-    assertThat(adapter.isResourceOpen(TENANT, "finance")).isTrue();
+    adapter.isResourceOpen(TENANT, "finance");
+    adapter.closedResources(TENANT);
+
+    // Tenant-private definitions are never asked for, so they can never claim a resource.
+    verify(definitions, atLeastOnce()).findByTenantId(TenantContext.SYSTEM_TENANT_ID);
+    verifyNoMoreInteractions(definitions);
+  }
+
+  @Test
+  void aDeactivatedPackageDefinitionStillGuardsItsResources() {
+    OSDefinition retired = definition("YarnOS", "yarn");
+    retired.setIsActive(false);
+    offerCatalogue(definition("FabricOS", "sales"), retired, definition("AccountOS", "finance"));
+
+    // A tenant that never held the package is not let in because nothing offers it any more.
+    when(subscriptions.findByTenantId(TENANT)).thenReturn(List.of(learning("FabricOS")));
+    assertThat(adapter.isResourceOpen(TENANT, "yarn")).isFalse();
+    assertThat(adapter.closedResources(TENANT)).contains("yarn", "finance");
+
+    // A tenant that already holds it keeps using it.
+    when(subscriptions.findByTenantId(TENANT))
+        .thenReturn(List.of(learning("FabricOS"), learning("YarnOS")));
+    assertThat(adapter.isResourceOpen(TENANT, "yarn")).isTrue();
+    assertThat(adapter.closedResources(TENANT)).doesNotContain("yarn");
+  }
+
+  @Test
+  void aSoftDeletedPackageDefinitionStillGuardsItsResources() {
+    OSDefinition deleted = definition("YarnOS", "yarn");
+    deleted.delete();
+    offerCatalogue(definition("FabricOS", "sales"), deleted);
+    when(subscriptions.findByTenantId(TENANT)).thenReturn(List.of(learning("FabricOS")));
+
+    assertThat(adapter.isResourceOpen(TENANT, "yarn")).isFalse();
+    assertThat(adapter.closedResources(TENANT)).containsExactly("yarn");
+  }
+
+  private void offerCatalogue(OSDefinition... catalogue) {
+    when(definitions.findByTenantId(TenantContext.SYSTEM_TENANT_ID)).thenReturn(List.of(catalogue));
   }
 
   private static OSDefinition definition(String code, String... resources) {

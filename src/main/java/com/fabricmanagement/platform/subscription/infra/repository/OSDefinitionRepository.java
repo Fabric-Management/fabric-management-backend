@@ -23,5 +23,13 @@ public interface OSDefinitionRepository extends JpaRepository<OSDefinition, UUID
 
   List<OSDefinition> findByIsActiveTrue();
 
+  /**
+   * Every definition owned by {@code tenantId}, whatever its lifecycle state (offered, deactivated
+   * or soft-deleted). Package access decisions read the system catalogue through this, never
+   * through {@link #findByIsActiveTrue()}: which resources a package owns must not change when the
+   * package stops being offered.
+   */
+  List<OSDefinition> findByTenantId(UUID tenantId);
+
   boolean existsByOsCode(String osCode);
 }

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,12 +47,14 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
   @Autowired private EvaluationSubscriptionService evaluations;
   @Autowired private EvaluationPackageQueryService catalogue;
   @Autowired private OSDefinitionRepository definitions;
+  @Autowired private JdbcTemplate jdbc;
 
   @MockitoBean private PermissionEvaluator permissionEvaluator;
 
   private UUID tenantId;
   private final UUID owner = UUID.randomUUID();
   private final UUID persona = UUID.randomUUID();
+  private boolean yarnDefinitionRetired;
 
   @BeforeEach
   void setUp() {
@@ -72,6 +75,8 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
   @AfterEach
   void clearContext() {
     TenantContext.clear();
+    // The catalogue is shared by every IT in the JVM: put it back as the migrations left it.
+    if (yarnDefinitionRetired) setYarnDefinitionOffered(true);
   }
 
   @Test
@@ -107,6 +112,22 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void retiringThePackageDefinitionNeverReopensItsResources() throws Exception {
+    // The playground starts with every package selected, YarnOS included.
+    setYarnDefinitionOffered(false);
+
+    // A tenant that already holds the package keeps using it ...
+    performAs(owner, "ADMIN").andExpect(status().isOk());
+
+    // ... and once it lets the package go, a retired definition must not let it back in.
+    selectOnly("FabricOS");
+    performAs(owner, "ADMIN")
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PACKAGE_NOT_ENABLED"))
+        .andExpect(jsonPath("$.args[0]").value("yarn"));
+  }
+
+  @Test
   void aRoleWithoutPermissionIsStillRefusedByTheRoleWhenThePackageIsSelected() throws Exception {
     when(permissionEvaluator.evaluate(any(), eq("VIEWER"), any(), any()))
         .thenReturn(new PermissionResult(Map.of(), false));
@@ -114,6 +135,15 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
     performAs(UUID.randomUUID(), "VIEWER")
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+  }
+
+  /** Retires or restores the migration-installed YarnOS definition (the catalogue is global). */
+  private void setYarnDefinitionOffered(boolean offered) {
+    yarnDefinitionRetired = !offered;
+    jdbc.update(
+        "UPDATE common_company.common_os_definition SET is_active = ?"
+            + " WHERE tenant_id = '00000000-0000-0000-0000-000000000000' AND os_code = 'YarnOS'",
+        offered);
   }
 
   private void selectOnly(String... codes) {

@@ -31,6 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>A resource no package claims stays open, so a new resource is never locked by omission.
  *   <li>A tenant that is no longer writable (an expired real trial, for example) keeps read access
  *       to its data; the tenant write guard blocks changes. Packages gate live use, not retention.
+ *   <li>A package definition keeps owning its resources after it is deactivated or soft-deleted.
+ *       Ownership is read from the whole system catalogue; only a tenant's own subscription decides
+ *       whether the package is enabled. Taking a package off the offer therefore never opens what
+ *       it guarded, and tenants that already hold it keep it.
  * </ul>
  *
  * <p>The decision reads current database state on purpose: a revoked grant or a passed deadline
@@ -84,11 +88,10 @@ public class PackageAccessAdapter implements PackageAccessPort {
             .filter(Subscription::isActive)
             .map(Subscription::getOsCode)
             .collect(Collectors.toSet());
-    List<OSDefinition> catalogue =
-        definitions.findByIsActiveTrue().stream()
-            .filter(definition -> TenantContext.SYSTEM_TENANT_ID.equals(definition.getTenantId()))
-            .filter(definition -> definition.getDeletedAt() == null)
-            .toList();
+    // Ownership must not depend on whether the definition is still offered (is_active) or deleted:
+    // a retired definition that dropped out of this list would leave its resources unclaimed, and
+    // an unclaimed resource is open to everyone.
+    List<OSDefinition> catalogue = definitions.findByTenantId(TenantContext.SYSTEM_TENANT_ID);
     return new Access(true, enabled, catalogue);
   }
 }
