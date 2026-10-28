@@ -70,8 +70,7 @@ public class UIDGenerator {
       tenantUid = "SYS-000"; // System tenant fallback
     }
 
-    String uniqueSuffix =
-        UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+    String uniqueSuffix = UidSuffix.random();
 
     String uid = String.format("%s-%s-%s", tenantUid, moduleCode.toUpperCase(), uniqueSuffix);
 

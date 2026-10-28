@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.fabricmanagement.common.infrastructure.persistence.UidSuffix;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ class PlaygroundCatalogueWriterTest {
   @Test
   void freshUidUsesTheBaseEntityFormat() {
     assertThat(PlaygroundCatalogueWriter.freshUid("PG-1a2b3c4d"))
-        .matches("PG-1a2b3c4d-TMPL-[0-9A-F]{8}");
+        .matches("PG-1a2b3c4d-TMPL-[0-9A-F]{" + UidSuffix.LENGTH + "}");
     assertThat(PlaygroundCatalogueWriter.freshUid(null)).startsWith("SYS-000-TMPL-");
   }
 }

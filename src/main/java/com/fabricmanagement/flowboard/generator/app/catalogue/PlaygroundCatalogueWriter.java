@@ -1,5 +1,6 @@
 package com.fabricmanagement.flowboard.generator.app.catalogue;
 
+import com.fabricmanagement.common.infrastructure.persistence.UidSuffix;
 import com.fabricmanagement.flowboard.generator.domain.catalogue.CatalogueCandidate;
 import com.fabricmanagement.flowboard.generator.domain.catalogue.CatalogueDecision;
 import com.fabricmanagement.flowboard.generator.domain.catalogue.CatalogueFinding;
@@ -15,7 +16,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -159,9 +159,9 @@ public class PlaygroundCatalogueWriter {
   }
 
   static String freshUid(String tenantUid) {
-    String suffix =
-        UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
-    return (tenantUid == null || tenantUid.isBlank() ? "SYS-000" : tenantUid) + "-TMPL-" + suffix;
+    return (tenantUid == null || tenantUid.isBlank() ? "SYS-000" : tenantUid)
+        + "-TMPL-"
+        + UidSuffix.random();
   }
 
   private static CatalogueCandidate candidate(ResultSet rs, int rowNum) throws SQLException {

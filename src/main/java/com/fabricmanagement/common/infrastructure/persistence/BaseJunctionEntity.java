@@ -140,9 +140,7 @@ public abstract class BaseJunctionEntity implements Serializable {
         tenantUid = "SYS-000";
       }
 
-      String uniqueSuffix =
-          UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
-      this.uid = String.format("%s-%s-%s", tenantUid, getModuleCode(), uniqueSuffix);
+      this.uid = String.format("%s-%s-%s", tenantUid, getModuleCode(), UidSuffix.random());
     }
 
     if (this.createdAt == null) {
