@@ -25,7 +25,7 @@ public class SystemDepartmentCodeRepairRunner
   public void onApplicationEvent(ApplicationReadyEvent event) {
     int repaired =
         tenantRepository.findAllActive().stream()
-            .mapToInt(tenant -> repairService.repairTenant(tenant.getId()))
+            .mapToInt(tenant -> repairService.repairTenant(tenant.getId(), tenant.getUid()))
             .sum();
     if (repaired > 0) {
       log.info("Repaired {} system department code rows across active tenants.", repaired);

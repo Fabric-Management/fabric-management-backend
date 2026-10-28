@@ -325,4 +325,26 @@ public final class TenantContext {
       restore(previous);
     }
   }
+
+  /**
+   * Executes a supplier as the given tenant with its UID set as well, so entities created inside
+   * mint UIDs under that tenant's prefix instead of the shared {@code SYS-000} fallback.
+   *
+   * @param tenantId the tenant ID to use
+   * @param tenantUid the tenant's UID
+   * @param supplier the code to execute
+   * @param <T> the return type
+   * @return the result from the supplier
+   */
+  public static <T> T executeInTenantContext(
+      UUID tenantId, String tenantUid, java.util.function.Supplier<T> supplier) {
+    TenantSnapshot previous = capture();
+    try {
+      setCurrentTenantId(tenantId);
+      setCurrentTenantUid(tenantUid);
+      return supplier.get();
+    } finally {
+      restore(previous);
+    }
+  }
 }

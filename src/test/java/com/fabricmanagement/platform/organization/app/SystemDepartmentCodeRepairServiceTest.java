@@ -17,6 +17,7 @@ class SystemDepartmentCodeRepairServiceTest {
 
   private static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
   private static final UUID ORG_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+  private static final String TENANT_UID = "ACME-001";
 
   @AfterEach
   void clearTenantContext() {
@@ -38,6 +39,7 @@ class SystemDepartmentCodeRepairServiceTest {
     departments.add(legacyDepartment(hrId, "Human Resources", "HUMANRESOURCES"));
     departments.add(legacyDepartment(qualityId, "Quality Control", "QUALITYCONTROL"));
     List<Department> savedDepartments = new ArrayList<>();
+    List<String> tenantUidsAtSave = new ArrayList<>();
     DepartmentRepository departmentRepository =
         repositoryProxy(
             DepartmentRepository.class,
@@ -48,6 +50,7 @@ class SystemDepartmentCodeRepairServiceTest {
               if ("save".equals(method.getName())) {
                 Department saved = (Department) args[0];
                 savedDepartments.add(saved);
+                tenantUidsAtSave.add(TenantContext.getCurrentTenantUid());
                 return saved;
               }
               return defaultValue(method.getReturnType());
@@ -55,10 +58,13 @@ class SystemDepartmentCodeRepairServiceTest {
     SystemDepartmentCodeRepairService service =
         new SystemDepartmentCodeRepairService(departmentRepository);
 
-    int repaired = service.repairTenant(TENANT_ID);
+    int repaired = service.repairTenant(TENANT_ID, TENANT_UID);
 
     assertThat(repaired).isGreaterThanOrEqualTo(3);
     assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
+    assertThat(TenantContext.getCurrentTenantUid()).isNull();
+    // Created departments mint their UIDs under the tenant's prefix, not the shared SYS-000.
+    assertThat(tenantUidsAtSave).isNotEmpty().containsOnly(TENANT_UID);
     assertThat(departments)
         .filteredOn(department -> financeId.equals(department.getId()))
         .singleElement()
