@@ -4,6 +4,8 @@ import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionE
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.platform.tenant.app.TenantClonerService;
+import com.fabricmanagement.platform.tenant.app.TenantUnderCreation;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Component;
 public class TenantQueryAdapter implements TenantQueryPort {
 
   private final SystemTransactionExecutor systemExecutor;
+  private final TenantUnderCreation tenantUnderCreation;
 
   private static final String SELECT_ACTIVE =
       "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE is_active = true ORDER BY created_at DESC";
@@ -90,29 +93,39 @@ public class TenantQueryAdapter implements TenantQueryPort {
       return Collections.emptyList();
     }
     UUID[] idArray = tenantIds.toArray(new UUID[0]);
-    return systemExecutor.executeQuery(
-        SELECT_BY_IDS,
-        (rs, i) ->
-            new TenantReference(
-                rs.getObject("id", UUID.class),
-                rs.getString("uid"),
-                rs.getString("name"),
-                rs.getString("type")),
-        (Object) idArray);
+    List<TenantReference> found =
+        new ArrayList<>(
+            systemExecutor.executeQuery(
+                SELECT_BY_IDS,
+                (rs, i) ->
+                    new TenantReference(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("uid"),
+                        rs.getString("name"),
+                        rs.getString("type")),
+                (Object) idArray));
+    // A tenant the current transaction is creating is invisible to the system connection.
+    for (UUID tenantId : tenantIds) {
+      if (tenantUnderCreation.isUnderCreation(tenantId)
+          && found.stream().noneMatch(reference -> tenantId.equals(reference.id()))) {
+        findById(tenantId).ifPresent(found::add);
+      }
+    }
+    return found;
   }
 
   @Override
   public Optional<TenantReference> findById(UUID tenantId) {
+    if (tenantUnderCreation.isUnderCreation(tenantId)) {
+      // Uncommitted row of the signup in progress: only its own connection can see it.
+      return tenantUnderCreation
+          .primaryJdbc()
+          .query(SELECT_BY_ID, TenantQueryAdapter::reference, tenantId)
+          .stream()
+          .findFirst();
+    }
     TenantReference result =
-        systemExecutor.executeQueryForObject(
-            SELECT_BY_ID,
-            (rs, i) ->
-                new TenantReference(
-                    rs.getObject("id", UUID.class),
-                    rs.getString("uid"),
-                    rs.getString("name"),
-                    rs.getString("type")),
-            tenantId);
+        systemExecutor.executeQueryForObject(SELECT_BY_ID, TenantQueryAdapter::reference, tenantId);
     return Optional.ofNullable(result);
   }
 

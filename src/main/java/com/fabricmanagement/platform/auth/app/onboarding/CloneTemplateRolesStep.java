@@ -10,9 +10,10 @@ import org.springframework.stereotype.Component;
 /**
  * Step 3: Clone platform roles from TEMPLATE tenant to the new tenant.
  *
- * <p>This step uses BYPASSRLS (SystemTransactionExecutor) to read roles from the TEMPLATE tenant
- * and insert them into the new tenant's scope. Must run BEFORE CreateAdminUserStep because admin
- * user creation requires an ADMIN role to exist in the target tenant.
+ * <p>The template's roles are read through the system connection (BYPASSRLS) and inserted into the
+ * new tenant's scope on the onboarding transaction itself, so a signup that fails later leaves no
+ * roles behind. Must run BEFORE CreateAdminUserStep because admin user creation requires an ADMIN
+ * role to exist in the target tenant.
  *
  * <p>Idempotent: skips roles that already exist in the target tenant (by role_code).
  *
@@ -44,7 +45,10 @@ public class CloneTemplateRolesStep implements OnboardingStep {
       return;
     }
 
-    int clonedCount = tenantClonerService.cloneRolesToTenant(templateTenantId, targetTenantId);
+    // On the onboarding transaction (ONBOARD-ATOMIC-1): the new tenant row is not visible to the
+    // system connection until that transaction commits.
+    int clonedCount =
+        tenantClonerService.cloneRolesInCallerTransaction(templateTenantId, targetTenantId);
     log.info(
         "CloneTemplateRolesStep: Cloned {} roles from TEMPLATE ({}) to new tenant ({})",
         clonedCount,

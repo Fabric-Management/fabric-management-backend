@@ -49,12 +49,15 @@ class TenantSeederPropertyRegistryTest {
     when(tenantSystemService.createTenant(any()))
         .thenReturn(TenantDto.builder().id(tenantId).name("Nexus Fabrics").build());
     when(tenantClonerService.findTemplateTenantId()).thenReturn(templateTenantId);
-    when(tenantClonerService.cloneRolesToTenant(templateTenantId, tenantId)).thenReturn(1);
-    when(tenantClonerService.cloneReferenceDataToTenant(tenantId)).thenReturn(1);
+    when(tenantClonerService.cloneRolesInCallerTransaction(templateTenantId, tenantId))
+        .thenReturn(1);
+    when(tenantClonerService.cloneReferenceDataInCallerTransaction(tenantId)).thenReturn(1);
 
     tenantSeeder.seed();
 
-    verify(tenantClonerService).cloneReferenceDataToTenant(tenantId);
+    // The tenant row lives on the seeder's own transaction, so the copies are written there too.
+    verify(tenantClonerService).cloneRolesInCallerTransaction(templateTenantId, tenantId);
+    verify(tenantClonerService).cloneReferenceDataInCallerTransaction(tenantId);
     verify(demoTransactionSeeder).seedIfEnabledFor(tenantId);
   }
 }

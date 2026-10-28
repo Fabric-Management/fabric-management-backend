@@ -13,12 +13,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class YarnPermissionSeedPropagationIT extends AbstractIntegrationTest {
 
   @Autowired private PermissionTemplateSeeder seeder;
   @Autowired private CloneTemplatePermissionsStep clonePermissionsStep;
   @Autowired private SystemTransactionExecutor systemTransactions;
+  @Autowired private TransactionTemplate onboardingTransaction;
 
   @Test
   void templateAndFreshOnboardingTenantMirrorFiberReadWriteWithoutYarnApprove() {
@@ -26,7 +28,9 @@ class YarnPermissionSeedPropagationIT extends AbstractIntegrationTest {
     UUID freshTenant = insertTenant();
     OnboardingContext context = new OnboardingContext();
     context.setTenantId(freshTenant);
-    clonePermissionsStep.execute(context);
+    // The clone steps write on the onboarding connection (ONBOARD-ATOMIC-1): they need the
+    // caller's transaction, as in a real signup.
+    onboardingTransaction.executeWithoutResult(status -> clonePermissionsStep.execute(context));
 
     Set<Grant> expected =
         grants(TenantContext.TEMPLATE_TENANT_ID, "fiber").stream()

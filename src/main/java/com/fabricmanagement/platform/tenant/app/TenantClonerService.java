@@ -2,20 +2,42 @@ package com.fabricmanagement.platform.tenant.app;
 
 import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeeder;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort;
 import com.fabricmanagement.platform.tenant.domain.port.TenantCatalogueProvisioningPort;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Service responsible for cloning the Golden Template tenant into an isolated Playground tenant.
- * Uses SystemTransactionExecutor (pure JDBC) to bypass RLS and avoid JPA Context contamination.
+ * Service responsible for cloning the Golden Template tenant into an isolated Playground tenant,
+ * and for giving a newly onboarded tenant its copy of the template's reference data.
+ *
+ * <p>Two families of methods, by where the copies are written:
+ *
+ * <ul>
+ *   <li>The plain ones use SystemTransactionExecutor (pure JDBC) to bypass RLS and avoid JPA
+ *       Context contamination; they read and write in one system transaction of their own. The
+ *       playground clone, the start-up backfills and repairs of existing tenants use these.
+ *   <li>The {@code …InCallerTransaction} ones serve onboarding (ONBOARD-ATOMIC-1). The new tenant
+ *       row exists only on the onboarding connection until that transaction commits, so the copies
+ *       must be written on it too: a failed signup then leaves none of them behind, and the rows
+ *       reference a tenant their own connection can see. Row-level security hides the template's
+ *       rows from that connection, so the template is READ through the system connection (committed
+ *       data, no transaction) and only the inserts run on the onboarding connection. Both families
+ *       share their SQL, so the copies cannot drift apart.
+ * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -29,6 +51,228 @@ public class TenantClonerService {
   private final DemoTransactionSeeder demoTransactionSeeder;
   private final TenantCatalogueProvisioningPort catalogueProvisioning;
   private final PlaygroundFixtureProvisioningPort playgroundFixtures;
+  private final TenantUnderCreation tenantUnderCreation;
+  private final TenantSessionBinder tenantSessionBinder;
+
+  @PersistenceContext private EntityManager entityManager;
+
+  // Shared by the system-transaction copies and the onboarding copies (see the class comment).
+  // %s is the source relation: the real table for the system path, a record set built from the
+  // template's rows for the onboarding path.
+  private static final String PROPERTY_DEFINITION_TABLE = "production.prod_property_definition";
+
+  private static final String PROPERTY_DEFINITION_COPY_SQL =
+      """
+        INSERT INTO production.prod_property_definition (
+            id, tenant_id, uid, property_key, canonical_field_name, semantic_role_default,
+            dimension, data_type, unit_family, canonical_unit_code, allowed_unit_codes,
+            conversion_policy, rounding_policy, nominal_source, tolerance_source, description,
+            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.property_key,
+            source.canonical_field_name, source.semantic_role_default, source.dimension,
+            source.data_type, source.unit_family, source.canonical_unit_code,
+            source.allowed_unit_codes, source.conversion_policy, source.rounding_policy,
+            source.nominal_source, source.tolerance_source, source.description,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_property_definition target
+              WHERE target.tenant_id = ?::uuid
+                AND target.property_key = source.property_key
+          )
+        """;
+
+  private static final String YARN_SPINNING_SYSTEM_TABLE = "production.prod_yarn_spinning_system";
+
+  private static final String YARN_SPINNING_SYSTEM_COPY_SQL =
+      """
+        INSERT INTO production.prod_yarn_spinning_system (
+            id, tenant_id, uid, code, name, description, display_order,
+            technology_family, system_defined, is_active, created_at, created_by,
+            updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+            source.name, source.description, source.display_order, source.technology_family,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_yarn_spinning_system target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
+  private static final String YARN_END_USE_TABLE = "production.prod_yarn_end_use";
+
+  private static final String YARN_END_USE_COPY_SQL =
+      """
+        INSERT INTO production.prod_yarn_end_use (
+            id, tenant_id, uid, code, name, description, display_order,
+            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+            source.name, source.description, source.display_order, TRUE, source.is_active,
+            NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_yarn_end_use target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
+  private static final String YARN_TEST_METHOD_TABLE = "production.prod_yarn_test_method";
+
+  private static final String YARN_TEST_METHOD_COPY_SQL =
+      """
+        INSERT INTO production.prod_yarn_test_method (
+            id, tenant_id, uid, code, name, description, display_order, standard_ref,
+            instrument, applicable_property_key, system_defined, is_active, created_at,
+            created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
+            source.name, source.description, source.display_order, source.standard_ref,
+            source.instrument, source.applicable_property_key, TRUE, source.is_active,
+            NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_yarn_test_method target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
+  private static final String FABRIC_CONSTRUCTION_TABLE = "production.prod_fabric_construction";
+
+  private static final String FABRIC_CONSTRUCTION_COPY_SQL =
+      """
+        INSERT INTO production.prod_fabric_construction (
+            id, tenant_id, uid, code, name, description, display_order, formation, family,
+            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+            source.description, source.display_order, source.formation, source.family,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_fabric_construction target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
+  private static final String FABRIC_FINISHING_PROCESS_TABLE =
+      "production.prod_fabric_finishing_process";
+
+  private static final String FABRIC_FINISHING_PROCESS_COPY_SQL =
+      """
+        INSERT INTO production.prod_fabric_finishing_process (
+            id, tenant_id, uid, code, name, description, display_order, category,
+            charge_unit, system_defined, is_active, created_at, created_by, updated_at,
+            updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+            source.description, source.display_order, source.category, source.charge_unit,
+            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_fabric_finishing_process target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
+  private static final String ROLE_SELECT_SQL =
+      "SELECT id, role_name, role_code, description, role_scope FROM common_user.common_role "
+          + "WHERE tenant_id = ? AND is_active = true";
+
+  private static final String ROLE_EXISTS_SQL =
+      "SELECT COUNT(*) FROM common_user.common_role WHERE tenant_id = ? AND role_code = ?";
+
+  private static final String ROLE_INSERT_SQL =
+      "INSERT INTO common_user.common_role (id, tenant_id, uid, role_name, role_code, description, role_scope, is_active, created_at, updated_at, version) "
+          + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)";
+
+  private static final String PERMISSION_TEMPLATE_COUNT_SQL =
+      "SELECT COUNT(*) FROM common_user.permission_template WHERE tenant_id = ?";
+
+  private static final String PERMISSION_TEMPLATE_SELECT_SQL =
+      "SELECT role_code, department_code, resource, action, data_scope "
+          + "FROM common_user.permission_template "
+          + "WHERE tenant_id = ? AND is_active = true AND deleted_at IS NULL "
+          + "AND NOT (resource || ':' || action = ANY(string_to_array(?, ',')))";
+
+  private static final String PERMISSION_TEMPLATE_INSERT_SQL =
+      "INSERT INTO common_user.permission_template "
+          + "(id, tenant_id, uid, role_code, department_code, resource, "
+          + "action, data_scope, is_active, created_at, updated_at, version) "
+          + "VALUES (gen_random_uuid(), ?, gen_random_uuid()::varchar, "
+          + "?, ?, ?, ?, ?, true, now(), now(), 0)";
+
+  private static final String OWNERSHIP_POLICY_TABLE = "sales.ownership_policy";
+
+  private static final String OWNERSHIP_POLICY_COUNT_SQL =
+      "SELECT COUNT(*) FROM sales.ownership_policy WHERE tenant_id = ?";
+
+  private static final String OWNERSHIP_POLICY_COPY_SQL =
+      """
+        INSERT INTO sales.ownership_policy (
+            id, tenant_id, uid, default_mode, mode_effective_at,
+            assignment_ladder_enabled, triage_age_threshold_hours,
+            is_active, created_at, updated_at, version
+        )
+        SELECT
+            gen_random_uuid(), ?, gen_random_uuid()::VARCHAR, default_mode, now(),
+            FALSE, triage_age_threshold_hours, TRUE, now(), now(), 0
+        FROM %s
+        WHERE tenant_id = ?
+        """;
+
+  /** Legacy reference tables: copied whole, only into a tenant that has none of their rows. */
+  private static final String COPY_WITHOUT_FKS_SQL =
+      "INSERT INTO %1$s (id, tenant_id, %2$s, created_at, updated_at, version) "
+          + "SELECT gen_random_uuid(), ?, %2$s, now(), now(), 0 FROM %3$s WHERE tenant_id = ?";
+
+  private static final String PRODUCT_ATTRIBUTE_TABLE = "production.prod_product_attribute";
+
+  private static final String PRODUCT_ATTRIBUTE_COLUMNS =
+      "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active";
+
+  private static final String YARN_CERTIFICATION_TABLE = "production.prod_yarn_certification";
+
+  private static final String YARN_CERTIFICATION_COLUMNS =
+      "uid, certification_code, certification_name, certifying_body, description, is_active";
 
   /**
    * Find the TEMPLATE tenant ID. Returns null if no template tenant exists.
@@ -66,22 +310,17 @@ public class TenantClonerService {
         jdbc -> {
           int[] count = {0};
           jdbc.query(
-              "SELECT id, role_name, role_code, description, role_scope FROM common_user.common_role WHERE tenant_id = ? AND is_active = true",
+              ROLE_SELECT_SQL,
               rs -> {
                 String roleCode = rs.getString("role_code");
                 // Idempotent — skip if role_code already exists for target tenant
                 Integer existing =
-                    jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM common_user.common_role WHERE tenant_id = ? AND role_code = ?",
-                        Integer.class,
-                        targetTenantId,
-                        roleCode);
+                    jdbc.queryForObject(ROLE_EXISTS_SQL, Integer.class, targetTenantId, roleCode);
                 if (existing != null && existing > 0) {
                   return;
                 }
                 jdbc.update(
-                    "INSERT INTO common_user.common_role (id, tenant_id, uid, role_name, role_code, description, role_scope, is_active, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
+                    ROLE_INSERT_SQL,
                     UUID.randomUUID(),
                     targetTenantId,
                     rs.getString("role_name"),
@@ -125,10 +364,7 @@ public class TenantClonerService {
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     // Idempotency guard: skip if target tenant already has permission templates
     Integer existing =
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM common_user.permission_template WHERE tenant_id = ?",
-            Integer.class,
-            targetTenantId);
+        jdbc.queryForObject(PERMISSION_TEMPLATE_COUNT_SQL, Integer.class, targetTenantId);
     if (existing != null && existing > 0) {
       log.debug(
           "Skipping permission template clone — target tenant {} already has {} templates.",
@@ -139,17 +375,10 @@ public class TenantClonerService {
 
     int[] count = {0};
     jdbc.query(
-        "SELECT role_code, department_code, resource, action, data_scope "
-            + "FROM common_user.permission_template "
-            + "WHERE tenant_id = ? AND is_active = true AND deleted_at IS NULL "
-            + "AND NOT (resource || ':' || action = ANY(string_to_array(?, ',')))",
+        PERMISSION_TEMPLATE_SELECT_SQL,
         rs -> {
           jdbc.update(
-              "INSERT INTO common_user.permission_template "
-                  + "(id, tenant_id, uid, role_code, department_code, resource, "
-                  + "action, data_scope, is_active, created_at, updated_at, version) "
-                  + "VALUES (gen_random_uuid(), ?, gen_random_uuid()::varchar, "
-                  + "?, ?, ?, ?, ?, true, now(), now(), 0)",
+              PERMISSION_TEMPLATE_INSERT_SQL,
               targetTenantId,
               rs.getString("role_code"),
               rs.getString("department_code"),
@@ -181,31 +410,7 @@ public class TenantClonerService {
   int doCopyMissingSystemPropertyDefinitions(
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     return jdbc.update(
-        """
-        INSERT INTO production.prod_property_definition (
-            id, tenant_id, uid, property_key, canonical_field_name, semantic_role_default,
-            dimension, data_type, unit_family, canonical_unit_code, allowed_unit_codes,
-            conversion_policy, rounding_policy, nominal_source, tolerance_source, description,
-            system_defined, is_active, created_at, created_by, updated_at, updated_by, version
-        )
-        SELECT
-            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.property_key,
-            source.canonical_field_name, source.semantic_role_default, source.dimension,
-            source.data_type, source.unit_family, source.canonical_unit_code,
-            source.allowed_unit_codes, source.conversion_policy, source.rounding_policy,
-            source.nominal_source, source.tolerance_source, source.description,
-            TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
-        FROM production.prod_property_definition source
-        WHERE source.tenant_id = ?::uuid
-          AND source.system_defined = TRUE
-          AND source.deleted_at IS NULL
-          AND NOT EXISTS (
-              SELECT 1
-              FROM production.prod_property_definition target
-              WHERE target.tenant_id = ?::uuid
-                AND target.property_key = source.property_key
-          )
-        """,
+        PROPERTY_DEFINITION_COPY_SQL.formatted(PROPERTY_DEFINITION_TABLE),
         targetTenantId,
         sourceTenantId,
         targetTenantId);
@@ -260,52 +465,13 @@ public class TenantClonerService {
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     int constructions =
         jdbc.update(
-            """
-            INSERT INTO production.prod_fabric_construction (
-                id, tenant_id, uid, code, name, description, display_order, formation, family,
-                system_defined, is_active, created_at, created_by, updated_at, updated_by, version
-            )
-            SELECT
-                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
-                source.description, source.display_order, source.formation, source.family,
-                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
-            FROM production.prod_fabric_construction source
-            WHERE source.tenant_id = ?::uuid
-              AND source.system_defined = TRUE
-              AND source.deleted_at IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM production.prod_fabric_construction target
-                  WHERE target.tenant_id = ?::uuid
-                    AND target.code = source.code
-              )
-            """,
+            FABRIC_CONSTRUCTION_COPY_SQL.formatted(FABRIC_CONSTRUCTION_TABLE),
             targetTenantId,
             sourceTenantId,
             targetTenantId);
     int finishingProcesses =
         jdbc.update(
-            """
-            INSERT INTO production.prod_fabric_finishing_process (
-                id, tenant_id, uid, code, name, description, display_order, category,
-                charge_unit, system_defined, is_active, created_at, created_by, updated_at,
-                updated_by, version
-            )
-            SELECT
-                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
-                source.description, source.display_order, source.category, source.charge_unit,
-                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
-            FROM production.prod_fabric_finishing_process source
-            WHERE source.tenant_id = ?::uuid
-              AND source.system_defined = TRUE
-              AND source.deleted_at IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM production.prod_fabric_finishing_process target
-                  WHERE target.tenant_id = ?::uuid
-                    AND target.code = source.code
-              )
-            """,
+            FABRIC_FINISHING_PROCESS_COPY_SQL.formatted(FABRIC_FINISHING_PROCESS_TABLE),
             targetTenantId,
             sourceTenantId,
             targetTenantId);
@@ -348,79 +514,19 @@ public class TenantClonerService {
 
     int spinningSystems =
         jdbc.update(
-            """
-            INSERT INTO production.prod_yarn_spinning_system (
-                id, tenant_id, uid, code, name, description, display_order,
-                technology_family, system_defined, is_active, created_at, created_by,
-                updated_at, updated_by, version
-            )
-            SELECT
-                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
-                source.name, source.description, source.display_order, source.technology_family,
-                TRUE, source.is_active, NOW(), NULL, NOW(), NULL, 0
-            FROM production.prod_yarn_spinning_system source
-            WHERE source.tenant_id = ?::uuid
-              AND source.system_defined = TRUE
-              AND source.deleted_at IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM production.prod_yarn_spinning_system target
-                  WHERE target.tenant_id = ?::uuid
-                    AND target.code = source.code
-              )
-            """,
+            YARN_SPINNING_SYSTEM_COPY_SQL.formatted(YARN_SPINNING_SYSTEM_TABLE),
             targetTenantId,
             sourceTenantId,
             targetTenantId);
     int endUses =
         jdbc.update(
-            """
-            INSERT INTO production.prod_yarn_end_use (
-                id, tenant_id, uid, code, name, description, display_order,
-                system_defined, is_active, created_at, created_by, updated_at, updated_by, version
-            )
-            SELECT
-                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
-                source.name, source.description, source.display_order, TRUE, source.is_active,
-                NOW(), NULL, NOW(), NULL, 0
-            FROM production.prod_yarn_end_use source
-            WHERE source.tenant_id = ?::uuid
-              AND source.system_defined = TRUE
-              AND source.deleted_at IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM production.prod_yarn_end_use target
-                  WHERE target.tenant_id = ?::uuid
-                    AND target.code = source.code
-              )
-            """,
+            YARN_END_USE_COPY_SQL.formatted(YARN_END_USE_TABLE),
             targetTenantId,
             sourceTenantId,
             targetTenantId);
     int testMethods =
         jdbc.update(
-            """
-            INSERT INTO production.prod_yarn_test_method (
-                id, tenant_id, uid, code, name, description, display_order, standard_ref,
-                instrument, applicable_property_key, system_defined, is_active, created_at,
-                created_by, updated_at, updated_by, version
-            )
-            SELECT
-                gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code,
-                source.name, source.description, source.display_order, source.standard_ref,
-                source.instrument, source.applicable_property_key, TRUE, source.is_active,
-                NOW(), NULL, NOW(), NULL, 0
-            FROM production.prod_yarn_test_method source
-            WHERE source.tenant_id = ?::uuid
-              AND source.system_defined = TRUE
-              AND source.deleted_at IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM production.prod_yarn_test_method target
-                  WHERE target.tenant_id = ?::uuid
-                    AND target.code = source.code
-              )
-            """,
+            YARN_TEST_METHOD_COPY_SQL.formatted(YARN_TEST_METHOD_TABLE),
             targetTenantId,
             sourceTenantId,
             targetTenantId);
@@ -481,15 +587,15 @@ public class TenantClonerService {
           tablesCloned +=
               cloneIfEmpty(
                   jdbc,
-                  "production.prod_product_attribute",
-                  "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
+                  PRODUCT_ATTRIBUTE_TABLE,
+                  PRODUCT_ATTRIBUTE_COLUMNS,
                   goldenTemplateId,
                   targetTenantId);
           tablesCloned +=
               cloneIfEmpty(
                   jdbc,
-                  "production.prod_yarn_certification",
-                  "uid, certification_code, certification_name, certifying_body, description, is_active",
+                  YARN_CERTIFICATION_TABLE,
+                  YARN_CERTIFICATION_COLUMNS,
                   goldenTemplateId,
                   targetTenantId);
           tablesCloned +=
@@ -830,12 +936,8 @@ public class TenantClonerService {
       String columns,
       UUID templateId,
       UUID newTenantId) {
-    String sql =
-        String.format(
-            "INSERT INTO %s (id, tenant_id, %s, created_at, updated_at, version) "
-                + "SELECT gen_random_uuid(), ?, %s, now(), now(), 0 FROM %s WHERE tenant_id = ?",
-            tableName, columns, columns, tableName);
-    jdbc.update(sql, newTenantId, templateId);
+    jdbc.update(
+        COPY_WITHOUT_FKS_SQL.formatted(tableName, columns, tableName), newTenantId, templateId);
   }
 
   /**
@@ -858,33 +960,339 @@ public class TenantClonerService {
   private int cloneOwnershipPolicyIfMissing(
       org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
     Integer existing =
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM sales.ownership_policy WHERE tenant_id = ?",
-            Integer.class,
-            targetTenantId);
+        jdbc.queryForObject(OWNERSHIP_POLICY_COUNT_SQL, Integer.class, targetTenantId);
     if (existing != null && existing > 0) {
       return 0;
     }
     int inserted =
         jdbc.update(
-            """
-            INSERT INTO sales.ownership_policy (
-                id, tenant_id, uid, default_mode, mode_effective_at,
-                assignment_ladder_enabled, triage_age_threshold_hours,
-                is_active, created_at, updated_at, version
-            )
-            SELECT
-                gen_random_uuid(), ?, gen_random_uuid()::VARCHAR, default_mode, now(),
-                FALSE, triage_age_threshold_hours, TRUE, now(), now(), 0
-            FROM sales.ownership_policy
-            WHERE tenant_id = ?
-            """,
+            OWNERSHIP_POLICY_COPY_SQL.formatted(OWNERSHIP_POLICY_TABLE),
             targetTenantId,
             sourceTenantId);
     if (inserted == 0) {
       throw new IllegalStateException(
           "Template tenant has no sales ownership policy: " + sourceTenantId);
     }
+    return 1;
+  }
+
+  // ========================================================================================
+  // ONBOARDING: copies written on the caller's transaction (ONBOARD-ATOMIC-1)
+  // ========================================================================================
+
+  private record TemplateRole(String roleName, String roleCode, String description, String scope) {}
+
+  private record TemplatePermission(
+      String roleCode, String departmentCode, String resource, String action, String dataScope) {}
+
+  /**
+   * Gets the onboarding connection ready for a copy into {@code targetTenantId}: pending JPA writes
+   * are flushed (JDBC does not see them otherwise) and the session is bound to the target, which
+   * row-level security requires for every insert and every read of the target's own rows.
+   */
+  private JdbcTemplate prepareCallerConnection(UUID targetTenantId) {
+    // Checked by hand rather than with @Transactional(MANDATORY): that would put a proxy around
+    // this whole service, which the system-connection methods have never needed.
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new IllegalTransactionStateException(
+          "Onboarding copies must run inside the onboarding transaction (tenant "
+              + targetTenantId
+              + ")");
+    }
+    entityManager.flush();
+    tenantSessionBinder.bindToCurrentSession(targetTenantId);
+    return tenantUnderCreation.primaryJdbc();
+  }
+
+  /**
+   * The template's rows of {@code table} as one JSON array, read through the system connection
+   * (committed data; no transaction of its own). {@code filter} is an {@code AND …} fragment on the
+   * alias {@code s}, or empty. Both arguments are internal constants, never request data.
+   */
+  private String readTemplateRowsAsJson(String table, String filter, UUID sourceTenantId) {
+    String json =
+        systemTransactionExecutor.executeQueryForObject(
+            "SELECT COALESCE(jsonb_agg(to_jsonb(s)), '[]'::jsonb)::text FROM "
+                + table
+                + " s WHERE s.tenant_id = ? "
+                + filter,
+            (rs, i) -> rs.getString(1),
+            sourceTenantId);
+    return json != null ? json : "[]";
+  }
+
+  /** The record set the shared copy statements read from, in place of the template's table. */
+  private static String templateRowsRelation(String table) {
+    return "jsonb_populate_recordset(NULL::" + table + ", ?::jsonb)";
+  }
+
+  /**
+   * Runs one shared "copy the missing system-owned rows" statement on the caller's connection. The
+   * statement's own filters (source tenant, {@code system_defined}, not deleted) apply to the
+   * record set exactly as they would to the table, and its NOT EXISTS clause reads the target's own
+   * rows, which the bound session can see.
+   */
+  private int copyMissingSystemRows(
+      JdbcTemplate callerJdbc, String copySql, String table, UUID sourceTenantId, UUID targetId) {
+    String rows =
+        readTemplateRowsAsJson(
+            table, "AND s.system_defined = TRUE AND s.deleted_at IS NULL", sourceTenantId);
+    return callerJdbc.update(
+        copySql.formatted(templateRowsRelation(table)), targetId, rows, sourceTenantId, targetId);
+  }
+
+  /**
+   * Onboarding counterpart of {@link #cloneRolesToTenant}: the template's active roles, written on
+   * the caller's transaction. Idempotent by role code.
+   */
+  public int cloneRolesInCallerTransaction(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    JdbcTemplate callerJdbc = prepareCallerConnection(targetTenantId);
+    List<TemplateRole> roles =
+        systemTransactionExecutor.executeQuery(
+            ROLE_SELECT_SQL,
+            (rs, i) ->
+                new TemplateRole(
+                    rs.getString("role_name"),
+                    rs.getString("role_code"),
+                    rs.getString("description"),
+                    rs.getString("role_scope")),
+            sourceTenantId);
+    int cloned = 0;
+    for (TemplateRole role : roles) {
+      Integer existing =
+          callerJdbc.queryForObject(
+              ROLE_EXISTS_SQL, Integer.class, targetTenantId, role.roleCode());
+      if (existing != null && existing > 0) {
+        continue;
+      }
+      callerJdbc.update(
+          ROLE_INSERT_SQL,
+          UUID.randomUUID(),
+          targetTenantId,
+          role.roleName(),
+          role.roleCode(),
+          role.description(),
+          role.scope());
+      cloned++;
+    }
+    return cloned;
+  }
+
+  /**
+   * Onboarding counterpart of {@link #clonePermissionTemplatesToTenant}. Idempotent: nothing is
+   * copied when the target already has permission templates.
+   */
+  public int clonePermissionTemplatesInCallerTransaction(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    JdbcTemplate callerJdbc = prepareCallerConnection(targetTenantId);
+    Integer existing =
+        callerJdbc.queryForObject(PERMISSION_TEMPLATE_COUNT_SQL, Integer.class, targetTenantId);
+    if (existing != null && existing > 0) {
+      log.debug(
+          "Skipping permission template clone — target tenant {} already has {} templates.",
+          targetTenantId,
+          existing);
+      return 0;
+    }
+    List<TemplatePermission> templates =
+        systemTransactionExecutor.executeQuery(
+            PERMISSION_TEMPLATE_SELECT_SQL,
+            (rs, i) ->
+                new TemplatePermission(
+                    rs.getString("role_code"),
+                    rs.getString("department_code"),
+                    rs.getString("resource"),
+                    rs.getString("action"),
+                    rs.getString("data_scope")),
+            sourceTenantId,
+            com.fabricmanagement.common.infrastructure.security.PermissionKey
+                .explicitAuthorisationKeysCsv());
+    for (TemplatePermission template : templates) {
+      callerJdbc.update(
+          PERMISSION_TEMPLATE_INSERT_SQL,
+          targetTenantId,
+          template.roleCode(),
+          template.departmentCode(),
+          template.resource(),
+          template.action(),
+          template.dataScope());
+    }
+    return templates.size();
+  }
+
+  /**
+   * Onboarding counterpart of {@link #cloneOwnershipPolicyToTenant}: the template's sales ownership
+   * policy, written on the caller's transaction.
+   *
+   * @return 1 when a policy was created, 0 when the tenant already had one
+   */
+  public int cloneOwnershipPolicyInCallerTransaction(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    JdbcTemplate callerJdbc = prepareCallerConnection(targetTenantId);
+    return cloneOwnershipPolicyFromRows(callerJdbc, sourceTenantId, targetTenantId);
+  }
+
+  private int cloneOwnershipPolicyFromRows(
+      JdbcTemplate callerJdbc, UUID sourceTenantId, UUID targetTenantId) {
+    Integer existing =
+        callerJdbc.queryForObject(OWNERSHIP_POLICY_COUNT_SQL, Integer.class, targetTenantId);
+    if (existing != null && existing > 0) {
+      return 0;
+    }
+    String rows = readTemplateRowsAsJson(OWNERSHIP_POLICY_TABLE, "", sourceTenantId);
+    int inserted =
+        callerJdbc.update(
+            OWNERSHIP_POLICY_COPY_SQL.formatted(templateRowsRelation(OWNERSHIP_POLICY_TABLE)),
+            targetTenantId,
+            rows,
+            sourceTenantId);
+    if (inserted == 0) {
+      throw new IllegalStateException(
+          "Template tenant has no sales ownership policy: " + sourceTenantId);
+    }
+    return 1;
+  }
+
+  /** Onboarding counterpart of {@link #copyMissingSystemPropertyDefinitions}. */
+  public int copyMissingSystemPropertyDefinitionsInCallerTransaction(
+      UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return copyMissingSystemPropertyDefinitionRows(
+        prepareCallerConnection(targetTenantId), sourceTenantId, targetTenantId);
+  }
+
+  private int copyMissingSystemPropertyDefinitionRows(
+      JdbcTemplate callerJdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return copyMissingSystemRows(
+        callerJdbc,
+        PROPERTY_DEFINITION_COPY_SQL,
+        PROPERTY_DEFINITION_TABLE,
+        sourceTenantId,
+        targetTenantId);
+  }
+
+  /**
+   * Onboarding counterpart of {@link #copyMissingSystemYarnCatalogues}. The collision log of the
+   * system path is not repeated: a tenant being onboarded has no rows of its own to collide with.
+   */
+  public int copyMissingSystemYarnCataloguesInCallerTransaction(
+      UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return copyMissingSystemYarnRows(
+        prepareCallerConnection(targetTenantId), sourceTenantId, targetTenantId);
+  }
+
+  private int copyMissingSystemYarnRows(
+      JdbcTemplate callerJdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return copyMissingSystemRows(
+            callerJdbc,
+            YARN_SPINNING_SYSTEM_COPY_SQL,
+            YARN_SPINNING_SYSTEM_TABLE,
+            sourceTenantId,
+            targetTenantId)
+        + copyMissingSystemRows(
+            callerJdbc, YARN_END_USE_COPY_SQL, YARN_END_USE_TABLE, sourceTenantId, targetTenantId)
+        + copyMissingSystemRows(
+            callerJdbc,
+            YARN_TEST_METHOD_COPY_SQL,
+            YARN_TEST_METHOD_TABLE,
+            sourceTenantId,
+            targetTenantId);
+  }
+
+  /** Onboarding counterpart of {@link #copyMissingSystemFabricCatalogues}. */
+  public int copyMissingSystemFabricCataloguesInCallerTransaction(
+      UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return copyMissingSystemFabricRows(
+        prepareCallerConnection(targetTenantId), sourceTenantId, targetTenantId);
+  }
+
+  private int copyMissingSystemFabricRows(
+      JdbcTemplate callerJdbc, UUID sourceTenantId, UUID targetTenantId) {
+    return copyMissingSystemRows(
+            callerJdbc,
+            FABRIC_CONSTRUCTION_COPY_SQL,
+            FABRIC_CONSTRUCTION_TABLE,
+            sourceTenantId,
+            targetTenantId)
+        + copyMissingSystemRows(
+            callerJdbc,
+            FABRIC_FINISHING_PROCESS_COPY_SQL,
+            FABRIC_FINISHING_PROCESS_TABLE,
+            sourceTenantId,
+            targetTenantId);
+  }
+
+  /**
+   * Onboarding counterpart of {@link #cloneReferenceDataToTenant}, for the start-up seeder of the
+   * demo company: same tables, same "tables cloned" count, written on the caller's transaction.
+   */
+  public int cloneReferenceDataInCallerTransaction(UUID targetTenantId) {
+    UUID goldenTemplateId = findTemplateTenantId();
+    if (goldenTemplateId == null || targetTenantId == null) {
+      log.warn("Golden Template not found — cannot clone reference data.");
+      return 0;
+    }
+    JdbcTemplate callerJdbc = prepareCallerConnection(targetTenantId);
+    int tablesCloned = 0;
+    tablesCloned +=
+        cloneIfEmptyFromRows(
+            callerJdbc,
+            PRODUCT_ATTRIBUTE_TABLE,
+            PRODUCT_ATTRIBUTE_COLUMNS,
+            goldenTemplateId,
+            targetTenantId);
+    tablesCloned +=
+        cloneIfEmptyFromRows(
+            callerJdbc,
+            YARN_CERTIFICATION_TABLE,
+            YARN_CERTIFICATION_COLUMNS,
+            goldenTemplateId,
+            targetTenantId);
+    tablesCloned +=
+        copyMissingSystemPropertyDefinitionRows(callerJdbc, goldenTemplateId, targetTenantId) > 0
+            ? 1
+            : 0;
+    tablesCloned +=
+        copyMissingSystemYarnRows(callerJdbc, goldenTemplateId, targetTenantId) > 0 ? 1 : 0;
+    tablesCloned +=
+        copyMissingSystemFabricRows(callerJdbc, goldenTemplateId, targetTenantId) > 0 ? 1 : 0;
+    tablesCloned += cloneOwnershipPolicyFromRows(callerJdbc, goldenTemplateId, targetTenantId);
+    return tablesCloned;
+  }
+
+  private int cloneIfEmptyFromRows(
+      JdbcTemplate callerJdbc, String table, String columns, UUID sourceId, UUID targetId) {
+    Integer existing =
+        callerJdbc.queryForObject(
+            String.format("SELECT COUNT(*) FROM %s WHERE tenant_id = ?", table),
+            Integer.class,
+            targetId);
+    if (existing != null && existing > 0) {
+      log.debug("Skipping {} — target already has {} rows.", table, existing);
+      return 0;
+    }
+    String rows = readTemplateRowsAsJson(table, "", sourceId);
+    callerJdbc.update(
+        COPY_WITHOUT_FKS_SQL.formatted(table, columns, templateRowsRelation(table)),
+        targetId,
+        rows,
+        sourceId);
+    log.info("Cloned reference data: {} (source={}, target={})", table, sourceId, targetId);
     return 1;
   }
 

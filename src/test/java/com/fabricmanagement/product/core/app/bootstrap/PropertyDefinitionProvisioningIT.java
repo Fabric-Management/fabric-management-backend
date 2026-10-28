@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
 
@@ -23,6 +24,7 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
   @Autowired private CloneTemplatePropertyDefinitionsStep registryStep;
   @Autowired private TenantClonerService tenantClonerService;
   @Autowired private SystemTransactionExecutor systemTransactionExecutor;
+  @Autowired private TransactionTemplate onboardingTransaction;
 
   @Test
   void onboardingStepRunsInTheBindingSlotAndCopiesOnlySystemRows() {
@@ -39,7 +41,9 @@ class PropertyDefinitionProvisioningIT extends AbstractIntegrationTest {
     OnboardingContext context = new OnboardingContext();
     context.setTenantId(tenantId);
 
-    registryStep.execute(context);
+    // The clone steps write on the onboarding connection (ONBOARD-ATOMIC-1): they need the
+    // caller's transaction, as in a real signup.
+    onboardingTransaction.executeWithoutResult(status -> registryStep.execute(context));
 
     assertRegistryAndYarnCataloguesReadyWithoutTenantRows(tenantId);
   }

@@ -5,13 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantSettingsUnreadableException;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
@@ -23,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,6 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -42,13 +43,20 @@ class TenantSystemServiceTest {
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private SystemTransactionExecutor systemExecutor;
   @Mock private JdbcTemplate jdbcTemplate;
+  @Mock private TenantUnderCreation tenantUnderCreation;
+  @Mock private TenantSessionBinder tenantSessionBinder;
 
   private TenantSystemService tenantSystemService;
 
   @BeforeEach
   void setUp() {
     tenantSystemService =
-        new TenantSystemService(eventPublisher, systemExecutor, new ObjectMapper());
+        new TenantSystemService(
+            eventPublisher,
+            systemExecutor,
+            new ObjectMapper(),
+            tenantUnderCreation,
+            tenantSessionBinder);
   }
 
   @AfterEach
@@ -94,24 +102,18 @@ class TenantSystemServiceTest {
   }
 
   @Test
-  void shouldRetryTenantCreationWhenUidOrSlugCollidesDuringInsert() {
+  void shouldRetryTenantCreationWhenUidOrSlugIsTakenDuringInsert() {
     UUID tenantId = UUID.randomUUID();
     List<String> insertedUids = new ArrayList<>();
+    List<UUID> insertedIds = new ArrayList<>();
     stubIdentityExistenceChecks();
-    when(systemExecutor.executeInTransaction(ArgumentMatchers.<Function<JdbcTemplate, UUID>>any()))
-        .thenAnswer(
-            invocation -> {
-              Function<JdbcTemplate, UUID> work = invocation.getArgument(0);
-              return work.apply(jdbcTemplate);
-            });
+    when(tenantUnderCreation.primaryJdbc()).thenReturn(jdbcTemplate);
     doAnswer(
             invocation -> {
+              insertedIds.add(invocation.getArgument(1, UUID.class));
               insertedUids.add(invocation.getArgument(2, String.class));
-              if (insertedUids.size() == 1) {
-                throw new DataIntegrityViolationException(
-                    "duplicate key value violates unique constraint \"uk_tenant_uid\"");
-              }
-              return 1;
+              // ON CONFLICT DO NOTHING: the first attempt finds the uid taken and writes no row.
+              return insertedUids.size() == 1 ? 0 : 1;
             })
         .when(jdbcTemplate)
         // sql + 11 values: id, uid, slug, name, type, status, settings, billing_email,
@@ -150,8 +152,70 @@ class TenantSystemServiceTest {
 
     assertThat(created.getUid()).isEqualTo("ACME-002");
     assertThat(insertedUids).containsExactly("ACME-001", "ACME-002");
-    verify(systemExecutor, times(2))
-        .executeInTransaction(ArgumentMatchers.<Function<JdbcTemplate, UUID>>any());
+    // Each attempt binds the session to its own id first (the tenant table's policy checks the new
+    // row), and only the row that was written is registered as "created by this transaction".
+    assertThat(insertedIds).hasSize(2).doesNotHaveDuplicates();
+    verify(tenantSessionBinder).bindToCurrentSession(insertedIds.get(0));
+    verify(tenantSessionBinder).bindToCurrentSession(insertedIds.get(1));
+    verify(tenantUnderCreation).register(insertedIds.get(1));
+    verify(tenantUnderCreation, never()).register(insertedIds.get(0));
+  }
+
+  @Test
+  void shouldGiveUpWhenNoFreeIdentityIsFoundInFiveAttempts() {
+    when(tenantUnderCreation.primaryJdbc()).thenReturn(jdbcTemplate);
+    when(jdbcTemplate.update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()))
+        .thenReturn(0);
+
+    assertThatThrownBy(
+            () ->
+                tenantSystemService.createTenant(
+                    CreateTenantRequest.builder().name("Acme Textiles").trialDays(90).build()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Acme Textiles");
+
+    verify(tenantSessionBinder, times(5)).bindToCurrentSession(any(UUID.class));
+    verify(tenantUnderCreation, never()).register(any(UUID.class));
+  }
+
+  @Test
+  void aTenantThisTransactionIsCreatingIsReadOnTheTransactionsConnection() {
+    UUID tenantId = UUID.randomUUID();
+    when(tenantUnderCreation.isUnderCreation(tenantId)).thenReturn(true);
+    when(tenantUnderCreation.primaryJdbc()).thenReturn(jdbcTemplate);
+    when(jdbcTemplate.query(
+            anyString(), ArgumentMatchers.<RowMapper<TenantDto>>any(), any(Object[].class)))
+        .thenReturn(List.of(TenantDto.builder().id(tenantId).status(TenantStatus.TRIAL).build()));
+
+    assertThat(tenantSystemService.findById(tenantId)).isPresent();
+    assertThat(tenantSystemService.findActiveById(tenantId)).isPresent();
+    // Its row is uncommitted: the system connection would answer "not found".
+    verifyNoInteractions(systemExecutor);
+  }
+
+  @Test
+  void theSettingsOfATenantThisTransactionIsCreatingAreReadOnTheTransactionsConnection() {
+    UUID tenantId = UUID.randomUUID();
+    when(tenantUnderCreation.isUnderCreation(tenantId)).thenReturn(true);
+    when(tenantUnderCreation.primaryJdbc()).thenReturn(jdbcTemplate);
+    when(jdbcTemplate.query(
+            anyString(), ArgumentMatchers.<RowMapper<String>>any(), any(Object[].class)))
+        .thenReturn(List.of("{}"));
+
+    assertThat(tenantSystemService.getSettings(tenantId)).isNotNull();
+    verifyNoInteractions(systemExecutor);
   }
 
   @Test

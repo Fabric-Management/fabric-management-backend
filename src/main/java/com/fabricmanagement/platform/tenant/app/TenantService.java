@@ -9,9 +9,11 @@ import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.tenant.mapper.TenantRowMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 /**
@@ -32,6 +34,7 @@ public class TenantService {
   private final DomainEventPublisher eventPublisher;
   private final SystemTransactionExecutor systemExecutor;
   private final ObjectMapper objectMapper;
+  private final TenantUnderCreation tenantUnderCreation;
 
   /**
    * Get the current tenant's details.
@@ -40,11 +43,10 @@ public class TenantService {
    */
   public TenantDto getMyTenant() {
     UUID tenantId = TenantContext.requireTenantId();
-    return systemExecutor
-        .executeQuery(
+    return readOwnRow(
+            tenantId,
             "SELECT * FROM common_tenant.common_tenant WHERE id = ?",
-            TenantRowMapper.INSTANCE,
-            tenantId)
+            TenantRowMapper.INSTANCE)
         .stream()
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("Current tenant not found: " + tenantId));
@@ -58,11 +60,12 @@ public class TenantService {
   public TenantSettings getMySettings() {
     UUID tenantId = TenantContext.requireTenantId();
     try {
-      String settingsJson =
-          systemExecutor.executeQueryForObject(
+      List<String> rows =
+          readOwnRow(
+              tenantId,
               "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
-              (rs, i) -> rs.getString("settings"),
-              tenantId);
+              (rs, i) -> rs.getString("settings"));
+      String settingsJson = rows.isEmpty() ? null : rows.getFirst();
       if (settingsJson == null || settingsJson.isBlank()) {
         return TenantSettings.defaults();
       }
@@ -116,6 +119,19 @@ public class TenantService {
 
     log.info("Tenant settings updated for current tenant: id={}", tenantId);
     return settings;
+  }
+
+  /**
+   * Reads the current tenant's own row ({@code sql} has the id as its only parameter). While the
+   * current transaction is still creating this tenant (a signup), the row is uncommitted and only
+   * that transaction's connection can see it; otherwise the system connection reads it, because the
+   * table's self-row policy would otherwise tie the read to the session binding.
+   */
+  private <T> List<T> readOwnRow(UUID tenantId, String sql, RowMapper<T> mapper) {
+    if (tenantUnderCreation.isUnderCreation(tenantId)) {
+      return tenantUnderCreation.primaryJdbc().query(sql, mapper, tenantId);
+    }
+    return systemExecutor.executeQuery(sql, mapper, tenantId);
   }
 
   /** The current tenant's stock-proposal settings, or the decided defaults. */
