@@ -1,5 +1,8 @@
 package com.fabricmanagement.product.fabric.dto;
 
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FinishingBillingBasis;
+import com.fabricmanagement.product.fabric.domain.vocabulary.GsmBasis;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -17,6 +20,41 @@ public record CreateFabricFinishingPriceRequest(
             nullable = true,
             description = "The firm the tariff belongs to; leave out for the general price")
         UUID partnerId,
+    @Schema(
+            nullable = true,
+            description =
+                "Which metres the price multiplies: what was SENT or what came back (RETURNED,"
+                    + " the default)")
+        FinishingBillingBasis billingBasis,
+    @Schema(
+            nullable = true,
+            description =
+                "The quality grade of the metres (a fabric quality grade); leave out for every"
+                    + " grade without a price of its own. A price of 0 makes a grade free.")
+        UUID qualityGradeId,
+    @Schema(nullable = true, description = "The dyehouse tier; leave out for any")
+        UUID priceClassId,
+    @Schema(nullable = true, description = "Leave out for any formation") FabricFormation formation,
+    @DecimalMin("0")
+        @Digits(integer = 6, fraction = 1)
+        @Schema(
+            nullable = true,
+            example = "150.0",
+            description = "Lower end of the weight range, inclusive; leave out for no lower end")
+        BigDecimal gsmFrom,
+    @DecimalMin("0")
+        @Digits(integer = 6, fraction = 1)
+        @Schema(
+            nullable = true,
+            example = "200.0",
+            description = "Upper end of the weight range, inclusive; leave out for no upper end")
+        BigDecimal gsmTo,
+    @Schema(
+            nullable = true,
+            description =
+                "Whether the weight range is the greige or the finished weight; required with a"
+                    + " range, not allowed without one")
+        GsmBasis gsmBasis,
     @NotNull
         @DecimalMin("0")
         @Digits(integer = 11, fraction = 4)

@@ -33,7 +33,8 @@ class TenantClonerCallerTransactionIT extends AbstractIntegrationTest {
           "production.prod_yarn_end_use",
           "production.prod_yarn_test_method",
           "production.prod_fabric_construction",
-          "production.prod_fabric_finishing_process");
+          "production.prod_fabric_finishing_process",
+          "production.prod_fabric_finishing_price_class");
 
   @Autowired private TenantClonerService cloner;
   @Autowired private TransactionTemplate transactionTemplate;

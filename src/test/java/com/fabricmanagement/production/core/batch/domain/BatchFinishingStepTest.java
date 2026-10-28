@@ -224,4 +224,24 @@ class BatchFinishingStepTest {
                     TENANT, BATCH, 0, PROCESS, null, null, BigDecimal.TEN, SENT, null, null))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void theFirmsPriceClassCanBeRecordedWhileTheLotIsOut() {
+    BatchFinishingStep step = sent();
+    UUID dark = UUID.randomUUID();
+
+    assertThat(step.getPriceClassId()).isNull();
+    step.assignPriceClass(dark);
+
+    assertThat(step.getPriceClassId()).isEqualTo(dark);
+  }
+
+  @Test
+  void thePriceClassCannotBeChangedOnceTheLotIsBack() {
+    BatchFinishingStep step = sent();
+    step.receive(new BigDecimal("990"), BACK, null, null, null, null);
+
+    assertThatThrownBy(() -> step.assignPriceClass(UUID.randomUUID()))
+        .isInstanceOf(BatchDomainException.class);
+  }
 }

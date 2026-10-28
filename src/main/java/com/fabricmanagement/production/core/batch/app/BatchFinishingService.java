@@ -8,11 +8,16 @@ import com.fabricmanagement.product.color.api.query.ColorQueryService;
 import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFinishingCategory;
+import com.fabricmanagement.product.fabric.dto.FabricArticleDto;
+import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceClassDto;
+import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceDto;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingProcessDto;
+import com.fabricmanagement.product.fabric.dto.FinishingPriceQuery;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchFinishingStep;
 import com.fabricmanagement.production.core.batch.domain.BatchFinishingStepStatus;
 import com.fabricmanagement.production.core.batch.domain.BatchStatus;
+import com.fabricmanagement.production.core.batch.domain.FinishingGradeBreakdown;
 import com.fabricmanagement.production.core.batch.domain.event.BatchFinishingReceivedEvent;
 import com.fabricmanagement.production.core.batch.domain.event.BatchFinishingSentEvent;
 import com.fabricmanagement.production.core.batch.domain.exception.BatchDomainException;
@@ -23,11 +28,13 @@ import com.fabricmanagement.production.core.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -61,6 +68,7 @@ public class BatchFinishingService {
   private final FabricFacade fabrics;
   private final ColorQueryService colours;
   private final TradingPartnerQueryService partners;
+  private final FinishingStepGradeService stepGrades;
   private final ApplicationEventPublisher events;
   private final Clock clock;
 
@@ -72,21 +80,25 @@ public class BatchFinishingService {
     FabricFinishingProcessDto process = usableProcess(request.processId());
     UUID colourId = colourFor(process, request.colorId());
     UUID partnerId = activePartner(tenantId, request.partnerId());
+    FabricFinishingPriceClassDto priceClass = usablePriceClass(request.priceClassId());
     requireLotMayLeave(tenantId, batch);
 
-    BatchFinishingStep step =
-        stepRepository.save(
-            BatchFinishingStep.send(
-                tenantId,
-                batchId,
-                nextSequence(tenantId, batchId),
-                process.id(),
-                partnerId,
-                request.firmJobNumber(),
-                batch.getQuantity(),
-                dateOrToday(request.sentOn()),
-                colourId,
-                request.note()));
+    BatchFinishingStep opened =
+        BatchFinishingStep.send(
+            tenantId,
+            batchId,
+            nextSequence(tenantId, batchId),
+            process.id(),
+            partnerId,
+            request.firmJobNumber(),
+            batch.getQuantity(),
+            dateOrToday(request.sentOn()),
+            colourId,
+            request.note());
+    if (priceClass != null) {
+      opened.assignPriceClass(priceClass.id());
+    }
+    BatchFinishingStep step = stepRepository.save(opened);
     batch.transitionStatus(BatchStatus.ON_HOLD, TenantContext.getCurrentUserId());
     batchRepository.save(batch);
 
@@ -99,7 +111,7 @@ public class BatchFinishingService {
             partnerId,
             step.getFirmJobNumber(),
             step.getSentMetres()));
-    return toDto(step, batch, process);
+    return toDto(step, batch, process, priceClass, List.of());
   }
 
   /** The lot is back: records what returned, releases the lot and applies the step's colour. */
@@ -109,6 +121,8 @@ public class BatchFinishingService {
     UUID tenantId = TenantContext.requireTenantId();
     BatchFinishingStep step = step(tenantId, stepId);
     Batch batch = lockedFabricLot(tenantId, step.getBatchId());
+    FinishingGradeBreakdown breakdown =
+        stepGrades.checked(request.grades(), request.returnedMetres());
 
     step.receive(
         request.returnedMetres(),
@@ -118,6 +132,7 @@ public class BatchFinishingService {
         request.costCurrency(),
         request.note());
     stepRepository.save(step);
+    stepGrades.save(tenantId, step.getId(), breakdown);
     applyLatestColour(tenantId, batch);
     releaseHold(batch);
     batchRepository.save(batch);
@@ -135,7 +150,12 @@ public class BatchFinishingService {
             step.getColourId(),
             step.getCostAmount(),
             step.getCostCurrency()));
-    return toDto(step, batch, processes(Set.of(step.getProcessId())).get(step.getProcessId()));
+    return toDto(
+        step,
+        batch,
+        processes(Set.of(step.getProcessId())).get(step.getProcessId()),
+        priceClassOf(priceClasses(List.of(step)), step),
+        stepGrades.forSteps(tenantId, Set.of(step.getId())).getOrDefault(step.getId(), List.of()));
   }
 
   /** Withdraws a step that was entered by mistake while the lot never left. */
@@ -148,7 +168,12 @@ public class BatchFinishingService {
     stepRepository.save(step);
     releaseHold(batch);
     batchRepository.save(batch);
-    return toDto(step, batch, processes(Set.of(step.getProcessId())).get(step.getProcessId()));
+    return toDto(
+        step,
+        batch,
+        processes(Set.of(step.getProcessId())).get(step.getProcessId()),
+        priceClassOf(priceClasses(List.of(step)), step),
+        List.of());
   }
 
   /**
@@ -188,7 +213,7 @@ public class BatchFinishingService {
                 request.note()));
     applyLatestColour(tenantId, batch);
     batchRepository.save(batch);
-    return toDto(step, batch, process);
+    return toDto(step, batch, process, null, List.of());
   }
 
   @Transactional(readOnly = true)
@@ -199,8 +224,19 @@ public class BatchFinishingService {
         stepRepository.findByTenantIdAndBatchIdAndIsActiveTrueOrderBySequenceAsc(tenantId, batchId);
     Map<UUID, FabricFinishingProcessDto> processes =
         processes(steps.stream().map(BatchFinishingStep::getProcessId).collect(Collectors.toSet()));
+    Map<UUID, FabricFinishingPriceClassDto> classes = priceClasses(steps);
+    Map<UUID, List<BatchFinishingDtos.StepGradeDto>> grades = gradesOf(tenantId, steps);
     List<BatchFinishingDtos.StepDto> dtos =
-        steps.stream().map(step -> toDto(step, batch, processes.get(step.getProcessId()))).toList();
+        steps.stream()
+            .map(
+                step ->
+                    toDto(
+                        step,
+                        batch,
+                        processes.get(step.getProcessId()),
+                        priceClassOf(classes, step),
+                        grades.getOrDefault(step.getId(), List.of())))
+            .toList();
     Set<FabricFinishingCategory> applied = new LinkedHashSet<>();
     for (BatchFinishingDtos.StepDto dto : dtos) {
       if (dto.status() == BatchFinishingStepStatus.DONE) {
@@ -235,11 +271,43 @@ public class BatchFinishingService {
             .collect(Collectors.toMap(Batch::getId, Function.identity()));
     Map<UUID, FabricFinishingProcessDto> processes =
         processes(steps.stream().map(BatchFinishingStep::getProcessId).collect(Collectors.toSet()));
+    Map<UUID, FabricFinishingPriceClassDto> classes = priceClasses(steps);
+    Map<UUID, List<BatchFinishingDtos.StepGradeDto>> grades = gradesOf(tenantId, steps);
     return steps.stream()
         .filter(step -> batches.containsKey(step.getBatchId()))
         .map(
-            step -> toDto(step, batches.get(step.getBatchId()), processes.get(step.getProcessId())))
+            step ->
+                toDto(
+                    step,
+                    batches.get(step.getBatchId()),
+                    processes.get(step.getProcessId()),
+                    priceClassOf(classes, step),
+                    grades.getOrDefault(step.getId(), List.of())))
         .toList();
+  }
+
+  /**
+   * The finishing prices that apply to a lot being sent for a process: the firm's own tariff when
+   * it has one that fits, else the general prices, one per quality grade the firm prices
+   * separately. The lot's formation and weights come from its fabric article; the price class is
+   * the tier the firm puts the colour in, which the caller knows. No amount is computed here: the
+   * metres that come back are only known when the lot returns, so the caller multiplies.
+   */
+  @Transactional(readOnly = true)
+  public List<FabricFinishingPriceDto> prices(
+      UUID batchId, UUID processId, UUID partnerId, UUID priceClassId, LocalDate date) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Batch batch = fabricLot(tenantId, batchId);
+    FabricArticleDto article = fabrics.findArticleByProduct(batch.getProductId()).orElse(null);
+    return fabrics.findFinishingPrices(
+        new FinishingPriceQuery(
+            processId,
+            partnerId,
+            dateOrToday(date),
+            priceClassId,
+            article == null ? null : article.formation(),
+            article == null ? null : article.gsmGreige(),
+            article == null ? null : article.gsmFinished()));
   }
 
   // ── Rules ──────────────────────────────────────────────────────────────────
@@ -314,6 +382,16 @@ public class BatchFinishingService {
       throw new NotFoundException("Active trading partner not found: " + partnerId);
     }
     return partnerId;
+  }
+
+  private FabricFinishingPriceClassDto usablePriceClass(UUID priceClassId) {
+    if (priceClassId == null) {
+      return null;
+    }
+    return fabrics
+        .findUsablePriceClass(priceClassId)
+        .orElseThrow(
+            () -> new NotFoundException("Finishing price class not found: " + priceClassId));
   }
 
   private FabricFinishingProcessDto usableProcess(UUID processId) {
@@ -404,8 +482,35 @@ public class BatchFinishingService {
     return fabrics.findFinishingProcesses(ids);
   }
 
+  private Map<UUID, FabricFinishingPriceClassDto> priceClasses(
+      Collection<BatchFinishingStep> steps) {
+    return fabrics.findPriceClasses(
+        steps.stream()
+            .map(BatchFinishingStep::getPriceClassId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet()));
+  }
+
+  /** The grade splits of the steps; only a received step can have one. */
+  private Map<UUID, List<BatchFinishingDtos.StepGradeDto>> gradesOf(
+      UUID tenantId, Collection<BatchFinishingStep> steps) {
+    return stepGrades.forSteps(
+        tenantId,
+        steps.stream().filter(BatchFinishingStep::isDone).map(BatchFinishingStep::getId).toList());
+  }
+
+  /** The step's price class, if it has one; an empty map must not be asked for a null key. */
+  private static FabricFinishingPriceClassDto priceClassOf(
+      Map<UUID, FabricFinishingPriceClassDto> classes, BatchFinishingStep step) {
+    return step.getPriceClassId() == null ? null : classes.get(step.getPriceClassId());
+  }
+
   private static BatchFinishingDtos.StepDto toDto(
-      BatchFinishingStep step, Batch batch, FabricFinishingProcessDto process) {
+      BatchFinishingStep step,
+      Batch batch,
+      FabricFinishingProcessDto process,
+      FabricFinishingPriceClassDto priceClass,
+      List<BatchFinishingDtos.StepGradeDto> grades) {
     return new BatchFinishingDtos.StepDto(
         step.getId(),
         step.getBatchId(),
@@ -424,7 +529,11 @@ public class BatchFinishingService {
         step.getReturnedMetres(),
         step.getReturnedOn(),
         step.lossMetres(),
+        grades,
         step.getColourId(),
+        step.getPriceClassId(),
+        priceClass == null ? null : priceClass.code(),
+        priceClass == null ? null : priceClass.name(),
         step.getCostAmount(),
         step.getCostCurrency(),
         step.getNote(),

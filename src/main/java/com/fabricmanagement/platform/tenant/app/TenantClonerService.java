@@ -213,6 +213,31 @@ public class TenantClonerService {
           )
         """;
 
+  private static final String FABRIC_FINISHING_PRICE_CLASS_TABLE =
+      "production.prod_fabric_finishing_price_class";
+
+  private static final String FABRIC_FINISHING_PRICE_CLASS_COPY_SQL =
+      """
+        INSERT INTO production.prod_fabric_finishing_price_class (
+            id, tenant_id, uid, code, name, description, display_order, system_defined,
+            is_active, created_at, created_by, updated_at, updated_by, version
+        )
+        SELECT
+            gen_random_uuid(), ?::uuid, gen_random_uuid()::varchar, source.code, source.name,
+            source.description, source.display_order, TRUE, source.is_active, NOW(), NULL,
+            NOW(), NULL, 0
+        FROM %s source
+        WHERE source.tenant_id = ?::uuid
+          AND source.system_defined = TRUE
+          AND source.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM production.prod_fabric_finishing_price_class target
+              WHERE target.tenant_id = ?::uuid
+                AND target.code = source.code
+          )
+        """;
+
   private static final String ROLE_SELECT_SQL =
       "SELECT id, role_name, role_code, description, role_scope FROM common_user.common_role "
           + "WHERE tenant_id = ? AND is_active = true";
@@ -475,7 +500,13 @@ public class TenantClonerService {
             targetTenantId,
             sourceTenantId,
             targetTenantId);
-    return constructions + finishingProcesses;
+    int finishingPriceClasses =
+        jdbc.update(
+            FABRIC_FINISHING_PRICE_CLASS_COPY_SQL.formatted(FABRIC_FINISHING_PRICE_CLASS_TABLE),
+            targetTenantId,
+            sourceTenantId,
+            targetTenantId);
+    return constructions + finishingProcesses + finishingPriceClasses;
   }
 
   /**
@@ -1233,6 +1264,12 @@ public class TenantClonerService {
             callerJdbc,
             FABRIC_FINISHING_PROCESS_COPY_SQL,
             FABRIC_FINISHING_PROCESS_TABLE,
+            sourceTenantId,
+            targetTenantId)
+        + copyMissingSystemRows(
+            callerJdbc,
+            FABRIC_FINISHING_PRICE_CLASS_COPY_SQL,
+            FABRIC_FINISHING_PRICE_CLASS_TABLE,
             sourceTenantId,
             targetTenantId);
   }

@@ -4,21 +4,28 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerQueryService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
+import com.fabricmanagement.product.core.domain.ProductType;
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.pricing.FabricFinishingPrice;
+import com.fabricmanagement.product.fabric.domain.pricing.FabricFinishingPriceClass;
+import com.fabricmanagement.product.fabric.domain.pricing.FinishingPriceResolver;
+import com.fabricmanagement.product.fabric.domain.pricing.PriceScope;
 import com.fabricmanagement.product.fabric.domain.reference.FabricFinishingProcess;
-import com.fabricmanagement.product.fabric.domain.vocabulary.FinishingChargeUnit;
 import com.fabricmanagement.product.fabric.dto.CreateFabricFinishingPriceRequest;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceDto;
+import com.fabricmanagement.product.fabric.dto.FinishingPriceQuery;
+import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingPriceClassRepository;
 import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingPriceRepository;
 import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingProcessRepository;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService;
+import com.fabricmanagement.product.qualitygrade.api.query.QualityGradeQueryService.QualityGradeReference;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -29,7 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The tenant's finishing price list (FABRIC-3c): what each process costs, in general or at one
- * firm, from a date. Prices are not edited; a new price is a new row from a later date.
+ * firm, from a date, narrowed where the firm prices that way by quality grade, dyehouse price
+ * class, formation and weight range. Prices are not edited; a new price is a new row from a later
+ * date.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,55 +46,74 @@ public class FabricFinishingPriceService {
 
   private final FabricFinishingPriceRepository prices;
   private final FabricFinishingProcessRepository processes;
+  private final FabricFinishingPriceClassRepository priceClasses;
   private final TradingPartnerQueryService partners;
+  private final QualityGradeQueryService qualityGrades;
 
   /**
    * The tenant's live prices, optionally of one process and of one firm, in the dictionary's order,
-   * the general price before the firms' tariffs and the latest date first.
+   * the general price before the firms' tariffs, grades in rank order and the latest date first.
    */
   @Transactional(readOnly = true)
   public List<FabricFinishingPriceDto> list(UUID processId, UUID partnerId) {
     UUID tenantId = TenantContext.requireTenantId();
     Map<UUID, FabricFinishingProcess> byId = processesById(tenantId);
+    List<FabricFinishingPrice> rows =
+        prices.findByTenantIdAndDeletedAtIsNull(tenantId).stream()
+            .filter(price -> processId == null || processId.equals(price.getProcessId()))
+            .filter(price -> partnerId == null || partnerId.equals(price.getPartnerId()))
+            .filter(price -> byId.containsKey(price.getProcessId()))
+            .toList();
+    Lookups lookups = lookups(tenantId, rows);
     Comparator<FabricFinishingPrice> order =
         Comparator.comparing(
                 (FabricFinishingPrice price) -> byId.get(price.getProcessId()),
                 FabricFinishingCatalogService.ORDER)
             .thenComparing(
                 FabricFinishingPrice::getPartnerId,
-                Comparator.nullsFirst(Comparator.naturalOrder()))
+                Comparator.nullsFirst(Comparator.<UUID>naturalOrder()))
+            .thenComparing(lookups.gradeOrder())
+            .thenComparing(
+                (FabricFinishingPrice price) -> lookups.priceClass(price),
+                Comparator.nullsFirst(FabricFinishingPriceClassService.ORDER))
             .thenComparing(FabricFinishingPrice::getValidFrom, Comparator.reverseOrder());
-    return prices.findByTenantIdAndDeletedAtIsNull(tenantId).stream()
-        .filter(price -> processId == null || processId.equals(price.getProcessId()))
-        .filter(price -> partnerId == null || partnerId.equals(price.getPartnerId()))
-        .filter(price -> byId.containsKey(price.getProcessId()))
+    return rows.stream()
         .sorted(order)
-        .map(price -> FabricFinishingPriceDto.from(price, byId.get(price.getProcessId())))
+        .map(price -> dto(price, byId.get(price.getProcessId()), lookups))
         .toList();
   }
 
   /**
-   * The price a process has at a firm on a date: the firm's own latest tariff that has started, or
-   * else the latest general price that has started. Empty when nothing is priced, which is normal
-   * for a firm the tenant has not agreed a tariff with. {@code partnerId} is null for work at an
-   * own site.
+   * The prices in force for a piece of work, one per quality grade the firm prices separately (see
+   * {@link FinishingPriceResolver}); the price without a grade, which covers every grade without a
+   * price of its own, comes first and the rest follow in rank order. Empty when nothing is priced,
+   * which is normal for a firm the tenant has not agreed a tariff with.
    */
   @Transactional(readOnly = true)
-  public Optional<FabricFinishingPriceDto> inForce(UUID processId, UUID partnerId, LocalDate date) {
-    if (processId == null || date == null) {
-      return Optional.empty();
+  public List<FabricFinishingPriceDto> inForce(FinishingPriceQuery query) {
+    if (query == null || query.processId() == null || query.date() == null) {
+      return List.of();
     }
     UUID tenantId = TenantContext.requireTenantId();
     return processes
-        .findByTenantIdAndIdAndDeletedAtIsNull(tenantId, processId)
-        .flatMap(
-            process ->
-                resolve(
-                        prices.findByTenantIdAndProcessIdAndDeletedAtIsNull(tenantId, processId),
-                        process.getChargeUnit(),
-                        partnerId,
-                        date)
-                    .map(price -> FabricFinishingPriceDto.from(price, process)));
+        .findByTenantIdAndIdAndDeletedAtIsNull(tenantId, query.processId())
+        .map(
+            process -> {
+              List<FabricFinishingPrice> winners =
+                  FinishingPriceResolver.resolve(
+                      prices.findByTenantIdAndProcessIdAndDeletedAtIsNull(
+                          tenantId, process.getId()),
+                      process.getChargeUnit(),
+                      query.partnerId(),
+                      query.date(),
+                      query.context());
+              Lookups lookups = lookups(tenantId, winners);
+              return winners.stream()
+                  .sorted(lookups.gradeOrder())
+                  .map(price -> dto(price, process, lookups))
+                  .toList();
+            })
+        .orElse(List.of());
   }
 
   @Transactional
@@ -103,12 +131,21 @@ public class FabricFinishingPriceService {
           422);
     }
     UUID partnerId = activePartner(tenantId, request.partnerId());
+    QualityGradeReference grade = fabricGrade(request.qualityGradeId());
+    FabricFinishingPriceClass priceClass = usablePriceClass(tenantId, request.priceClassId());
+    PriceScope scope =
+        new PriceScope(
+            partnerId,
+            request.billingBasis(),
+            grade == null ? null : grade.id(),
+            priceClass == null ? null : priceClass.getId(),
+            request.formation(),
+            request.gsmFrom(),
+            request.gsmTo(),
+            request.gsmBasis());
     boolean taken =
         prices.findByTenantIdAndProcessIdAndDeletedAtIsNull(tenantId, process.getId()).stream()
-            .anyMatch(
-                price ->
-                    Objects.equals(price.getPartnerId(), partnerId)
-                        && price.getValidFrom().equals(request.validFrom()));
+            .anyMatch(price -> price.sameSlotAs(scope, request.validFrom()));
     if (taken) {
       throw duplicate(process, request.validFrom());
     }
@@ -116,7 +153,7 @@ public class FabricFinishingPriceService {
         FabricFinishingPrice.record(
             tenantId,
             process.getId(),
-            partnerId,
+            scope,
             process.getChargeUnit(),
             request.unitPrice(),
             request.currency(),
@@ -126,7 +163,7 @@ public class FabricFinishingPriceService {
     } catch (DataIntegrityViolationException raced) {
       throw duplicate(process, request.validFrom());
     }
-    return FabricFinishingPriceDto.from(price, process);
+    return FabricFinishingPriceDto.from(price, process, priceClass, grade);
   }
 
   /** Withdraws a price that was entered by mistake; an earlier price applies again. */
@@ -140,33 +177,58 @@ public class FabricFinishingPriceService {
     prices.save(price);
   }
 
-  /**
-   * Picks the price in force. Only prices in the process's current charge unit count, so a process
-   * moved from metres to kilograms never reads an old per-metre price as per-kilogram.
-   */
-  static Optional<FabricFinishingPrice> resolve(
-      Collection<FabricFinishingPrice> candidates,
-      FinishingChargeUnit unit,
-      UUID partnerId,
-      LocalDate date) {
-    Comparator<FabricFinishingPrice> latest =
-        Comparator.comparing(FabricFinishingPrice::getValidFrom);
-    List<FabricFinishingPrice> started =
-        candidates.stream()
-            .filter(price -> price.getUnit() == unit && price.startedBy(date))
-            .toList();
-    Optional<FabricFinishingPrice> firm =
-        partnerId == null
-            ? Optional.empty()
-            : started.stream().filter(price -> partnerId.equals(price.getPartnerId())).max(latest);
-    return firm.isPresent()
-        ? firm
-        : started.stream().filter(price -> !price.isFirmTariff()).max(latest);
-  }
-
   private Map<UUID, FabricFinishingProcess> processesById(UUID tenantId) {
     return processes.findByTenantIdAndDeletedAtIsNull(tenantId).stream()
         .collect(Collectors.toMap(FabricFinishingProcess::getId, Function.identity()));
+  }
+
+  private Lookups lookups(UUID tenantId, Collection<FabricFinishingPrice> rows) {
+    Set<UUID> gradeIds =
+        rows.stream()
+            .map(FabricFinishingPrice::getQualityGradeId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return new Lookups(
+        priceClasses.findByTenantIdAndDeletedAtIsNull(tenantId).stream()
+            .collect(Collectors.toMap(FabricFinishingPriceClass::getId, Function.identity())),
+        qualityGrades.findReferencesByIds(gradeIds).stream()
+            .collect(Collectors.toMap(QualityGradeReference::id, Function.identity())));
+  }
+
+  private FabricFinishingPriceDto dto(
+      FabricFinishingPrice price, FabricFinishingProcess process, Lookups lookups) {
+    return FabricFinishingPriceDto.from(
+        price, process, lookups.priceClass(price), lookups.grade(price));
+  }
+
+  /** The grade must be an active fabric quality grade of the tenant; none means every grade. */
+  private QualityGradeReference fabricGrade(UUID gradeId) {
+    if (gradeId == null) {
+      return null;
+    }
+    return qualityGrades.findSalesGradeReferences(ProductType.FABRIC, true).stream()
+        .filter(grade -> grade.id().equals(gradeId))
+        .findFirst()
+        .orElseThrow(
+            () -> new NotFoundException("Active fabric quality grade not found: " + gradeId));
+  }
+
+  private FabricFinishingPriceClass usablePriceClass(UUID tenantId, UUID priceClassId) {
+    if (priceClassId == null) {
+      return null;
+    }
+    FabricFinishingPriceClass priceClass =
+        priceClasses
+            .findByTenantIdAndIdAndDeletedAtIsNull(tenantId, priceClassId)
+            .orElseThrow(
+                () -> new NotFoundException("Finishing price class not found: " + priceClassId));
+    if (!priceClass.isUsable()) {
+      throw new FabricDomainException(
+          "Finishing price class " + priceClass.getCode() + " is retired; it cannot be priced",
+          "FINISHING_PRICE_CLASS_RETIRED",
+          422);
+    }
+    return priceClass;
   }
 
   private UUID activePartner(UUID tenantId, UUID partnerId) {
@@ -190,8 +252,32 @@ public class FabricFinishingPriceService {
             + process.getCode()
             + " already has a price from "
             + from
-            + " for this firm; withdraw it first or choose another date",
+            + " for this firm and this narrowing; withdraw it first or choose another date",
         "FINISHING_PRICE_DUPLICATE",
         409);
+  }
+
+  /** The price classes and grades the rows being shown point at. */
+  private record Lookups(
+      Map<UUID, FabricFinishingPriceClass> classes, Map<UUID, QualityGradeReference> grades) {
+
+    FabricFinishingPriceClass priceClass(FabricFinishingPrice price) {
+      return price.getPriceClassId() == null ? null : classes.get(price.getPriceClassId());
+    }
+
+    QualityGradeReference grade(FabricFinishingPrice price) {
+      return price.getQualityGradeId() == null ? null : grades.get(price.getQualityGradeId());
+    }
+
+    /** The price without a grade first, then the grades by rank. */
+    Comparator<FabricFinishingPrice> gradeOrder() {
+      return Comparator.comparing(
+          (FabricFinishingPrice price) -> {
+            QualityGradeReference grade = grade(price);
+            return price.getQualityGradeId() == null
+                ? Integer.MIN_VALUE
+                : grade == null ? Integer.MAX_VALUE : grade.rank();
+          });
+    }
   }
 }

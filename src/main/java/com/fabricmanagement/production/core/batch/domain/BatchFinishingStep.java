@@ -73,6 +73,13 @@ public class BatchFinishingStep extends BaseEntity {
   @Column(name = "colour_id", updatable = false)
   private UUID colourId;
 
+  /**
+   * The tier the firm put the colour in (dark, black, ...), which decides the firm's price for a
+   * dyeing (FABRIC-3c). The firm says which tier a colour belongs to; nothing derives it.
+   */
+  @Column(name = "price_class_id")
+  private UUID priceClassId;
+
   @Column(name = "cost_amount", precision = 15, scale = 2)
   private BigDecimal costAmount;
 
@@ -137,6 +144,12 @@ public class BatchFinishingStep extends BaseEntity {
             note);
     step.complete(returnedMetres, returnedOn, costAmount, costCurrency);
     return step;
+  }
+
+  /** Records the firm's price class for the job; only while the lot is out. */
+  public void assignPriceClass(UUID priceClassId) {
+    requireSent("given a price class");
+    this.priceClassId = priceClassId;
   }
 
   /** The lot is back with the metres the firm returned. */

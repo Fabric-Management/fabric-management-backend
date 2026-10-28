@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder;
 import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder.ConstructionSeed;
 import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder.FinishingSeed;
+import com.fabricmanagement.product.fabric.app.bootstrap.FabricCatalogueSeeder.PriceClassSeed;
 import com.fabricmanagement.product.fabric.domain.exception.FabricDomainException;
 import com.fabricmanagement.product.fabric.domain.reference.FabricFinishingProcess;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricConstructionFamily;
@@ -172,5 +173,36 @@ class FabricCatalogueSeederTest {
                     FabricFinishingCategory.CHEMICAL_FINISH,
                     null))
         .isInstanceOf(FabricDomainException.class);
+  }
+
+  private static final List<PriceClassSeed> PRICE_CLASSES = FabricCatalogueSeeder.priceClasses();
+
+  @Test
+  void priceClassCodesAreUniqueUpperSnakeCase() {
+    assertThat(PRICE_CLASSES).extracting(PriceClassSeed::code).doesNotHaveDuplicates();
+    assertThat(PRICE_CLASSES)
+        .extracting(PriceClassSeed::code)
+        .allMatch(code -> code.matches("^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"));
+    assertThat(PRICE_CLASSES).extracting(PriceClassSeed::displayOrder).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void theDyeStrengthTiersAndTheColoursDyehousesListAsLinesOfTheirOwnAreProvided() {
+    assertThat(PRICE_CLASSES)
+        .extracting(PriceClassSeed::code)
+        .containsExactly("LIGHT", "MEDIUM", "DARK", "EXTRA_DARK", "BLACK", "ROYAL", "TURQUOISE");
+  }
+
+  @Test
+  void priceClassNamesAreBritishEnglish() {
+    Pattern turkishLetters = Pattern.compile("[ğĞıİşŞçÇöÖüÜ]");
+    assertThat(PRICE_CLASSES)
+        .allSatisfy(
+            seed -> {
+              assertThat(turkishLetters.matcher(seed.name()).find()).as(seed.code()).isFalse();
+              assertThat(turkishLetters.matcher(seed.description()).find())
+                  .as(seed.code())
+                  .isFalse();
+            });
   }
 }

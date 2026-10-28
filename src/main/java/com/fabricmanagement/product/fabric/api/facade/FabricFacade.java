@@ -3,10 +3,12 @@ package com.fabricmanagement.product.fabric.api.facade;
 import com.fabricmanagement.product.fabric.dto.FabricArticleDto;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
 import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
+import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceClassDto;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceDto;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingProcessDto;
-import java.time.LocalDate;
+import com.fabricmanagement.product.fabric.dto.FinishingPriceQuery;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,10 +40,19 @@ public interface FabricFacade {
   Optional<FabricFinishingProcessDto> findUsableFinishingProcess(UUID id);
 
   /**
-   * What a finishing process costs at a firm on a date: the firm's own latest tariff that has
-   * started, else the latest general price that has started. {@code partnerId} is null for work at
-   * an own site. Empty when nothing is priced.
+   * The finishing prices in force for a piece of work: the firm's own tariff when it has one that
+   * fits the lot, else the general prices, with one price per quality grade the firm prices
+   * separately. The price without a grade comes first and covers every grade without a price of its
+   * own; a grade with neither is not billed. Empty when nothing is priced.
    */
-  Optional<FabricFinishingPriceDto> findFinishingPrice(
-      UUID processId, UUID partnerId, LocalDate date);
+  List<FabricFinishingPriceDto> findFinishingPrices(FinishingPriceQuery query);
+
+  /** A finishing price class of the current tenant that may still be chosen for a step. */
+  Optional<FabricFinishingPriceClassDto> findUsablePriceClass(UUID id);
+
+  /**
+   * The current tenant's finishing price classes by id, retired ones included, so the history of a
+   * lot stays readable. Unknown ids are absent from the result.
+   */
+  Map<UUID, FabricFinishingPriceClassDto> findPriceClasses(Collection<UUID> ids);
 }

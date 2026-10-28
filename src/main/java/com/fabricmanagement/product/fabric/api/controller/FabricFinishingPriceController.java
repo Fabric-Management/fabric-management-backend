@@ -2,11 +2,14 @@ package com.fabricmanagement.product.fabric.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.product.fabric.app.FabricFinishingPriceService;
+import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFormation;
 import com.fabricmanagement.product.fabric.dto.CreateFabricFinishingPriceRequest;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceDto;
+import com.fabricmanagement.product.fabric.dto.FinishingPriceQuery;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -27,7 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The finishing price list (FABRIC-3c): what a process costs per metre or kilogram, in general or
- * at one firm, from a date. Tariffs are commercial terms, so they follow the costing permissions.
+ * at one firm, from a date, narrowed where the firm prices that way. Tariffs are commercial terms,
+ * so they follow the costing permissions.
  */
 @RestController
 @RequestMapping("/api/v1/production/fabrics/finishing-prices")
@@ -52,18 +56,28 @@ public class FabricFinishingPriceController {
   @GetMapping("/in-force")
   @PreAuthorize("@auth.can(authentication, 'costing', 'read')")
   @Operation(
-      operationId = "findFabricFinishingPriceInForce",
-      summary = "The price a process has at a firm on a date",
+      operationId = "listFabricFinishingPricesInForce",
+      summary = "The prices a process has at a firm on a date, one per quality grade",
       description =
-          "The firm's own latest tariff that has started, else the latest general price that has"
-              + " started. The data is empty when nothing is priced. Leave the firm out for work"
-              + " at an own site.")
-  public ResponseEntity<ApiResponse<FabricFinishingPriceDto>> inForce(
+          "Only the prices that have started and fit the lot (price class, formation, weights)"
+              + " count. At a firm that has a tariff of its own only the firm's prices are used,"
+              + " otherwise the general ones. Per quality grade the most specific, then the latest,"
+              + " price wins. The price without a grade comes first and covers every grade that has"
+              + " no price of its own; a grade with neither is not billed. The list is empty when"
+              + " nothing is priced. Leave the firm out for work at an own site.")
+  public ResponseEntity<ApiResponse<List<FabricFinishingPriceDto>>> inForce(
       @RequestParam(name = "processId") UUID processId,
       @RequestParam(name = "partnerId", required = false) UUID partnerId,
-      @RequestParam(name = "date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+      @RequestParam(name = "date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+      @RequestParam(name = "priceClassId", required = false) UUID priceClassId,
+      @RequestParam(name = "formation", required = false) FabricFormation formation,
+      @RequestParam(name = "gsmGreige", required = false) BigDecimal gsmGreige,
+      @RequestParam(name = "gsmFinished", required = false) BigDecimal gsmFinished) {
     return ResponseEntity.ok(
-        ApiResponse.success(prices.inForce(processId, partnerId, date).orElse(null)));
+        ApiResponse.success(
+            prices.inForce(
+                new FinishingPriceQuery(
+                    processId, partnerId, date, priceClassId, formation, gsmGreige, gsmFinished))));
   }
 
   @PostMapping

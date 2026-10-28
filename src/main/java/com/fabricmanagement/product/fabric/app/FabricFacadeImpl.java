@@ -5,12 +5,15 @@ import com.fabricmanagement.product.fabric.api.facade.FabricFacade;
 import com.fabricmanagement.product.fabric.dto.FabricArticleDto;
 import com.fabricmanagement.product.fabric.dto.FabricArticleRequest;
 import com.fabricmanagement.product.fabric.dto.FabricConstructionDto;
+import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceClassDto;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingPriceDto;
 import com.fabricmanagement.product.fabric.dto.FabricFinishingProcessDto;
+import com.fabricmanagement.product.fabric.dto.FinishingPriceQuery;
 import com.fabricmanagement.product.fabric.infra.repository.FabricConstructionRepository;
+import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingPriceClassRepository;
 import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingProcessRepository;
-import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +32,7 @@ class FabricFacadeImpl implements FabricFacade {
   private final FabricConstructionRepository constructions;
   private final FabricFinishingProcessRepository finishingProcesses;
   private final FabricFinishingPriceService finishingPrices;
+  private final FabricFinishingPriceClassRepository priceClasses;
 
   @Override
   @Transactional
@@ -89,8 +93,29 @@ class FabricFacadeImpl implements FabricFacade {
 
   @Override
   @Transactional(readOnly = true)
-  public Optional<FabricFinishingPriceDto> findFinishingPrice(
-      UUID processId, UUID partnerId, LocalDate date) {
-    return finishingPrices.inForce(processId, partnerId, date);
+  public List<FabricFinishingPriceDto> findFinishingPrices(FinishingPriceQuery query) {
+    return finishingPrices.inForce(query);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<FabricFinishingPriceClassDto> findUsablePriceClass(UUID id) {
+    return priceClasses
+        .findByTenantIdAndIdAndDeletedAtIsNull(TenantContext.requireTenantId(), id)
+        .filter(priceClass -> priceClass.isUsable())
+        .map(FabricFinishingPriceClassDto::from);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Map<UUID, FabricFinishingPriceClassDto> findPriceClasses(Collection<UUID> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Map.of();
+    }
+    Set<UUID> wanted = Set.copyOf(ids);
+    return priceClasses.findByTenantIdAndDeletedAtIsNull(TenantContext.requireTenantId()).stream()
+        .filter(priceClass -> wanted.contains(priceClass.getId()))
+        .map(FabricFinishingPriceClassDto::from)
+        .collect(Collectors.toMap(FabricFinishingPriceClassDto::id, Function.identity()));
   }
 }
