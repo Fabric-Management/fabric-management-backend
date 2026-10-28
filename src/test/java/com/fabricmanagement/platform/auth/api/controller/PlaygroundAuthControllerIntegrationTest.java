@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
+import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
@@ -38,6 +39,7 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JwtService jwtService;
+  @Autowired private TaskTemplateCatalogueBackfillRunner catalogueRunner;
 
   @BeforeEach
   void setUpTemplateTenant() {
@@ -53,22 +55,28 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
           jdbc.queryForObject(
               "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
               UUID.class);
-
-      // If Jane Smith already exists, we have already seeded for this test class
-      Long janeCount =
-          jdbc.queryForObject(
-              "SELECT count(*) FROM common_user.common_user WHERE first_name = 'Jane' AND tenant_id = ?",
-              Long.class,
-              templateTenantId);
-      if (janeCount != null && janeCount > 0) {
-        return;
-      }
     } else {
       templateTenantId = UUID.fromString("00000000-0000-0000-ffff-000000000002");
       jdbc.update(
           "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, billing_email, status, settings, is_active, created_at, updated_at, version) VALUES (?, ?, 'nexus-fabrics', 'Nexus Fabrics', 'TEMPLATE', 'test@example.com', 'ACTIVE', '{}', true, now(), now(), 0)",
           templateTenantId,
           UUID.randomUUID().toString());
+    }
+
+    // The playground clone copies the task-template catalogue from nexus-fabrics and fails with
+    // "lacks <key>" (409) when the source misses an entry (TASK-TEMPLATE-TENANCY-1). Only the
+    // start-up runner distributes it, so without this the init tests passed only when an earlier
+    // test class or a later-started Spring context had already installed it on nexus-fabrics.
+    catalogueRunner.run();
+
+    // If Jane Smith already exists, we have already seeded for this test class
+    Long janeCount =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM common_user.common_user WHERE first_name = 'Jane' AND tenant_id = ?",
+            Long.class,
+            templateTenantId);
+    if (janeCount != null && janeCount > 0) {
+      return;
     }
 
     UUID orgId;
