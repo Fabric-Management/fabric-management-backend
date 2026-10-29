@@ -34,6 +34,9 @@ public final class AcceptanceTerms {
             Boolean.toString(line.isSingleLotRequired()),
             price == null ? "" : plain(price),
             price == null || line.getCurrency() == null ? "" : line.getCurrency());
+    if (line.getQuantityPolicy()
+        != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED)
+      canonical += "|" + line.getQuantityPolicy().name();
     return sha256(canonical);
   }
 

@@ -28,12 +28,17 @@ public class CloneTemplatePropertyDefinitionsStep implements OnboardingStep {
       log.warn("CloneTemplatePropertyDefinitionsStep: golden-template tenant not found.");
       return;
     }
+    // On the onboarding transaction (ONBOARD-ATOMIC-1): the template is read through the system
+    // connection, the copies are written on the onboarding connection.
     int inserted =
-        tenantClonerService.copyMissingSystemPropertyDefinitions(templateTenantId, targetTenantId);
+        tenantClonerService.copyMissingSystemPropertyDefinitionsInCallerTransaction(
+            templateTenantId, targetTenantId);
     int yarnCataloguesInserted =
-        tenantClonerService.copyMissingSystemYarnCatalogues(templateTenantId, targetTenantId);
+        tenantClonerService.copyMissingSystemYarnCataloguesInCallerTransaction(
+            templateTenantId, targetTenantId);
     int fabricCataloguesInserted =
-        tenantClonerService.copyMissingSystemFabricCatalogues(templateTenantId, targetTenantId);
+        tenantClonerService.copyMissingSystemFabricCataloguesInCallerTransaction(
+            templateTenantId, targetTenantId);
     log.info(
         "CloneTemplatePropertyDefinitionsStep: inserted {} property definitions, {} yarn "
             + "catalogue rows and {} fabric catalogue rows into {}.",

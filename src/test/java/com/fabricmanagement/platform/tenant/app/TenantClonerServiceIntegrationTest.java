@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.tenant.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
@@ -24,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private TenantClonerService tenantClonerService;
+  @Autowired private TaskTemplateCatalogueBackfillRunner catalogueBackfillRunner;
   @Autowired private TenantRepository tenantRepository;
   @Autowired private UserRepository userRepository;
 
@@ -56,6 +58,13 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     }
     long templateCount = tenantRepository.findByType(TenantType.TEMPLATE).size();
     assertThat(templateCount).as("Precondition: TEMPLATE tenant must exist").isGreaterThan(0);
+
+    // The playground clone copies the task-template catalogue from the playground source and
+    // fails when the source lacks an entry (TASK-TEMPLATE-TENANCY-1). A source inserted above
+    // holds none; the start-up runner distributes it. Without this the test only passed when an
+    // earlier test class had already installed the catalogue on nexus-fabrics, or when a Spring
+    // context started after the row existed (PlaygroundCatalogueCloneIT does the same).
+    catalogueBackfillRunner.run();
 
     // Insert dummy data into TEMPLATE tenant to test cloning
     UUID orgId;

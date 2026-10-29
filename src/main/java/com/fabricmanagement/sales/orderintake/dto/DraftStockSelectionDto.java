@@ -33,7 +33,58 @@ public record DraftStockSelectionDto(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Capability> capabilities,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) UUID salesOrderId,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) UUID salesOrderLineId,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Long orderVersion) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) Long orderVersion,
+    @Schema(
+            nullable = true,
+            description = "Verified business target; absent on historical receipts")
+        Target target) {
+  public DraftStockSelectionDto(
+      UUID selectionId,
+      UUID sessionId,
+      UUID clientLineId,
+      long selectionRevision,
+      State state,
+      Policy policy,
+      Instant expiresAt,
+      long remainingMs,
+      QuantityProposalDto.Option option,
+      List<Grant> grants,
+      List<Capability> capabilities,
+      UUID orderId,
+      UUID orderLineId,
+      Long orderVersion) {
+    this(
+        selectionId,
+        sessionId,
+        clientLineId,
+        selectionRevision,
+        state,
+        policy,
+        expiresAt,
+        remainingMs,
+        option,
+        grants,
+        capabilities,
+        orderId,
+        orderLineId,
+        orderVersion,
+        null);
+  }
+
+  @Schema(name = "DraftStockTargetKind", enumAsRef = true)
+  public enum TargetKind {
+    FORM,
+    ORDER_LINE,
+    QUOTE_LINE,
+    QUOTE_NEW_LINE
+  }
+
+  @Schema(name = "DraftStockTarget")
+  public record Target(
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) TargetKind kind,
+      @Schema(nullable = true) UUID documentId,
+      @Schema(nullable = true) UUID lineId) {}
+
   @Schema(name = "DraftStockSelectionState", enumAsRef = true)
   public enum State {
     OPEN,
@@ -57,6 +108,7 @@ public record DraftStockSelectionDto(
 
   @Schema(name = "DraftStockSelectionReason", enumAsRef = true)
   public enum Reason {
+    EXACT_QUANTITY_REQUIRED,
     OWNERSHIP_REQUIRED,
     SELECTION_EXPIRED,
     SELECTION_ENDED

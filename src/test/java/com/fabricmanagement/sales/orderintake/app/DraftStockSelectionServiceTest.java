@@ -99,7 +99,11 @@ class DraftStockSelectionServiceTest {
             adjustments,
             entityManager,
             new ObjectMapper().findAndRegisterModules(),
-            Clock.fixed(now, ZoneOffset.UTC));
+            Clock.fixed(now, ZoneOffset.UTC),
+            mock(OrderIntakeStockPreviewService.class),
+            mock(com.fabricmanagement.sales.quote.app.QuoteStockTargetAccess.class),
+            mock(com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort.class),
+            mock(com.fabricmanagement.production.core.stockunit.api.StockUnitCutTargetPort.class));
     when(users.isActive(eq(tenant), any())).thenReturn(true);
     when(permissions.resolve(eq(tenant), eq(actor), eq("write"), any()))
         .thenReturn(new SalesAccessScopeResolver.AccessScope(DataScope.GLOBAL, Set.of()));
@@ -302,7 +306,7 @@ class DraftStockSelectionServiceTest {
   }
 
   @Test
-  void savedRemoveRestoresTheOriginalRequestAndReleasesOnlyThisLine() {
+  void savedRemoveKeepsTheCommercialQuantityAndReleasesOnlyThisLine() {
     var order = order();
     var line = line();
     line.applyStockQuantity(new BigDecimal("700"), new BigDecimal("790"));
@@ -318,7 +322,9 @@ class DraftStockSelectionServiceTest {
             line.getId(),
             new DraftStockSelectionRequests.Remove(UUID.randomUUID(), 0L),
             actor);
-    assertThat(line.getRequestedQty()).isEqualByComparingTo("700");
+    // Removing the stock choice never silently renegotiates the commercial quantity.
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("790");
+    assertThat(line.getCustomerRequestQty()).isEqualByComparingTo("700");
     assertThat(result.state()).isEqualTo(DraftStockSelectionDto.State.RELEASED);
     verify(holds).releaseHolds(line.getId());
     verify(editLeases).assertLineFieldFree(order, line.getId(), OrderEditKey.LINE_QUANTITY, actor);

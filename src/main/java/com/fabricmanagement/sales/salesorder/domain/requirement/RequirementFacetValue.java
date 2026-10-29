@@ -32,19 +32,6 @@ import java.util.regex.Pattern;
       name = "YARN_CONSTRUCTION"),
   @JsonSubTypes.Type(value = RequirementFacetValue.Categorical.class, name = "CATEGORICAL")
 })
-@Schema(
-    oneOf = {
-      RequirementFacetValue.Certification.class,
-      RequirementFacetValue.Origin.class,
-      RequirementFacetValue.ColourIdentity.class,
-      RequirementFacetValue.ShadeApproval.class,
-      RequirementFacetValue.Width.class,
-      RequirementFacetValue.Weight.class,
-      RequirementFacetValue.YarnCount.class,
-      RequirementFacetValue.YarnTwist.class,
-      RequirementFacetValue.YarnConstruction.class,
-      RequirementFacetValue.Categorical.class
-    })
 public sealed interface RequirementFacetValue
     permits RequirementFacetValue.Certification,
         RequirementFacetValue.Origin,
@@ -57,11 +44,11 @@ public sealed interface RequirementFacetValue
         RequirementFacetValue.YarnConstruction,
         RequirementFacetValue.Categorical {
 
-  // The discriminated subtypes keep the runtime any-setter but publish no
-  // additionalProperties:false:
-  // their schemas are allOf the parent, where valueType lives, so the flag would reject every
-  // valid value. Unknown properties are still refused when the request is read.
+  // Each member is published as its own closed object carrying valueType
+  // (DiscriminatedUnionModelConverter), so it declares additionalProperties:false like the
+  // any-setter that refuses unknown properties when the request is read.
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record Certification(List<CertificateRef> certificates) implements RequirementFacetValue {
     @JsonAnySetter
     public void rejectUnknownProperty(String name, Object value) {
@@ -107,6 +94,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record Origin(
       OriginSubject originSubject,
       Set<String> allowedCountries,
@@ -176,6 +164,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record ColourIdentity(UUID colorId) implements RequirementFacetValue {
     @JsonAnySetter
     public void rejectUnknownProperty(String name, Object value) {
@@ -188,6 +177,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record ShadeApproval(boolean required, ApprovalKind approvalKind)
       implements RequirementFacetValue {
     @JsonAnySetter
@@ -209,6 +199,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record Width(NumericBounds bounds, WidthForm form, MaterialState materialState)
       implements RequirementFacetValue {
     @JsonAnySetter
@@ -237,6 +228,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record Weight(NumericBounds bounds) implements RequirementFacetValue {
     @JsonAnySetter
     public void rejectUnknownProperty(String name, Object value) {
@@ -292,6 +284,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record YarnCount(
       String originalSystem,
       BigDecimal originalValue,
@@ -316,6 +309,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record YarnTwist(List<TwistStage> stages) implements RequirementFacetValue {
     @JsonAnySetter
     public void rejectUnknownProperty(String name, Object value) {
@@ -378,6 +372,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record YarnConstruction(
       SubValue<String> structureType,
       SubValue<Integer> foldCount,
@@ -423,6 +418,7 @@ public sealed interface RequirementFacetValue
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
   record Categorical(Set<String> values) implements RequirementFacetValue {
     @JsonAnySetter
     public void rejectUnknownProperty(String name, Object value) {

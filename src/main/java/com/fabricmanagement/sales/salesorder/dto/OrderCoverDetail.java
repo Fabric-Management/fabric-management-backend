@@ -82,7 +82,8 @@ public record OrderCoverDetail(
 
   @Schema(name = "DecisionSubjectType")
   public enum DecisionSubjectType {
-    SALES_ORDER
+    SALES_ORDER,
+    COLLECTION_OBLIGATION
   }
 
   @Schema(name = "DecisionAssignmentBucket")
@@ -96,7 +97,8 @@ public record OrderCoverDetail(
   @Schema(name = "DecisionCapabilityAction")
   public enum DecisionCapabilityAction {
     CONFIRM_PRODUCTION_COVER,
-    OPEN_CONTROL
+    OPEN_CONTROL,
+    RECORD_COLLECTION_CONTACT
   }
 
   @Schema(name = "DecisionBlockedReasonCode")

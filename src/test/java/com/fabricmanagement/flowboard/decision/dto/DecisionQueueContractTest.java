@@ -77,7 +77,8 @@ class DecisionQueueContractTest {
         .doesNotContainKey("deleted");
     assertThat(property(schemas, "DecisionProjectionRebuildRequest", "caseIds").getMaxItems())
         .isEqualTo(100);
-    assertThat(enumValues(schemas, "DecisionQueueItem", "kind")).containsExactly("ORDER_COVER");
+    assertThat(enumValues(schemas, "DecisionQueueItem", "kind"))
+        .containsExactly("ORDER_COVER", "COLLECTION_FOLLOW_UP");
     assertThat(enumValues(schemas, "DecisionQueueItem", "verdictCode"))
         .containsExactlyInAnyOrder("ACTIONABLE", "EVIDENCE_UNKNOWN", "NO_EVIDENCE", "CASE_CLOSED");
     assertThat(schemas.keySet().stream().filter(name -> name.equals("VerdictCode"))).isEmpty();

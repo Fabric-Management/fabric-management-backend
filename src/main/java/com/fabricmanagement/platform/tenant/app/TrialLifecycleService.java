@@ -90,6 +90,7 @@ public class TrialLifecycleService implements TrialLifecyclePort {
               AND type = 'REGULAR'
               AND status = 'TRIAL'
               AND trial_started_at IS NOT NULL
+              AND demo_mode = false
               AND is_active = true
               AND (last_activity_at IS NULL OR last_activity_at < ?)
             """,
@@ -113,6 +114,7 @@ public class TrialLifecycleService implements TrialLifecyclePort {
                       WHERE type = 'REGULAR'
                         AND status = 'TRIAL'
                         AND trial_started_at IS NOT NULL
+                        AND demo_mode = false
                         AND is_active = true
                       """,
                       (rs, rowNum) ->
@@ -138,6 +140,15 @@ public class TrialLifecycleService implements TrialLifecyclePort {
                         decision.status().name(),
                         Timestamp.from(decision.effectiveExpiry()),
                         row.tenantId());
+                jdbc.update(
+                    """
+                    UPDATE common_company.common_subscription
+                    SET trial_ends_at = ?, learning_access = false,
+                        updated_at = now(), version = version + 1
+                    WHERE tenant_id = ? AND evaluation_managed = true AND status = 'TRIAL'
+                    """,
+                    Timestamp.from(decision.effectiveExpiry()),
+                    row.tenantId());
                 if (decision.status() == TenantStatus.EXPIRED) {
                   evictWritableCache(row.tenantId());
                 }
@@ -145,6 +156,13 @@ public class TrialLifecycleService implements TrialLifecyclePort {
               return count;
             });
     log.info("Trial lifecycle refresh completed: {} tenant(s) updated", updated);
+    if (updated > 0) {
+      for (String name :
+          java.util.List.of("subscription-check", "feature-check", "policy-decision")) {
+        var cache = cacheManager.getCache(name);
+        if (cache != null) cache.clear();
+      }
+    }
   }
 
   TrialDecision evaluate(TrialWindow row, Instant now) {

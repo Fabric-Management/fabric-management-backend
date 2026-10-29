@@ -84,6 +84,19 @@ public class BatchReservation extends BaseEntity {
     return reservedQuantity.subtract(consumedQuantity);
   }
 
+  /** Releases the verified remainder of one source without replacing other piece allocations. */
+  public void releasePart(BigDecimal quantity) {
+    if (quantity == null
+        || quantity.signum() < 0
+        || quantity.compareTo(getRemainingQuantity()) > 0
+        || status == ReservationStatus.CANCELLED
+        || status == ReservationStatus.FULFILLED)
+      throw new BatchDomainException(
+          "Only an unconsumed part of an active reservation can be released");
+    reservedQuantity = reservedQuantity.subtract(quantity);
+    onUpdate();
+  }
+
   /**
    * Consume a quantity against this reservation.
    *

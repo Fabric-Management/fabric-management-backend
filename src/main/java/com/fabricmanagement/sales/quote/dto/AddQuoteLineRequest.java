@@ -24,6 +24,14 @@ public class AddQuoteLineRequest {
 
   private UUID colorId;
 
+  @Schema(description = "Stable form line identity, required with a provisional stock proof")
+  private UUID clientLineId;
+
+  @Valid
+  @Schema(description = "Applied stock proof; omitted for metre-only entry")
+  private com.fabricmanagement.sales.orderintake.dto.DraftStockSelectionRequests.Proof
+      stockSelection;
+
   @Valid private List<QuoteLineLotSelectionRequest> selectedLots;
 
   private QuoteLineDeliveryStatus deliveryStatus;
@@ -38,6 +46,16 @@ public class AddQuoteLineRequest {
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Requested quantity must be greater than zero")
   private BigDecimal requestedQty;
+
+  @Schema(
+      description =
+          "Explicit quantity decision; omission preserves an existing decision or means UNRECORDED"
+              + " on creation")
+  private com.fabricmanagement.sales.common.domain.SalesQuantityPolicy quantityPolicy;
+
+  @Schema(description = "Reason for a new or changed quantity decision", maxLength = 500)
+  @jakarta.validation.constraints.Size(max = 500)
+  private String quantityPolicyReason;
 
   @NotBlank(message = "Unit is required")
   @Size(max = 20, message = "Unit must be 20 characters or less")

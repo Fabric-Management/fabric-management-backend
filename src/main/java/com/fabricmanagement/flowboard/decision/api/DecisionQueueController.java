@@ -43,7 +43,8 @@ public class DecisionQueueController {
 
   @GetMapping
   @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'read') and @auth.can(authentication, 'sales', 'read')")
+      "@auth.can(authentication, 'flowboard', 'read') and (@auth.can(authentication, 'sales',"
+          + " 'read') or @auth.can(authentication, 'finance', 'read'))")
   @Operation(summary = "List the caller's scoped decision queue")
   public ApiResponse<PagedResponse<DecisionQueueItem>> list(
       @RequestParam(defaultValue = "MINE") DecisionQueueBucket bucket,
@@ -60,7 +61,8 @@ public class DecisionQueueController {
 
   @GetMapping("/summary")
   @PreAuthorize(
-      "@auth.can(authentication, 'flowboard', 'read') and @auth.can(authentication, 'sales', 'read')")
+      "@auth.can(authentication, 'flowboard', 'read') and (@auth.can(authentication, 'sales',"
+          + " 'read') or @auth.can(authentication, 'finance', 'read'))")
   @Operation(summary = "Count the caller's decision buckets")
   public ApiResponse<DecisionQueueSummary> summary(Authentication authentication) {
     return ApiResponse.success(

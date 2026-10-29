@@ -519,3 +519,23 @@ the frontend obtains approval of the prepared preview before uploading those byt
 fonts and runtime tools as documented in `docs/TENANT-BRANDING-TEXT.md`. No schema migration is needed.
 The additive OpenAPI snapshot and frontend generated types are prepared; operator re-export and tests
 are required before commit. Never run those validations or commit/push on the operator's behalf.
+
+
+## User language-only preference update — 2026-10-23 (prepared)
+
+`PATCH /api/v1/common/users/me/language` is an authenticated self-service operation with
+`UpdateUserLanguagePreferenceRequest`. It changes only `preferredLocale`; it reads the saved
+`preferredTimezone` from the tenant-scoped user rather than replaying a browser snapshot. The
+notification locale config retains that same timezone in the transaction. BaseEntity's optimistic
+version rejects overlapping writes instead of silently losing another device's preference.
+The existing `/me/locale` tuple update and its null/clear semantics are unchanged. OpenAPI snapshots
+and frontend types are prepared; the operator must re-export the contract and run the regression
+suites. No build, tests or verification were run for this change.
+
+
+`PATCH /api/v1/common/users/me/timezone` is the symmetric self-service operation:
+`UpdateUserTimezonePreferenceRequest` validates an IANA timezone and changes only that field,
+preserving the latest persisted language. The frontend sends only edited fields; a tuple update
+is used only for two explicitly edited fields. Responses confirm both current preferences for
+session-cache reconciliation and draft cleanup. Contract snapshots are prepared; operator export
+and regression verification remain pending.

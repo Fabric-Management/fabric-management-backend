@@ -27,7 +27,85 @@ public record OrderVersionContent(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Total> totals,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int unpricedLineCount,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Request> customRequests,
-    Proposal proposal) {
+    Proposal proposal,
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        @Schema(description = "Frozen payment plan; absent on historical versions", nullable = true)
+        com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent paymentPlan,
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        @Schema(description = "Additional payment terms as sent", nullable = true, maxLength = 2000)
+        String paymentNote) {
+
+  /** Retain source compatibility for historical snapshots and their canonical hash. */
+  public OrderVersionContent(
+      String sellerName,
+      String orderNumber,
+      String customerName,
+      String customerReference,
+      LocalDate orderDate,
+      LocalDate requestedDeliveryDate,
+      String paymentTerms,
+      Terms delivery,
+      Contact contact,
+      List<Line> lines,
+      List<Total> totals,
+      int unpricedLineCount,
+      List<Request> customRequests,
+      Proposal proposal) {
+    this(
+        sellerName,
+        orderNumber,
+        customerName,
+        customerReference,
+        orderDate,
+        requestedDeliveryDate,
+        paymentTerms,
+        delivery,
+        contact,
+        lines,
+        totals,
+        unpricedLineCount,
+        customRequests,
+        proposal,
+        null,
+        null);
+  }
+
+  public OrderVersionContent(
+      String sellerName,
+      String orderNumber,
+      String customerName,
+      String customerReference,
+      LocalDate orderDate,
+      LocalDate requestedDeliveryDate,
+      String paymentTerms,
+      Terms delivery,
+      Contact contact,
+      List<Line> lines,
+      List<Total> totals,
+      int unpricedLineCount,
+      List<Request> customRequests,
+      Proposal proposal,
+      com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent paymentPlan) {
+    this(
+        sellerName,
+        orderNumber,
+        customerName,
+        customerReference,
+        orderDate,
+        requestedDeliveryDate,
+        paymentTerms,
+        delivery,
+        contact,
+        lines,
+        totals,
+        unpricedLineCount,
+        customRequests,
+        proposal,
+        paymentPlan,
+        null);
+  }
 
   public OrderVersionContent {
     lines = lines == null ? List.of() : List.copyOf(lines);
@@ -78,7 +156,52 @@ public record OrderVersionContent(
       @Schema(
               description = "Original customer request; absent on historical versions",
               nullable = true)
-          BigDecimal requestQuantity) {
+          BigDecimal requestQuantity,
+      @Schema(
+              nullable = true,
+              description = "Quantity policy as sent; absent on historical versions")
+          @com.fasterxml.jackson.annotation.JsonInclude(
+              com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+          com.fabricmanagement.sales.common.domain.SalesQuantityPolicy quantityPolicy) {
+    public Line(
+        UUID lineId,
+        String product,
+        String colour,
+        BigDecimal finishedWidth,
+        String finishedWidthUnit,
+        BigDecimal quantity,
+        String unit,
+        BigDecimal toleranceUpPct,
+        BigDecimal toleranceDownPct,
+        BigDecimal unitPrice,
+        String currency,
+        BigDecimal discount,
+        BigDecimal tax,
+        LocalDate requestedDeliveryDate,
+        boolean singleLotRequired,
+        LineShipmentPreference shipmentPreference,
+        BigDecimal requestQuantity) {
+      this(
+          lineId,
+          product,
+          colour,
+          finishedWidth,
+          finishedWidthUnit,
+          quantity,
+          unit,
+          toleranceUpPct,
+          toleranceDownPct,
+          unitPrice,
+          currency,
+          discount,
+          tax,
+          requestedDeliveryDate,
+          singleLotRequired,
+          shipmentPreference,
+          requestQuantity,
+          null);
+    }
+
     public Line(
         UUID lineId,
         String product,

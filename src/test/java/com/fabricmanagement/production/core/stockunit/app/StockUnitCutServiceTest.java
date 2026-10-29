@@ -47,7 +47,11 @@ class StockUnitCutServiceTest {
     when(cuts.save(any())).thenAnswer(call -> call.getArgument(0));
     assertThat(unit.getLength()).isEqualByComparingTo("100");
     assertThat(cut.isRemainingVerified()).isFalse();
-    new StockUnitCutService(units, cuts, Clock.fixed(now, ZoneOffset.UTC))
+    new StockUnitCutService(
+            units,
+            cuts,
+            Clock.fixed(now, ZoneOffset.UTC),
+            mock(com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort.class))
         .verifyRemaining(id, cutId);
     assertThat(unit.getLength()).isEqualByComparingTo("70");
     assertThat(unit.getInitialLength()).isEqualByComparingTo("100");

@@ -24,10 +24,21 @@ public class SystemDepartmentCodeRepairService {
 
   private final DepartmentRepository departmentRepository;
 
+  /**
+   * Repairs one tenant's system departments.
+   *
+   * @param tenantId the tenant whose departments are repaired
+   * @param tenantUid the tenant's UID, so a department created here gets a UID under that tenant's
+   *     prefix. Without it every tenant's repair minted {@code SYS-000-DEPT-xxxxxxxx}: one shared
+   *     namespace with an 8-character random suffix, which collides on the global unique uid once
+   *     enough rows accumulate (seen as uk_department_uid failing application start-up).
+   * @return the number of departments created or corrected
+   */
   @Transactional
-  public int repairTenant(UUID tenantId) {
+  public int repairTenant(UUID tenantId, String tenantUid) {
     return TenantContext.executeInTenantContext(
         tenantId,
+        tenantUid,
         () ->
             departmentRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .collect(Collectors.groupingBy(Department::getOrganizationId))

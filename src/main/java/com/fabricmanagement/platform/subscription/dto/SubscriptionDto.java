@@ -25,6 +25,21 @@ public class SubscriptionDto {
   private Instant startDate;
   private Instant expiryDate;
   private Instant trialEndsAt;
+
+  @io.swagger.v3.oas.annotations.media.Schema(
+      description = "Non-paid evaluation access managed by company onboarding")
+  private boolean evaluationManaged;
+
+  @io.swagger.v3.oas.annotations.media.Schema(
+      description = "Learning access has no package trial deadline; go-real starts it")
+  private boolean learningAccess;
+
+  @io.swagger.v3.oas.annotations.media.Schema(
+      nullable = true,
+      description =
+          "SERVER_DEFAULT, OWNER, REPAIRED_DEFAULT or REPAIRED_PRESERVED; not payment consent")
+  private String evaluationSelectionSource;
+
   private Map<String, Boolean> features;
 
   /**
@@ -54,6 +69,9 @@ public class SubscriptionDto {
         .startDate(subscription.getStartDate())
         .expiryDate(subscription.getExpiryDate())
         .trialEndsAt(subscription.getTrialEndsAt())
+        .evaluationManaged(subscription.isEvaluationManaged())
+        .learningAccess(subscription.isLearningAccess())
+        .evaluationSelectionSource(subscription.getEvaluationSelectionSource())
         .features(subscription.getFeatures())
         .pricingTier(subscription.getPricingTier())
         .isActive(subscription.isActive())

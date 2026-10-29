@@ -6,7 +6,9 @@ import java.util.UUID;
 
 @Schema(name = "RoutingPoolUpdateRequest")
 public record RoutingPoolUpdateRequest(
-    @Schema(description = "Absent only when configuring the pool for the first time")
+    @Schema(
+            nullable = true,
+            description = "Absent only when configuring the pool for the first time")
         @jakarta.validation.constraints.Positive
         Long expectedRevision,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @jakarta.validation.constraints.NotNull

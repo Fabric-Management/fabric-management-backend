@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.persistence;
 
+import java.util.Objects;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -292,7 +293,14 @@ public final class TenantContext {
   }
 
   /**
-   * Executes a runnable with a specific tenant context
+   * Executes a runnable with a specific tenant context.
+   *
+   * <p>When {@code tenantId} differs from the tenant already bound to this thread, the previous
+   * tenant's UID and country are dropped for the duration of the call: they describe the other
+   * tenant, and leaving them would stamp the other tenant's UID prefix on every entity created
+   * inside. The tenant UID is then unknown (new entities fall back to the {@code SYS-000} prefix);
+   * use {@link #executeInTenantContext(UUID, String, java.util.function.Supplier)} when it is
+   * known. The user stays, since the same person is acting. Everything is restored afterwards.
    *
    * @param tenantId the tenant ID to use
    * @param runnable the code to execute
@@ -300,7 +308,7 @@ public final class TenantContext {
   public static void executeInTenantContext(UUID tenantId, Runnable runnable) {
     TenantSnapshot previous = capture();
     try {
-      setCurrentTenantId(tenantId);
+      enterTenant(tenantId, null, false);
       runnable.run();
     } finally {
       restore(previous);
@@ -308,7 +316,10 @@ public final class TenantContext {
   }
 
   /**
-   * Executes a supplier with a specific tenant context
+   * Executes a supplier with a specific tenant context.
+   *
+   * <p>See {@link #executeInTenantContext(UUID, Runnable)} for what happens to the previous
+   * tenant's UID and country.
    *
    * @param tenantId the tenant ID to use
    * @param supplier the code to execute
@@ -319,10 +330,54 @@ public final class TenantContext {
       UUID tenantId, java.util.function.Supplier<T> supplier) {
     TenantSnapshot previous = capture();
     try {
-      setCurrentTenantId(tenantId);
+      enterTenant(tenantId, null, false);
       return supplier.get();
     } finally {
       restore(previous);
+    }
+  }
+
+  /**
+   * Executes a supplier as the given tenant with its UID set as well, so entities created inside
+   * mint UIDs under that tenant's prefix instead of the shared {@code SYS-000} fallback.
+   *
+   * <p>The previous tenant's country is dropped when the tenant changes, as in {@link
+   * #executeInTenantContext(UUID, Runnable)}.
+   *
+   * @param tenantId the tenant ID to use
+   * @param tenantUid the tenant's UID
+   * @param supplier the code to execute
+   * @param <T> the return type
+   * @return the result from the supplier
+   */
+  public static <T> T executeInTenantContext(
+      UUID tenantId, String tenantUid, java.util.function.Supplier<T> supplier) {
+    TenantSnapshot previous = capture();
+    try {
+      enterTenant(tenantId, tenantUid, true);
+      return supplier.get();
+    } finally {
+      restore(previous);
+    }
+  }
+
+  /**
+   * Binds {@code tenantId} to this thread. Values that belong to the previous tenant (UID, country)
+   * are removed when the tenant changes; staying in the same tenant keeps them.
+   *
+   * @param tenantId the tenant to enter
+   * @param tenantUid the tenant's UID, used only when {@code uidKnown}
+   * @param uidKnown whether the caller supplied the UID
+   */
+  private static void enterTenant(UUID tenantId, String tenantUid, boolean uidKnown) {
+    boolean sameTenant = Objects.equals(tenantId, CURRENT_TENANT_ID.get());
+    setCurrentTenantId(tenantId);
+    if (!sameTenant) {
+      CURRENT_TENANT_UID.remove();
+      CURRENT_TENANT_COUNTRY.remove();
+    }
+    if (uidKnown) {
+      setCurrentTenantUid(tenantUid);
     }
   }
 }

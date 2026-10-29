@@ -114,6 +114,11 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @Column(name = "customer_request_qty", precision = 15, scale = 3)
   private BigDecimal customerRequestQty;
 
+  /** Evidence as recorded; unlike the working fallback, null remains unknown on conversion. */
+  public BigDecimal getRecordedCustomerRequestQty() {
+    return customerRequestQty;
+  }
+
   public BigDecimal getCustomerRequestQty() {
     return customerRequestQty != null
         ? customerRequestQty
@@ -132,7 +137,42 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
     customerRequestQty = quantity;
   }
 
+  @jakarta.persistence.Embedded
+  @Builder.Default
+  @Setter(AccessLevel.NONE)
+  private com.fabricmanagement.sales.common.domain.SalesQuantityTerms quantityTerms =
+      new com.fabricmanagement.sales.common.domain.SalesQuantityTerms();
+
+  public com.fabricmanagement.sales.common.domain.SalesQuantityPolicy getQuantityPolicy() {
+    return quantityTerms == null
+        ? com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED
+        : quantityTerms.getPolicy();
+  }
+
+  public void recordQuantityPolicy(
+      com.fabricmanagement.sales.common.domain.SalesQuantityPolicy policy,
+      UUID actor,
+      java.time.Instant at,
+      String reason) {
+    if (quantityTerms == null)
+      quantityTerms = new com.fabricmanagement.sales.common.domain.SalesQuantityTerms();
+    if (policy != null) policy.assertQuantity(customerRequestQty, requestedQty);
+    quantityTerms.record(policy, actor, at, reason);
+  }
+
+  public void inheritQuantityTerms(
+      com.fabricmanagement.sales.common.domain.SalesQuantityTerms terms,
+      BigDecimal customerRequest) {
+    quantityTerms =
+        terms == null
+            ? new com.fabricmanagement.sales.common.domain.SalesQuantityTerms()
+            : terms.copy();
+    customerRequestQty = customerRequest;
+    getQuantityPolicy().assertQuantity(customerRequest, requestedQty);
+  }
+
   public void applyStockQuantity(BigDecimal original, BigDecimal selected) {
+    getQuantityPolicy().assertQuantity(original, selected);
     if (original == null || selected == null || original.signum() <= 0 || selected.signum() <= 0)
       throw new IllegalArgumentException("Both requested and selected quantities must be positive");
     customerRequestQty = original;
@@ -431,7 +471,8 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
     if (!this.lineStatus.canTransitionTo(SalesOrderLineStatus.RECIPE_ASSIGNED)) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
           String.format(
-              "Cannot assign recipe to SalesOrderLine %s: current status %s does not allow recipe assignment",
+              "Cannot assign recipe to SalesOrderLine %s: current status %s does not allow recipe"
+                  + " assignment",
               this.getId(), this.lineStatus));
     }
     this.recipeId = recipeId;
@@ -544,6 +585,7 @@ public class SalesOrderLine extends BaseEntity implements CatalogLineInput {
   @PrePersist
   @PreUpdate
   private void validateEntity() {
+    getQuantityPolicy().assertQuantity(customerRequestQty, requestedQty);
     captureInitialRequestIfAbsent();
     if (shipmentPreference == null) {
       // A builder given an explicit null still saves the decided default (LINE-PREFERENCES-1).

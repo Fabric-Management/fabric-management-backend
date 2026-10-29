@@ -14,6 +14,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ContactRepository extends JpaRepository<Contact, UUID> {
 
+  List<Contact> findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+      UUID tenantId, ContactType contactType, String contactValue);
+
   /** Find contact by value and type within tenant. */
   @Query(
       "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "

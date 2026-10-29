@@ -202,7 +202,9 @@ class DecisionProjectionReplayIT extends OrderCoverIntegrationSupport {
     doCallRealMethod().when(writerTarget()).apply(any(Facts.class), any());
     incompletePublications.resubmitIncompletePublicationsOlderThan(Duration.ZERO);
 
+    // The queue reads the tenant's business zone from the bound tenant: poll on this thread.
     await()
+        .pollInSameThread()
         .atMost(Duration.ofSeconds(20))
         .untilAsserted(
             () -> {

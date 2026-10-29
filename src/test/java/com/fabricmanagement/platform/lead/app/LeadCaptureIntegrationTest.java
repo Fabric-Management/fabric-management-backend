@@ -25,6 +25,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @AutoConfigureMockMvc(addFilters = false)
@@ -33,6 +34,10 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private LeadRepository leadRepository;
+
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+  private LeadService leadService;
+
   @Autowired private TenantResetService tenantResetService;
 
   @MockitoBean private NotificationService notificationService;
@@ -42,17 +47,17 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
   void signupCreatesLeadThatSurvivesDemoResetAndHasNoTenantIdColumn() throws Exception {
     stubEmailRendering();
     long suffix = System.currentTimeMillis();
-    String organizationName = "Lead Capture Company " + suffix;
+    String organizationName = "Hawthorn Weaving Ltd " + suffix;
     String email = "lead-capture-" + suffix + "@example.com";
-    String taxId = "LEAD" + suffix % 100000000;
+    String taxId = "GB" + suffix % 100000000;
     String body =
         """
         {
           "organizationName": "%s",
           "taxId": "%s",
           "organizationType": "VERTICAL_MILL",
-          "firstName": "Lead",
-          "lastName": "Owner",
+          "firstName": "Eleanor",
+          "lastName": "Hughes",
           "email": "%s",
           "selectedOS": ["FabricOS", "WarehouseOS"],
           "intent": "PLAYGROUND",
@@ -81,8 +86,8 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
     Lead lead = leadsByEmail.get(0);
     assertThat(lead.getCompanyName()).isEqualTo(organizationName);
     assertThat(lead.getTaxId()).isEqualTo(taxId);
-    assertThat(lead.getFirstName()).isEqualTo("Lead");
-    assertThat(lead.getLastName()).isEqualTo("Owner");
+    assertThat(lead.getFirstName()).isEqualTo("Eleanor");
+    assertThat(lead.getLastName()).isEqualTo("Hughes");
     assertThat(lead.getSelectedOs()).containsExactly("FabricOS", "WarehouseOS");
     assertThat(lead.getSignupIntent()).isEqualTo("PLAYGROUND");
     assertThat(lead.getTrialTenantId()).isEqualTo(tenantId);
@@ -108,6 +113,85 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
     assertThat(leadRepository.findByTrialTenantId(tenantId))
         .extracting(Lead::getId)
         .contains(lead.getId());
+  }
+
+  @Test
+  void leadFailureRollsBackSignupAndRetryCreatesOneDurableCompany() throws Exception {
+    stubEmailRendering();
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    String name = "Willow Cloth Ltd " + suffix;
+    String email = "eleanor." + suffix + "@example.com";
+    String body =
+        """
+        {"organizationName":"%s","taxId":"GB%s","organizationType":"WEAVER",
+         "firstName":"Eleanor","lastName":"Hughes","email":"%s",
+         "selectedOS":["FabricOS"],"intent":"TRIAL","acceptedTerms":true}
+        """
+            .formatted(name, suffix, email);
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              call.callRealMethod();
+              throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+                  "Injected Lead write failure", "LEAD_CAPTURE_FAILED", 503);
+            })
+        // Stub the spy behind the transaction proxy: through the proxy, capture() would demand
+        // its MANDATORY transaction before Mockito saw the call and leave the stubbing unfinished.
+        .when(AopTestUtils.<LeadService>getUltimateTargetObject(leadService))
+        .capture(org.mockito.ArgumentMatchers.any());
+    try {
+      mockMvc
+          .perform(
+              post("/api/v1/public/signup")
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isServiceUnavailable());
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM common_tenant.common_tenant WHERE name = ?",
+                  Long.class,
+                  name))
+          .isZero();
+      assertThat(leadRepository.findByWorkEmail(email)).isEmpty();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM common_communication.common_contact WHERE contact_value = ?",
+                  Long.class,
+                  email))
+          .isZero();
+    } finally {
+      org.mockito.Mockito.reset(AopTestUtils.<LeadService>getUltimateTargetObject(leadService));
+    }
+    mockMvc
+        .perform(
+            post("/api/v1/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    assertThat(leadRepository.findByWorkEmail(email)).hasSize(1);
+    Lead lead = leadRepository.findByWorkEmail(email).get(0);
+    assertThat(lead.getSignupId()).isNotNull();
+    assertThat(lead.getSignupSnapshot()).isEqualTo(lead.getAcceptedSnapshot());
+    assertThat(lead.getTermsAcceptedAt()).isNotNull();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_user.onboarding_journey WHERE signup_id = ?",
+                Long.class,
+                lead.getSignupId()))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_company.lead_profile_snapshot WHERE lead_id = ?",
+                Long.class,
+                lead.getId()))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_tenant.common_tenant WHERE name = ?",
+                Long.class,
+                name))
+        .isEqualTo(1);
   }
 
   /** Every event publication of the tenant has been delivered, and stays so for a moment. */

@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.annotation.Order;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(OutputCaptureExtension.class)
 class YarnCataloguePropagationIT extends AbstractIntegrationTest {
@@ -29,6 +30,7 @@ class YarnCataloguePropagationIT extends AbstractIntegrationTest {
   @Autowired private TenantClonerService tenantClonerService;
   @Autowired private PropertyRegistryFacade propertyRegistryFacade;
   @Autowired private SystemTransactionExecutor systemTransactionExecutor;
+  @Autowired private TransactionTemplate onboardingTransaction;
 
   @Test
   void runnerOrderIsStrictFromDevSeedThroughYarnCatalogue() throws NoSuchMethodException {
@@ -163,7 +165,9 @@ class YarnCataloguePropagationIT extends AbstractIntegrationTest {
     UUID onboardingTenant = insertTenant("onboarding");
     OnboardingContext context = new OnboardingContext();
     context.setTenantId(onboardingTenant);
-    onboardingRegistryStep.execute(context);
+    // The clone steps write on the onboarding connection (ONBOARD-ATOMIC-1): they need the
+    // caller's transaction, as in a real signup.
+    onboardingTransaction.executeWithoutResult(status -> onboardingRegistryStep.execute(context));
     assertCompleteSystemCatalogue(onboardingTenant);
     assertNoTenantRows(onboardingTenant);
 

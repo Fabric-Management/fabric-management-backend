@@ -241,6 +241,27 @@ public class QuantityEvaluationService {
    * transaction proxy.
    */
   public EvaluationRun run(EvaluationRequest request) {
+    return runWithOwnedSources(request, Set.of());
+  }
+
+  /** The verified target's existing hard allocations stay usable when replanning a cut. */
+  public EvaluationRun runForCut(EvaluationRequest request, Set<UUID> allocatedToVerifiedTarget) {
+    return runWithOwnedSources(request, Set.copyOf(allocatedToVerifiedTarget));
+  }
+
+  public java.util.Map<UUID, BigDecimal> freeCapacitiesForCut(
+      EvaluationRequest request, Set<UUID> owned) {
+    var run = runForCut(request, owned);
+    var evidence = QuoteHoldEvidence.of(run.holds());
+    java.util.Map<UUID, BigDecimal> capacities = new java.util.HashMap<>();
+    for (var lot : run.stock().lots()) {
+      var free = StockPools.lotFree(evidence, lot).canonical();
+      if (free != null) capacities.put(lot.batchId(), free);
+    }
+    return java.util.Map.copyOf(capacities);
+  }
+
+  private EvaluationRun runWithOwnedSources(EvaluationRequest request, Set<UUID> owned) {
     // Both limits are required (Fatih, 2026-10-13): a missing side is missing information, never
     // 0%. No proposal is computed, so no earlier one is presented as current.
     if (request.toleranceUpPct() == null || request.toleranceDownPct() == null) {
@@ -273,11 +294,48 @@ public class QuantityEvaluationService {
                 request.finishedWidth(),
                 request.finishedWidthUnit(),
                 request.customerId()));
+    if (!owned.isEmpty()) {
+      stock =
+          new ProposalStockQueryService.ProposalStock(
+              stock.lots().stream()
+                  .map(
+                      lot ->
+                          new ProposalStockQueryService.ProposalLot(
+                              lot.batchId(),
+                              lot.lotNo(),
+                              lot.productionDate(),
+                              lot.measure(),
+                              lot.canonicalUnit(),
+                              lot.widthEvidence(),
+                              lot.pieces().stream()
+                                  .map(
+                                      piece ->
+                                          owned.contains(piece.stockUnitId())
+                                                  && "ALLOCATED".equals(piece.reason())
+                                              ? new ProposalStockQueryService.ProposalPiece(
+                                                  piece.stockUnitId(),
+                                                  piece.pieceNo(),
+                                                  piece.canonicalMeasure(),
+                                                  ProposalStockQueryService.PieceState.ELIGIBLE,
+                                                  null,
+                                                  piece.version(),
+                                                  piece.packageType(),
+                                                  piece.initialCanonicalMeasure())
+                                              : piece)
+                                  .toList(),
+                              lot.averagePiece(),
+                              lot.averageBasis(),
+                              lot.inventoryComplete()))
+                  .toList(),
+              stock.confirmedCompatibleGroups());
+    }
     QuoteHoldQueryService.QuoteHolds holds =
         stock.lots().isEmpty()
             ? NO_HOLDS
             : quoteHolds.find(
-                stock.lots().stream().map(ProposalStockQueryService.ProposalLot::batchId).toList());
+                stock.lots().stream().map(ProposalStockQueryService.ProposalLot::batchId).toList(),
+                request.ownSessionId(),
+                request.lineId());
     Set<UUID> ownOwners =
         java.util.stream.Stream.of(request.lineId(), request.ownSessionId())
             .filter(Objects::nonNull)

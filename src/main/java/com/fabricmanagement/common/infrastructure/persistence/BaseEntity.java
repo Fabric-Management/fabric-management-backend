@@ -151,13 +151,13 @@ public abstract class BaseEntity implements Serializable, Persistable<UUID> {
    * <p><b>Template Method Pattern:</b> Subclasses can override this method to provide custom UID
    * generation logic.
    *
-   * <p><b>Default Implementation:</b> Uses standard pattern {TENANT_UID}-{MODULE}-{UUID_SUFFIX}
+   * <p><b>Default Implementation:</b> Uses standard pattern {TENANT_UID}-{MODULE}-{SUFFIX}
    *
    * <p><b>Examples:</b>
    *
    * <ul>
-   *   <li>User: "ACME-001-USER-A3F5B2C9"
-   *   <li>Product: "ACME-001-MAT-B7E8F9A1"
+   *   <li>User: "ACME-001-USER-A3F5B2C9D41E"
+   *   <li>Product: "ACME-001-MAT-B7E8F9A1C203"
    *   <li>Company (override): "ACME-001" (no module code)
    * </ul>
    *
@@ -169,11 +169,10 @@ public abstract class BaseEntity implements Serializable, Persistable<UUID> {
       tenantUid = "SYS-000";
     }
 
-    // Use UUID-based suffix to guarantee uniqueness
-    // Format: {TENANT_UID}-{MODULE}-{UUID_SUFFIX}
-    // Example: "ACME-001-USER-A3F5B2C9"
-    String uniqueSuffix =
-        UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+    // Random suffix (see UidSuffix for why it is 12 characters)
+    // Format: {TENANT_UID}-{MODULE}-{SUFFIX}
+    // Example: "ACME-001-USER-A3F5B2C9D41E"
+    String uniqueSuffix = UidSuffix.random();
 
     return String.format("%s-%s-%s", tenantUid, getModuleCode(), uniqueSuffix);
   }

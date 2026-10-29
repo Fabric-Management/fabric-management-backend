@@ -2,15 +2,8 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.platform.communication.app.AddressService;
-import com.fabricmanagement.platform.communication.app.ContactService;
-import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.domain.ContactType;
-import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
-import com.fabricmanagement.platform.organization.app.OrganizationAddressAssignmentService;
-import com.fabricmanagement.platform.organization.app.OrganizationContactAssignmentService;
-import com.fabricmanagement.platform.organization.app.OrganizationService;
-import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.platform.organization.app.CompanyOnboardingProfileService;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserOnboardingCompletedEvent;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
@@ -18,11 +11,11 @@ import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.OnboardingAccessService;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       persists company profile data (legalName, industry, address, etc.) to the root
  *       Organization.
  * </ol>
+ *
+ * Registered company owners use the accepted six-step journey; this legacy route remains for
+ * personal callers and corrections after an already completed company journey.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,22 +42,19 @@ public class UserOnboardingService {
   private final UserRepository userRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final DomainEventPublisher eventPublisher;
-  private final OrganizationService organizationService;
-  private final AddressService addressService;
-  private final ContactService contactService;
-  private final OrganizationAddressAssignmentService addressAssignmentService;
-  private final OrganizationContactAssignmentService contactAssignmentService;
+  private final CompanyOnboardingProfileService companyProfileService;
+  private final OnboardingCommandLockService commandLockService;
+  private final OnboardingRequestValidator requestValidator;
   private final UserProfileService userProfileService;
+  private final OnboardingAccessService onboardingAccessService;
+  private final OnboardingLegacyRetentionService legacyRetention;
 
   @Transactional(readOnly = true)
   public OnboardingStatusResponse getStatus(UUID userId) {
     UUID tenantId = TenantContext.requireTenantId();
     log.trace("Getting onboarding status: tenantId={}, userId={}", tenantId, userId);
 
-    User user =
-        userRepository
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user = onboardingAccessService.requireCurrentUser(userId);
 
     boolean completed = user.getOnboardingCompletedAt() != null;
     Instant completedAt = user.getOnboardingCompletedAt();
@@ -69,6 +62,7 @@ public class UserOnboardingService {
     return OnboardingStatusResponse.builder()
         .hasCompletedOnboarding(completed)
         .completedAt(completedAt)
+        .companySetup(onboardingAccessService.companySetupCapability(user))
         .build();
   }
 
@@ -84,21 +78,37 @@ public class UserOnboardingService {
     UUID tenantId = TenantContext.requireTenantId();
     log.info("Completing onboarding: tenantId={}, userId={}", tenantId, userId);
 
-    User user =
-        userRepository
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user = onboardingAccessService.requireCurrentUser(userId);
+    boolean companyChanges = request != null && request.hasCompanyChanges();
+    commandLockService.lockAndRefresh(user);
+    // Check company authority only after the wait: evaluating it before locking could retain
+    // permission entities in the persistence context while another transaction revokes them.
+    user = onboardingAccessService.requireCurrentUser(userId);
+    if (companyChanges) onboardingAccessService.requireCompanySetup(user);
+    requestValidator.validate(request);
+    var retainedJourney = legacyRetention.prepare(user, request);
+    var profile = companyChanges ? companyProfileService.prepare(request) : null;
+    if (request != null) saveUserMobile(userId, request);
+    if (profile != null) companyProfileService.save(profile);
+    legacyRetention.retain(retainedJourney, user, request);
 
-    if (user.getOnboardingCompletedAt() != null) {
-      log.debug("User already completed onboarding: userId={}", userId);
-      if (request != null) {
-        applyEnrichment(tenantId, userId, request);
-      }
+    UserDto completed = markCompleted(user, tenantId);
+    legacyRetention.completePersonal(user);
+    return completed;
+  }
+
+  /** Only the accepted-journey orchestrator in this package calls this after validating review. */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  UserDto completeAcceptedJourney(UUID userId) {
+    User user = onboardingAccessService.requireCurrentUser(userId);
+    return markCompleted(user, user.getTenantId());
+  }
+
+  private UserDto markCompleted(User user, UUID tenantId) {
+    UUID userId = user.getId();
+
+    if (user.hasCompletedOnboarding()) {
       return UserDto.from(user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
-    }
-
-    if (request != null) {
-      applyEnrichment(tenantId, userId, request);
     }
 
     user.completeOnboarding();
@@ -122,101 +132,10 @@ public class UserOnboardingService {
     return user.hasCompletedOnboarding();
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────────────
-
-  /**
-   * Persist enrichment data to the tenant's root organization:
-   *
-   * <ol>
-   *   <li>Company profile fields (legalName, industry, website, etc.)
-   *   <li>Headquarters address (created fresh; existing HQ address not duplicated if one exists)
-   *   <li>Company contacts (email and/or phone)
-   * </ol>
-   */
-  private void applyEnrichment(UUID tenantId, UUID userId, CompleteOnboardingRequest request) {
-    log.debug("Applying onboarding enrichment: tenantId={}", tenantId);
-
-    organizationService.enrichRootOrganization(tenantId, request);
-    saveUserMobile(userId, request);
-
-    OrganizationDto rootOrg = organizationService.getRootOrganization().orElse(null);
-    if (rootOrg == null) {
-      log.warn("applyEnrichment: root organization not found, skipping address/contact save");
-      return;
-    }
-    UUID orgId = rootOrg.getId();
-
-    saveHqAddress(orgId, request);
-    saveContacts(orgId, request);
-  }
-
   private void saveUserMobile(UUID userId, CompleteOnboardingRequest request) {
-    if (request.getMobilePhone() == null || request.getMobilePhone().isBlank()) {
-      return;
-    }
-    userProfileService.updatePersonalContact(
-        userId, request.getMobilePhone().trim(), ContactType.MOBILE);
-    log.debug("saveUserMobile: personal mobile assigned, userId={}", userId);
-  }
-
-  private void saveHqAddress(UUID orgId, CompleteOnboardingRequest req) {
-    if (req.getAddressLine1() == null && req.getCity() == null && req.getCountry() == null) {
-      return;
-    }
-    try {
-      String label =
-          (req.getAddressLabel() != null && !req.getAddressLabel().isBlank())
-              ? req.getAddressLabel().trim()
-              : "Headquarters";
-
-      CreateAddressRequest createRequest =
-          CreateAddressRequest.builder()
-              .streetAddress(req.getAddressLine1() != null ? req.getAddressLine1().trim() : "")
-              .addressLine2(req.getAddressLine2() != null ? req.getAddressLine2().trim() : null)
-              .city(req.getCity() != null ? req.getCity().trim() : "")
-              .state(req.getState() != null ? req.getState().trim() : null)
-              .district(req.getDistrict() != null ? req.getDistrict().trim() : null)
-              .postalCode(req.getPostalCode() != null ? req.getPostalCode().trim() : null)
-              .country(req.getCountry() != null ? req.getCountry().trim() : "")
-              .countryCode(null)
-              .addressType(AddressType.HEADQUARTERS)
-              .label(label)
-              .build();
-
-      var address = addressService.createAddress(createRequest);
-      addressAssignmentService.assignAddress(orgId, address.getId(), true, true);
-      log.debug("saveHqAddress: addressId={}, orgId={}", address.getId(), orgId);
-    } catch (DataAccessException | IllegalArgumentException ex) {
-      log.warn("saveHqAddress: failed for orgId={} — {}", orgId, ex.getMessage());
-    } catch (Exception ex) {
-      log.warn("saveHqAddress: unexpected error for orgId={} — {}", orgId, ex.getMessage(), ex);
-      throw ex;
-    }
-  }
-
-  private void saveContacts(UUID orgId, CompleteOnboardingRequest req) {
-    if (req.getCompanyEmail() != null && !req.getCompanyEmail().isBlank()) {
-      try {
-        var contact =
-            contactService.createContact(
-                req.getCompanyEmail().trim(), ContactType.EMAIL, "Organization", false, null);
-        contactAssignmentService.assignContact(orgId, contact.getId(), true, null);
-        log.debug("saveContacts: email assigned, orgId={}", orgId);
-      } catch (Exception ex) {
-        log.warn("saveContacts: email failed for orgId={} — {}", orgId, ex.getMessage());
-      }
-    }
-
-    if (req.getCompanyPhone() != null && !req.getCompanyPhone().isBlank()) {
-      try {
-        var contact =
-            contactService.createContact(
-                req.getCompanyPhone().trim(), ContactType.MOBILE, "Organization", false, null);
-        contactAssignmentService.assignContact(orgId, contact.getId(), false, null);
-        log.debug("saveContacts: phone assigned, orgId={}", orgId);
-      } catch (Exception ex) {
-        log.warn("saveContacts: phone failed for orgId={} — {}", orgId, ex.getMessage());
-      }
+    if (request.getMobilePhone() != null) {
+      userProfileService.updatePersonalContact(
+          userId, request.getMobilePhone().trim(), ContactType.MOBILE);
     }
   }
 }

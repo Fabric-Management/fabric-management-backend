@@ -6,6 +6,20 @@ import java.util.UUID;
 /** Canonical frontend route templates and builders emitted by backend contracts. */
 public final class AppRoutes {
   public static final String SALES_ORDER_TEMPLATE = "/sales/{orderId}";
+  public static final String SALES_QUOTE_TEMPLATE = "/sales/quotes/{quoteId}";
+  public static final String STOCK_CUT_PLAN_TEMPLATE = "/stock-cut-plans/{planId}";
+
+  public static String stockCutPlan(UUID planId) {
+    return STOCK_CUT_PLAN_TEMPLATE.replace("{planId}", planId.toString());
+  }
+
+  public static final String COLLECTION_FOLLOW_UP_TEMPLATE =
+      "/decisions/collection-follow-up/{followUpId}";
+
+  public static String collectionFollowUp(UUID id) {
+    return COLLECTION_FOLLOW_UP_TEMPLATE.replace("{followUpId}", id.toString());
+  }
+
   public static final String ORDER_COVER_DECISION_TEMPLATE = "/decisions/order-cover/{orderId}";
 
   /** The customer's page for approving a sent order version; public, behind the e-mailed link. */
@@ -15,6 +29,10 @@ public final class AppRoutes {
 
   public static String salesOrder(UUID orderId) {
     return SALES_ORDER_TEMPLATE.replace("{orderId}", orderId.toString());
+  }
+
+  public static String salesQuote(UUID quoteId) {
+    return SALES_QUOTE_TEMPLATE.replace("{quoteId}", quoteId.toString());
   }
 
   public static String orderCoverDecision(UUID orderId) {
@@ -28,7 +46,10 @@ public final class AppRoutes {
   public static List<Template> templates() {
     return List.of(
         new Template("salesOrder", SALES_ORDER_TEMPLATE),
+        new Template("salesQuote", SALES_QUOTE_TEMPLATE),
+        new Template("stockCutPlan", STOCK_CUT_PLAN_TEMPLATE),
         new Template("orderCoverDecision", ORDER_COVER_DECISION_TEMPLATE),
+        new Template("collectionFollowUp", COLLECTION_FOLLOW_UP_TEMPLATE),
         new Template("orderApproval", ORDER_APPROVAL_TEMPLATE));
   }
 

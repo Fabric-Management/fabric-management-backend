@@ -59,6 +59,8 @@ public class CreateTenantStep implements OnboardingStep {
     // app.current_tenant only at connection acquisition, so switching TenantContext above is not
     // enough — re-bind the DB session on the same connection or the next tenant-scoped insert
     // (common_organization, step 2) fails the RLS WITH CHECK. See TenantSessionBinder.
+    // createTenant already left the session bound to the new tenant (it inserted the row on this
+    // connection); binding again is idempotent and keeps this step independent of that detail.
     tenantSessionBinder.bindToCurrentSession(tenant.getId());
 
     log.debug("CreateTenantStep: tenantId={}, tenantUid={}", tenant.getId(), tenant.getUid());

@@ -16,4 +16,10 @@ public class FinanceDomainException extends DomainException {
   protected FinanceDomainException(String message, String errorCode, int httpStatus) {
     super(message, errorCode, httpStatus);
   }
+
+  /** With the arguments a localized message fills in, in the order its placeholders use them. */
+  protected FinanceDomainException(
+      String message, String errorCode, int httpStatus, Object[] args) {
+    super(message, errorCode, httpStatus, args);
+  }
 }

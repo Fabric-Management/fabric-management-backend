@@ -8,5 +8,7 @@ public enum OrderVersionKind {
   /** The draft's details, for the customer's information; it cannot be approved. */
   INFORMATION,
   /** The evaluated order with planning's date, sent for the customer's approval. */
-  APPROVAL
+  APPROVAL,
+  /** A payment-plan amendment to an already confirmed order. */
+  PAYMENT_PLAN
 }

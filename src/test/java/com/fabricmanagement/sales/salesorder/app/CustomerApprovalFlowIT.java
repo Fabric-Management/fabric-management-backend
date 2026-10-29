@@ -44,15 +44,21 @@ import com.fabricmanagement.sales.salesorder.domain.DeliveryTerm;
 import com.fabricmanagement.sales.salesorder.domain.DeliveryTerms;
 import com.fabricmanagement.sales.salesorder.domain.IncotermsVersion;
 import com.fabricmanagement.sales.salesorder.domain.LineShipmentPreference;
+import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderVersionContent;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
+import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent;
+import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanInput;
+import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Frequency;
+import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Method;
 import com.fabricmanagement.sales.salesorder.dto.CustomerApprovalDtos;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.ApprovalAuthorityView;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.GrantApprovalAuthorityRequest;
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RevokeApprovalAuthorityRequest;
 import com.fabricmanagement.sales.salesorder.dto.PublicOrderApprovalDtos;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Save;
 import com.fabricmanagement.sales.salesorder.infra.repository.DeliveryProposalRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
@@ -61,6 +67,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -150,6 +157,7 @@ class CustomerApprovalFlowIT {
 
   @Autowired private ApprovalAuthorityService authorityService;
   @Autowired private CustomerApprovalDecisionService decisions;
+  @Autowired private SalesOrderPaymentPlanService paymentPlans;
 
   @MockitoBean private PermissionEvaluator permissionEvaluator;
   @MockitoBean private CustomerApprovalMailer mailer;
@@ -246,25 +254,7 @@ class CustomerApprovalFlowIT {
             .unit("MT")
             .unitPrice(Money.of(new BigDecimal("4.20"), "GBP"))
             .build());
-    // Planning finished with a proposal valid for a week.
-    jdbc.update(
-        "UPDATE sales_ord.sales_order SET flow_stage = 'PLANNED', planning_round = 1"
-            + " WHERE tenant_id = ? AND id = ?",
-        tenantId,
-        orderId);
-    proposals.saveAndFlush(
-        DeliveryProposal.propose(
-            orderId,
-            null,
-            1,
-            0,
-            PROPOSED,
-            Instant.now().plus(Duration.ofDays(7)),
-            order.getDeliveryTerms(),
-            null,
-            sales,
-            Instant.now(),
-            LocalDate.now()));
+    planned();
     TenantContext.clear();
   }
 
@@ -334,6 +324,81 @@ class CustomerApprovalFlowIT {
                 Integer.class,
                 token))
         .isZero();
+  }
+
+  /**
+   * The customer's approval is what makes a payment plan binding, and the module event it raises is
+   * what hands the plan to finance: the collection obligations are built from the revision as it
+   * was agreed, on that very approval, and not before.
+   */
+  @Test
+  void anAgreedPaymentPlanBecomesCollectionObligationsInFinance() {
+    planThePayment();
+    String token = send();
+    assertThat(obligationsOf(orderId)).as("a proposed plan is not an obligation").isZero();
+
+    String session = publicApprovals.verify(token, code(token)).session();
+    publicApprovals.approve(token, session, "203.0.113.7", "JUnit");
+
+    org.awaitility.Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .untilAsserted(() -> assertThat(obligationsOf(orderId)).isEqualTo(3));
+    UUID approvalId =
+        jdbc.queryForObject(
+            "SELECT id FROM sales_ord.customer_approval WHERE sales_order_id = ?",
+            UUID.class,
+            orderId);
+    var agreed = asSales(() -> paymentPlans.read(orderId, sales)).agreed();
+    assertThat(agreed.agreedApprovalId()).isEqualTo(approvalId);
+    List<PaymentPlanContent.Line> instalments =
+        agreed.content().currencyGroups().getFirst().lines();
+
+    List<Map<String, Object>> obligations =
+        jdbc.queryForList(
+            "SELECT logical_id, partner_id, currency, revision_id, kind, method, amount, cancelled,"
+                + " source_activated_at FROM finance.collection_obligation WHERE order_id = ?",
+            orderId);
+    assertThat(obligations)
+        .extracting(row -> row.get("logical_id"))
+        .containsExactlyInAnyOrderElementsOf(
+            instalments.stream().map(PaymentPlanContent.Line::obligationId).toList());
+    assertThat(obligations)
+        .allSatisfy(
+            row -> {
+              assertThat(row.get("partner_id")).isEqualTo(partnerId);
+              assertThat(row.get("currency")).isEqualTo("GBP");
+              assertThat(row.get("revision_id")).isEqualTo(agreed.id());
+              assertThat(row.get("kind")).isEqualTo("INSTALMENT");
+              assertThat(row.get("method")).isEqualTo("CASH");
+              assertThat(row.get("cancelled")).isEqualTo(false);
+              assertThat(row.get("source_activated_at")).isNotNull();
+            });
+    assertThat(
+            obligations.stream()
+                .map(row -> (BigDecimal) row.get("amount"))
+                .reduce(BigDecimal.ZERO, BigDecimal::add))
+        .isEqualByComparingTo(
+            instalments.stream()
+                .map(PaymentPlanContent.Line::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM finance.collection_expectation e"
+                    + " JOIN finance.collection_obligation o ON o.id = e.obligation_id"
+                    + " WHERE o.order_id = ? AND e.approval_id = ?",
+                Integer.class,
+                orderId,
+                approvalId))
+        .isEqualTo(3);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT revision_id, cancelled, stale, source_missing"
+                    + " FROM finance.collection_projection WHERE order_id = ?",
+                orderId))
+        .containsEntry("revision_id", agreed.id())
+        .containsEntry("cancelled", false)
+        .containsEntry("stale", false)
+        .containsEntry("source_missing", false);
   }
 
   @Test
@@ -953,6 +1018,91 @@ class CustomerApprovalFlowIT {
         .sendApprovalRequest(
             eq(tenantId), eq("jane@northern-garments.co.uk"), any(), any(), token.capture(), any());
     return token.getValue();
+  }
+
+  /** The seller plans three monthly cash instalments while the order is still being prepared. */
+  private void planThePayment() {
+    // A plan is written while the order is a draft, so sales takes the planned order back first and
+    // hands it over again afterwards, as it would to change anything else about the order.
+    moveOrder(order -> order.moveFlowTo(OrderFlowStage.DRAFT));
+    Long orderVersion =
+        asSales(() -> orders.findByTenantIdAndId(tenantId, orderId).orElseThrow().getVersion());
+    asSales(
+        () ->
+            paymentPlans.save(
+                orderId,
+                new Save(UUID.randomUUID(), orderVersion, 0L, threeMonthlyInstalments(), "Terms"),
+                sales));
+    planned();
+  }
+
+  /**
+   * Sales hands the draft to planning and a planner finishes with a proposal valid for a week. The
+   * order goes through the stages the flow itself allows, and the proposal belongs to the planning
+   * round that the hand-over opened, so the fixture does not depend on how the stage is stored.
+   */
+  private void planned() {
+    moveOrder(
+        order -> {
+          order.startPlanningRound(Instant.now());
+          order.moveFlowTo(OrderFlowStage.AWAITING_PLANNING);
+          order.moveFlowTo(OrderFlowStage.IN_PLANNING);
+          order.moveFlowTo(OrderFlowStage.PLANNED);
+          // A later round follows the order's last proposal, as OrderFlowService.propose does.
+          DeliveryProposal previous =
+              proposals
+                  .findFirstByTenantIdAndSalesOrderIdOrderBySequenceDesc(tenantId, orderId)
+                  .orElse(null);
+          proposals.saveAndFlush(
+              DeliveryProposal.propose(
+                  orderId,
+                  previous,
+                  order.getPlanningRound(),
+                  0,
+                  PROPOSED,
+                  Instant.now().plus(Duration.ofDays(7)),
+                  order.getDeliveryTerms(),
+                  null,
+                  sales,
+                  Instant.now(),
+                  LocalDate.now()));
+        });
+  }
+
+  /** Changes the order through its own methods, in one transaction, in the tenant as the seller. */
+  private void moveOrder(java.util.function.Consumer<SalesOrder> change) {
+    asSales(
+        () ->
+            transactions.execute(
+                status -> {
+                  SalesOrder order = orders.findByTenantIdAndId(tenantId, orderId).orElseThrow();
+                  change.accept(order);
+                  return orders.saveAndFlush(order);
+                }));
+  }
+
+  private static PaymentPlanInput threeMonthlyInstalments() {
+    var rules =
+        new PaymentPlanInput.Rules(
+            Frequency.MONTH,
+            3,
+            LocalDate.now().plusDays(10),
+            20,
+            Method.CASH,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    return new PaymentPlanInput(List.of(new PaymentPlanInput.CurrencyInput("GBP", rules, null)));
+  }
+
+  private int obligationsOf(UUID order) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM finance.collection_obligation WHERE order_id = ?",
+        Integer.class,
+        order);
   }
 
   /** The customer asks for the one-time code; returns the code e-mailed to them. */

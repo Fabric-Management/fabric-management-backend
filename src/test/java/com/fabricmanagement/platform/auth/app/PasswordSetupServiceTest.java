@@ -1,5 +1,7 @@
 package com.fabricmanagement.platform.auth.app;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +19,7 @@ import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RegistrationTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
@@ -29,7 +32,9 @@ import com.fabricmanagement.platform.user.domain.UserContact;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.testsupport.SensitiveLogCapture;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +42,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -136,6 +143,56 @@ class PasswordSetupServiceTest {
             fixture.userId());
   }
 
+  @Test
+  void successfulSetupLogsOnlySafeIdentifiersAndStillReturnsSessionTokens() {
+    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SELF_SERVICE);
+    try (var logs = new SensitiveLogCapture(PasswordSetupService.class)) {
+      var response = service.setupPassword(fixture.request(), "127.0.0.1");
+      assertThat(response.getAccessToken()).isEqualTo("access-token");
+      assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
+      assertThat(logs.text()).contains(fixture.tenantId().toString(), fixture.userId().toString());
+      assertThat(logs.text())
+          .doesNotContain(
+              fixture.request().getToken(),
+              fixture.request().getToken().substring(0, 8),
+              fixture.request().getPassword(),
+              "access-token",
+              "refresh-token");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"expired", "used", "short"})
+  void invalidTokensStayRejectedWithoutLoggingOrSubstringFailures(String state) {
+    UUID tenantId = UUID.randomUUID();
+    RegistrationToken token =
+        RegistrationToken.create("eleanor.hughes@example.com", RegistrationTokenType.SELF_SERVICE);
+    token.setToken(state.equals("short") ? "tiny" : "b24788a1-62fe-40ad-899f-80ea7543a1cc");
+    if (state.equals("used")) token.markAsUsed();
+    else token.setExpiresAt(Instant.now().minusSeconds(60));
+    when(tenantQueryPort.findTenantIdByRegistrationToken(token.getToken()))
+        .thenReturn(Optional.of(tenantId));
+    when(tokenRepository.findByToken(token.getToken())).thenReturn(Optional.of(token));
+    var request =
+        PasswordSetupRequest.builder()
+            .token(token.getToken())
+            .password("Hawthorn!Secret27")
+            .build();
+    try (var logs = new SensitiveLogCapture(PasswordSetupService.class)) {
+      assertThatThrownBy(() -> service.setupPassword(request, "127.0.0.1"))
+          .isInstanceOfSatisfying(
+              PlatformDomainException.class,
+              failure -> assertThat(failure.getErrorCode()).isEqualTo("AUTH_TOKEN_INVALID"));
+      assertThat(logs.text()).contains("AUTH_TOKEN_INVALID", tenantId.toString());
+      assertThat(logs.text()).doesNotContain(request.getToken(), request.getPassword());
+      if (request.getToken().length() >= 8) {
+        assertThat(logs.text()).doesNotContain(request.getToken().substring(0, 8));
+      }
+      verify(passwordEncoder, never()).encode(any());
+      verify(tokenRepository, never()).save(any());
+    }
+  }
+
   private PasswordSetupFixture arrangePasswordSetup(RegistrationTokenType tokenType) {
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -159,7 +216,10 @@ class PasswordSetupServiceTest {
     when(userFacade.findByContactValue(contactValue)).thenReturn(Optional.of(userDto));
     when(authUserRepository.existsByUserId(userId)).thenReturn(false);
     when(tenantQueryPort.findById(tenantId))
-        .thenReturn(Optional.of(new TenantReference(tenantId, "ACME-001", "Acme", "ACME")));
+        .thenReturn(
+            Optional.of(
+                new TenantReference(
+                    tenantId, "HWN-001", "Hawthorn Weaving Ltd", "hawthorn-weaving")));
     when(userRepository.findByTenantIdAndContactValue(tenantId, contactValue))
         .thenReturn(Optional.of(user));
     when(passwordEncoder.encode(request.getPassword())).thenReturn("hash");
@@ -178,10 +238,10 @@ class PasswordSetupServiceTest {
             .contactValue(contactValue)
             .isVerified(true)
             .build();
-    User user = User.create("Admin", "User", organizationId);
+    User user = User.create("Eleanor", "Hughes", organizationId);
     user.setId(userId);
     user.setTenantId(tenantId);
-    user.setUid("ACME-001-USER-00001");
+    user.setUid("HWN-001-USER-00001");
     user.completeOnboarding();
     user.getUserContacts().add(UserContact.builder().contact(contact).isDefault(true).build());
     return user;

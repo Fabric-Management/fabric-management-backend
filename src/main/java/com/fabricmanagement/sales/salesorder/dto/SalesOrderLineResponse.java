@@ -31,6 +31,9 @@ public class SalesOrderLineResponse {
   @Schema(description = "Current customer request before applying whole-roll stock")
   BigDecimal customerRequestQty;
 
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+  com.fabricmanagement.sales.common.dto.SalesQuantityTermsDto quantityTerms;
+
   boolean singleLotRequired;
 
   @Schema(

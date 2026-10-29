@@ -41,6 +41,23 @@ public class QuoteLineResponse {
   @Schema(description = "How the current fulfilment mode was determined", nullable = true)
   private final FulfillmentDeterminationMethod fulfillmentDeterminationMethod;
 
+  @Schema(
+      nullable = true,
+      description = "Known customer request; never inferred for historical rows")
+  private final BigDecimal customerRequestQty;
+
+  private final BigDecimal finishedWidth;
+  private final String finishedWidthUnit;
+  private final boolean singleLotRequired;
+  private final BigDecimal toleranceUpPct;
+  private final BigDecimal toleranceDownPct;
+
+  @Schema(nullable = true, description = "First recorded customer request")
+  private final BigDecimal initialRequestedQty;
+
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+  private final com.fabricmanagement.sales.common.dto.SalesQuantityTermsDto quantityTerms;
+
   private final BigDecimal requestedQty;
   private final String unit;
   private final BigDecimal listPrice;
@@ -70,6 +87,15 @@ public class QuoteLineResponse {
     this.fulfillmentMode = line.getFulfillmentMode();
     this.fulfillmentDeterminationStatus = line.getFulfillmentDeterminationStatus();
     this.fulfillmentDeterminationMethod = line.getFulfillmentDeterminationMethod();
+    this.customerRequestQty = line.getCustomerRequestQty();
+    this.finishedWidth = line.getFinishedWidth();
+    this.finishedWidthUnit = line.getFinishedWidthUnit();
+    this.singleLotRequired = line.isSingleLotRequired();
+    this.toleranceUpPct = line.getToleranceUpPct();
+    this.toleranceDownPct = line.getToleranceDownPct();
+    this.initialRequestedQty = line.getInitialRequestedQty();
+    this.quantityTerms =
+        com.fabricmanagement.sales.common.dto.SalesQuantityTermsDto.from(line.getQuantityTerms());
     this.requestedQty = line.getRequestedQty();
     this.unit = line.getUnit();
     this.listPrice = line.getListPrice();

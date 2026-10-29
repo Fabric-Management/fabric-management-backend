@@ -141,7 +141,7 @@ class OrderIntakeStockPreviewServiceTest {
     when(toneAcceptances.findByTenantIdAndCustomerIdAndIsActiveTrue(any(), any()))
         .thenReturn(List.of());
     when(proposals.save(any(QuantityProposal.class))).thenAnswer(call -> call.getArgument(0));
-    when(quoteHolds.find(any())).thenReturn(holds(List.of(), List.of()));
+    when(quoteHolds.find(any(), any(), any())).thenReturn(holds(List.of(), List.of()));
     // Every quote is readable unless a test says otherwise.
     when(quoteScopes.findReadableQuoteIds(any(), any(), any()))
         .thenAnswer(
@@ -205,7 +205,7 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(preview.totals().notCoveredByReadyStock()).isNull();
     assertThat(preview.totals().freeComplete()).isFalse();
     verify(stockQuery, never()).find(any());
-    verify(quoteHolds, never()).find(any());
+    verify(quoteHolds, never()).find(any(), any(), any());
   }
 
   @Test
@@ -330,7 +330,7 @@ class OrderIntakeStockPreviewServiceTest {
         .isInstanceOf(OrderIntakeException.class);
 
     verify(stockQuery, never()).find(any());
-    verify(quoteHolds, never()).find(any());
+    verify(quoteHolds, never()).find(any(), any(), any());
   }
 
   @Test
@@ -425,7 +425,7 @@ class OrderIntakeStockPreviewServiceTest {
             eligible("100"),
             eligible("100")),
         lot(lotB, "LOT-B", eligible("100")));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(
@@ -463,7 +463,7 @@ class OrderIntakeStockPreviewServiceTest {
   void anUnconvertibleIntentMakesFreeUndeterminable_neverAGuessedNumber() {
     UUID lotA = UUID.randomUUID();
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(
@@ -509,7 +509,7 @@ class OrderIntakeStockPreviewServiceTest {
   void aPartTakingMoreThanTheLotsFreeQuantityIsHeldStock_namingTheIntent() {
     UUID lotA = UUID.randomUUID();
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), eligible("100")));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(lotA, UUID.randomUUID(), UUID.randomUUID(), "250", "250")),
@@ -548,7 +548,7 @@ class OrderIntakeStockPreviewServiceTest {
     ProposalPiece third = eligible("100");
     stock(lot(lotA, "LOT-A", first, second, third));
     UUID quoteLine = UUID.randomUUID();
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(lotA, UUID.randomUUID(), quoteLine, "10", "10")),
@@ -617,7 +617,7 @@ class OrderIntakeStockPreviewServiceTest {
         lot(older, "LOT-HELD", heldPiece),
         lot(free, "LOT-FREE", eligible("100"), eligible("100"), eligible("100"), eligible("90")));
     UUID quoteLine = UUID.randomUUID();
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(older, UUID.randomUUID(), quoteLine, "500", "500")),
@@ -647,7 +647,7 @@ class OrderIntakeStockPreviewServiceTest {
     stock(
         lot(held, "LOT-HELD", heldPiece), lot(free, "LOT-FREE", eligible("100"), eligible("100")));
     UUID quoteLine = UUID.randomUUID();
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(held, UUID.randomUUID(), quoteLine, "400", "400")),
@@ -729,7 +729,7 @@ class OrderIntakeStockPreviewServiceTest {
         lot(lotB, "LOT-B", piece("50", PieceState.UNKNOWN)));
     UUID quoteLine = UUID.randomUUID();
     // The same quote line has a readable, active intent, but on another lot.
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(lotB, UUID.randomUUID(), quoteLine, "30", "30")),
@@ -783,7 +783,7 @@ class OrderIntakeStockPreviewServiceTest {
     ProposalPiece held = eligible("100");
     stock(lot(lotA, "LOT-A", held, eligible("100"), eligible("100")));
     UUID quoteLine = UUID.randomUUID();
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(lotA, UUID.randomUUID(), quoteLine, "100", "100")),
@@ -805,7 +805,7 @@ class OrderIntakeStockPreviewServiceTest {
     ProposalPiece held = eligible("100");
     stock(lot(lotA, "LOT-A", held, eligible("100")));
     UUID quoteLine = UUID.randomUUID();
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(intent(lotA, UUID.randomUUID(), quoteLine, "10", "10")),
@@ -883,7 +883,7 @@ class OrderIntakeStockPreviewServiceTest {
     assertThat(preview.totals().unknown().canonical()).isEqualByComparingTo("0");
     assertThat(preview.totals().notCoveredByReadyStock().canonical()).isEqualByComparingTo("100");
     assertThat(preview.totals().freeComplete()).isTrue();
-    verify(quoteHolds, never()).find(any());
+    verify(quoteHolds, never()).find(any(), any(), any());
   }
 
   @Test
@@ -928,7 +928,7 @@ class OrderIntakeStockPreviewServiceTest {
     UUID lotA = UUID.randomUUID();
     ProposalPiece pending = piece("50", PieceState.UNKNOWN);
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), pending));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(List.of(), List.of(hold(pending.stockUnitId(), lotA, UUID.randomUUID()))));
 
@@ -943,7 +943,7 @@ class OrderIntakeStockPreviewServiceTest {
     UUID lotA = UUID.randomUUID();
     ProposalPiece excluded = piece("70", PieceState.EXCLUDED);
     stock(lot(lotA, "LOT-A", eligible("100"), eligible("100"), excluded));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(List.of(), List.of(hold(excluded.stockUnitId(), lotA, UUID.randomUUID()))));
 
@@ -989,7 +989,7 @@ class OrderIntakeStockPreviewServiceTest {
     service.preview(request("100", "M", false, "0", "0"), actor);
 
     verify(proposals, never()).save(any());
-    verify(quoteHolds, times(1)).find(any());
+    verify(quoteHolds, times(1)).find(any(), any(), any());
   }
 
   @Test
@@ -998,7 +998,7 @@ class OrderIntakeStockPreviewServiceTest {
     ProposalPiece held = eligible("120");
     stock(lot(lotId, "PINNED", held, eligible("880")));
     for (String intent : List.of("100", "150")) {
-      when(quoteHolds.find(any()))
+      when(quoteHolds.find(any(), any(), any()))
           .thenReturn(
               holds(
                   List.of(intent(lotId, quoteId, quoteLine, intent, intent)),
@@ -1020,7 +1020,7 @@ class OrderIntakeStockPreviewServiceTest {
     UUID lotId = UUID.randomUUID(), firstLine = UUID.randomUUID(), secondLine = UUID.randomUUID();
     ProposalPiece piece = eligible("100");
     stock(lot(lotId, "CONFLICT", piece));
-    when(quoteHolds.find(any()))
+    when(quoteHolds.find(any(), any(), any()))
         .thenReturn(
             holds(
                 List.of(

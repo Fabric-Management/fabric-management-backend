@@ -63,7 +63,9 @@ class SalesOrderMutationScopeServiceTest {
             null,
             null,
             null,
-            null);
+            null,
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.sales.salesorder.app.SalesOrderPaymentPlanService.class));
   }
 
   @AfterEach

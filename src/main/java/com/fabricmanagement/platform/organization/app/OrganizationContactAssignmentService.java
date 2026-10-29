@@ -115,6 +115,36 @@ public class OrganizationContactAssignmentService
         .build();
   }
 
+  /** Reuse the existing junction under the caller's root-organisation command lock. */
+  @Transactional
+  public OrganizationContact ensureOnboardingContact(
+      UUID organizationId, UUID contactId, boolean isDefault) {
+    validateParentExists(organizationId);
+    validateChildExists(contactId);
+    var existing = findExisting(organizationId, contactId);
+    if (existing.isPresent()) {
+      OrganizationContact assignment = existing.get();
+      boolean reactivated = !Boolean.TRUE.equals(assignment.getIsActive());
+      if (reactivated) {
+        assignment.activate();
+        assignment.setIsDefault(false);
+      }
+      if (isDefault) {
+        organizationContactRepository
+            .findByTenantIdAndOrganizationId(TenantContext.requireTenantId(), organizationId)
+            .stream()
+            .filter(other -> !other.getContactId().equals(contactId))
+            .filter(other -> Boolean.TRUE.equals(other.getIsDefault()))
+            .forEach(other -> other.setIsDefault(false));
+        assignment.setIsDefault(true);
+      }
+      OrganizationContact saved = organizationContactRepository.save(assignment);
+      if (reactivated) onAfterAssign(saved);
+      return saved;
+    }
+    return assignContact(organizationId, contactId, isDefault, null);
+  }
+
   /** Assign contact to organization with optional department. */
   @Transactional
   public OrganizationContact assignContact(

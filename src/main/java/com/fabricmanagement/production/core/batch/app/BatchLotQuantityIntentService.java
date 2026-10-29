@@ -141,6 +141,18 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public boolean hasActiveIntents(UUID ownerLineId) {
+    return intentRepository
+        .findByTenantIdAndOwnerLineId(TenantContext.requireTenantId(), ownerLineId)
+        .stream()
+        .anyMatch(
+            row ->
+                Boolean.TRUE.equals(row.getIsActive())
+                    && row.getStatus() == BatchLotQuantityIntentStatus.ACTIVE);
+  }
+
+  @Override
   @Transactional
   public void releaseIntents(UUID quoteLineId) {
     UUID tenantId = TenantContext.requireTenantId();

@@ -15,11 +15,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class SalesOrderRevisionTest {
+  @org.junit.jupiter.api.BeforeEach
+  void tenant() {
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        java.util.UUID.randomUUID());
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void clearTenant() {
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
+  }
 
   private final EntityManager entityManager = mock(EntityManager.class);
   private final SalesOrderRevision revision =
       new SalesOrderRevision(
           entityManager,
+          mock(org.springframework.context.ApplicationEventPublisher.class),
           mock(SalesOrderLineRepository.class),
           mock(com.fabricmanagement.sales.orderintake.app.StockSelectionLifecycleService.class));
 

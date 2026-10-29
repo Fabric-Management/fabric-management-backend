@@ -76,6 +76,7 @@ public class CustomerApprovalService {
   private final Clock clock;
   private final ApproverAuthorities approvers;
   private final DeliveryVerificationGate deliveryGate;
+  private final SalesOrderPaymentPlanService paymentPlans;
 
   // ── Sales ──────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ public class CustomerApprovalService {
                 snapshot.hash(),
                 actor,
                 now));
+    paymentPlans.proposed(order, version);
     // A new version answers the customer's earlier change request.
     invalidator.resolveChangeRequests(order.getId());
     CustomerApproval approval =
@@ -195,6 +197,80 @@ public class CustomerApprovalService {
     return state(order, actor);
   }
 
+  /** Submit a specific revision; a repeat of an already proposed revision sends no second mail. */
+  @Transactional
+  public CustomerApprovalDtos.State submitPaymentPlan(
+      UUID orderId,
+      UUID revisionId,
+      com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Submit input,
+      UUID actor) {
+    var revision = paymentPlans.requireSubmission(orderId, revisionId, input, actor);
+    if (revision.getState()
+        != com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.State.DRAFT)
+      return state(orderId, actor);
+    SalesOrder order = writableLocked(orderId, actor);
+    if (order.getStatus() == OrderStatus.DRAFT)
+      return sendForApproval(
+          orderId, new CustomerApprovalDtos.SendForApproval(input.linkValidHours()), actor);
+    UUID tenantId = TenantContext.requireTenantId();
+    Instant now = clock.instant();
+    var authorised = approvers.resolve(order);
+    if (authorised.block() != null) throw refusal(authorised.block(), order);
+    var approver = authorised.approver();
+    var snapshot = snapshotter.snapshot(tenantId, order, null);
+    // Amendment readiness is checked even though there is no planning proposal.
+    paymentPlans.snapshot(order, true);
+    OrderVersion version =
+        versions.save(
+            OrderVersion.freeze(
+                orderId,
+                latestVersion(tenantId, orderId),
+                OrderVersionKind.PAYMENT_PLAN,
+                order.getPlanningRound(),
+                order.getPlanningEvaluation(),
+                null,
+                snapshot.content(),
+                snapshot.hash(),
+                actor,
+                now));
+    paymentPlans.proposed(order, version);
+    invalidator.withdrawOpen(orderId, "A new payment plan revision was submitted", actor);
+    invalidator.resolveChangeRequests(orderId);
+    var approval =
+        CustomerApproval.request(
+            version,
+            approver.authorityId(),
+            approver.name(),
+            approver.email(),
+            now.plus(
+                java.time.Duration.ofHours(
+                    input.linkValidHours() == null
+                        ? CustomerApproval.DEFAULT_LINK_HOURS
+                        : input.linkValidHours())),
+            input.linkValidHours(),
+            actor,
+            now);
+    boolean internal =
+        approvalPort.requiresApproval(
+            tenantId,
+            actor,
+            OrderApprovalInvalidator.APPROVAL_ENTITY,
+            orderId,
+            snapshot.content().totals().stream()
+                .map(
+                    total ->
+                        com.fabricmanagement.common.util.Money.of(total.total(), total.currency()))
+                .toList());
+    if (internal) {
+      approval.awaitInternalApproval(
+          approvalPort
+              .pendingRequestId(tenantId, OrderApprovalInvalidator.APPROVAL_ENTITY, orderId)
+              .orElseThrow());
+      approvals.save(approval);
+    } else sendLink(tenantId, order, approval, snapshot.content(), actor);
+    return state(orderId, actor);
+  }
+
   /**
    * Sends a new link for the same version to the same representative, at the address their
    * authority was granted for. The earlier link, code and session stop working; the version and its
@@ -207,7 +283,15 @@ public class CustomerApprovalService {
     SalesOrder order = writableLocked(orderId, actor);
     UUID tenantId = TenantContext.requireTenantId();
     CustomerApproval approval = openApproval(tenantId, order.getId()).orElse(null);
-    String reason = resendBlock(order, approval, clock.instant());
+    boolean amendment =
+        approval != null
+            && order.isPaymentPlanManaged()
+            && versionOf(tenantId, approval).getKind() == OrderVersionKind.PAYMENT_PLAN;
+    if (amendment) paymentPlans.assertApprovalCurrent(order, versionOf(tenantId, approval));
+    String reason =
+        amendment
+            ? (approval.isOpenAt(clock.instant()) ? null : "APPROVAL_CLOSED")
+            : resendBlock(order, approval, clock.instant());
     if (reason != null) {
       throw refusal(reason, order);
     }
@@ -266,6 +350,20 @@ public class CustomerApprovalService {
     }
     SalesOrder order = locked(found.get().getSalesOrderId());
     CustomerApproval approval = found.get();
+    if (order.isPaymentPlanManaged()
+        && versionOf(tenantId, approval).getKind() == OrderVersionKind.PAYMENT_PLAN) {
+      if (!approval.awaitsInternalApproval()) return;
+      var frozen = versionOf(tenantId, approval);
+      try {
+        paymentPlans.assertApprovalCurrent(order, frozen);
+        approval.internallyApproved(clock.instant());
+        sendLink(tenantId, order, approval, frozen.getContent(), SystemUser.ID);
+      } catch (OrderDomainException failure) {
+        approval.withdraw(failure.getMessage(), SystemUser.ID, clock.instant());
+        approvals.save(approval);
+      }
+      return;
+    }
     if (!approval.awaitsInternalApproval()
         || order.getFlowStage() != OrderFlowStage.AWAITING_INTERNAL_APPROVAL) {
       log.info(
@@ -327,6 +425,14 @@ public class CustomerApprovalService {
     }
     SalesOrder order = locked(found.get().getSalesOrderId());
     CustomerApproval approval = found.get();
+    if (order.isPaymentPlanManaged()
+        && versionOf(tenantId, approval).getKind() == OrderVersionKind.PAYMENT_PLAN) {
+      if (approval.awaitsInternalApproval()) {
+        approval.internallyRejected(reason, clock.instant());
+        approvals.save(approval);
+      }
+      return;
+    }
     if (!approval.awaitsInternalApproval()
         || order.getFlowStage() != OrderFlowStage.AWAITING_INTERNAL_APPROVAL) {
       return;

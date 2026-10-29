@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.app.onboarding;
 
+import com.fabricmanagement.platform.subscription.app.EvaluationSubscriptionService;
 import com.fabricmanagement.platform.subscription.app.SubscriptionService;
 import com.fabricmanagement.platform.subscription.dto.CreateInitialSubscriptionsResult;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 public class CreateSubscriptionsStep implements OnboardingStep {
 
   private final SubscriptionService subscriptionService;
+  private final EvaluationSubscriptionService evaluations;
 
   @Override
   public void execute(OnboardingContext context) {
@@ -34,7 +36,10 @@ public class CreateSubscriptionsStep implements OnboardingStep {
       selectedOS = List.of("FabricOS");
     }
     CreateInitialSubscriptionsResult result =
-        subscriptionService.createInitialSubscriptions(tenantId, selectedOS, trialDays);
+        "PLAYGROUND".equals(context.getSignupIntent()) && !context.isSalesLed()
+            ? evaluations.initialisePlayground(tenantId)
+            : subscriptionService.createInitialSubscriptions(tenantId, selectedOS, trialDays);
+    context.setSelectedOS(result.getOsCodes());
     context.setSubscriptionOsCodes(result.getOsCodes());
     context.setTrialEndsAt(result.getTrialEndsAt());
     log.debug("CreateSubscriptionsStep: osCodes={}", result.getOsCodes());

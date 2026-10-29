@@ -23,6 +23,8 @@ class StockSelectionLifecycleServiceTest {
   @Mock SalesOrderLineRepository lines;
   @Mock StockUnitSoftHoldPort holds;
   @Mock StockUnitOwnershipPort ownership;
+  @Mock ProvisionalStockLifecycleService provisional;
+  @Mock com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanLifecyclePort cutPlans;
   @InjectMocks StockSelectionLifecycleService lifecycle;
   UUID tenant = UUID.randomUUID();
   SalesOrder order;
@@ -78,11 +80,12 @@ class StockSelectionLifecycleServiceTest {
   }
 
   @Test
-  void changingWidthReleasesOnlyTheAffectedChoiceAndRestoresCustomerRequest() {
+  void changingWidthReleasesOnlyTheAffectedChoiceWithoutRenegotiatingQuantity() {
     line.setFinishedWidth(new BigDecimal("160"));
     lifecycle.releaseChanged(order);
     assertThat(selected.getState()).isEqualTo(DraftStockSelection.State.RELEASED);
-    assertThat(line.getRequestedQty()).isEqualByComparingTo("700");
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("665");
+    assertThat(line.getCustomerRequestQty()).isEqualByComparingTo("700");
     verify(holds).releaseHolds(line.getId());
     verify(ownership).lockProduct(line.getProductId());
   }
@@ -94,6 +97,40 @@ class StockSelectionLifecycleServiceTest {
     assertThat(line.getRequestedQty()).isEqualByComparingTo("800");
     assertThat(line.getCustomerRequestQty()).isEqualByComparingTo("800");
     verify(holds).releaseHolds(line.getId());
+  }
+
+  @Test
+  void aMaterialEditAlsoReleasesCandidatesShownForASavedLineBeforeApply() {
+    var candidate =
+        DraftStockSelection.open(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            line.getProductId(),
+            UUID.randomUUID(),
+            UUID.randomUUID());
+    candidate.bindTarget(order.getId(), line.getId());
+    var request =
+        new com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest(
+            line.getProductId(),
+            line.getColorId(),
+            line.getFinishedWidth(),
+            line.getFinishedWidthUnit(),
+            order.getTradingPartnerId(),
+            line.getCustomerRequestQty(),
+            line.getUnit(),
+            false,
+            null,
+            null,
+            null);
+    candidate.hold(
+        request, null, List.of(UUID.randomUUID()), java.time.Instant.now().plusSeconds(90));
+    when(selections.findByTenantIdAndTargetOrderIdAndState(
+            tenant, order.getId(), DraftStockSelection.State.HELD))
+        .thenReturn(List.of(candidate));
+    line.setFinishedWidth(new BigDecimal("160"));
+    lifecycle.releaseChanged(order);
+    verify(provisional).ownerLine(line.getId());
+    assertThat(line.getRequestedQty()).isEqualByComparingTo("665");
   }
 
   @Test

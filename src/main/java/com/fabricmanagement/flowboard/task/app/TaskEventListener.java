@@ -63,6 +63,7 @@ public class TaskEventListener {
     // 2. AutomationEngine çağrısı (DB'den temiz güncel state çekilerek LazyInit önlenir)
     taskRepo
         .findById(event.getTaskId())
+        .filter(task -> task.getTaskType() != TaskType.COLLECTION_FOLLOW_UP)
         .ifPresent(
             task ->
                 automationEngine.evaluate(
@@ -88,7 +89,8 @@ public class TaskEventListener {
               // Governed ORDER_COVER routing did not publish this event before DECISION-FOLLOW-1.
               // Its durable event feeds follow/projection listeners, but must not newly execute
               // legacy board automations or emit a WebSocket side effect for system routing.
-              if (task.getTaskType() == TaskType.ORDER_COVER
+              if ((task.getTaskType() == TaskType.ORDER_COVER
+                      || task.getTaskType() == TaskType.COLLECTION_FOLLOW_UP)
                   && event.getOrigin() == TaskAssignedEvent.Origin.ROUTING_EVALUATION) {
                 return;
               }

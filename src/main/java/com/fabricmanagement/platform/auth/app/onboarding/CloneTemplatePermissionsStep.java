@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
  * in the async ownership listener. The legacy playground clone and start-up reference provisioning
  * already copy the policy; self-service onboarding did not.
  *
- * <p>This step uses BYPASSRLS (SystemTransactionExecutor) to read permission templates from the
- * TEMPLATE tenant and insert them into the new tenant's scope. This ensures that non-ADMIN users
+ * <p>The template's rows are read through the system connection (BYPASSRLS) and inserted into the
+ * new tenant's scope on the onboarding transaction itself. This ensures that non-ADMIN users
  * (managers, supervisors, workers) resolve correct permissions when they are eventually created.
  *
  * <p>Idempotent: skips cloning if the target tenant already has permission_template rows.
@@ -49,9 +49,13 @@ public class CloneTemplatePermissionsStep implements OnboardingStep {
       return;
     }
 
+    // On the onboarding transaction (ONBOARD-ATOMIC-1), like the roles.
     int clonedCount =
-        tenantClonerService.clonePermissionTemplatesToTenant(templateTenantId, targetTenantId);
-    int ownershipPolicies = tenantClonerService.cloneOwnershipPolicyToTenant(targetTenantId);
+        tenantClonerService.clonePermissionTemplatesInCallerTransaction(
+            templateTenantId, targetTenantId);
+    int ownershipPolicies =
+        tenantClonerService.cloneOwnershipPolicyInCallerTransaction(
+            templateTenantId, targetTenantId);
     log.info(
         "CloneTemplatePermissionsStep: ownership policy provisioned={} for tenant ({})",
         ownershipPolicies,

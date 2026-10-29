@@ -18,6 +18,8 @@ public interface BatchLotQuantityIntentPort {
       LocalDate expiresAt,
       Collection<LotIntentRequest> intents);
 
+  boolean hasActiveIntents(UUID ownerLineId);
+
   void releaseIntents(UUID quoteLineId);
 
   /** Re-align active intent expiry with the quote's current valid-until (advisory metadata). */

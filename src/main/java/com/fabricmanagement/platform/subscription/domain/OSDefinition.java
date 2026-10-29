@@ -26,12 +26,15 @@ import org.hibernate.annotations.Type;
  *
  * <h2>Module Inclusion:</h2>
  *
- * <p>includedModules defines which business modules are accessible:
+ * <p>includedModules lists the permission resources the package opens, the same names the API
+ * checks in {@code @auth.can(authentication, 'yarn', 'read')}. A tenant whose packages do not
+ * include a listed resource is refused it, whatever its users' roles (see {@code
+ * PackageAccessAdapter}); a resource no package lists stays open:
  *
  * <pre>
- * YarnOS includes: ["production.fiber", "production.yarn"]
- * LoomOS includes: ["production.weaving"]
- * FabricOS includes: ["auth", "user", "policy", "audit", "company"]
+ * FabricOS includes: ["sales", "products", "fiber", "fabric", "colors", "logistics", ...]
+ * YarnOS includes: ["yarn"]
+ * AccountOS includes: ["finance"]
  * </pre>
  *
  * <h2>Pricing Tiers:</h2>
@@ -94,6 +97,11 @@ public class OSDefinition extends BaseEntity {
    */
   @Column(name = "default_tier", length = 50)
   private String defaultTier;
+
+  /** Explicit opt-out for internal or customer-specific catalogue definitions. */
+  @Column(name = "evaluation_available", nullable = false)
+  @Builder.Default
+  private boolean evaluationAvailable = true;
 
   public boolean includesModule(String modulePath) {
     return includedModules.stream()

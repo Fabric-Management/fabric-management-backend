@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.domain.strategy;
 
+import com.fabricmanagement.common.infrastructure.logging.LogSafeFailure;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.mail.MessagingException;
@@ -149,8 +150,11 @@ public class EmailStrategy implements VerificationStrategy {
 
       log.debug("✅ Custom email sent successfully to: {}", PiiMaskingUtil.maskEmail(recipient));
     } catch (Exception e) {
-      log.error("❌ Failed to send custom email to: {}", PiiMaskingUtil.maskEmail(recipient), e);
-      throw new RuntimeException("Email sending failed: " + e.getMessage(), e);
+      log.error(
+          "Custom email delivery failed: recipient={}",
+          PiiMaskingUtil.maskEmail(recipient),
+          LogSafeFailure.snapshot(e));
+      throw new RuntimeException("Email sending failed", e);
     }
   }
 

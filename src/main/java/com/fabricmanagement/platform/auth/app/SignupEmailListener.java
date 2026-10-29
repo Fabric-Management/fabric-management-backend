@@ -1,5 +1,7 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.logging.LogSafeFailure;
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.web.LocalizationService;
 import com.fabricmanagement.platform.auth.domain.event.SelfSignupCompletedEvent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
@@ -24,19 +26,29 @@ public class SignupEmailListener {
   private final LocalizationService localizationService;
 
   @Async
+  @SensitiveLogData
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onSelfSignupCompleted(SelfSignupCompletedEvent event) {
-    Locale locale = Locale.forLanguageTag(event.getLocaleLanguageTag());
-
-    if (event.isSalesLed()) {
-      sendSalesLedWelcome(event, locale);
-    } else {
-      sendSelfServiceSetup(event, locale);
+    try {
+      Locale locale = Locale.forLanguageTag(event.getLocaleLanguageTag());
+      if (event.isSalesLed()) {
+        sendSalesLedWelcome(event, locale);
+      } else {
+        sendSelfServiceSetup(event, locale);
+      }
+    } catch (RuntimeException failure) {
+      log.error(
+          "Signup email submission failed: eventId={}, tenantId={}",
+          event.getEventId(),
+          event.getTenantId(),
+          LogSafeFailure.snapshot(failure));
+      throw failure;
     }
 
     log.info(
-        "Signup email sent: recipient={}, salesLed={}",
-        maskEmail(event.getRecipientEmail()),
+        "Signup email submitted: eventId={}, tenantId={}, salesLed={}",
+        event.getEventId(),
+        event.getTenantId(),
         event.isSalesLed());
   }
 
@@ -72,12 +84,5 @@ public class SignupEmailListener {
         .map(os -> "<li style='margin: 10px 0; color: #374151;'>" + os + "</li>")
         .reduce((a, b) -> a + b)
         .orElse("<li style='margin: 10px 0; color: #374151;'>None</li>");
-  }
-
-  private String maskEmail(String email) {
-    if (email == null) {
-      return "";
-    }
-    return email.replaceAll("(.).*@", "$1***@");
   }
 }

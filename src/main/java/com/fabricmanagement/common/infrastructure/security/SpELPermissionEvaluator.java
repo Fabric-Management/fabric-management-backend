@@ -1,16 +1,43 @@
 package com.fabricmanagement.common.infrastructure.security;
 
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
-import lombok.RequiredArgsConstructor;
+import com.fabricmanagement.common.infrastructure.tenant.PackageAccessPort;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
+/**
+ * The single door every {@code @PreAuthorize("@auth.can(...)")} endpoint goes through.
+ *
+ * <p>Access needs two independent yeses: the user's role/department permission, and the tenant's
+ * packages ({@link PackageAccessPort}). The package check is not a permission and is not bypassed
+ * by an administrator role; only platform staff operating across tenants skip it.
+ */
 @Component("auth")
-@RequiredArgsConstructor
 public class SpELPermissionEvaluator {
+
+  private static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
 
   private final PermissionEvaluator permissionEvaluator;
   private final AuthenticatedUserContextResolver contextResolver;
+  private final Optional<PackageAccessPort> packages;
+
+  @Autowired
+  public SpELPermissionEvaluator(
+      PermissionEvaluator permissionEvaluator,
+      AuthenticatedUserContextResolver contextResolver,
+      Optional<PackageAccessPort> packages) {
+    this.permissionEvaluator = permissionEvaluator;
+    this.contextResolver = contextResolver;
+    this.packages = packages;
+  }
+
+  /** Role-only evaluator for slices that have no package catalogue (every resource stays open). */
+  public SpELPermissionEvaluator(
+      PermissionEvaluator permissionEvaluator, AuthenticatedUserContextResolver contextResolver) {
+    this(permissionEvaluator, contextResolver, Optional.empty());
+  }
 
   /** Used in SpEL expressions: @PreAuthorize("@auth.can(authentication, 'sales', 'write')") */
   public boolean can(Authentication authentication, String resource, String action) {
@@ -27,7 +54,7 @@ public class SpELPermissionEvaluator {
         permissionEvaluator.evaluate(
             ctx.tenantId(), ctx.roleCode(), ctx.departmentCodes(), ctx.userId());
 
-    return result.can(resource, action);
+    return result.can(resource, action) && packageOpens(ctx, resource);
   }
 
   /**
@@ -58,6 +85,17 @@ public class SpELPermissionEvaluator {
     com.fabricmanagement.platform.user.domain.DataScope reqScope =
         com.fabricmanagement.platform.user.domain.DataScope.valueOf(requiredScope.toUpperCase());
 
-    return userScope.compareTo(reqScope) >= 0;
+    return userScope.compareTo(reqScope) >= 0 && packageOpens(ctx, resource);
+  }
+
+  private boolean packageOpens(AuthenticatedUserContext ctx, String resource) {
+    if (PLATFORM_ADMIN.equals(ctx.roleCode())) {
+      return true;
+    }
+    boolean open = packages.map(port -> port.isResourceOpen(ctx.tenantId(), resource)).orElse(true);
+    if (!open) {
+      PackageAccessDenial.record(resource);
+    }
+    return open;
   }
 }

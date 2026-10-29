@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.events.TenantSettingsUpdatedEvent;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantSettingsUnreadableException;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
@@ -21,7 +22,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +55,8 @@ public class TenantSystemService {
   private final DomainEventPublisher eventPublisher;
   private final SystemTransactionExecutor systemExecutor;
   private final ObjectMapper objectMapper;
+  private final TenantUnderCreation tenantUnderCreation;
+  private final TenantSessionBinder tenantSessionBinder;
 
   // ========================================
   // CREATE OPERATIONS
@@ -62,19 +65,26 @@ public class TenantSystemService {
   /**
    * Create a new tenant.
    *
+   * <p>The row is written on the caller's own (primary) connection, inside the caller's
+   * transaction, so a signup that fails later leaves no tenant behind (ONBOARD-ATOMIC-1). Every
+   * later write of the new tenant (clones, demo data) must go through that same connection too:
+   * until the caller commits, no other connection can see the row, and a row that references it
+   * fails its foreign key at once.
+   *
+   * <p>The transaction's session is left bound to the new tenant ({@code app.current_tenant}): the
+   * tenant table's row-level policy admits only the row whose id is the session's tenant, and the
+   * caller's next writes are the new tenant's.
+   *
+   * <p>While the caller's transaction is open, reads of the new tenant (this class, {@link
+   * TenantService}, {@code TenantQueryAdapter}) are served on that connection; see {@link
+   * TenantUnderCreation}.
+   *
    * @param request Creation request
    * @return Created tenant DTO
    */
-  // CR-P4-2: Keep @Transactional to provide a transaction boundary for
-  // @TransactionalEventListener(AFTER_COMMIT)
-  // in QualityGradeSeedListener. The actual DB insert bypasses this via SystemTransactionExecutor.
-  //
-  // ⚠ DUAL-TX RISK: The systemExecutor INSERT commits on its own TransactionManager.
-  // If the outer @Transactional rolls back (e.g., event listener throws), the INSERT
-  // is NOT rolled back → orphan tenant row in DB without seed data.
-  // Accepted because: (1) eventPublisher.publish() is synchronous and listeners are
-  // @Async @TransactionalEventListener(AFTER_COMMIT), so they run AFTER this method
-  // returns successfully; (2) manual cleanup is preferable to cross-DataSource XA.
+  // Keep @Transactional (REQUIRED): this is a write on the caller's connection, and it provides the
+  // transaction boundary @TransactionalEventListener(AFTER_COMMIT) listeners need
+  // (QualityGradeSeedListener). Both callers already run inside a primary transaction.
   @Transactional
   public TenantDto createTenant(CreateTenantRequest request) {
     log.debug("Creating tenant: name={}", request.getName());
@@ -85,7 +95,8 @@ public class TenantSystemService {
       settings = TenantSettings.defaults();
     }
 
-    // Create tenant via system executor (BYPASSRLS) — tenant table has self-row RLS
+    // Create the tenant on the caller's connection — the tenant table has self-row RLS, so the
+    // session is bound to the new id for the insert (see insertTenant).
     TenantType type = request.getType() != null ? request.getType() : TenantType.REGULAR;
     TenantStatus status = request.getTrialDays() > 0 ? TenantStatus.TRIAL : TenantStatus.ACTIVE;
     Instant trialEndsAt =
@@ -98,6 +109,8 @@ public class TenantSystemService {
         insertTenantWithIdentityRetry(request, type, status, settingsJson, trialEndsAt);
     UUID tenantId = insert.tenantId();
     String uid = insert.uid();
+    // From here until the commit, reads of this tenant must use the transaction's connection.
+    tenantUnderCreation.register(tenantId);
 
     // CR-1: Set TenantContext BEFORE event publish so that:
     // 1. TenantRestoringEventListenerAspect can propagate the correct tenantId
@@ -114,7 +127,7 @@ public class TenantSystemService {
 
       log.info("Tenant created: id={}, uid={}, status={}", tenantId, uid, status);
 
-      // Return DTO via system executor (self-row RLS blocks fabric_app from seeing other tenants)
+      // Read the DTO back on the same connection: the system connection cannot see the new row yet.
       return findByIdSystem(tenantId)
           .orElseThrow(
               () -> new IllegalStateException("Tenant just created but not found: " + tenantId));
@@ -129,6 +142,13 @@ public class TenantSystemService {
 
   private record TenantIdentityInsert(UUID tenantId, String uid) {}
 
+  /**
+   * Reserves a unique uid and slug by inserting the row. Candidates are chosen from committed rows
+   * (the system connection), so a concurrent signup for the same company name can pick the same
+   * ones; the loser's insert waits on the unique index until the other transaction ends, and when
+   * that one commits, writes nothing ({@code ON CONFLICT DO NOTHING}) and is retried with fresh
+   * candidates. No exception path: a failed statement would leave the whole transaction unusable.
+   */
   private TenantIdentityInsert insertTenantWithIdentityRetry(
       CreateTenantRequest request,
       TenantType type,
@@ -136,26 +156,31 @@ public class TenantSystemService {
       String settingsJson,
       Instant trialEndsAt) {
     for (int attempt = 1; attempt <= TENANT_IDENTITY_INSERT_MAX_ATTEMPTS; attempt++) {
+      UUID tenantId = UUID.randomUUID();
       String uid = generateUid(request.getName());
       String slug = generateUniqueSlug(request.getName());
-      try {
-        UUID tenantId = insertTenant(request, type, status, settingsJson, trialEndsAt, uid, slug);
+      if (insertTenant(tenantId, request, type, status, settingsJson, trialEndsAt, uid, slug)) {
         return new TenantIdentityInsert(tenantId, uid);
-      } catch (DataIntegrityViolationException e) {
-        if (!isTenantIdentityCollision(e) || attempt == TENANT_IDENTITY_INSERT_MAX_ATTEMPTS) {
-          throw e;
-        }
-        log.warn(
-            "Tenant identity collision while creating tenant '{}', retrying ({}/{})",
-            request.getName(),
-            attempt,
-            TENANT_IDENTITY_INSERT_MAX_ATTEMPTS);
       }
+      log.warn(
+          "Tenant identity taken while creating tenant '{}', retrying ({}/{})",
+          request.getName(),
+          attempt,
+          TENANT_IDENTITY_INSERT_MAX_ATTEMPTS);
     }
-    throw new IllegalStateException("Tenant identity retry loop exhausted unexpectedly");
+    throw new IllegalStateException(
+        "No free tenant uid/slug for '"
+            + request.getName()
+            + "' after "
+            + TENANT_IDENTITY_INSERT_MAX_ATTEMPTS
+            + " attempts");
   }
 
-  private UUID insertTenant(
+  /**
+   * @return true when the row was written, false when its uid, slug or id was already taken
+   */
+  private boolean insertTenant(
+      UUID id,
       CreateTenantRequest request,
       TenantType type,
       TenantStatus status,
@@ -163,45 +188,35 @@ public class TenantSystemService {
       Instant trialEndsAt,
       String uid,
       String slug) {
-    return systemExecutor.executeInTransaction(
-        jdbc -> {
-          UUID id = UUID.randomUUID();
-          // A tenant born in demo mode is born sandboxed: its users may not email a third party.
-          // The two flags are separate columns because they diverge later — TenantGoRealService
-          // clears demo_mode when a prospect converts, and the sandbox must lift with it, but a
-          // paying customer who later re-seeds demo data must not have their mail redirected.
-          boolean emailSandboxed = request.isDemoMode() || type == TenantType.PLAYGROUND;
-          jdbc.update(
-              "INSERT INTO common_tenant.common_tenant "
-                  + "(id, uid, slug, name, type, status, settings, billing_email, "
-                  + "trial_ends_at, demo_mode, email_sandboxed, is_active, created_at, updated_at, version) "
-                  + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, true, now(), now(), 0)",
-              id,
-              uid,
-              slug,
-              request.getName(),
-              type.name(),
-              status.name(),
-              settingsJson,
-              request.getBillingEmail(),
-              trialEndsAt != null ? java.sql.Timestamp.from(trialEndsAt) : null,
-              request.isDemoMode(),
-              emailSandboxed);
-          return id;
-        });
-  }
-
-  private boolean isTenantIdentityCollision(DataIntegrityViolationException exception) {
-    Throwable current = exception;
-    while (current != null) {
-      String message = current.getMessage();
-      if (message != null
-          && (message.contains("uk_tenant_uid") || message.contains("uk_tenant_slug"))) {
-        return true;
-      }
-      current = current.getCause();
-    }
-    return false;
+    // The tenant table's policy (id = current_setting('app.current_tenant')) checks the new row
+    // too, so the session is bound to the new id first.
+    tenantSessionBinder.bindToCurrentSession(id);
+    // A tenant born in demo mode is born sandboxed: its users may not email a third party.
+    // The two flags are separate columns because they diverge later — TenantGoRealService
+    // clears demo_mode when a prospect converts, and the sandbox must lift with it, but a
+    // paying customer who later re-seeds demo data must not have their mail redirected.
+    boolean emailSandboxed = request.isDemoMode() || type == TenantType.PLAYGROUND;
+    int written =
+        tenantUnderCreation
+            .primaryJdbc()
+            .update(
+                "INSERT INTO common_tenant.common_tenant "
+                    + "(id, uid, slug, name, type, status, settings, billing_email, "
+                    + "trial_ends_at, demo_mode, email_sandboxed, is_active, created_at, updated_at, version) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, true, now(), now(), 0) "
+                    + "ON CONFLICT DO NOTHING",
+                id,
+                uid,
+                slug,
+                request.getName(),
+                type.name(),
+                status.name(),
+                settingsJson,
+                request.getBillingEmail(),
+                trialEndsAt != null ? java.sql.Timestamp.from(trialEndsAt) : null,
+                request.isDemoMode(),
+                emailSandboxed);
+    return written == 1;
   }
 
   // ========================================
@@ -228,11 +243,10 @@ public class TenantSystemService {
    * @return Tenant if found and active
    */
   public Optional<TenantDto> findActiveById(UUID id) {
-    return systemExecutor
-        .executeQuery(
+    return readTenantRow(
+            id,
             "SELECT * FROM common_tenant.common_tenant WHERE id = ? AND is_active = true",
-            TenantRowMapper.INSTANCE,
-            id)
+            TenantRowMapper.INSTANCE)
         .stream()
         .findFirst();
   }
@@ -332,11 +346,21 @@ public class TenantSystemService {
   public TenantSettings requireSettings(UUID tenantId) {
     String settingsJson;
     try {
-      settingsJson =
-          systemExecutor.executeQueryForObject(
-              "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
-              (rs, i) -> rs.getString("settings"),
-              tenantId);
+      RowMapper<String> settingsMapper = (rs, i) -> rs.getString("settings");
+      if (tenantUnderCreation.isUnderCreation(tenantId)) {
+        List<String> rows =
+            readTenantRow(
+                tenantId,
+                "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
+                settingsMapper);
+        settingsJson = rows.isEmpty() ? null : rows.getFirst();
+      } else {
+        settingsJson =
+            systemExecutor.executeQueryForObject(
+                "SELECT settings FROM common_tenant.common_tenant WHERE id = ?",
+                settingsMapper,
+                tenantId);
+      }
     } catch (Exception e) {
       throw new TenantSettingsUnreadableException(tenantId, e);
     }
@@ -567,6 +591,10 @@ public class TenantSystemService {
    * @return true if tenant exists
    */
   public boolean exists(UUID tenantId) {
+    return tenantUnderCreation.isUnderCreation(tenantId) || existsCommitted(tenantId);
+  }
+
+  private boolean existsCommitted(UUID tenantId) {
     Integer count =
         systemExecutor.executeQueryForObject(
             "SELECT count(*) FROM common_tenant.common_tenant WHERE id = ?",
@@ -623,13 +651,27 @@ public class TenantSystemService {
     return count != null && count > 0;
   }
 
-  /** CR-3: Reusable system-level find by ID. */
+  /**
+   * CR-3: Reusable system-level find by ID (on the caller's connection for a tenant it creates).
+   */
   private Optional<TenantDto> findByIdSystem(UUID id) {
-    return systemExecutor
-        .executeQuery(
-            "SELECT * FROM common_tenant.common_tenant WHERE id = ?", TenantRowMapper.INSTANCE, id)
+    return readTenantRow(
+            id, "SELECT * FROM common_tenant.common_tenant WHERE id = ?", TenantRowMapper.INSTANCE)
         .stream()
         .findFirst();
+  }
+
+  /**
+   * Reads one tenant row by id ({@code sql} has the id as its only parameter). The tenant this
+   * transaction is creating is read on the transaction's connection, bound to that tenant, because
+   * no other connection can see the uncommitted row; every other tenant is read through the system
+   * connection (the table's self-row policy would hide it from {@code fabric_app}).
+   */
+  private <T> List<T> readTenantRow(UUID id, String sql, RowMapper<T> mapper) {
+    if (tenantUnderCreation.isUnderCreation(id)) {
+      return tenantUnderCreation.primaryJdbc().query(sql, mapper, id);
+    }
+    return systemExecutor.executeQuery(sql, mapper, id);
   }
 
   /** CR-12: Use injected ObjectMapper instead of creating a new one per call. */

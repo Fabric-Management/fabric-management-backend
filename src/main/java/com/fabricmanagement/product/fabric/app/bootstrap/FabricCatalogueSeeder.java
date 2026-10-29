@@ -10,12 +10,14 @@ import static com.fabricmanagement.product.fabric.domain.vocabulary.FinishingCha
 import static com.fabricmanagement.product.fabric.domain.vocabulary.FinishingChargeUnit.M;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.product.fabric.domain.pricing.FabricFinishingPriceClass;
 import com.fabricmanagement.product.fabric.domain.reference.FabricConstruction;
 import com.fabricmanagement.product.fabric.domain.reference.FabricFinishingProcess;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricConstructionFamily;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FabricFinishingCategory;
 import com.fabricmanagement.product.fabric.domain.vocabulary.FinishingChargeUnit;
 import com.fabricmanagement.product.fabric.infra.repository.FabricConstructionRepository;
+import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingPriceClassRepository;
 import com.fabricmanagement.product.fabric.infra.repository.FabricFinishingProcessRepository;
 import java.util.List;
 import java.util.Set;
@@ -27,10 +29,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The constructions (FABRIC-ARCHITECTURE F3) and finishing processes (FABRIC-3a) FabricOS provides,
- * seeded into the template tenant and copied from there to every tenant as system-defined rows a
- * tenant may rename but not remove. British English names; Turkish is a translation, never the
- * source (root AGENTS.md).
+ * The constructions (FABRIC-ARCHITECTURE F3), finishing processes (FABRIC-3a) and finishing price
+ * classes (FABRIC-3c) FabricOS provides, seeded into the template tenant and copied from there to
+ * every tenant as system-defined rows a tenant may rename but not remove. British English names;
+ * Turkish is a translation, never the source (root AGENTS.md).
  */
 @Component
 @RequiredArgsConstructor
@@ -216,8 +218,22 @@ public class FabricCatalogueSeeder {
           finishing("COATING", "Coating", "A coated layer, such as PU or PVC.", 51, COATING, M),
           finishing("LAMINATING", "Laminating", "A bonded film or fabric.", 52, COATING, M));
 
+  /** One finishing price class FabricOS ships; a tenant renames them and adds its own. */
+  public record PriceClassSeed(String code, String name, String description, int displayOrder) {}
+
+  private static final List<PriceClassSeed> PRICE_CLASSES =
+      List.of(
+          new PriceClassSeed("LIGHT", "Light", "Pale shades, a low dye percentage.", 1),
+          new PriceClassSeed("MEDIUM", "Medium", "Mid shades.", 2),
+          new PriceClassSeed("DARK", "Dark", "Deep shades, a high dye percentage.", 3),
+          new PriceClassSeed("EXTRA_DARK", "Extra dark", "The deepest shades.", 4),
+          new PriceClassSeed("BLACK", "Black", "Priced as a line of its own.", 5),
+          new PriceClassSeed("ROYAL", "Royal blue", "Priced as a line of its own.", 6),
+          new PriceClassSeed("TURQUOISE", "Turquoise", "Priced as a line of its own.", 7));
+
   private final FabricConstructionRepository repository;
   private final FabricFinishingProcessRepository finishingRepository;
+  private final FabricFinishingPriceClassRepository priceClassRepository;
   private final TransactionTemplate transactionTemplate;
 
   public static List<ConstructionSeed> constructions() {
@@ -228,12 +244,18 @@ public class FabricCatalogueSeeder {
     return FINISHING_PROCESSES;
   }
 
+  public static List<PriceClassSeed> priceClasses() {
+    return PRICE_CLASSES;
+  }
+
   /**
-   * Inserts the missing system constructions and finishing processes of a tenant; returns how many
-   * rows were inserted.
+   * Inserts the missing system constructions, finishing processes and price classes of a tenant;
+   * returns how many rows were inserted.
    */
   public int seed(UUID tenantId) {
-    return seedConstructions(tenantId) + seedFinishingProcesses(tenantId);
+    return seedConstructions(tenantId)
+        + seedFinishingProcesses(tenantId)
+        + seedPriceClasses(tenantId);
   }
 
   private int seedConstructions(UUID tenantId) {
@@ -295,6 +317,35 @@ public class FabricCatalogueSeeder {
                   finishingRepository.saveAll(missing);
                   if (!missing.isEmpty()) {
                     log.info("Seeded {} finishing processes for {}", missing.size(), tenantId);
+                  }
+                  return missing.size();
+                }));
+  }
+
+  private int seedPriceClasses(UUID tenantId) {
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () ->
+            transactionTemplate.execute(
+                status -> {
+                  List<FabricFinishingPriceClass> missing =
+                      PRICE_CLASSES.stream()
+                          .filter(
+                              seed ->
+                                  !priceClassRepository.existsByTenantIdAndCode(
+                                      tenantId, seed.code()))
+                          .map(
+                              seed ->
+                                  FabricFinishingPriceClass.defineSystem(
+                                      tenantId,
+                                      seed.code(),
+                                      seed.name(),
+                                      seed.description(),
+                                      seed.displayOrder()))
+                          .toList();
+                  priceClassRepository.saveAll(missing);
+                  if (!missing.isEmpty()) {
+                    log.info("Seeded {} finishing price classes for {}", missing.size(), tenantId);
                   }
                   return missing.size();
                 }));

@@ -58,6 +58,19 @@ import org.springframework.web.bind.annotation.*;
 public class DraftStockSelectionController {
   private final DraftStockSelectionService service;
 
+  @PostMapping("/{id}/cut-evaluation")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      operationId = "evaluateDraftStockCut",
+      summary = "Evaluate an explicit exact cut using this draft's verified whole-source proof")
+  public ResponseEntity<
+          ApiResponse<com.fabricmanagement.production.core.stockunit.dto.StockUnitCutPlanDtos.View>>
+      previewCut(
+          @PathVariable UUID id, @Valid @RequestBody DraftStockSelectionRequests.Proof request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(service.previewCut(id, request, OrderIntakeActor.current())));
+  }
+
   @PostMapping
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(
@@ -67,6 +80,24 @@ public class DraftStockSelectionController {
       @Valid @RequestBody DraftStockSelectionRequests.Open request) {
     return ResponseEntity.ok(
         ApiResponse.success(service.open(request, OrderIntakeActor.current())));
+  }
+
+  @PostMapping("/{id}/preview")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      operationId = "previewDraftStockTarget",
+      summary = "Read stock for the verified saved target before acquiring any rolls",
+      description =
+          "Excludes only the authenticated target line's existing commitment. Does not acquire,"
+              + " renew or reserve stock.")
+  public ResponseEntity<
+          ApiResponse<com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewDto>>
+      preview(
+          @PathVariable UUID id,
+          @Valid @RequestBody
+              com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(service.preview(id, request, OrderIntakeActor.current())));
   }
 
   @GetMapping("/{id}")
@@ -84,7 +115,9 @@ public class DraftStockSelectionController {
       operationId = "acquireDraftStockSelection",
       summary = "Acquire or replace the active displayed roll proposal atomically",
       description =
-          "Called when the proposal is presented, before Apply. All requested rolls or none. Requires sales write; read-only preview never acquires stock. A retry carries the same operationId and payload.")
+          "Called when the proposal is presented, before Apply. All requested rolls or none."
+              + " Requires sales write; read-only preview never acquires stock. A retry carries the"
+              + " same operationId and payload.")
   public ResponseEntity<ApiResponse<DraftStockSelectionDto>> acquire(
       @PathVariable UUID id, @Valid @RequestBody DraftStockSelectionRequests.Acquire request) {
     return ResponseEntity.ok(
@@ -130,7 +163,9 @@ public class DraftStockSelectionController {
       operationId = "applyDraftStockSelection",
       summary = "Apply and transfer a displayed selection to a saved draft order line",
       description =
-          "Checks the order version and existing edit-field leases. Salesperson confirmation is not customer consent. New-order creation carries the same proof within its atomic create request.")
+          "Checks the order version and existing edit-field leases. Salesperson confirmation is not"
+              + " customer consent. New-order creation carries the same proof within its atomic"
+              + " create request.")
   public ResponseEntity<ApiResponse<DraftStockSelectionDto>> apply(
       @PathVariable UUID orderId,
       @PathVariable UUID lineId,
@@ -143,9 +178,10 @@ public class DraftStockSelectionController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(
       operationId = "removeAppliedStockSelection",
-      summary = "Remove an applied draft stock choice and restore its customer-request quantity",
+      summary = "Remove an applied draft stock choice without changing its commercial quantity",
       description =
-          "Versioned and idempotent. Uses the existing quantity/whole-line edit lease guard; releases only this order line's permanent holds.")
+          "Versioned and idempotent. Uses the existing quantity/whole-line edit lease guard;"
+              + " releases only this order line's permanent holds.")
   public ResponseEntity<ApiResponse<DraftStockSelectionDto>> remove(
       @PathVariable UUID orderId,
       @PathVariable UUID lineId,

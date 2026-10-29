@@ -52,11 +52,15 @@ public class TenantSeeder implements DataSeeder {
               log.info("Created Default Tenant: {} with ID: {}", tenant.getName(), tenant.getId());
 
               // Clone platform roles from Golden Template into the newly created Nexus Fabrics
-              // tenant
+              // tenant. The tenant row is written on this transaction's connection
+              // (ONBOARD-ATOMIC-1)
+              // and is invisible to any other connection until it commits, so the copies are
+              // written on this connection too.
               UUID goldenTemplateId = tenantClonerService.findTemplateTenantId();
               if (goldenTemplateId != null) {
                 int clonedRoles =
-                    tenantClonerService.cloneRolesToTenant(goldenTemplateId, tenant.getId());
+                    tenantClonerService.cloneRolesInCallerTransaction(
+                        goldenTemplateId, tenant.getId());
                 log.info("Cloned {} roles into Nexus Fabrics", clonedRoles);
               } else {
                 log.warn("Golden Template not found, roles were not cloned into Nexus Fabrics!");
@@ -66,7 +70,8 @@ public class TenantSeeder implements DataSeeder {
               // catalogue rows from Golden Template. This provisions the demo company so
               // playground cloning produces complete tenants. Chain: golden-template →
               // nexus-fabrics → playground.
-              int refTables = tenantClonerService.cloneReferenceDataToTenant(tenant.getId());
+              int refTables =
+                  tenantClonerService.cloneReferenceDataInCallerTransaction(tenant.getId());
               log.info("Cloned {} reference data tables into Nexus Fabrics", refTables);
 
               // Return tenant ID to seed transactions outside this transaction boundary

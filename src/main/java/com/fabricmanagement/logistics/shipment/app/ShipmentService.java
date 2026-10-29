@@ -46,6 +46,7 @@ public class ShipmentService {
   private final TradingPartnerService partnerService;
   private final DomainEventPublisher eventPublisher;
   private final BatchFacade batchFacade;
+  private final ExactShipmentQuantityGuard exactQuantity;
 
   private static final DateTimeFormatter SHIPMENT_NUMBER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -341,6 +342,7 @@ public class ShipmentService {
     UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
+    exactQuantity.assertPickupAllowed(shipment);
     shipment.recordPickup(carrierName, trackingNumber);
     Shipment saved = shipmentRepository.save(shipment);
 

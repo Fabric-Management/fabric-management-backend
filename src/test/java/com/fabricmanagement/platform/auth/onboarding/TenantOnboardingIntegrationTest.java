@@ -56,6 +56,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @DisplayName("Tenant onboarding integration")
 class TenantOnboardingIntegrationTest {
 
+  @org.junit.jupiter.api.BeforeEach
+  void requireMigrationCatalogue() {
+    com.fabricmanagement.testsupport.EvaluationCatalogueGuard.requireMigrationCatalogue(jdbc);
+  }
+
   @Container
   @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =

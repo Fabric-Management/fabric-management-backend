@@ -1,5 +1,7 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.logging.LogSafeFailure;
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
@@ -60,11 +62,13 @@ public class NotificationService {
    * @param message Email body
    */
   @Async
+  @SensitiveLogData
   public void sendNotification(String recipient, String subject, String message) {
     sendNotification(TenantContext.requireTenantId(), recipient, subject, message);
   }
 
   @Async
+  @SensitiveLogData
   public void sendNotification(UUID tenantId, String recipient, String subject, String message) {
     log.info("Sending notification (async) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
@@ -78,7 +82,8 @@ public class NotificationService {
         sendDirectly(tenantId, recipient, subject, message);
       }
     } catch (Exception e) {
-      log.error("❌ Failed to send notification to: {}", PiiMaskingUtil.maskEmail(recipient), e);
+      log.error(
+          "Notification submission failed: tenantId={}", tenantId, LogSafeFailure.snapshot(e));
     }
   }
 

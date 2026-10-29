@@ -56,6 +56,7 @@ class RlsAllowlistArchTest {
 
           // Permanent marketing lead; tenant-independent with nullable trial_tenant_id link
           "common_lead",
+          "lead_profile_snapshot", // Lead-owned retained evidence; deliberately tenant-independent
 
           // Audit Logs without tenantId (joined via parent entity)
           "production_execution_batch_override_log",

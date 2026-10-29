@@ -52,7 +52,9 @@ class OrderVersionStockQuantityTest {
             mock(ColorQueryService.class),
             requests,
             tenants,
-            new ObjectMapper().findAndRegisterModules());
+            new ObjectMapper().findAndRegisterModules(),
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.sales.salesorder.app.SalesOrderPaymentPlanService.class));
     var content = snapshots.snapshot(tenant, order, null).content();
     assertThat(line.getInitialRequestedQty()).isEqualByComparingTo("700");
     assertThat(content.lines().getFirst().requestQuantity()).isEqualByComparingTo("700");

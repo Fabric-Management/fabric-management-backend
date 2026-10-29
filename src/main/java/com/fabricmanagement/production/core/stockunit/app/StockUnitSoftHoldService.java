@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class StockUnitSoftHoldService implements StockUnitSoftHoldPort {
 
   private final StockUnitSoftHoldRepository repository;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitProvisionalReleasePort
+      provisional;
   private final com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository
       pieces;
   private final ApplicationEventPublisher eventPublisher;
@@ -29,14 +31,23 @@ public class StockUnitSoftHoldService implements StockUnitSoftHoldPort {
   private final com.fabricmanagement.production.core.batch.infra.repository
           .BatchLotQuantityIntentRepository
       intents;
+  private final StockUnitCutPlanGuard cutPlans;
 
   @Override
   @Transactional
   public void replaceHolds(UUID quoteLineId, Collection<UUID> stockUnitIds) {
+    replaceQuoteHolds(quoteLineId, stockUnitIds, null);
+  }
+
+  @Override
+  @Transactional
+  public void replaceQuoteHolds(
+      UUID quoteLineId, Collection<UUID> stockUnitIds, UUID ownSessionId) {
     UUID tenantId = TenantContext.requireTenantId();
     Set<UUID> requested =
         stockUnitIds == null ? Set.of() : stockUnitIds.stream().collect(Collectors.toSet());
-    ownership.assertAvailable(requested, quoteLineId, null);
+    ownership.assertAvailable(requested, quoteLineId, ownSessionId);
+    cutPlans.beforeReplace(quoteLineId);
     repository
         .findByTenantIdAndQuoteLineId(tenantId, quoteLineId)
         .forEach(
@@ -57,12 +68,16 @@ public class StockUnitSoftHoldService implements StockUnitSoftHoldPort {
   @Override
   @Transactional
   public void releaseHolds(UUID quoteLineId) {
+    provisional.releaseOwnerLine(quoteLineId);
     UUID tenantId = TenantContext.requireTenantId();
+    var physical = cutPlans.physicallyCutSources(quoteLineId);
+    cutPlans.commercialChange(quoteLineId);
     intents
         .findByTenantIdAndOwnerLineId(tenantId, quoteLineId)
         .forEach(intent -> intent.release(Instant.now()));
     repository.findByTenantIdAndOwnerLineId(tenantId, quoteLineId).stream()
         .filter(existing -> existing.getStatus() == StockUnitSoftHoldStatus.ACTIVE)
+        .filter(existing -> !physical.contains(existing.getStockUnitId()))
         .forEach(
             existing -> {
               if (existing.release(Instant.now())) {
@@ -87,6 +102,7 @@ public class StockUnitSoftHoldService implements StockUnitSoftHoldPort {
       Collection<OrderLot> lots) {
     UUID tenant = TenantContext.requireTenantId();
     ownership.assertAvailable(pieceIds, lineId, ownSessionId);
+    cutPlans.beforeReplace(lineId);
     var old = repository.findByTenantIdAndOwnerLineId(tenant, lineId);
     old.stream()
         .filter(hold -> !pieceIds.contains(hold.getStockUnitId()))
@@ -123,6 +139,19 @@ public class StockUnitSoftHoldService implements StockUnitSoftHoldPort {
                 lot.unit()));
     }
     repository.flush();
+  }
+
+  @Override
+  @Transactional
+  public void consumeAtConfirmation(UUID lineId, UUID applyingSessionId) {
+    UUID tenant = TenantContext.requireTenantId();
+    cutPlans.endSourceSessions(lineId, applyingSessionId);
+    repository
+        .findByTenantIdAndOwnerLineId(tenant, lineId)
+        .forEach(row -> row.release(Instant.now()));
+    intents.findByTenantIdAndOwnerLineId(tenant, lineId).forEach(row -> row.release(Instant.now()));
+    repository.flush();
+    intents.flush();
   }
 
   @Override

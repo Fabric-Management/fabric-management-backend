@@ -47,9 +47,21 @@ class SalesEndpointAuthorizationArchTest {
     Map<String, Category> expected = expectedClassifications();
 
     assertThat(mappedSalesMethods())
-        .hasSize(166)
+        .hasSize(180)
         .containsExactlyInAnyOrderElementsOf(expected.keySet());
-    assertThat(expected).hasSize(166);
+    assertThat(expected).hasSize(180);
+  }
+
+  @Test
+  void quantityAndQuoteStockCommandsKeepSalesPermissions() throws Exception {
+    for (String action : List.of("apply", "create", "remove", "policy"))
+      assertThat(preAuthorize("QuoteRollSelectionController", action))
+          .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+    assertThat(preAuthorize("SalesStockPlanningController", "policy"))
+        .isEqualTo("@auth.can(authentication, 'sales', 'write')");
+    for (String action : List.of("order", "quote"))
+      assertThat(preAuthorize("SalesStockPlanningController", action))
+          .isEqualTo("@auth.can(authentication, 'sales', 'read')");
   }
 
   @Test
@@ -128,12 +140,23 @@ class SalesEndpointAuthorizationArchTest {
   @Test
   void holdingStockNeedsWriteEvenWhenTheCommercialApplyHasNotHappened() throws Exception {
     for (String action :
-        List.of("open", "status", "acquire", "renew", "release", "close", "apply", "remove")) {
+        List.of(
+            "open",
+            "preview",
+            "previewCut",
+            "status",
+            "acquire",
+            "renew",
+            "release",
+            "close",
+            "apply",
+            "remove")) {
       assertThat(preAuthorize("DraftStockSelectionController", action))
           .isEqualTo("@auth.can(authentication, 'sales', 'write')");
     }
     assertThat(preAuthorize("DraftStockLiveController", "subscribe"))
-        .isEqualTo("@auth.can(authentication, 'sales', 'read')");
+        .isEqualTo(
+            "@auth.can(authentication, 'sales', 'read') or @auth.can(authentication, 'production', 'read')");
   }
 
   @Test
@@ -449,7 +472,23 @@ class SalesEndpointAuthorizationArchTest {
         "close",
         "apply",
         "remove");
-    add(result, "DraftStockSelectionController", Category.TRANSACTIONAL_READ, "status");
+    add(
+        result,
+        "DraftStockSelectionController",
+        Category.TRANSACTIONAL_READ,
+        "status",
+        "preview",
+        "previewCut");
+    add(
+        result,
+        "QuoteRollSelectionController",
+        Category.MUTATION,
+        "apply",
+        "create",
+        "remove",
+        "policy");
+    add(result, "SalesStockPlanningController", Category.TRANSACTIONAL_READ, "order", "quote");
+    add(result, "SalesStockPlanningController", Category.MUTATION, "policy");
     add(result, "DraftStockLiveController", Category.TRANSACTIONAL_READ, "subscribe");
     // SOI order intake (D1-D8).
     add(result, "OrderIntakeProductController", Category.REFERENCE_READ, "search");
@@ -568,6 +607,10 @@ class SalesEndpointAuthorizationArchTest {
         "getOrderApprovalVersion",
         "approveOrderVersion",
         "requestOrderChanges");
+    add(result, "SalesOrderPaymentPlanController", Category.TRANSACTIONAL_READ, "read", "history");
+    // preview computes and persists nothing, but it is a sales:write calculation like the order
+    // form it serves.
+    add(result, "SalesOrderPaymentPlanController", Category.MUTATION, "preview", "save", "submit");
     return Map.copyOf(result);
   }
 

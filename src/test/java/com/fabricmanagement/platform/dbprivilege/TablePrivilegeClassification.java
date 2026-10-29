@@ -18,6 +18,12 @@ final class TablePrivilegeClassification {
 
   private static Map<String, TablePrivilegeClass> entries() {
     Map<String, TablePrivilegeClass> entries = new LinkedHashMap<>();
+    entries.put("common_company.common_lead", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("common_company.lead_profile_snapshot", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("common_company.onboarding_link_issue", TablePrivilegeClass.NO_RUNTIME_ACCESS);
+    entries.put("common_company.evaluation_reconciliation", TablePrivilegeClass.NO_RUNTIME_ACCESS);
+    entries.put("common_user.onboarding_journey", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("common_user.onboarding_operation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("flowboard.routing_pool", TablePrivilegeClass.MUTABLE);
     entries.put("flowboard.routing_pool_member", TablePrivilegeClass.MUTABLE);
     entries.put("flowboard.routing_task_state", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
@@ -54,6 +60,11 @@ final class TablePrivilegeClassification {
     entries.put("production.prod_product_finished_width", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.prod_product_sales_unit", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.stock_unit_cut", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    // Traceable roll cut plans: plans and sessions are mutable (fabric_system purges); each plan
+    // operation is an immutable step that the app only appends.
+    entries.put("production.stock_unit_cut_plan", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("production.stock_unit_cut_session", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("production.stock_unit_cut_plan_operation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put(
         "production.lot_compatibility_confirmation", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("production.lot_compatibility_request", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
@@ -74,6 +85,31 @@ final class TablePrivilegeClassification {
         TablePrivilegeClass.READ_ONLY_ARCHIVE);
     // Tenant branding slots: the app soft-deletes and reuses a slot; only fabric_system deletes.
     entries.put("common_tenant.tenant_brand_asset", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    // PAYMENT-PLAN-1 S2-S6: mutable roots/projections are purged by fabric_system only;
+    // plan content, evidence and command receipts are append-only.
+    entries.put("sales_ord.order_payment_plan", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.order_payment_plan_revision", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("sales_ord.order_payment_plan_currency", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("sales_ord.order_payment_plan_line", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put(
+        "sales_ord.order_payment_plan_settlement_ack", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_projection", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("finance.collection_obligation", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("finance.collection_expectation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_cheque", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("finance.collection_cheque_application", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("finance.collection_payment_match", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("finance.collection_cheque_event", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_refund", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_refund_event", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_command_receipt", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_source_observation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put(
+        "finance.collection_reconciliation_health", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("flowboard.collection_follow_up", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("flowboard.collection_contact", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("flowboard.collection_follow_up_command", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("flowboard.collection_follow_up_scan", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("common_tenant.flyway_schema_history", TablePrivilegeClass.NO_RUNTIME_ACCESS);
     entries.put("public.jobrunr_migrations", TablePrivilegeClass.APP_ONLY_MUTABLE);
     entries.put("public.jobrunr_jobs", TablePrivilegeClass.APP_ONLY_MUTABLE);

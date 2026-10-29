@@ -126,6 +126,7 @@ public class ExistingAccountOrganizationService {
     context.setAdminContact(identity.getEmail());
     context.setOrganizationEmail(identity.getEmail());
     context.setSelectedOS(resolveSelectedOs(request.getSelectedOS()));
+    context.setSignupSelectedOS(request.getSelectedOS());
     context.setSignupIntent(SignupIntent.TRIAL.name());
     context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);

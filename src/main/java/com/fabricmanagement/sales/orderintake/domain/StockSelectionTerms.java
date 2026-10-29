@@ -14,6 +14,25 @@ import java.util.Objects;
 public final class StockSelectionTerms {
   private StockSelectionTerms() {}
 
+  public static boolean matchesRequest(
+      SalesOrder order,
+      SalesOrderLine line,
+      com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest request) {
+    return request != null
+        && Objects.equals(request.productId(), line.getProductId())
+        && Objects.equals(request.colorId(), line.getColorId())
+        && plain(request.finishedWidth()).equals(plain(line.getFinishedWidth()))
+        && upper(request.finishedWidthUnit()).equals(upper(line.getFinishedWidthUnit()))
+        && Objects.equals(request.customerId(), order.getTradingPartnerId())
+        && upper(request.unit()).equals(upper(line.getUnit()))
+        && plain(request.requestedQty()).equals(plain(line.getCustomerRequestQty()))
+        && plain(request.toleranceUpPct()).equals(plain(line.getToleranceUpPct()))
+        && plain(request.toleranceDownPct()).equals(plain(line.getToleranceDownPct()))
+        && Boolean.TRUE.equals(request.singleLotRequired()) == line.isSingleLotRequired()
+        && (request.quantityPolicy() == null
+            || request.quantityPolicy() == line.getQuantityPolicy());
+  }
+
   public static String fingerprint(SalesOrder order, SalesOrderLine line) {
     String terms =
         String.join(
@@ -29,6 +48,9 @@ public final class StockSelectionTerms {
             plain(line.getToleranceUpPct()),
             plain(line.getToleranceDownPct()),
             Boolean.toString(line.isSingleLotRequired()));
+    if (line.getQuantityPolicy()
+        != com.fabricmanagement.sales.common.domain.SalesQuantityPolicy.UNRECORDED)
+      terms += "|" + line.getQuantityPolicy().name();
     try {
       return HexFormat.of()
           .formatHex(

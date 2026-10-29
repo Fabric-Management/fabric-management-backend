@@ -4,6 +4,7 @@ import com.fabricmanagement.common.domain.vo.DeliveryVerificationStatus;
 import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
@@ -13,6 +14,7 @@ import com.fabricmanagement.platform.organization.infra.repository.OrganizationA
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,11 +40,61 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class AddressService {
-
   private final AddressRepository addressRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
   private final DeliveryVerificationPolicy verificationPolicy;
+
+  @Transactional(readOnly = true)
+  public void requireExclusiveOnboardingAddress(UUID addressId, UUID organizationId) {
+    if (addressRepository.countSharedOnboardingAddress(
+            TenantContext.requireTenantId(), addressId, organizationId)
+        > 0) {
+      throw new PlatformDomainException(
+          "Headquarters address is shared; edit its ownership before changing it",
+          "ONBOARDING_HQ_ADDRESS_SHARED",
+          409);
+    }
+  }
+
+  /** Replace only the onboarding-owned address fields after patch values have been merged. */
+  @Transactional
+  public Address replaceOnboardingHeadquarters(
+      UUID addressId, UUID organizationId, CreateAddressRequest request) {
+    Address address =
+        findById(addressId)
+            .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Headquarters address not found", "ONBOARDING_HQ_ADDRESS_NOT_FOUND", 404));
+    requireExclusiveOnboardingAddress(addressId, organizationId);
+    boolean locationChanged =
+        !Objects.equals(address.getStreetAddress(), request.getStreetAddress())
+            || !Objects.equals(address.getAddressLine2(), request.getAddressLine2())
+            || !Objects.equals(address.getCity(), request.getCity())
+            || !Objects.equals(address.getState(), request.getState())
+            || !Objects.equals(address.getDistrict(), request.getDistrict())
+            || !Objects.equals(address.getPostalCode(), request.getPostalCode())
+            || !Objects.equals(address.getCountry(), request.getCountry());
+    if (!Objects.equals(address.getCountry(), request.getCountry())) address.setCountryCode(null);
+    if (locationChanged) {
+      address.setLatitude(null);
+      address.setLongitude(null);
+      address.setPlaceId(null);
+      address.setFormattedAddress(null);
+    }
+    address.setStreetAddress(request.getStreetAddress());
+    address.setAddressLine2(request.getAddressLine2());
+    address.setCity(request.getCity());
+    address.setState(request.getState());
+    address.setDistrict(request.getDistrict());
+    address.setPostalCode(request.getPostalCode());
+    address.setCountry(request.getCountry());
+    address.setLabel(request.getLabel());
+    address.setVerification(verificationPolicy.forCurrentActor());
+    return addressRepository.save(address);
+  }
 
   /**
    * Create an address from the shared DTO. Single entry point for all address creation (REST and

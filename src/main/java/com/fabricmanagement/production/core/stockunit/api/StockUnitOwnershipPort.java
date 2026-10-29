@@ -17,6 +17,9 @@ public interface StockUnitOwnershipPort {
 
   void assertAvailable(Collection<UUID> pieceIds, UUID ownLineId, UUID ownSessionId);
 
+  /** Checks all stock owners before permitting consumption against a work-order reservation. */
+  void assertReservedConsumption(UUID pieceId, UUID workOrderId);
+
   Set<UUID> provisionallyHeld(UUID productId, UUID ownSessionId);
 
   List<UUID> productIdsForLots(Collection<UUID> batchIds);

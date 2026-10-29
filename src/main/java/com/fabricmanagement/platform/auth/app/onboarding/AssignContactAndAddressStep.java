@@ -55,7 +55,7 @@ public class AssignContactAndAddressStep implements OnboardingStep {
               .label("Organization")
               .build();
       var address = addressService.createAddress(createRequest);
-      addressAssignmentService.assignAddress(organizationId, address.getId(), true, false);
+      addressAssignmentService.assignAddress(organizationId, address.getId(), true, true);
     }
 
     // Create and assign contact if provided (email or phone)
@@ -67,8 +67,8 @@ public class AssignContactAndAddressStep implements OnboardingStep {
     }
     if (context.getPhoneNumber() != null && !context.getPhoneNumber().isBlank()) {
       var contact =
-          contactService.createContact(
-              context.getPhoneNumber(), ContactType.MOBILE, "Organization", false, null);
+          contactService.reuseOrCreateOnboardingContact(
+              contactService.prepareOnboardingContact(context.getPhoneNumber(), null));
       contactAssignmentService.assignContact(organizationId, contact.getId(), false, null);
     }
 

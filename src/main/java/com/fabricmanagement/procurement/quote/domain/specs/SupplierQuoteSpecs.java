@@ -13,14 +13,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
   @Type(value = DyeQuoteSpecs.class, name = "DYE_FINISHING"),
   @Type(value = GenericQuoteSpecs.class, name = "GENERIC")
 })
-@Schema(
-    description = "Module-specific quote specs, discriminated by specType",
-    oneOf = {
-      FiberQuoteSpecs.class,
-      YarnQuoteSpecs.class,
-      FabricQuoteSpecs.class,
-      DyeQuoteSpecs.class,
-      GenericQuoteSpecs.class
-    })
+@Schema(description = "Module-specific quote specs, discriminated by specType")
 public sealed interface SupplierQuoteSpecs
     permits FiberQuoteSpecs, YarnQuoteSpecs, FabricQuoteSpecs, DyeQuoteSpecs, GenericQuoteSpecs {}

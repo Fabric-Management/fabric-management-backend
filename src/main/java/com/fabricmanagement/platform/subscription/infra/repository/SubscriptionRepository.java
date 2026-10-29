@@ -32,12 +32,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
   List<Subscription> findByTenantId(UUID tenantId);
 
   @Query(
-      "SELECT s FROM Subscription s WHERE s.tenantId = :tenantId AND s.status = 'ACTIVE' AND (s.expiryDate IS NULL OR s.expiryDate > :now)")
+      "SELECT s FROM Subscription s WHERE s.tenantId = :tenantId AND s.deletedAt IS NULL AND s.isActive = true AND ((s.status = 'ACTIVE' AND (s.expiryDate IS NULL OR s.expiryDate > :now)) OR (s.status = 'TRIAL' AND (s.learningAccess = true OR s.trialEndsAt > :now)))")
   List<Subscription> findActiveSubscriptions(
       @Param("tenantId") UUID tenantId, @Param("now") Instant now);
 
   @Query(
-      "SELECT s FROM Subscription s WHERE s.tenantId = :tenantId AND s.osCode = :osCode AND s.status = 'ACTIVE' AND (s.expiryDate IS NULL OR s.expiryDate > :now)")
+      "SELECT s FROM Subscription s WHERE s.tenantId = :tenantId AND s.osCode = :osCode AND s.deletedAt IS NULL AND s.isActive = true AND ((s.status = 'ACTIVE' AND (s.expiryDate IS NULL OR s.expiryDate > :now)) OR (s.status = 'TRIAL' AND (s.learningAccess = true OR s.trialEndsAt > :now)))")
   Optional<Subscription> findActiveSubscriptionByOsCode(
       @Param("tenantId") UUID tenantId, @Param("osCode") String osCode, @Param("now") Instant now);
 
@@ -56,9 +56,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
    */
   @Query(
       "SELECT s FROM Subscription s "
-          + "WHERE s.status != 'EXPIRED' "
+          + "WHERE s.status IN ('ACTIVE', 'TRIAL') AND s.learningAccess = false AND s.evaluationManaged = false "
           + "AND (s.expiryDate IS NOT NULL AND s.expiryDate < :now "
-          + "OR (s.trialEndsAt IS NOT NULL AND s.trialEndsAt < :now))")
+          + "OR (s.status = 'TRIAL' AND s.trialEndsAt IS NOT NULL AND s.trialEndsAt < :now))")
   Page<Subscription> findExpiredButNotExpiredStatus(@Param("now") Instant now, Pageable pageable);
 
   /**
@@ -80,10 +80,10 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
    */
   @Query(
       "SELECT COUNT(s) FROM Subscription s "
-          + "WHERE s.tenantId = :tenantId "
+          + "WHERE s.tenantId = :tenantId AND s.deletedAt IS NULL AND s.isActive = true "
           + "AND ("
           + "  (s.status = 'ACTIVE' AND (s.expiryDate IS NULL OR s.expiryDate > :now)) "
-          + "  OR (s.status = 'TRIAL' AND s.trialEndsAt IS NOT NULL AND s.trialEndsAt > :now)"
+          + "  OR (s.status = 'TRIAL' AND (s.learningAccess = true OR s.trialEndsAt > :now))"
           + ")")
   long countActiveSubscriptionsByTenantId(
       @Param("tenantId") UUID tenantId, @Param("now") Instant now);

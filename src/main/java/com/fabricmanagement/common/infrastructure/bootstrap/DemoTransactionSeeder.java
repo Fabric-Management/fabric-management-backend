@@ -117,16 +117,11 @@ public class DemoTransactionSeeder {
       financeDemoSeeder.seedFor(tenantId);
 
       // 2c. Sales demo orders (DEMO-2a): CONFIRMED orders so Margin + Backlog views show real data.
-      // Runs in its own transaction (REQUIRES_NEW) and is isolated here so a failure in the confirm
-      // rule-engine path can never roll back the finance demo above or fail playground init.
-      try {
-        salesDemoSeeder.seedFor(tenantId);
-      } catch (Exception salesEx) {
-        log.warn(
-            "Sales demo order seeding failed for tenant {} — continuing; finance demo unaffected.",
-            tenantId,
-            salesEx);
-      }
+      // Runs in its own transaction (REQUIRES_NEW), after the caller's transaction commits when
+      // there is one (it must see the demo customers created above), and is isolated so a failure
+      // in the confirm rule-engine path can never roll back the finance demo above or fail
+      // playground init.
+      seedSalesOrderDemo(tenantId);
 
       seedProcurementDemo(tenantId);
       seedSalesQuoteDemo(tenantId);
@@ -230,6 +225,50 @@ public class DemoTransactionSeeder {
         TenantContext.clear();
       }
     }
+  }
+
+  /**
+   * The confirmed sales orders (DEMO-2a). They run in their own transaction (REQUIRES_NEW), which
+   * cannot see rows the register-first signup has not committed yet: the demo customers, and the
+   * tenant itself (ONBOARD-ATOMIC-1). Run inline, the seeder found no customer in every such signup
+   * and the playground silently had no sales demo orders. So when a transaction is active the run
+   * is deferred to just after its commit, ahead of the colour/stock and partner-network demos
+   * (callbacks run in registration order); without one it runs at once.
+   */
+  private void seedSalesOrderDemo(UUID tenantId) {
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              runSalesOrderDemo(tenantId);
+            }
+          });
+      return;
+    }
+    runSalesOrderDemo(tenantId);
+  }
+
+  /**
+   * Rebinds the tenant before the seeder's own transaction opens (the orchestrator has restored the
+   * caller's context by the time {@code afterCommit} runs) and catches everything: an exception
+   * escaping an {@code afterCommit} callback propagates out of {@code commit()} and would turn a
+   * signup that did commit into an error response.
+   */
+  private void runSalesOrderDemo(UUID tenantId) {
+    TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          try {
+            salesDemoSeeder.seedFor(tenantId);
+          } catch (Exception salesEx) {
+            log.warn(
+                "Sales demo order seeding failed for tenant {} — continuing; finance demo"
+                    + " unaffected.",
+                tenantId,
+                salesEx);
+          }
+        });
   }
 
   private void seedProcurementDemo(UUID tenantId) {

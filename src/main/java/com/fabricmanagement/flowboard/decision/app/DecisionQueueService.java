@@ -3,6 +3,8 @@ package com.fabricmanagement.flowboard.decision.app;
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.common.infrastructure.web.AppRoutes;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.flowboard.collection.app.CollectionFollowUpHealthService;
+import com.fabricmanagement.flowboard.collection.app.port.CollectionFollowUpPort;
 import com.fabricmanagement.flowboard.decision.domain.DecisionQueueBucket;
 import com.fabricmanagement.flowboard.decision.dto.*;
 import com.fabricmanagement.flowboard.decision.infra.repository.DecisionQueueRepository;
@@ -35,6 +37,8 @@ public class DecisionQueueService {
   private final RoutingRepository routing;
   private final DecisionProjectionRebuildState rebuildState;
   private final Clock clock;
+  private final CollectionFollowUpPort collections;
+  private final CollectionFollowUpHealthService collectionHealth;
 
   public DecisionQueueService(
       DecisionQueueRepository queue,
@@ -44,7 +48,9 @@ public class DecisionQueueService {
       RoutingEligibilityService eligibility,
       RoutingRepository routing,
       DecisionProjectionRebuildState rebuildState,
-      Clock clock) {
+      Clock clock,
+      CollectionFollowUpPort collections,
+      CollectionFollowUpHealthService collectionHealth) {
     this.queue = queue;
     this.readScopes = readScopes;
     this.writeScopes = writeScopes;
@@ -53,6 +59,8 @@ public class DecisionQueueService {
     this.routing = routing;
     this.rebuildState = rebuildState;
     this.clock = clock;
+    this.collections = collections;
+    this.collectionHealth = collectionHealth;
   }
 
   @Transactional(readOnly = true)
@@ -64,6 +72,10 @@ public class DecisionQueueService {
     assertActive(tenant, caller);
     var readScope = readScopes.readScope(tenant, caller);
     var user = eligibility.user(tenant, caller);
+    if (!user.active()
+        || !tenant.equals(user.tenantId())
+        || !user.permissions().can("flowboard", "read"))
+      throw new AccessDeniedException("Fresh FlowBoard read access is required");
     boolean managesRouting =
         user.permissions()
             .can(
@@ -73,12 +85,15 @@ public class DecisionQueueService {
       throw new DecisionBlockedException(
           "PERMISSION_DENIED", PermissionKey.FLOWBOARD_MANAGE_ROUTING.key(), null);
     }
-    if (readScope.kind() == SalesOrderReadScopePort.Kind.NONE) {
+    var financeScope = financeScope(tenant, caller);
+    if (readScope.kind() == SalesOrderReadScopePort.Kind.NONE
+        && financeScope.kind() == SalesOrderReadScopePort.Kind.NONE) {
       return PagedResponse.from(new PageImpl<>(List.of(), PageRequest.of(page, size), 0));
     }
 
     Set<UUID> departments = users.departmentIds(tenant, caller);
-    var slice = queue.page(tenant, caller, departments, readScope, bucket, page, size);
+    var slice =
+        queue.page(tenant, caller, departments, readScope, bucket, page, size, financeScope);
     boolean candidate = eligibility.candidacy(tenant, user).isEmpty();
     boolean poolMember =
         candidate && routing.isActiveMember(tenant, RoutingPoolKey.ORDER_COVER, caller);
@@ -87,11 +102,27 @@ public class DecisionQueueService {
             ? writeScopes.allowedOrderIds(
                 tenant,
                 caller,
-                slice.rows().stream().map(DecisionQueueRepository.Row::orderId).toList())
+                slice.rows().stream()
+                    .filter(row -> "ORDER_COVER".equals(row.kind()))
+                    .map(DecisionQueueRepository.Row::orderId)
+                    .toList())
             : Set.of();
+    boolean collectionAllowed =
+        slice.rows().stream().anyMatch(row -> "COLLECTION_FOLLOW_UP".equals(row.kind()))
+            && eligibility.candidacy(tenant, user, RoutingPoolKey.COLLECTION_FOLLOW_UP).isEmpty()
+            && routing.isActiveMember(tenant, RoutingPoolKey.COLLECTION_FOLLOW_UP, caller);
     var items =
         slice.rows().stream()
-            .map(row -> item(row, bucket, caller, candidate, poolMember, allowedOrders))
+            .map(
+                row ->
+                    item(
+                        row,
+                        bucket,
+                        caller,
+                        candidate,
+                        poolMember,
+                        allowedOrders,
+                        collectionAllowed))
             .toList();
     return PagedResponse.from(new PageImpl<>(items, PageRequest.of(page, size), slice.total()));
   }
@@ -101,12 +132,18 @@ public class DecisionQueueService {
     assertActive(tenant, caller);
     var readScope = readScopes.readScope(tenant, caller);
     var user = eligibility.user(tenant, caller);
+    if (!user.active()
+        || !tenant.equals(user.tenantId())
+        || !user.permissions().can("flowboard", "read"))
+      throw new AccessDeniedException("Fresh FlowBoard read access is required");
     boolean managesRouting =
         user.permissions()
             .can(
                 PermissionKey.FLOWBOARD_MANAGE_ROUTING.resource(),
                 PermissionKey.FLOWBOARD_MANAGE_ROUTING.action());
-    if (readScope.kind() == SalesOrderReadScopePort.Kind.NONE) {
+    var financeScope = financeScope(tenant, caller);
+    if (readScope.kind() == SalesOrderReadScopePort.Kind.NONE
+        && financeScope.kind() == SalesOrderReadScopePort.Kind.NONE) {
       return new DecisionQueueSummary(
           0,
           0,
@@ -114,19 +151,28 @@ public class DecisionQueueService {
           0,
           clock.instant(),
           rebuildState.isRunning(tenant)
-              || queue.hasOverduePublication(tenant, DecisionQueueFreshness.LISTENERS));
+              || (queue.hasOverduePublication(tenant, DecisionQueueFreshness.LISTENERS)
+                  || (user.permissions().can("finance", "read")
+                      && collectionHealth.stale(tenant))));
     }
     Set<UUID> departments = users.departmentIds(tenant, caller);
     return new DecisionQueueSummary(
-        queue.count(tenant, caller, departments, readScope, DecisionQueueBucket.MINE),
-        queue.count(tenant, caller, departments, readScope, DecisionQueueBucket.DEPARTMENT),
+        count(tenant, caller, departments, readScope, DecisionQueueBucket.MINE, financeScope),
+        count(tenant, caller, departments, readScope, DecisionQueueBucket.DEPARTMENT, financeScope),
         managesRouting
-            ? queue.count(tenant, caller, departments, readScope, DecisionQueueBucket.UNASSIGNED)
+            ? count(
+                tenant,
+                caller,
+                departments,
+                readScope,
+                DecisionQueueBucket.UNASSIGNED,
+                financeScope)
             : null,
-        queue.count(tenant, caller, departments, readScope, DecisionQueueBucket.WAITING),
+        count(tenant, caller, departments, readScope, DecisionQueueBucket.WAITING, financeScope),
         clock.instant(),
         rebuildState.isRunning(tenant)
-            || queue.hasOverduePublication(tenant, DecisionQueueFreshness.LISTENERS));
+            || (queue.hasOverduePublication(tenant, DecisionQueueFreshness.LISTENERS)
+                || (user.permissions().can("finance", "read") && collectionHealth.stale(tenant))));
   }
 
   private DecisionQueueItem item(
@@ -135,7 +181,10 @@ public class DecisionQueueService {
       UUID caller,
       boolean candidate,
       boolean poolMember,
-      Set<UUID> allowedOrders) {
+      Set<UUID> allowedOrders,
+      boolean collectionAllowed) {
+    if ("COLLECTION_FOLLOW_UP".equals(row.kind()))
+      return collectionItem(row, bucket, caller, collectionAllowed);
     var result =
         OrderCoverActionEvaluator.evaluate(
             new OrderCoverActionEvaluator.Inputs(
@@ -187,6 +236,76 @@ public class DecisionQueueService {
         DecisionVerdictCode.valueOf(row.verdictCode()),
         List.of(action),
         AppRoutes.orderCoverDecision(row.orderId()));
+  }
+
+  private SalesOrderReadScopePort.OrderReadScope financeScope(UUID tenant, UUID caller) {
+    var user = eligibility.user(tenant, caller);
+    if (!user.permissions().can("finance", "read"))
+      return SalesOrderReadScopePort.OrderReadScope.none();
+    var scope = collections.readScope(caller);
+    return scope.all()
+        ? SalesOrderReadScopePort.OrderReadScope.all()
+        : SalesOrderReadScopePort.OrderReadScope.principals(scope.principals());
+  }
+
+  private long count(
+      UUID tenant,
+      UUID caller,
+      Set<UUID> departments,
+      SalesOrderReadScopePort.OrderReadScope sales,
+      DecisionQueueBucket bucket,
+      SalesOrderReadScopePort.OrderReadScope finance) {
+    return queue.count(tenant, caller, departments, sales, bucket, finance);
+  }
+
+  private DecisionQueueItem collectionItem(
+      DecisionQueueRepository.Row row,
+      DecisionQueueBucket bucket,
+      UUID caller,
+      boolean collectionAllowed) {
+    boolean allowed =
+        row.directAssigneeIds().contains(caller)
+            && collectionAllowed
+            && "ACTIONABLE".equals(row.verdictCode());
+    var reason =
+        allowed
+            ? null
+            : new DecisionBlockedReason(
+                row.directAssigneeIds().isEmpty()
+                    ? DecisionBlockedReasonCode.UNASSIGNED
+                    : DecisionBlockedReasonCode.ASSIGNED_ELSEWHERE,
+                "decision.blocked.collection",
+                new DecisionReasonParameters(null, row.taskVersion()));
+    return new DecisionQueueItem(
+        row.caseId(),
+        DecisionQueueItem.Kind.COLLECTION_FOLLOW_UP,
+        row.taskId(),
+        row.taskVersion(),
+        new DecisionSubjectRef(
+            DecisionSubjectType.COLLECTION_OBLIGATION, row.orderId(), row.orderNumber(), null),
+        new DecisionAssignment(
+            DecisionAssignmentBucket.valueOf(bucket.name()),
+            row.directAssigneeIds(),
+            row.departmentIds(),
+            null),
+        Priority.valueOf(row.priority()),
+        row.dueDate(),
+        row.createdAt(),
+        row.projectedAt(),
+        bucket == DecisionQueueBucket.WAITING
+            ? DecisionQueueItem.State.WAITING
+            : DecisionQueueItem.State.OPEN,
+        DecisionVerdictCode.valueOf(row.verdictCode()),
+        List.of(
+            new DecisionCapability(
+                DecisionCapabilityAction.RECORD_COLLECTION_CONTACT,
+                allowed,
+                reason,
+                null,
+                false,
+                clock.instant(),
+                List.of(PermissionKey.FLOWBOARD_WRITE, PermissionKey.FINANCE_READ))),
+        AppRoutes.collectionFollowUp(row.caseId()));
   }
 
   private void assertActive(UUID tenant, UUID caller) {

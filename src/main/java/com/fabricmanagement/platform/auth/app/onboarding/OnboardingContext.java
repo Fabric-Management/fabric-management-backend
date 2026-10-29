@@ -31,6 +31,11 @@ import lombok.Data;
 @Data
 public class OnboardingContext {
 
+  /** Independent signup correlation: never a setup/session token and never derived from email. */
+  private UUID signupId = UUID.randomUUID();
+
+  private Instant termsAcceptedAt;
+
   // ========================================
   // REQUEST DATA (sales-led or self-service)
   // ========================================
@@ -49,6 +54,10 @@ public class OnboardingContext {
   private String adminLastName;
   private String adminContact;
   private List<String> selectedOS;
+
+  /** Raw registration input, kept separate from provisioning defaults and never billing consent. */
+  private List<String> signupSelectedOS;
+
   private String signupIntent;
   private int trialDays;
   private boolean salesLed;

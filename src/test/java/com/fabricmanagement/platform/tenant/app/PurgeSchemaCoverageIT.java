@@ -130,6 +130,12 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "Scheduler-owned cross-tenant stuck-event bookkeeping (EVENT-VISIBILITY-1); non-RLS, "
             + "self-purging by resolution/age. tenant_id is informational, not tenant business data.");
     tables.put("common_audit.common_audit_log", "Audit history is retained across demo reset.");
+    tables.put(
+        "common_user.onboarding_journey",
+        "Real accepted onboarding progress survives reset/go-real; tenant/owner deletion cascades it.");
+    tables.put(
+        "common_user.onboarding_operation",
+        "Frozen onboarding results survive reset/go-real and cascade with their journey on tenant deletion.");
     tables.put("common_auth.common_auth_user", "Seed-user auth rows are deleted by demo_seed CTE.");
     tables.put(
         "common_auth.common_refresh_token",

@@ -119,6 +119,15 @@ class QuoteServiceTest {
   @Mock private BatchLotQuantityIntentPort batchLotQuantityIntentPort;
   @Mock private DefaultOwnerPolicy defaultOwnerPolicy;
   @Mock private QuoteAccessPolicy accessPolicy;
+  @Mock private com.fabricmanagement.sales.orderintake.app.DraftStockSelectionService draftStock;
+
+  @Mock
+  private com.fabricmanagement.sales.orderintake.app.ProvisionalStockLifecycleService
+      provisionalLifecycle;
+
+  @Mock
+  private com.fabricmanagement.production.core.batch.api.query.ProposalStockQueryService
+      stockMeasures;
 
   @InjectMocks private QuoteService quoteService;
 

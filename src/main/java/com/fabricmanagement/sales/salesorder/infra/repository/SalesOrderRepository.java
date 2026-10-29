@@ -23,6 +23,8 @@ import org.springframework.data.repository.query.Param;
  */
 public interface SalesOrderRepository
     extends JpaRepository<SalesOrder, UUID>, JpaSpecificationExecutor<SalesOrder> {
+  Optional<SalesOrder> findFirstByTenantIdAndQuoteIdAndIsActiveTrueOrderByCreatedAtDesc(
+      UUID tenantId, UUID quoteId);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Basic Lookups
@@ -62,6 +64,17 @@ public interface SalesOrderRepository
   @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
   @Query("select o from SalesOrder o where o.tenantId=:tenantId and o.id=:id")
   Optional<SalesOrder> lockByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+  /**
+   * Share lock ({@code FOR SHARE}) for a reader that needs the order and its plan to stay as they
+   * are until its transaction ends (finance reading the agreed plan). Every writer of the order
+   * takes {@link #lockByTenantIdAndId} first, which conflicts with this lock, so no writer commits
+   * in between; other readers, and other share locks, do not wait for each other.
+   */
+  @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+  @Query("select o from SalesOrder o where o.tenantId=:tenantId and o.id=:id")
+  Optional<SalesOrder> lockSharedByTenantIdAndId(
+      @Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   Optional<SalesOrder> findByTenantIdAndUid(UUID tenantId, String uid);
 

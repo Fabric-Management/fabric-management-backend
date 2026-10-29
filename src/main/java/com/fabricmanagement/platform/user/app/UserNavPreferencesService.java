@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.UidSuffix;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.User;
@@ -54,10 +55,7 @@ public class UserNavPreferencesService {
     // Match BaseEntity.generateUid/onCreate and the configured JPA auditor. Native SQL bypasses
     // those callbacks, so every identifier, audit, soft-delete and version column is explicit.
     String tenantUid = TenantContext.getCurrentTenantUid();
-    String uid =
-        (tenantUid == null ? "SYS-000" : tenantUid)
-            + "-NAVPREF-"
-            + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+    String uid = (tenantUid == null ? "SYS-000" : tenantUid) + "-NAVPREF-" + UidSuffix.random();
     var inserted =
         preferencesRepository.insertIfAbsent(
             tenantId,

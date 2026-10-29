@@ -2,6 +2,7 @@ package com.fabricmanagement.flowboard.decision.infra.repository;
 
 import static com.fabricmanagement.flowboard.decision.infra.repository.DecisionFollowRepository.EFFECTIVE_FOLLOW_PREDICATE;
 
+import com.fabricmanagement.common.infrastructure.tenant.TenantBusinessCalendarPort;
 import com.fabricmanagement.flowboard.decision.domain.DecisionQueueBucket;
 import com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReadScopePort.OrderReadScope;
 import java.sql.ResultSet;
@@ -23,26 +24,36 @@ import org.springframework.stereotype.Repository;
 public class DecisionQueueRepository {
   private static final String FROM =
       """
-      FROM (SELECT tenant_id, case_id AS id, subject_id, subject_number, order_created_by,
+      FROM (SELECT kind, tenant_id, case_id AS id, subject_id, subject_number, order_created_by,
                    task_id, case_state, verdict_code, projected_at, is_active
-              FROM flowboard.decision_subject_projection) c
+              FROM flowboard.decision_subject_projection WHERE kind='ORDER_COVER'
+            UNION ALL
+            SELECT 'COLLECTION_FOLLOW_UP',tenant_id,id,obligation_id,COALESCE(customer_label,obligation_id::text) || ' · ' || currency || ' ' || outstanding,
+              (SELECT a.user_id FROM flowboard.task_assignee a WHERE a.tenant_id=f.tenant_id AND a.task_id=f.task_id AND a.is_active AND a.user_id IS NOT NULL ORDER BY a.user_id LIMIT 1),task_id,CASE WHEN closed_at IS NULL THEN 'OPEN' ELSE 'SETTLED' END,
+              CASE WHEN source_missing OR stale THEN 'EVIDENCE_UNKNOWN' ELSE 'ACTIONABLE' END,
+              checked_at,is_active FROM flowboard.collection_follow_up f) c
       JOIN flowboard.task t ON t.tenant_id=c.tenant_id AND t.id=c.task_id
       WHERE c.tenant_id=:tenant AND c.is_active AND t.is_active
         AND t.closed_at IS NULL AND t.status NOT IN ('DONE','CANCELLED')
         AND c.case_state IN ('OPEN','PARTIALLY_SETTLED')
+        AND (c.kind <> 'COLLECTION_FOLLOW_UP' OR :includeFuture OR t.deadline IS NULL OR t.deadline <= :today)
       """;
 
   private final NamedParameterJdbcTemplate jdbc;
   private final Clock clock;
   private final Duration staleAfter;
 
+  private final TenantBusinessCalendarPort calendar;
+
   public DecisionQueueRepository(
       @Qualifier("dataSource") DataSource dataSource,
       Clock clock,
-      @Value("${flowboard.decision-queue.stale-after:30s}") Duration staleAfter) {
+      @Value("${flowboard.decision-queue.stale-after:30s}") Duration staleAfter,
+      TenantBusinessCalendarPort calendar) {
     this.jdbc = new NamedParameterJdbcTemplate(dataSource);
     this.clock = clock;
     this.staleAfter = staleAfter;
+    this.calendar = calendar;
   }
 
   public PageSlice page(
@@ -52,9 +63,16 @@ public class DecisionQueueRepository {
       OrderReadScope readScope,
       DecisionQueueBucket bucket,
       int page,
-      int size) {
+      int size,
+      OrderReadScope financeScope) {
     MapSqlParameterSource parameters = parameters(tenant, caller, callerDepartments, readScope);
-    String where = readScope(readScope) + bucket(bucket, callerDepartments);
+    parameters.addValue("includeFuture", bucket == DecisionQueueBucket.UNASSIGNED);
+    parameters.addValue(
+        "financePrincipals",
+        financeScope.principalIds().isEmpty()
+            ? Set.of(new UUID(0, 0))
+            : financeScope.principalIds());
+    String where = scope(readScope, financeScope) + bucket(bucket, callerDepartments);
     long total =
         Objects.requireNonNull(
             jdbc.queryForObject("SELECT count(*) " + FROM + where, parameters, Long.class));
@@ -62,7 +80,7 @@ public class DecisionQueueRepository {
     List<Row> rows =
         jdbc.query(
             """
-            SELECT c.id, c.subject_id, c.subject_number, c.projected_at,
+            SELECT c.kind, c.id, c.subject_id, c.subject_number, c.projected_at,
                    c.verdict_code, t.id AS task_id, t.version AS task_version,
                    t.priority, t.deadline, t.created_at,
                    (SELECT string_agg(a.user_id::text, ',' ORDER BY a.user_id)
@@ -89,11 +107,23 @@ public class DecisionQueueRepository {
       UUID caller,
       Set<UUID> callerDepartments,
       OrderReadScope readScope,
-      DecisionQueueBucket bucket) {
+      DecisionQueueBucket bucket,
+      OrderReadScope financeScope) {
+    var params =
+        parameters(tenant, caller, callerDepartments, readScope)
+            .addValue("includeFuture", bucket == DecisionQueueBucket.UNASSIGNED)
+            .addValue(
+                "financePrincipals",
+                financeScope.principalIds().isEmpty()
+                    ? Set.of(new UUID(0, 0))
+                    : financeScope.principalIds());
     return Objects.requireNonNull(
         jdbc.queryForObject(
-            "SELECT count(*) " + FROM + readScope(readScope) + bucket(bucket, callerDepartments),
-            parameters(tenant, caller, callerDepartments, readScope),
+            "SELECT count(*) "
+                + FROM
+                + scope(readScope, financeScope)
+                + bucket(bucket, callerDepartments),
+            params,
             Long.class));
   }
 
@@ -131,6 +161,7 @@ public class DecisionQueueRepository {
       UUID tenant, UUID caller, Set<UUID> departments, OrderReadScope scope) {
     return new MapSqlParameterSource()
         .addValue("tenant", tenant)
+        .addValue("today", java.sql.Date.valueOf(LocalDate.now(clock.withZone(calendar.zone()))))
         .addValue("caller", caller)
         .addValue("departments", departments.isEmpty() ? Set.of(new UUID(0, 0)) : departments)
         .addValue(
@@ -138,12 +169,32 @@ public class DecisionQueueRepository {
             scope.principalIds().isEmpty() ? Set.of(new UUID(0, 0)) : scope.principalIds());
   }
 
-  private String readScope(OrderReadScope scope) {
-    return switch (scope.kind()) {
-      case NONE -> " AND false";
-      case ALL -> "";
-      case PRINCIPALS -> " AND c.order_created_by IN (:readPrincipals)";
-    };
+  private String scope(OrderReadScope sales, OrderReadScope finance) {
+    String salesPredicate =
+        sales.kind()
+                == com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReadScopePort.Kind
+                    .ALL
+            ? "true"
+            : sales.kind()
+                    == com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReadScopePort
+                        .Kind.NONE
+                ? "false"
+                : "c.order_created_by IN (:readPrincipals)";
+    String financePredicate =
+        finance.kind()
+                == com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReadScopePort.Kind
+                    .ALL
+            ? "true"
+            : finance.kind()
+                    == com.fabricmanagement.sales.salesorder.domain.port.SalesOrderReadScopePort
+                        .Kind.NONE
+                ? "false"
+                : "c.order_created_by IN (:financePrincipals)";
+    return " AND ((c.kind='ORDER_COVER' AND "
+        + salesPredicate
+        + ") OR (c.kind='COLLECTION_FOLLOW_UP' AND "
+        + financePredicate
+        + "))";
   }
 
   private String bucket(DecisionQueueBucket bucket, Set<UUID> departments) {
@@ -194,7 +245,8 @@ public class DecisionQueueRepository {
         rs.getTimestamp("projected_at").toInstant(),
         rs.getString("verdict_code"),
         ids(rs.getString("direct_ids")),
-        ids(rs.getString("department_ids")));
+        ids(rs.getString("department_ids")),
+        rs.getString("kind"));
   }
 
   private static List<UUID> ids(String csv) {
@@ -216,5 +268,35 @@ public class DecisionQueueRepository {
       Instant projectedAt,
       String verdictCode,
       List<UUID> directAssigneeIds,
-      List<UUID> departmentIds) {}
+      List<UUID> departmentIds,
+      String kind) {
+    public Row(
+        UUID caseId,
+        UUID orderId,
+        String orderNumber,
+        UUID taskId,
+        long taskVersion,
+        String priority,
+        LocalDate dueDate,
+        Instant createdAt,
+        Instant projectedAt,
+        String verdictCode,
+        List<UUID> directAssigneeIds,
+        List<UUID> departmentIds) {
+      this(
+          caseId,
+          orderId,
+          orderNumber,
+          taskId,
+          taskVersion,
+          priority,
+          dueDate,
+          createdAt,
+          projectedAt,
+          verdictCode,
+          directAssigneeIds,
+          departmentIds,
+          "ORDER_COVER");
+    }
+  }
 }

@@ -13,14 +13,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
   @Type(value = DyeRFQSpecs.class, name = "DYE_FINISHING"),
   @Type(value = GenericRFQSpecs.class, name = "GENERIC")
 })
-@Schema(
-    description = "Module-specific RFQ specs, discriminated by specType",
-    oneOf = {
-      FiberRFQSpecs.class,
-      YarnRFQSpecs.class,
-      FabricRFQSpecs.class,
-      DyeRFQSpecs.class,
-      GenericRFQSpecs.class
-    })
+@Schema(description = "Module-specific RFQ specs, discriminated by specType")
 public sealed interface SupplierRFQSpecs
     permits FiberRFQSpecs, YarnRFQSpecs, FabricRFQSpecs, DyeRFQSpecs, GenericRFQSpecs {}

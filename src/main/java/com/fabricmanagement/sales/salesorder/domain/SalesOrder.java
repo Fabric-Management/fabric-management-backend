@@ -218,6 +218,28 @@ public class SalesOrder extends BaseEntity {
   @Column(name = "payment_terms", length = 200)
   private String paymentTerms;
 
+  @Column(name = "payment_plan_managed", nullable = false)
+  @Builder.Default
+  private boolean paymentPlanManaged = false;
+
+  @Column(name = "payment_note", length = 2000)
+  private String paymentNote;
+
+  /** Structured summaries are generated; legacy safe-edit cannot overwrite the agreement. */
+  public void setPaymentTerms(String value) {
+    if (paymentPlanManaged && !java.util.Objects.equals(paymentTerms, value))
+      throw com.fabricmanagement.sales.common.exception.OrderDomainException.conflict(
+          "PAYMENT_PLAN_MANAGED",
+          "Revise the structured payment plan instead of editing its summary");
+    paymentTerms = value;
+  }
+
+  public void applyPaymentPlanSummary(String value) {
+    if (!paymentPlanManaged && paymentNote == null) paymentNote = paymentTerms;
+    paymentPlanManaged = true;
+    paymentTerms = value;
+  }
+
   /** Where the conversation that led to the order took place; context, not acceptance. */
   @Enumerated(EnumType.STRING)
   @Column(name = "agreement_context", length = 30)

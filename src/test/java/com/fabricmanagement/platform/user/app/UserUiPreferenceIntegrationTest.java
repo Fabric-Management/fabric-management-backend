@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.UidSuffix;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
@@ -113,7 +114,8 @@ class UserUiPreferenceIntegrationTest extends AbstractIntegrationTest {
     var stored = row(identity);
 
     assertThat(stored.get("id")).isInstanceOf(UUID.class);
-    assertThat(stored.get("uid").toString()).matches(identity.tenantUid() + "-UIPREF-[0-9A-F]{8}");
+    assertThat(stored.get("uid").toString())
+        .matches(identity.tenantUid() + "-UIPREF-[0-9A-F]{" + UidSuffix.LENGTH + "}");
     assertThat(stored.get("created_at")).isNotNull();
     assertThat(stored.get("updated_at")).isNotNull();
     assertThat(stored)

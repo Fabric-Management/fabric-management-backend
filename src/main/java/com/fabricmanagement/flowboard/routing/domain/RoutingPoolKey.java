@@ -4,9 +4,12 @@ import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import java.util.Set;
 
 public enum RoutingPoolKey {
-  ORDER_COVER;
+  ORDER_COVER,
+  COLLECTION_FOLLOW_UP;
 
   public Set<PermissionKey> requiredPermissions() {
-    return Set.of(PermissionKey.FLOWBOARD_WRITE, PermissionKey.SALES_WRITE);
+    return this == COLLECTION_FOLLOW_UP
+        ? Set.of(PermissionKey.FLOWBOARD_WRITE, PermissionKey.FINANCE_READ)
+        : Set.of(PermissionKey.FLOWBOARD_WRITE, PermissionKey.SALES_WRITE);
   }
 }

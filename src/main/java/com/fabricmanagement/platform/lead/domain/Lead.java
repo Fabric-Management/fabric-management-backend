@@ -39,6 +39,30 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Lead {
 
+  @Column(name = "signup_id", nullable = false, updatable = false, unique = true)
+  private UUID signupId;
+
+  /** Independent linkage survives deletion of the nullable operational tenant FK. */
+  @Column(name = "signup_tenant_id", updatable = false)
+  private UUID signupTenantId;
+
+  @Column(name = "signup_user_id", updatable = false)
+  private UUID signupUserId;
+
+  @Column(name = "terms_accepted_at", updatable = false)
+  private Instant termsAcceptedAt;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "signup_snapshot", updatable = false, columnDefinition = "jsonb")
+  private CompanyEvidence signupSnapshot;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "accepted_snapshot", columnDefinition = "jsonb")
+  private CompanyEvidence acceptedSnapshot;
+
+  @Column(name = "accepted_revision", nullable = false)
+  private long acceptedRevision;
+
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   @Column(name = "id", nullable = false, updatable = false)
@@ -50,7 +74,7 @@ public class Lead {
   @Column(name = "company_name", nullable = false, length = 255)
   private String companyName;
 
-  @Column(name = "tax_id", nullable = false, length = 50)
+  @Column(name = "tax_id", length = 50)
   private String taxId;
 
   @Enumerated(EnumType.STRING)
@@ -127,8 +151,27 @@ public class Lead {
         .build();
   }
 
+  public void linkSignup(
+      UUID correlation, UUID tenant, UUID user, CompanyEvidence facts, Instant termsAt) {
+    if (signupSnapshot != null)
+      throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+          "Signup evidence is immutable", "ONBOARDING_SIGNUP_IMMUTABLE", 409);
+    signupId = correlation;
+    signupTenantId = tenant;
+    signupUserId = user;
+    signupSnapshot = facts;
+    acceptedSnapshot = facts;
+    termsAcceptedAt = termsAt;
+  }
+
+  public long accept(CompanyEvidence evidence) {
+    acceptedSnapshot = evidence;
+    return ++acceptedRevision;
+  }
+
   @PrePersist
   void onCreate() {
+    if (signupId == null) signupId = UUID.randomUUID();
     if (uid == null || uid.isBlank()) {
       uid = "LEAD-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
     }

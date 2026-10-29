@@ -63,6 +63,10 @@ public class TenantTransactionalPurgeService {
           "flowboard.routing_task_state",
           "flowboard.routing_pool_member",
           "flowboard.routing_pool",
+          "flowboard.collection_follow_up_command",
+          "flowboard.collection_contact",
+          "flowboard.collection_follow_up_scan",
+          "flowboard.collection_follow_up",
           "flowboard.task_transition_attempt",
           "flowboard.task_affected_subject",
           "flowboard.task_attachment",
@@ -96,6 +100,18 @@ public class TenantTransactionalPurgeService {
           "common_approval.approval_request",
           "common_approval.user_promotion_request",
           "common_approval.approval_policy",
+          "finance.collection_source_observation",
+          "finance.collection_command_receipt",
+          "finance.collection_cheque_event",
+          "finance.collection_refund_event",
+          "finance.collection_refund",
+          "finance.collection_payment_match",
+          "finance.collection_cheque_application",
+          "finance.collection_cheque",
+          "finance.collection_expectation",
+          "finance.collection_obligation",
+          "finance.collection_reconciliation_health",
+          "finance.collection_projection",
           "finance.fx_revaluation",
           "finance.fx_realization",
           "finance.finance_credit_note_application",
@@ -134,6 +150,9 @@ public class TenantTransactionalPurgeService {
           "production.batch_finished_width_measurement",
           "production.lot_compatibility_request",
           "production.lot_compatibility_confirmation",
+          "production.stock_unit_cut_plan_operation",
+          "production.stock_unit_cut_session",
+          "production.stock_unit_cut_plan",
           "production.stock_unit_cut",
           "production.stock_unit_allocation",
           "production.work_order_hold",
@@ -146,6 +165,8 @@ public class TenantTransactionalPurgeService {
           "production.quality_decision_unit",
           "production.quality_decision",
           "production.stock_unit_audit_log",
+          "sales.quote_stock_operation",
+          "sales_ord.quantity_policy_operation",
           "sales_ord.draft_stock_selection_operation",
           "sales_ord.draft_stock_selection",
           "production.stock_unit_soft_hold",
@@ -164,6 +185,8 @@ public class TenantTransactionalPurgeService {
           "production.production_execution_batch_reservation",
           "production.production_execution_inventory_transaction",
           "production.production_execution_inventory_balance",
+          "production.batch_finishing_step_grade",
+          "production.batch_finishing_step",
           "production.production_execution_batch_lineage",
           "production.production_execution_batch",
           // FABRIC-1: detail before article, article before its construction and product.
@@ -173,6 +196,8 @@ public class TenantTransactionalPurgeService {
           "production.prod_fabric_woven",
           "production.prod_fabric_article",
           "production.prod_fabric_construction",
+          "production.prod_fabric_finishing_price",
+          "production.prod_fabric_finishing_price_class",
           "production.prod_fabric_finishing_process",
           "production.prod_yarn_backfill_reconciliation",
           "production.prod_yarn_article_audit",
@@ -202,6 +227,11 @@ public class TenantTransactionalPurgeService {
           "flowboard.decision_follow",
           // CEDIT-03: field history and the technical edit records go before their order and
           // lines; a base names its origin receipt (deferred FK), so bases go before receipts.
+          "sales_ord.order_payment_plan_settlement_ack",
+          "sales_ord.order_payment_plan_line",
+          "sales_ord.order_payment_plan_currency",
+          "sales_ord.order_payment_plan",
+          "sales_ord.order_payment_plan_revision",
           "sales_ord.order_field_change",
           "sales_ord.order_edit_base",
           "sales_ord.order_edit_operation",
@@ -281,7 +311,7 @@ public class TenantTransactionalPurgeService {
     if (tenantId == null) {
       throw new PlatformDomainException("Tenant not found", "TENANT_NOT_FOUND", 404);
     }
-    Instant now = Instant.now(clock);
+    Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
     Instant trialEndsAt = now.plus(baseDays, ChronoUnit.DAYS);
 
     Map<String, Integer> deletedRows =
@@ -376,6 +406,10 @@ public class TenantTransactionalPurgeService {
         "SELECT set_config(?, ?, true)",
         String.class,
         DECISION_FOLLOW_PURGE_SETTING,
+        tenantId.toString());
+    jdbc.queryForObject(
+        "SELECT set_config('app.collection_purge_tenant', ?, true)",
+        String.class,
         tenantId.toString());
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
@@ -770,6 +804,17 @@ public class TenantTransactionalPurgeService {
     if (affected != 1) {
       throw new PlatformDomainException("Tenant is already real", "TENANT_ALREADY_REAL", 409);
     }
+    // The tenant and its selected evaluation packages start the same real trial, atomically.
+    // Suspended/deselected and paid/cancelled rows keep their lifecycle state.
+    jdbc.update(
+        """
+        UPDATE common_company.common_subscription
+        SET learning_access = false, trial_ends_at = ?, expiry_date = NULL,
+            updated_at = now(), version = version + 1
+        WHERE tenant_id = ? AND evaluation_managed = true AND status = 'TRIAL'
+        """,
+        Timestamp.from(trialEndsAt),
+        tenantId);
   }
 
   private void delete(
@@ -784,6 +829,11 @@ public class TenantTransactionalPurgeService {
     // Going real lifts the email sandbox in the same statement; a stale cache entry would keep
     // redirecting a paying customer's mail to their billing address.
     evict(TENANT_EMAIL_SANDBOX_CACHE, tenantId);
+    for (String name :
+        java.util.List.of("subscription-check", "feature-check", "policy-decision")) {
+      var cache = cacheManager.getCache(name);
+      if (cache != null) cache.clear();
+    }
   }
 
   private void evict(String cacheName, UUID tenantId) {

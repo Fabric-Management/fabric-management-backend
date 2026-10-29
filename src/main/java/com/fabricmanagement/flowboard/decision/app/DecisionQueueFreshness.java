@@ -9,6 +9,8 @@ import java.util.Set;
 public final class DecisionQueueFreshness {
   public static final Set<String> LISTENERS =
       Set.of(
+          com.fabricmanagement.flowboard.collection.app.listener.CollectionFollowUpListener.class
+              .getName(),
           DecisionProjectionListener.class.getName(),
           DecisionFollowEventListener.class.getName(),
           OrderCoverCaseOpenedListener.class.getName());

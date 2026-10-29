@@ -9,6 +9,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface OrderFlowEventRepository extends JpaRepository<OrderFlowEvent, UUID> {
 
+  java.util.Optional<OrderFlowEvent>
+      findFirstByTenantIdAndSalesOrderIdAndToStageOrderByOccurredAtAsc(
+          UUID tenantId,
+          UUID salesOrderId,
+          com.fabricmanagement.sales.salesorder.domain.OrderFlowStage toStage);
+
   List<OrderFlowEvent> findByTenantIdAndSalesOrderIdOrderByOccurredAtDesc(
       UUID tenantId, UUID salesOrderId);
 }

@@ -198,12 +198,17 @@ public class EmailOutboxService {
         } catch (ObjectOptimisticLockingFailureException optimisticLockException) {
           log.warn("⚠️ Skipping email due to concurrent update: emailId={}", pending.id());
         } catch (Exception e) {
-          log.error("Error processing email {}", pending.id(), e);
+          log.error(
+              "Error processing email {}",
+              pending.id(),
+              com.fabricmanagement.common.infrastructure.logging.LogSafeFailure.snapshot(e));
         }
       }
 
     } catch (Exception e) {
-      log.error("Error processing email queue", e);
+      log.error(
+          "Error processing email queue",
+          com.fabricmanagement.common.infrastructure.logging.LogSafeFailure.snapshot(e));
     }
   }
 
@@ -271,10 +276,8 @@ public class EmailOutboxService {
       log.warn("⚠️ Concurrent update detected while processing email: emailId={}", email.getId());
     } catch (Exception e) {
       // Failure - mark as failed and schedule retry
-      String errorMsg = e.getMessage();
-      if (errorMsg != null && errorMsg.length() > 500) {
-        errorMsg = errorMsg.substring(0, 500) + "...";
-      }
+      // A provider/SQL message can contain the complete setup email. Store metadata only.
+      String errorMsg = "failureType=" + e.getClass().getName();
 
       email.markAsFailed(errorMsg);
       emailOutboxRepository.save(email);

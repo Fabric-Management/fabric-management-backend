@@ -31,8 +31,10 @@ public class DraftStockLiveController {
   private final DraftStockLiveRevisionSource source;
   private final SalesOrderLiveService authentication;
 
-  @GetMapping("/api/v1/sales/order-intake/products/{productId}/stock-live-events")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @GetMapping(
+      com.fabricmanagement.production.core.stockunit.api.StockUnitLeaseKeys.LIVE_EVENTS_TEMPLATE)
+  @PreAuthorize(
+      "@auth.can(authentication, 'sales', 'read') or @auth.can(authentication, 'production', 'read')")
   @Operation(
       operationId = "subscribeDraftStockLiveEvents",
       summary = "Subscribe to roll availability and provisional ownership changes",

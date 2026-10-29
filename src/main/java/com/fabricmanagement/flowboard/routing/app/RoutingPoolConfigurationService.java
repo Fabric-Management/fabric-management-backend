@@ -32,7 +32,10 @@ public class RoutingPoolConfigurationService {
         .sorted()
         .forEach(
             id -> {
-              var reasons = eligibility.candidacy(tenant, eligibility.user(tenant, id));
+              var reasons =
+                  key == RoutingPoolKey.ORDER_COVER
+                      ? eligibility.candidacy(tenant, eligibility.user(tenant, id))
+                      : eligibility.candidacy(tenant, eligibility.user(tenant, id), key);
               if (!reasons.isEmpty()) invalid.put(id, reasons);
             });
     if (!invalid.isEmpty()) throw new RoutingMembersRejectedException(invalid);

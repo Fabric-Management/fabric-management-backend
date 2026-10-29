@@ -74,7 +74,9 @@ class ConfirmationGateTest {
                 com.fabricmanagement.production.core.stockunit.api.StockUnitSoftHoldPort.class),
             evaluation,
             allocation,
-            customRequests);
+            customRequests,
+            org.mockito.Mockito.mock(
+                com.fabricmanagement.production.core.stockunit.api.StockUnitCutPlanPort.class));
     order = SalesOrder.builder().tradingPartnerId(UUID.randomUUID()).orderNumber("SO-1").build();
     order.setId(UUID.randomUUID());
     line =

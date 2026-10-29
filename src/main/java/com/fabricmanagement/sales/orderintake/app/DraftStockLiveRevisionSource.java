@@ -20,6 +20,8 @@ public class DraftStockLiveRevisionSource implements LiveRevisionSource {
   private final SalesAccessScopeResolver permissions;
   private final ProductSalesDefinitionQueryService products;
   private final StockUnitOwnershipPort ownership;
+  private final com.fabricmanagement.common.infrastructure.security.PermissionEvaluator
+      productionPermissions;
 
   @Override
   public String resourceType() {
@@ -35,14 +37,15 @@ public class DraftStockLiveRevisionSource implements LiveRevisionSource {
                 .getCurrentTenantIdOrNull()))
       throw new IllegalStateException("A live stock read runs in the actor's own tenant scope");
     if (!users.isActive(actor.tenantId(), actor.userId())
-        || permissions
-                .resolve(
-                    actor.tenantId(),
-                    actor.userId(),
-                    "read",
-                    SalesAccessScopeResolver.PermissionFreshness.FRESH)
-                .scope()
-            == null) return LiveReadResult.Hidden.FORBIDDEN;
+        || (permissions
+                    .resolve(
+                        actor.tenantId(),
+                        actor.userId(),
+                        "read",
+                        SalesAccessScopeResolver.PermissionFreshness.FRESH)
+                    .scope()
+                == null
+            && !productionRead(actor))) return LiveReadResult.Hidden.FORBIDDEN;
     if (products
         .find(actor.tenantId(), productId)
         .filter(
@@ -55,5 +58,17 @@ public class DraftStockLiveRevisionSource implements LiveRevisionSource {
         new LiveRevision(ownership.availabilityRevision(productId)),
         null,
         leases.leaseRevision(StockUnitLeaseKeys.resource(productId), 1));
+  }
+
+  private boolean productionRead(LiveActor actor) {
+    var identity = users.findPermissionIdentity(actor.tenantId(), actor.userId());
+    return identity
+        .map(
+            value ->
+                productionPermissions
+                    .evaluateFresh(
+                        actor.tenantId(), value.roleCode(), value.departmentCodes(), actor.userId())
+                    .can("production", "read"))
+        .orElse(false);
   }
 }

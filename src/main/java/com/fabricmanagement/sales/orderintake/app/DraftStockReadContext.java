@@ -20,6 +20,8 @@ import org.springframework.stereotype.Component;
 public class DraftStockReadContext {
   private final DraftStockSelectionRepository selections;
   private final LiveEditLeaseService leases;
+  private final com.fabricmanagement.sales.quote.app.QuoteStockTargetAccess quoteTargets;
+  private final OrderIntakeAccess orders;
 
   public record Own(UUID sessionId, UUID targetLineId) {}
 
@@ -31,6 +33,16 @@ public class DraftStockReadContext {
                 value -> value.getActorId().equals(actor) && value.getProductId().equals(productId))
             .orElseThrow(
                 () -> OrderIntakeException.notFound("Draft stock selection", proof.selectionId()));
+    if (row.getTargetQuoteId() != null)
+      quoteTargets.verifyReadContext(
+          row.getTargetQuoteId(), row.getTargetQuoteLineId(), productId, actor);
+    if (row.getTargetOrderId() != null) {
+      var order = orders.writableOrderFresh(row.getTargetOrderId(), actor);
+      if (order.getStatus() != com.fabricmanagement.sales.salesorder.domain.OrderStatus.DRAFT
+          || !orders.line(order, row.getTargetLineId()).getProductId().equals(productId))
+        throw OrderIntakeException.conflict(
+            "STOCK_TARGET_CHANGED", "The stock target is no longer editable");
+    }
     var tokens = Set.copyOf(proof.tokens());
     var actual =
         leases.held(StockUnitLeaseKeys.resource(productId), 1).stream()
@@ -47,6 +59,6 @@ public class DraftStockReadContext {
               "STOCK_PROPOSAL_STALE", "The preview no longer holds this exact stock selection")
           .withDetail("clientLineId", row.getClientLineId())
           .withDetail("selectionId", row.getId());
-    return new Own(row.getSessionId(), row.getTargetLineId());
+    return new Own(row.getSessionId(), row.ownLineId());
   }
 }

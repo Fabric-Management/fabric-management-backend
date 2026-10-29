@@ -40,6 +40,7 @@ public class OrderVersionSnapshotter {
   private final CustomerProductRequestRepository requests;
   private final TenantQueryPort tenants;
   private final ObjectMapper canonical;
+  private final SalesOrderPaymentPlanService paymentPlans;
 
   public OrderVersionSnapshotter(
       SalesOrderLineRepository lines,
@@ -47,7 +48,9 @@ public class OrderVersionSnapshotter {
       ColorQueryService colours,
       CustomerProductRequestRepository requests,
       TenantQueryPort tenants,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      SalesOrderPaymentPlanService paymentPlans) {
+    this.paymentPlans = paymentPlans;
     this.lines = lines;
     this.partners = partners;
     this.colours = colours;
@@ -69,6 +72,7 @@ public class OrderVersionSnapshotter {
     List<SalesOrderLine> active =
         lines.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
     OrderCurrencyTotals totals = OrderCurrencyTotals.of(active);
+    var paymentPlan = paymentPlans.snapshot(order, proposal != null);
     OrderVersionContent content =
         new OrderVersionContent(
             tenants.findById(tenantId).map(TenantReference::name).orElse(null),
@@ -80,7 +84,9 @@ public class OrderVersionSnapshotter {
             order.getCustomerReference(),
             order.getOrderDate(),
             order.getRequestedDeliveryDate(),
-            order.getPaymentTerms(),
+            paymentPlan == null
+                ? order.getPaymentTerms()
+                : SalesOrderPaymentPlanService.summary(paymentPlan),
             new OrderVersionContent.Terms(
                 order.getDeliveryTerm(),
                 order.getDeliveryPlace(),
@@ -106,7 +112,9 @@ public class OrderVersionSnapshotter {
                     proposal.getId(),
                     proposal.getProposedOn(),
                     proposal.getDeliveryEvent(),
-                    proposal.getValidUntil()));
+                    proposal.getValidUntil()),
+            paymentPlan,
+            order.getPaymentNote());
     return new Snapshot(content, hash(content));
   }
 
@@ -152,7 +160,8 @@ public class OrderVersionSnapshotter {
         line.getRequestedDeliveryDate(),
         line.isSingleLotRequired(),
         line.getShipmentPreference(),
-        line.getCustomerRequestQty());
+        line.getRecordedCustomerRequestQty(),
+        line.getQuantityPolicy());
   }
 
   private static OrderVersionContent.Total total(OrderCurrencyTotal total) {

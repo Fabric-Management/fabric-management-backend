@@ -26,12 +26,20 @@ public class StockUnitCutService {
   private final StockUnitRepository stockUnitRepository;
   private final StockUnitCutRepository cutRepository;
   private final Clock clock;
+  private final com.fabricmanagement.production.core.stockunit.api.StockUnitOwnershipPort ownership;
 
   @Transactional
   public StockUnitCutDtos.CutDto recordCut(
       UUID stockUnitId, StockUnitCutDtos.RecordCutRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
+    ownership.assertAvailable(java.util.List.of(stockUnitId), null, null);
     StockUnit unit = unit(tenantId, stockUnitId);
+    if (cutRepository
+        .findByTenantIdAndStockUnitIdInAndIsActiveTrue(tenantId, java.util.List.of(stockUnitId))
+        .stream()
+        .anyMatch(cut -> !cut.isRemainingVerified()))
+      throw new com.fabricmanagement.production.core.stockunit.domain.exception
+          .StockUnitDomainException("Verify the pending cut before recording another one");
     if (unit.getLength() == null || unit.getLengthUnit() == null) {
       throw new IllegalArgumentException("Only pieces with a recorded length can be cut by length");
     }
@@ -60,6 +68,7 @@ public class StockUnitCutService {
   @Transactional
   public StockUnitCutDtos.CutDto verifyRemaining(UUID stockUnitId, UUID cutId) {
     UUID tenantId = TenantContext.requireTenantId();
+    ownership.assertAvailable(java.util.List.of(stockUnitId), null, null);
     StockUnitCut cut =
         cutRepository
             .findByTenantIdAndIdAndStockUnitId(tenantId, cutId, stockUnitId)

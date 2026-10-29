@@ -61,8 +61,10 @@ public class PublishSelfSignupCompletedStep implements OnboardingStep {
 
     eventPublisher.publish(event);
     log.debug(
-        "PublishSelfSignupCompletedStep: event published for {} (salesLed={})",
-        email,
+        "Signup email event published: eventId={}, tenantId={}, userId={}, salesLed={}",
+        event.getEventId(),
+        context.getTenantId(),
+        context.getUserId(),
         context.isSalesLed());
   }
 }

@@ -17,6 +17,11 @@ import lombok.Getter;
 @Getter
 public class QuoteResponse {
 
+  @Schema(
+      requiredMode = Schema.RequiredMode.REQUIRED,
+      description = "Aggregate version for stock and quantity-policy commands")
+  private final Long version;
+
   private final UUID id;
   private final String quoteNumber;
   private final UUID customerId;
@@ -56,6 +61,7 @@ public class QuoteResponse {
   }
 
   private QuoteResponse(Quote quote, String customerName) {
+    this.version = quote.getVersion();
     this.id = quote.getId();
     this.quoteNumber = quote.getQuoteNumber();
     this.customerId = quote.getCustomerId();

@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
@@ -64,22 +65,21 @@ public class TenantOnboardingController {
               mediaType = "application/json",
               schema = @Schema(implementation = TenantOnboardingResponse.class)))
   @PostMapping("/tenant")
+  @SensitiveLogData
   // @PreAuthorize("hasRole('PLATFORM_ADMIN')")  // Enable in production after creating first
   // platform admin
   public ResponseEntity<ApiResponse<TenantOnboardingResponse>> createTenant(
       @Valid @RequestBody TenantOnboardingRequest request) {
 
-    log.info(
-        "Admin onboarding request: organizationName={}, admin={}",
-        request.getOrganizationName(),
-        request.getAdminContact());
+    log.info("Sales-led tenant onboarding requested");
 
     TenantOnboardingResponse response = onboardingService.createSalesLedTenant(request);
 
     log.info(
-        "✅ Tenant onboarded successfully: organizationUid={}, setupUrl={}",
-        response.getOrganizationUid(),
-        response.getSetupUrl());
+        "Tenant onboarded successfully: tenantId={}, organizationId={}, userId={}",
+        response.getTenantId(),
+        response.getOrganizationId(),
+        response.getAdminUserId());
 
     return ResponseEntity.ok(
         ApiResponse.success(response, "Tenant created successfully. Welcome email sent to admin."));

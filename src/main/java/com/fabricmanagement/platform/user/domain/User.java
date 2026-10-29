@@ -118,7 +118,7 @@ public class User extends BaseEntity {
   private String preferredLocale;
 
   /**
-   * User's preferred IANA timezone (e.g. "Europe/Istanbul", "UTC").
+   * User's preferred IANA timezone (e.g. "Europe/London", "UTC").
    *
    * <p>Null = inherit from tenant settings.
    */
@@ -155,11 +155,21 @@ public class User extends BaseEntity {
   /**
    * Update locale and timezone preferences for this user.
    *
-   * @param locale IETF BCP 47 language tag (e.g. "tr-TR"). Null clears override (inherits tenant).
-   * @param timezone IANA timezone identifier (e.g. "Europe/Istanbul"). Null clears override.
+   * @param locale IETF BCP 47 language tag (e.g. "en-GB"). Null clears override (inherits tenant).
+   * @param timezone IANA timezone identifier (e.g. "Europe/London"). Null clears override.
    */
   public void updateLocalePreferences(String locale, String timezone) {
     this.preferredLocale = locale;
+    this.preferredTimezone = timezone;
+  }
+
+  /** Changes language without copying or clearing the saved timezone. */
+  public void updateLanguagePreference(String locale) {
+    this.preferredLocale = locale;
+  }
+
+  /** Changes timezone without copying or clearing the saved language. */
+  public void updateTimezonePreference(String timezone) {
     this.preferredTimezone = timezone;
   }
 
