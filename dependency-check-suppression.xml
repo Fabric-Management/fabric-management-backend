@@ -177,4 +177,25 @@
         <cve>CVE-2026-59284</cve>
     </suppress>
 
+    <suppress until="2026-12-01Z">
+        <notes>DOMPurify 3.4.13, bundled in the org.webjars:swagger-ui 5.32.14 webjar, is affected
+        by CVE-2026-116803 (IN_PLACE sanitization with a hook that removes a parent or sibling
+        node) and CVE-2026-116804 (SAFE_FOR_TEMPLATES). Both are fixed in DOMPurify 3.4.17; the
+        DOMPurify security advisories rate them Low, while the NVD data used by Dependency-Check
+        scores them 10.0. Swagger UI 5.32.14 calls DOMPurify.sanitize only on markdown strings
+        (src/core/components/providers/markdown.jsx) with ADD_ATTR, FORBID_TAGS, ALLOW_DATA_ATTR
+        and FORBID_ATTR: it never passes a DOM node (IN_PLACE needs one), never sets
+        SAFE_FOR_TEMPLATES, and its only hook (beforeSanitizeElements) sets rel and removes
+        nothing. Swagger UI is switched off in the base and prod profiles
+        (springdoc.swagger-ui.enabled=false) and on only in the local and docker development
+        profiles. DependencySecurityAssumptionsTest guards the disabled-by-default configuration
+        and the reviewed webjar version. Checked 2026-10-29: the newest webjar, 5.34.0, bundles
+        DOMPurify 3.4.16 (swagger-ui-bundle.js carries version="3.4.16"), still one short of the
+        fix. Remove this rule once a swagger-ui webjar that bundles DOMPurify 3.4.17 or
+        later is released and pom.xml consumes it.</notes>
+        <packageUrl regex="true">^pkg:javascript/DOMPurify@3\.4\.13$</packageUrl>
+        <cve>CVE-2026-116803</cve>
+        <cve>CVE-2026-116804</cve>
+    </suppress>
+
 </suppressions>

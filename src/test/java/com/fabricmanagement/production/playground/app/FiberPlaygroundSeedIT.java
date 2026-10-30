@@ -25,6 +25,7 @@ import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisi
 import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort.RegisterFirstPlaygroundSignup;
 import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -402,23 +403,7 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
     return value == null ? 0 : value;
   }
 
-  /** The playground source with its task-template catalogue (as PlaygroundCatalogueCloneIT). */
   private void playgroundSourceWithCatalogue() {
-    List<UUID> existing =
-        jdbc.queryForList(
-            "SELECT id FROM common_tenant.common_tenant WHERE slug = ?",
-            UUID.class,
-            TenantClonerService.PLAYGROUND_SOURCE_SLUG);
-    if (existing.isEmpty()) {
-      jdbc.update(
-          "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, billing_email,"
-              + " status, settings, is_active, created_at, updated_at, version)"
-              + " VALUES (?, ?, ?, 'Nexus Fabrics', 'TEMPLATE', 'test@example.com', 'ACTIVE', '{}',"
-              + " true, now(), now(), 0)",
-          UUID.randomUUID(),
-          UUID.randomUUID().toString(),
-          TenantClonerService.PLAYGROUND_SOURCE_SLUG);
-    }
-    catalogueRunner.run();
+    PlaygroundSourceFixture.ensureWithCatalogue(jdbc, catalogueRunner);
   }
 }

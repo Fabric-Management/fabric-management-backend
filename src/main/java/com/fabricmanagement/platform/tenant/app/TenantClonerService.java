@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.tenant.app;
 import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeeder;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
+import com.fabricmanagement.common.infrastructure.persistence.UidSuffix;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort;
@@ -11,6 +12,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -688,8 +690,10 @@ public class TenantClonerService {
                 throw new IllegalStateException("No PLAYGROUND TEMPLATE tenant found for cloning.");
               }
 
-              // 2. Create the new PLAYGROUND tenant
-              String playgroundSuffix = UUID.randomUUID().toString().substring(0, 8);
+              // 2. Create the new PLAYGROUND tenant. uid and slug are unique across all tenants,
+              //    so the suffix is the shared 12-character one (UidSuffix), lower-cased for the
+              //    slug and kept so for the uid, as before.
+              String playgroundSuffix = UidSuffix.random().toLowerCase(Locale.ROOT);
               UUID newTenantId = UUID.randomUUID();
               String uid = "PG-" + playgroundSuffix;
               String slug = "playground-" + playgroundSuffix;

@@ -434,7 +434,8 @@
                 <artifactId>opentelemetry-semconv</artifactId>
                 <version>${opentelemetry-semconv.version}</version>
             </dependency>
-            <!-- Override swagger-ui to consume patched DOMPurify 3.4.13 -->
+            <!-- Override swagger-ui: 5.32.14 bundles DOMPurify 3.4.13. DOMPurify 3.4.17 is not in any
+                 webjar yet; see the CVE-2026-116803/116804 rule in dependency-check-suppression.xml -->
             <dependency>
                 <groupId>org.webjars</groupId>
                 <artifactId>swagger-ui</artifactId>
@@ -651,9 +652,9 @@
                 <version>${spotbugs-maven-plugin.version}</version>
                 <configuration>
                     <effort>Max</effort>
-                    <!-- Analysis runs in a forked JVM; the 512MB default OOMs at effort=Max
-                         as the codebase grows. Give it room (GitHub runners have ~7GB). -->
-                    <fork>true</fork>
+                    <!-- Analysis runs in a forked JVM (the plugin's default; its fork parameter
+                         is deprecated, so it is not set here). The 512MB default heap OOMs at
+                         effort=Max as the codebase grows. Give it room (GitHub runners have ~7GB). -->
                     <maxHeap>3072</maxHeap>
                     <threshold>High</threshold>
                     <!-- spotbugs:check must be a real blocking quality gate. -->

@@ -21,7 +21,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.util.ClassUtils;
 
 /**
- * Guards the repository-owned assumptions behind the temporary Spring suppressions.
+ * Guards the repository-owned assumptions behind the temporary dependency suppressions.
  *
  * <p>The classpath and source checks describe what this codebase depends on. The YAML checks
  * describe what its committed profiles request; external configuration can still override those
@@ -36,6 +36,8 @@ class DependencySecurityAssumptionsTest {
       new ClassFileImporter()
           .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
           .importPackages("com.fabricmanagement");
+  private static final String REVIEWED_SWAGGER_UI_BUNDLE =
+      "META-INF/resources/webjars/swagger-ui/5.32.14/swagger-ui-bundle.js";
 
   @Test
   void webFluxMustRemainOffTheClasspath() {
@@ -255,6 +257,28 @@ class DependencySecurityAssumptionsTest {
         .noneMatch(endpoint -> endpoint.equalsIgnoreCase("env") || endpoint.equals("*"));
   }
 
+  @Test
+  void swaggerUiMustRemainDisabledByDefaultAndInProduction() throws IOException {
+    List<YamlProperty> switches =
+        loadApplicationYamlProperties().stream()
+            .filter(property -> property.name().equals("springdoc.swagger-ui.enabled"))
+            .toList();
+
+    assertThat(valuesIn(switches, "application.yml"))
+        .as("CVE-2026-116803: Swagger UI must stay off in the base profile")
+        .containsOnly("false");
+    assertThat(valuesIn(switches, "application-prod.yml"))
+        .as("CVE-2026-116803: Swagger UI must stay off in the prod profile")
+        .containsOnly("false");
+  }
+
+  @Test
+  void swaggerUiWebjarMustRemainTheReviewedVersion() {
+    assertThat(getClass().getClassLoader().getResource(REVIEWED_SWAGGER_UI_BUNDLE))
+        .as("CVE-2026-116803: a new swagger-ui webjar needs a new DOMPurify call-site review")
+        .isNotNull();
+  }
+
   private static void assertNoProductionDependency(String className, String reason) {
     ArchRule rule =
         noClasses()
@@ -305,6 +329,13 @@ class DependencySecurityAssumptionsTest {
     } catch (IOException exception) {
       throw new UncheckedIOException("Cannot read application profile " + yamlFile, exception);
     }
+  }
+
+  private static List<String> valuesIn(List<YamlProperty> properties, String fileName) {
+    return properties.stream()
+        .filter(property -> property.file().getFileName().toString().equals(fileName))
+        .map(property -> String.valueOf(property.value()))
+        .toList();
   }
 
   private static boolean isPropertyOrDescendant(String candidate, String propertyName) {
