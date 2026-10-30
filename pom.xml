@@ -652,9 +652,9 @@
                 <version>${spotbugs-maven-plugin.version}</version>
                 <configuration>
                     <effort>Max</effort>
-                    <!-- Analysis runs in a forked JVM; the 512MB default OOMs at effort=Max
-                         as the codebase grows. Give it room (GitHub runners have ~7GB). -->
-                    <fork>true</fork>
+                    <!-- Analysis runs in a forked JVM (the plugin's default; its fork parameter
+                         is deprecated, so it is not set here). The 512MB default heap OOMs at
+                         effort=Max as the codebase grows. Give it room (GitHub runners have ~7GB). -->
                     <maxHeap>3072</maxHeap>
                     <threshold>High</threshold>
                     <!-- spotbugs:check must be a real blocking quality gate. -->
