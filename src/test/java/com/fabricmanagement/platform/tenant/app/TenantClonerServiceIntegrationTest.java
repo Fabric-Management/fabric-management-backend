@@ -15,6 +15,7 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -38,33 +39,11 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
   @Test
   @DisplayName("Should successfully clone TEMPLATE tenant with all relations")
   void cloneTemplateToPlayground_clonesAllRelations() {
-    // Arrange - verify TEMPLATE exists
-    Long count =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics'",
-            Long.class);
-    UUID templateTenantId;
-    if (count == null || count == 0) {
-      templateTenantId = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, billing_email, status, settings, is_active, created_at, updated_at, version) VALUES (?, ?, 'nexus-fabrics', 'Nexus Fabrics', 'TEMPLATE', 'test@example.com', 'ACTIVE', '{}', true, now(), now(), 0)",
-          templateTenantId,
-          UUID.randomUUID().toString());
-    } else {
-      templateTenantId =
-          jdbc.queryForObject(
-              "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
-              UUID.class);
-    }
+    // Arrange - the playground source with its catalogue (see PlaygroundSourceFixture)
+    UUID templateTenantId =
+        PlaygroundSourceFixture.ensureWithCatalogue(jdbc, catalogueBackfillRunner);
     long templateCount = tenantRepository.findByType(TenantType.TEMPLATE).size();
     assertThat(templateCount).as("Precondition: TEMPLATE tenant must exist").isGreaterThan(0);
-
-    // The playground clone copies the task-template catalogue from the playground source and
-    // fails when the source lacks an entry (TASK-TEMPLATE-TENANCY-1). A source inserted above
-    // holds none; the start-up runner distributes it. Without this the test only passed when an
-    // earlier test class had already installed the catalogue on nexus-fabrics, or when a Spring
-    // context started after the row existed (PlaygroundCatalogueCloneIT does the same).
-    catalogueBackfillRunner.run();
 
     // Insert dummy data into TEMPLATE tenant to test cloning
     UUID orgId;

@@ -20,6 +20,7 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserContact;
 import com.fabricmanagement.platform.user.domain.UserDepartment;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.util.List;
@@ -43,31 +44,9 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
 
   @BeforeEach
   void setUpTemplateTenant() {
-    UUID templateTenantId;
-
-    // Check if nexus-fabrics exists first
-    Long count =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics'",
-            Long.class);
-    if (count != null && count > 0) {
-      templateTenantId =
-          jdbc.queryForObject(
-              "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
-              UUID.class);
-    } else {
-      templateTenantId = UUID.fromString("00000000-0000-0000-ffff-000000000002");
-      jdbc.update(
-          "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, billing_email, status, settings, is_active, created_at, updated_at, version) VALUES (?, ?, 'nexus-fabrics', 'Nexus Fabrics', 'TEMPLATE', 'test@example.com', 'ACTIVE', '{}', true, now(), now(), 0)",
-          templateTenantId,
-          UUID.randomUUID().toString());
-    }
-
-    // The playground clone copies the task-template catalogue from nexus-fabrics and fails with
-    // "lacks <key>" (409) when the source misses an entry (TASK-TEMPLATE-TENANCY-1). Only the
-    // start-up runner distributes it, so without this the init tests passed only when an earlier
-    // test class or a later-started Spring context had already installed it on nexus-fabrics.
-    catalogueRunner.run();
+    // The playground source with its catalogue (see PlaygroundSourceFixture); the users below
+    // are what /playground/init and /personas read back.
+    UUID templateTenantId = PlaygroundSourceFixture.ensureWithCatalogue(jdbc, catalogueRunner);
 
     // If Jane Smith already exists, we have already seeded for this test class
     Long janeCount =
