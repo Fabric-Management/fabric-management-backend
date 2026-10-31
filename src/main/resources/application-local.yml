@@ -26,7 +26,8 @@ spring:
     host: ${MAIL_HOST:smtp.hostinger.com}
     port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:info@storeandsale.shop}
-    password: ${MAIL_PASSWORD:Akk789987@}
+    # No default: the SMTP password is a real credential and lives only in .env.
+    password: ${MAIL_PASSWORD:}
     protocol: ${MAIL_PROTOCOL:smtps}
     properties:
       mail:
