@@ -139,8 +139,6 @@ public class SecurityConfig {
                         "/v3/api-docs/**",
                         "/v3/api-docs.yaml")
                     .permitAll()
-                    .requestMatchers("/api/v1/dev/**")
-                    .permitAll()
                     .requestMatchers("/api/v1/public/**")
                     .permitAll()
                     .requestMatchers("/api/v1/auth/**")

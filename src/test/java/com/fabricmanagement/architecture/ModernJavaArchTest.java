@@ -161,8 +161,6 @@ class ModernJavaArchTest {
           noClasses()
               .that()
               .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-              .and()
-              .resideOutsideOfPackage("com.fabricmanagement.platform.dev..")
               .should()
               .dependOnClassesThat()
               .areAnnotatedWith(jakarta.persistence.Entity.class)
@@ -213,10 +211,9 @@ class ModernJavaArchTest {
     @Test
     @DisplayName("API-1: @RestController classes must reside under api/ package")
     void controllersMustResideInApiPackage() {
-      // Existing violations (2 counts):
+      // Existing violation (1 count):
       //   - common/infrastructure/web/HealthController (infra-level health check)
-      //   - platform/dev/DevelopmentToolsController (dev-only tools)
-      // These are infrastructure controllers, not domain API controllers.
+      // It is an infrastructure controller, not a domain API controller.
 
       ArchRule rule =
           classes()
@@ -224,15 +221,12 @@ class ModernJavaArchTest {
               .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
               .and()
               .doNotHaveSimpleName("HealthController")
-              .and()
-              .doNotHaveSimpleName("DevelopmentToolsController")
               .should()
               .resideInAPackage("..api..")
               .as(
                   "API-1: All @RestController classes must reside under the api/ package."
                       + " Controllers outside api/ violate the layered architecture."
-                      + " (2 infra controllers frozen: HealthController,"
-                      + " DevelopmentToolsController)");
+                      + " (1 infra controller frozen: HealthController)");
 
       rule.check(allClasses);
     }

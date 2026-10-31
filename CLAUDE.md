@@ -4,7 +4,11 @@
 
 ## Build & Run Commands
 - Build project (skip tests): `./mvnw clean install -DskipTests`
-- Run local application: `./mvnw spring-boot:run`
+- Run the application: `docker compose up -d --build` (or `make run`). Docker is the only way to
+  run it locally (application-local.yml and `./mvnw spring-boot:run` were retired on 2026-10-31);
+  the app is served on http://localhost:8080. `local` remains only as the fallback profile for
+  tests that choose none.
+- Verify it starts: `make check-run` (builds the image and waits for the health check).
 - Format code: `./mvnw fmt:format`
 - Run bug detection: `./mvnw spotbugs:check`
 
