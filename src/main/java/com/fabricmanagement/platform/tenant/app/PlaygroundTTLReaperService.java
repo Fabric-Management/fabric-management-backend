@@ -66,17 +66,17 @@ public class PlaygroundTTLReaperService {
    * Hard-purge job: permanently deletes playground tenants that have been inactive for 30+ days.
    * Runs daily at 4 AM, one hour after the soft-delete reaper.
    *
-   * <p>Cascading delete order: UserContact → Contact → UserDepartment → User → Department →
-   * Organization → Tenant.
+   * <p>The deletion itself exists: common_tenant.purge_tenant (V20261031120000) removes one tenant
+   * completely, as fabric_system. Only scheduling it is still open.
    */
   @Scheduled(cron = "${playground.purge.cron:0 0 4 * * ?}")
   public void purgeInactivePlaygrounds() {
     log.info("Starting Playground Hard Purge job for tenants inactive for 30+ days...");
-    // TODO(CR4-3): Implement cascading hard delete for playground tenant data.
+    // TODO(CR4-3): schedule the hard delete of expired playground tenants.
     // Steps:
     //   1. Find tenants WHERE type=PLAYGROUND AND isActive=false AND updatedAt < now()-30d
-    //   2. For each tenant, delete in order: notifications, user_contacts, contacts,
-    //      user_departments, users, departments, organizations, tenant
+    //   2. For each tenant, as fabric_system and in its own transaction:
+    //      SELECT * FROM common_tenant.purge_tenant(id, name, true)
     //   3. Log count of purged tenants
     log.info("Hard purge not yet implemented — skipping.");
   }
