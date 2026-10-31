@@ -9,11 +9,9 @@ spring:
   application:
     name: fabric-management-system
 
-  profiles:
-    # The app runs only in Docker, under the docker profile that docker-compose.yml sets.
-    # `local` survives as the fallback for tests that choose no profile; there is no
-    # application-local.yml behind it any more, so it adds nothing to this file.
-    active: ${SPRING_PROFILES_ACTIVE:local}
+  # No default profile: SPRING_PROFILES_ACTIVE chooses it (docker-compose.yml sets docker,
+  # production sets prod) and tests choose test with @ActiveProfiles. Starting with none fails
+  # at once (RequireActiveProfileConfig) instead of running on settings meant for another place.
 
   modulith:
     events:

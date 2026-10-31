@@ -27,7 +27,9 @@
     </appender>
 
     <!-- Profiles Configuration -->
-    <springProfile name="dev,local,test,docker">
+    <!-- default: no profile is active; RequireActiveProfileConfig then stops the start, and its
+         message has to reach the console. -->
+    <springProfile name="dev,test,docker,default">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
         </root>

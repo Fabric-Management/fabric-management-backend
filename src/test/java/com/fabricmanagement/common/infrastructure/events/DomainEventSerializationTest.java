@@ -55,9 +55,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.core.EventSerializer;
+import org.springframework.test.context.ActiveProfiles;
 
 @JsonTest
 @Import(EventsConfiguration.class)
+@ActiveProfiles("test")
 class DomainEventSerializationTest {
 
   @Autowired private EventSerializer eventSerializer;
