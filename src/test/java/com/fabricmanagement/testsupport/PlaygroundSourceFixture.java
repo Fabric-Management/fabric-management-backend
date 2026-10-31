@@ -24,8 +24,8 @@ public final class PlaygroundSourceFixture {
   private PlaygroundSourceFixture() {}
 
   /**
-   * Finds the playground source, inserting a bare one when absent, and distributes the
-   * task-template catalogue to it.
+   * Finds the playground source, inserting a bare one when absent, gives it a company organization
+   * when it has none, and distributes the task-template catalogue to it.
    *
    * @return the source tenant's id
    */
@@ -50,6 +50,7 @@ public final class PlaygroundSourceFixture {
     } else {
       source = existing.getFirst();
     }
+    ensureCompanyOrganization(jdbc, source);
     catalogueRunner.run();
     assertThat(
             jdbc.queryForObject(
@@ -60,5 +61,32 @@ public final class PlaygroundSourceFixture {
         .as("precondition: the playground source holds the task-template catalogue")
         .isEqualTo(TaskTemplateCatalogue.values().length);
     return source;
+  }
+
+  /**
+   * Gives the source the company organization the real one has. Without it a clone has no root
+   * organization, so the finance demo seeding cannot set USD as the reporting currency, falls back
+   * to the platform default and converts its EUR invoices to GBP through the ECB, which publishes
+   * no rate at weekends: the clone then failed or passed by the day of the week and by whether an
+   * earlier test had added an organization.
+   */
+  private static void ensureCompanyOrganization(JdbcTemplate jdbc, UUID source) {
+    Long roots =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM common_company.common_organization WHERE tenant_id = ?"
+                + " AND parent_organization_id IS NULL AND organization_type <> 'EXTERNAL_PARTNER'",
+            Long.class,
+            source);
+    if (roots != null && roots > 0) {
+      return;
+    }
+    jdbc.update(
+        "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, tax_id,"
+            + " organization_type, is_active, created_at, updated_at, version)"
+            + " VALUES (?, ?, ?, 'Nexus Fabrics', ?, 'VERTICAL_MILL', true, now(), now(), 0)",
+        UUID.randomUUID(),
+        source,
+        UUID.randomUUID().toString(),
+        "NEXUS-" + UUID.randomUUID().toString().substring(0, 8));
   }
 }
