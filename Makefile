@@ -4,7 +4,7 @@
 
 .SHELLFLAGS := -eu -o pipefail -c
 .ONESHELL:
-.PHONY: help setup build compile check check-run run format lint test verify verify-coverage build-4-verify up down logs status db-migrate db-repair db-repair-checksum db-reset db-reset-local db-shell clean dev-reset info
+.PHONY: help setup build compile check check-run run format lint test verify verify-coverage build-4-verify up down logs status db-migrate db-repair db-repair-checksum db-reset db-shell clean info
 
 .DEFAULT_GOAL := help
 
@@ -13,8 +13,9 @@ APP_PORT ?= 8080
 BASE_URL := http://localhost:$(APP_PORT)
 POSTGRES_SERVICE := postgres
 POSTGRES_CONTAINER := fabric-postgres
-POSTGRES_LOCAL_USER ?= postgres
-# psql: use PATH, or common macOS locations. Override: make db-reset-local PSQL=/path/to/psql
+# Seconds `make check-run` waits for the stack to report healthy.
+CHECK_RUN_TIMEOUT ?= 300
+# psql: use PATH, or common macOS locations. Override: make db-repair-checksum PSQL=/path/to/psql
 PSQL ?= $(shell which psql 2>/dev/null || ( [ -x /usr/local/opt/postgresql@16/bin/psql ] && echo /usr/local/opt/postgresql@16/bin/psql ) || ( [ -x /usr/local/opt/postgresql/bin/psql ] && echo /usr/local/opt/postgresql/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql@16/bin/psql ] && echo /opt/homebrew/opt/postgresql@16/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql/bin/psql ] && echo /opt/homebrew/opt/postgresql/bin/psql ) || ( [ -x /Applications/Postgres.app/Contents/Versions/latest/bin/psql ] && echo /Applications/Postgres.app/Contents/Versions/latest/bin/psql ) || echo psql)
 MVN := $(if $(wildcard mvnw),./mvnw,mvn)
 BUILD_4_BASELINE ?= $(HOME)/build-4-baseline
@@ -61,18 +62,21 @@ compile: ## Compile only (fast; catches compile errors)
 	$(MVN) compile -q
 	@echo "$(GREEN)✅ Compile OK.$(NC)"
 
-check: compile test ## Compile + unit tests (no Docker). For startup verification use check-run.
-	@echo "$(GREEN)✅ Check passed. Safe to run 'make run'.$(NC)"
+check: compile test ## Compile + unit tests (no app start). For startup verification use check-run.
+	@echo "$(GREEN)✅ Check passed. Start the stack with 'make run'.$(NC)"
 
-check-run: check ## Verify app starts with local PostgreSQL (no Docker). Catches circular deps, Flyway, bean errors.
-	@echo "$(YELLOW)🔍 Verifying application startup (local DB)...$(NC)"
-	@chmod +x "$(CURDIR)/scripts/check-run.sh"
-	@$(CURDIR)/scripts/check-run.sh
-	@echo "$(GREEN)✅ Check-run passed. App starts successfully.$(NC)"
+# The application runs only in Docker (docker profile, port APP_PORT). The image's HEALTHCHECK
+# calls /actuator/health, so --wait fails when the app does not come up: bean wiring, Flyway and
+# circular-dependency errors surface here, as the retired local-profile check-run used to show.
+check-run: check ## Build the image, start the stack and wait until the app reports healthy.
+	@echo "$(YELLOW)🔍 Verifying application startup (Docker)...$(NC)"
+	docker compose up -d --build --wait --wait-timeout $(CHECK_RUN_TIMEOUT)
+	@echo "$(GREEN)✅ Check-run passed. The app is healthy at $(BASE_URL).$(NC)"
 
-run: ## Run the Spring Boot application (local profile). Tip: run 'make check-run' before to catch startup errors.
-	@echo "$(YELLOW)🚀 Running application (local profile)...$(NC)"
-	$(MVN) spring-boot:run -Dspring-boot.run.profiles=local
+run: ## Build and start the application in Docker (the only way to run it locally).
+	@echo "$(YELLOW)🚀 Starting the application (Docker)...$(NC)"
+	docker compose up -d --build
+	@echo "$(GREEN)✅ Starting at $(BASE_URL); follow it with 'make logs'.$(NC)"
 
 ##@ 💅 CODE QUALITY & TESTS
 format: ## Format code (Google Java Format)
@@ -132,9 +136,9 @@ db-migrate: ## Run Flyway database migrations
 	$(MVN) flyway:migrate
 	@echo "$(GREEN)✅ Migrations completed.$(NC)"
 
-# DB connection for repair (match flyway.conf / application-local)
+# DB connection for repair: the compose PostgreSQL on the host (match flyway.conf)
 REPAIR_DB_HOST ?= localhost
-REPAIR_DB_PORT ?= 5432
+REPAIR_DB_PORT ?= 5433
 REPAIR_DB_USER ?= fabric_owner
 REPAIR_DB_NAME ?= fabric_management
 REPAIR_DB_PASSWORD ?= owner_dev_2026
@@ -155,11 +159,6 @@ db-reset: ## Reset database volume completely (Docker) - DESTRUCTIVE!
 	docker compose up -d $(POSTGRES_SERVICE)
 	@echo "$(GREEN)✅ DB reset complete. Flyway will run on next app start.$(NC)"
 
-db-reset-local: ## Reset local PostgreSQL DB (drop + recreate fabric_management). Uses POSTGRES_LOCAL_USER (default: postgres). On Homebrew use: POSTGRES_LOCAL_USER=$(whoami)
-	@echo "$(RED)⚠️  Resetting local database fabric_management...$(NC)"
-	@$(PSQL) -U $(POSTGRES_LOCAL_USER) -d postgres -f "$(CURDIR)/scripts/db-reset-local.sql"
-	@echo "$(GREEN)✅ DB reset complete. Run: make run$(NC)"
-
 db-shell: ## Open PostgreSQL shell
 	docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_owner -d fabric_management
 
@@ -169,10 +168,6 @@ clean: ## Clean Maven build and remove Docker volumes (DESTRUCTIVE!)
 	$(MVN) clean
 	docker compose down -v 2>/dev/null || true
 	@echo "$(GREEN)✅ Clean completed.$(NC)"
-
-dev-reset: ## Reset ALL application data via API (DESTRUCTIVE!)
-	@echo "$(RED)⚠️  Resetting all data via API...$(NC)"
-	curl -s -X POST $(BASE_URL)/api/dev/reset-all | jq . 2>/dev/null || echo "$(RED)❌ API not responding$(NC)"
 
 info: ## Show system information (Java, Maven, Docker)
 	@echo "$(BLUE)📋 System Information:$(NC)"

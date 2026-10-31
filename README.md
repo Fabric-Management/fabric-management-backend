@@ -93,7 +93,8 @@ make down            # Stop all services
 
 # Application
 make build           # Build application without tests
-make run             # Run application with the local profile
+make run             # Build and start the application in Docker (port 8080)
+make check-run       # Same, then wait until the health check passes
 
 # Testing
 make test            # Run unit tests
