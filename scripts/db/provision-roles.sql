@@ -1,5 +1,6 @@
 -- Bir kez, superuser (veya managed PG master) tarafından çalıştırılır.
 -- Parolalar psql -v ile dışarıdan verilir:  psql -v owner_pw="..." -v app_pw="..."
+--   -v system_pw="..." -v operator_pw="..."
 -- Local geliştirme için bu betik doğrudan db-reset-local.sql içinden de çağrılabilir veya kodu oraya eklenebilir.
 
 DO $$
@@ -21,9 +22,19 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
     CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS;
   END IF;
+
+  -- fabric_operator: people doing operator work, such as common_tenant.purge_tenant, which refuses
+  -- the application's own fabric_system login. NOINHERIT: it holds no rights until it runs
+  -- SET ROLE fabric_system, so every privileged step is a deliberate switch.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_operator') THEN
+    CREATE ROLE fabric_operator LOGIN NOSUPERUSER NOCREATEDB NOINHERIT;
+  END IF;
 END $$;
+
+GRANT fabric_system TO fabric_operator;
 
 -- Parolaları ayarla (Eğer ortam değişkeni ile aktarılmışsa çalışır, aksi halde \set ile ayarlanmalı)
 ALTER ROLE fabric_owner  WITH PASSWORD :'owner_pw';
 ALTER ROLE fabric_app    WITH PASSWORD :'app_pw';
 ALTER ROLE fabric_system WITH PASSWORD :'system_pw';
+ALTER ROLE fabric_operator WITH PASSWORD :'operator_pw';
