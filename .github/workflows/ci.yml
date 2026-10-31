@@ -15,6 +15,16 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # A dependency-cache download that stalls is abandoned after 3 minutes instead of the default 10.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: "3"
+
+# Minutes: a pull request runs every gate, because its merge commit is what reaches main. The push
+# that merges it into main skips "Tests & Coverage" (about an hour), which already ran on that same
+# merge commit; the quick code-quality and dependency jobs still run there and keep the Maven and
+# Dependency-Check caches that pull requests read. A release tag or a manual run (also through
+# cd.yml) runs everything.
+
 jobs:
   code-quality:
     name: Code Quality
@@ -45,21 +55,27 @@ jobs:
       - name: Run blocking SpotBugs analysis
         run: ./mvnw spotbugs:check
 
+      # Reports are for reading, not part of any gate: a full artifact store (the quota both
+      # repositories share) must not fail a run whose checks passed.
       - name: Upload Checkstyle results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: checkstyle-results
           path: target/checkstyle-result.xml
           if-no-files-found: ignore
+          retention-days: 5
 
       - name: Upload SpotBugs results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: spotbugs-results
           path: target/spotbugsXml.xml
           if-no-files-found: ignore
+          retention-days: 5
 
   security:
     name: Dependency Security
@@ -122,14 +138,17 @@ jobs:
 
       - name: Upload dependency vulnerability report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: dependency-check-results
           path: target/dependency-check-report.*
           if-no-files-found: ignore
+          retention-days: 5
 
   test:
     name: Tests & Coverage
+    if: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     # Testcontainers uses the runner's Docker daemon; no explicit service is needed.
     steps:
@@ -179,6 +198,7 @@ jobs:
 
       - name: Upload test results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: test-results
@@ -186,14 +206,17 @@ jobs:
             target/surefire-reports
             target/failsafe-reports
           if-no-files-found: ignore
+          retention-days: 5
 
       - name: Upload JaCoCo coverage
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-coverage
           path: target/site/jacoco
           if-no-files-found: ignore
+          retention-days: 5
 
   container-build:
     name: Container Build

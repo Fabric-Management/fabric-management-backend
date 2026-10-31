@@ -157,7 +157,7 @@ public class FiberBatch extends BaseEntity {
 - `ddl-auto` (validate hariç) → Flyway kullan
 - Tenant bypass eden query
 - `double`/`float` para/miktar için → `BigDecimal`
-- `@Transactional` production/domain Controller'da → Service'te kullan (yalnızca `@Profile("local")` bakım controller'ları istisnadır; pattern olarak kopyalanmaz)
+- `@Transactional` production/domain Controller'da → Service'te kullan
 - `catch (Exception e) {}` → Spesifik exception yakala, yutma
 - Schema değişikliği migration'sız
 - Cross-module'de doğrudan repository inject → QueryService/Facade/Event kullan

@@ -7,8 +7,10 @@ import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalo
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
 import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -23,10 +25,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * common_tenant.purge_tenant (V20261031120000) on real cloned tenants, called as fabric_system
- * (BYPASSRLS, not a superuser) as in production: the dry run changes nothing, the purge removes
- * every row of that tenant and nothing of any other tenant, and the guards refuse what must never
- * be deleted. Fixtures are written as the container's owner.
+ * common_tenant.purge_tenant (V20261031120000, V20261031130000) on real cloned tenants, called the
+ * way an operator calls it: logged in as another role and switched to fabric_system (BYPASSRLS, not
+ * a superuser). The dry run changes nothing, the purge removes every row of that tenant and nothing
+ * of any other tenant, and the guards refuse what must never be deleted, including any call from
+ * the application's own fabric_system login. Fixtures are written as the container's owner.
  */
 class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
 
@@ -37,7 +40,7 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
   @Autowired private TenantClonerService tenantClonerService;
   @Autowired private TaskTemplateCatalogueBackfillRunner catalogueBackfillRunner;
 
-  /** fabric_system, the role the purge runs as in production. */
+  /** The application's own fabric_system login: it may read everything but never purge. */
   @Autowired
   @Qualifier("systemJdbcTemplate")
   private JdbcTemplate systemJdbc;
@@ -166,7 +169,7 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
   }
 
   @Test
-  @DisplayName("Refuses templates, the platform tenant, a wrong name and an ungranted caller")
+  @DisplayName("Refuses templates, the platform tenant, a wrong name and callers who may not purge")
   void guardsRefuseWhatMustNotBeDeleted() {
     UUID templateId = PlaygroundSourceFixture.ensureWithCatalogue(owner(), catalogueBackfillRunner);
     String templateName =
@@ -174,7 +177,25 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
             "SELECT name FROM common_tenant.common_tenant WHERE id = ?", String.class, templateId);
     Tenant victim = tenantClonerService.cloneTemplateToPlayground();
     deactivate(victim.getId());
+    UUID memberIdentity = insertIdentity();
+    insertMembership(memberIdentity, victim.getId(), insertUser(victim.getId()));
     Map<String, Long> victimBefore = settledRowsByTable(victim.getId());
+
+    // The running application logs in as fabric_system; it may never purge.
+    assertThatThrownBy(
+            () ->
+                systemJdbc.query(
+                    PURGE, (rs, rowNum) -> null, victim.getId(), victim.getName(), false))
+        .rootCause()
+        .hasMessageContaining("purge_tenant is for operators");
+    // An identity that still has a membership cannot be deleted, so no deletion of an identity
+    // can take another tenant's membership with it.
+    assertThatThrownBy(
+            () ->
+                owner()
+                    .update("DELETE FROM common_auth.login_identity WHERE id = ?", memberIdentity))
+        .rootCause()
+        .hasMessageContaining("fk_membership_login_identity");
 
     assertThatThrownBy(() -> purge(templateId, templateName, true))
         .rootCause()
@@ -235,15 +256,34 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
             postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()));
   }
 
-  private List<ReportRow> purge(UUID tenantId, String confirmName, boolean apply) {
-    return systemJdbc.query(
-        PURGE,
-        (ResultSet rs, int rowNum) ->
-            new ReportRow(
-                rs.getString("step"), rs.getString("table_name"), rs.getLong("row_count")),
-        tenantId,
-        confirmName,
-        apply);
+  /** As an operator: another login that switches to fabric_system for the call. */
+  private static List<ReportRow> purge(UUID tenantId, String confirmName, boolean apply) {
+    return owner()
+        .execute(
+            (ConnectionCallback<List<ReportRow>>)
+                connection -> {
+                  try (Statement role = connection.createStatement()) {
+                    role.execute("SET ROLE fabric_system");
+                    try (PreparedStatement call = connection.prepareStatement(PURGE)) {
+                      call.setObject(1, tenantId);
+                      call.setString(2, confirmName);
+                      call.setBoolean(3, apply);
+                      List<ReportRow> rows = new ArrayList<>();
+                      try (ResultSet rs = call.executeQuery()) {
+                        while (rs.next()) {
+                          rows.add(
+                              new ReportRow(
+                                  rs.getString("step"),
+                                  rs.getString("table_name"),
+                                  rs.getLong("row_count")));
+                        }
+                      }
+                      return rows;
+                    } finally {
+                      role.execute("RESET ROLE");
+                    }
+                  }
+                });
   }
 
   /** The per-table rows of a report; the identity and tenant summary rows carry " (". */
