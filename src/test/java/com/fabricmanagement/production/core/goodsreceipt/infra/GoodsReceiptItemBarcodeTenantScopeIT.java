@@ -3,64 +3,51 @@ package com.fabricmanagement.production.core.goodsreceipt.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true"})
-@ActiveProfiles("test")
-@Testcontainers
-class GoodsReceiptItemBarcodeTenantScopeIT {
+class GoodsReceiptItemBarcodeTenantScopeIT extends AbstractIntegrationTest {
 
-  private static final String TENANT_1 = "11111111-1111-1111-1111-111111111111";
-  private static final String TENANT_2 = "22222222-2222-2222-2222-222222222222";
   private static final String SHARED_BARCODE = "PO-20260625-00001-001";
 
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("fabric_test")
-          .withUsername("fabric_owner")
-          .withPassword("fabric123");
-
-  @DynamicPropertySource
-  static void registerPgProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-  }
+  // The database is shared with other test classes, so every id this test writes is its own.
+  private final String run = UUID.randomUUID().toString().substring(0, 8);
+  private final String tenant1 = UUID.randomUUID().toString();
+  private final String tenant2 = UUID.randomUUID().toString();
+  private final String receipt1 = UUID.randomUUID().toString();
+  private final String receipt2 = UUID.randomUUID().toString();
+  private final String item1 = UUID.randomUUID().toString();
+  private final String item2 = UUID.randomUUID().toString();
 
   @Autowired private SystemTransactionExecutor systemTransactionExecutor;
+
+  @AfterEach
+  void removeOwnRows() {
+    systemTransactionExecutor.executeInTransaction(
+        jdbcTemplate -> {
+          jdbcTemplate.update(
+              "DELETE FROM production.goods_receipt_item WHERE tenant_id IN (?::uuid, ?::uuid)",
+              tenant1,
+              tenant2);
+          jdbcTemplate.update(
+              "DELETE FROM production.goods_receipt WHERE tenant_id IN (?::uuid, ?::uuid)",
+              tenant1,
+              tenant2);
+          return null;
+        });
+  }
 
   @Test
   void goodsReceiptItemBarcodeIsUniquePerTenantNotGlobally() {
     systemTransactionExecutor.executeInTransaction(
         jdbcTemplate -> {
           insertGoodsReceiptWithItem(
-              jdbcTemplate,
-              TENANT_1,
-              "00000000-0000-0000-0000-000000000101",
-              "00000000-0000-0000-0000-000000000201",
-              "TEST-GR-001",
-              "TEST-001-GRI-00001");
+              jdbcTemplate, tenant1, receipt1, item1, "TEST-GR-1-" + run, "TEST-1-GRI-" + run);
           insertGoodsReceiptWithItem(
-              jdbcTemplate,
-              TENANT_2,
-              "00000000-0000-0000-0000-000000000102",
-              "00000000-0000-0000-0000-000000000202",
-              "TEST-GR-002",
-              "TEST-002-GRI-00001");
+              jdbcTemplate, tenant2, receipt2, item2, "TEST-GR-2-" + run, "TEST-2-GRI-" + run);
           return null;
         });
 
@@ -77,8 +64,8 @@ class GoodsReceiptItemBarcodeTenantScopeIT {
                     """,
                     Integer.class,
                     SHARED_BARCODE,
-                    TENANT_1,
-                    TENANT_2));
+                    tenant1,
+                    tenant2));
 
     assertThat(count).isEqualTo(2);
   }

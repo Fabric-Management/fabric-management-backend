@@ -14,7 +14,7 @@ import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
 import com.fabricmanagement.finance.payment.dto.CreatePaymentRequest;
 import com.fabricmanagement.finance.payment.dto.PaymentDto;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -23,35 +23,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest
-@Testcontainers
-@ActiveProfiles("test")
-class PaymentPersistenceIT {
-
-  @Container
-  @SuppressWarnings("resource")
-  static final PostgreSQLContainer<?> POSTGRES =
-      PostgresImage.container()
-          .withDatabaseName("fabric")
-          .withUsername("fabric")
-          .withPassword("fabric");
-
-  @DynamicPropertySource
-  static void registerPgProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-    registry.add("spring.datasource.username", POSTGRES::getUsername);
-    registry.add("spring.datasource.password", POSTGRES::getPassword);
-  }
+class PaymentPersistenceIT extends AbstractIntegrationTest {
 
   @Autowired private PaymentService paymentService;
   @Autowired private PaymentRepository paymentRepository;
@@ -61,6 +36,7 @@ class PaymentPersistenceIT {
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID tradingPartnerId = UUID.randomUUID();
+  private final UUID registryId = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
@@ -74,13 +50,12 @@ class PaymentPersistenceIT {
         "test-tenant-" + UUID.randomUUID().toString().substring(0, 8),
         "Test Tenant");
 
-    UUID registryId = UUID.randomUUID();
     jdbcTemplate.update(
         "INSERT INTO common_company.trading_partner_registry (id, uid, tax_id, official_name, verified_status, is_active, created_at, updated_at, version) "
             + "VALUES (?, ?, ?, ?, 'UNVERIFIED', true, now(), now(), 0)",
         registryId,
         UUID.randomUUID().toString(),
-        "1234567890",
+        "PAY-" + registryId,
         "Test Official Name");
 
     jdbcTemplate.update(
@@ -95,12 +70,22 @@ class PaymentPersistenceIT {
 
   @AfterEach
   void tearDown() {
-    fxRealizationRepository.deleteAll();
-    paymentRepository.deleteAll();
-    invoiceRepository.deleteAll();
+    fxRealizationRepository.deleteAll(
+        fxRealizationRepository.findAll().stream()
+            .filter(row -> tenantId.equals(row.getTenantId()))
+            .toList());
+    paymentRepository.deleteAll(
+        paymentRepository.findAll().stream()
+            .filter(row -> tenantId.equals(row.getTenantId()))
+            .toList());
+    invoiceRepository.deleteAll(
+        invoiceRepository.findAll().stream()
+            .filter(row -> tenantId.equals(row.getTenantId()))
+            .toList());
     jdbcTemplate.update(
         "DELETE FROM common_company.common_trading_partner WHERE id = ?", tradingPartnerId);
-    jdbcTemplate.update("DELETE FROM common_company.trading_partner_registry");
+    jdbcTemplate.update(
+        "DELETE FROM common_company.trading_partner_registry WHERE id = ?", registryId);
     jdbcTemplate.update("DELETE FROM common_tenant.common_tenant WHERE id = ?", tenantId);
     TenantContext.clear();
   }
