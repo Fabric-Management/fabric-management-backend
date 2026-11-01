@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -40,9 +39,6 @@ public class SecurityConfig {
   private final LocalizationFilter localizationFilter;
   private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
-  @Value("${spring.profiles.active:local}")
-  private String activeProfile;
-
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
@@ -59,7 +55,7 @@ public class SecurityConfig {
    */
   @Bean
   @Order(1)
-  @Profile({"local", "dev", "test", "docker"})
+  @Profile({"dev", "test", "docker"})
   public SecurityFilterChain devPartnerPortalFilterChain(HttpSecurity http) throws Exception {
     return http.securityMatcher("/api/v1/partner-portal/**")
         .csrf(AbstractHttpConfigurer::disable)
@@ -115,7 +111,7 @@ public class SecurityConfig {
   // ────────────────────────────────────────────────────────────────────────
 
   @Bean
-  @Profile({"local", "dev", "test", "docker"})
+  @Profile({"dev", "test", "docker"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
     log.info("DEVELOPMENT MODE - URL-level auth enforced, @PreAuthorize for method-level");
 
@@ -212,7 +208,7 @@ public class SecurityConfig {
    * <p>⚠️ In production, configure specific origins for security.
    */
   @Bean
-  @Profile({"local", "dev", "test", "docker"})
+  @Profile({"dev", "test", "docker"})
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 

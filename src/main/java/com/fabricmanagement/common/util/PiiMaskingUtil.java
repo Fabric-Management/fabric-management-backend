@@ -1,15 +1,11 @@
 package com.fabricmanagement.common.util;
 
-import java.util.Arrays;
 import lombok.experimental.UtilityClass;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.env.Environment;
 
 /**
  * Utility for masking Personally Identifiable Information (PII) in logs.
  *
- * <p>GDPR/KVKK compliance - sensitive data should be masked in production logs.
+ * <p>GDPR/KVKK compliance: sensitive data is masked in every log, in every environment.
  *
  * <p><b>Usage:</b>
  *
@@ -19,36 +15,12 @@ import org.springframework.core.env.Environment;
  * </pre>
  */
 @UtilityClass
-@Slf4j
 public class PiiMaskingUtil {
 
   private static final String MASK = "***";
-  private static volatile Boolean maskingEnabled;
-
-  /**
-   * Initialize masking state from Spring Environment. Called automatically via {@link
-   * PiiMaskingInitializer}.
-   */
-  static void init(ApplicationContext ctx) {
-    Environment env = ctx.getEnvironment();
-    String[] activeProfiles = env.getActiveProfiles();
-    boolean isLocal = Arrays.stream(activeProfiles).anyMatch(p -> "local".equalsIgnoreCase(p));
-    maskingEnabled = !isLocal;
-    log.info(
-        "PII masking initialized: enabled={}, activeProfiles={}",
-        maskingEnabled,
-        Arrays.toString(activeProfiles));
-  }
-
-  private static boolean isMaskingActive() {
-    if (maskingEnabled != null) {
-      return maskingEnabled;
-    }
-    return !isLocalProfileFallback();
-  }
 
   public static String maskEmail(String email) {
-    if (!isMaskingActive() || email == null || email.isBlank()) {
+    if (email == null || email.isBlank()) {
       return email;
     }
 
@@ -70,7 +42,7 @@ public class PiiMaskingUtil {
   }
 
   public static String maskPhone(String phone) {
-    if (!isMaskingActive() || phone == null || phone.isBlank()) {
+    if (phone == null || phone.isBlank()) {
       return phone;
     }
 
@@ -85,7 +57,7 @@ public class PiiMaskingUtil {
   }
 
   public static String maskCardNumber(String cardNumber) {
-    if (!isMaskingActive() || cardNumber == null || cardNumber.isBlank()) {
+    if (cardNumber == null || cardNumber.isBlank()) {
       return cardNumber;
     }
 
@@ -100,7 +72,7 @@ public class PiiMaskingUtil {
   }
 
   public static String mask(String sensitive) {
-    if (!isMaskingActive() || sensitive == null || sensitive.isBlank()) {
+    if (sensitive == null || sensitive.isBlank()) {
       return sensitive;
     }
 
@@ -109,17 +81,5 @@ public class PiiMaskingUtil {
     }
 
     return sensitive.charAt(0) + MASK + sensitive.charAt(sensitive.length() - 1);
-  }
-
-  public static boolean isMaskingEnabled() {
-    return isMaskingActive();
-  }
-
-  private static boolean isLocalProfileFallback() {
-    String activeProfile = System.getProperty("spring.profiles.active");
-    if (activeProfile == null) {
-      activeProfile = System.getenv("SPRING_PROFILES_ACTIVE");
-    }
-    return activeProfile != null && activeProfile.contains("local");
   }
 }

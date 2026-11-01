@@ -80,11 +80,6 @@ public class LoginService {
   public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
     log.info("Login attempt: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-    // Debug: Log actual email (only in local/dev profiles)
-    if (!PiiMaskingUtil.isMaskingEnabled()) {
-      log.debug("Login attempt (unmasked): contactValue={}", request.getContactValue());
-    }
-
     String normalizedEmail = normalizeEmail(request.getContactValue());
     Optional<LoginIdentity> identityOpt = loginIdentityRepository.findByEmail(normalizedEmail);
 

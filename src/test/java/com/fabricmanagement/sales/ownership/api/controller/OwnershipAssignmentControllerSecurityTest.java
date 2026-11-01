@@ -30,12 +30,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
     controllers = {CustomerCommercialAssignmentController.class, OwnershipTriageController.class})
 @EnableMethodSecurity
+@ActiveProfiles("test")
 class OwnershipAssignmentControllerSecurityTest {
 
   private static final String ASSIGN_OWNER_EXPRESSION =

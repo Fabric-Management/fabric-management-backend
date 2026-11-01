@@ -36,6 +36,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 @WebMvcTest(YarnReconciliationController.class)
 @EnableMethodSecurity
+@ActiveProfiles("test")
 class YarnReconciliationApiTest {
 
   private static final String READ = "@auth.can(authentication, 'yarn', 'read')";

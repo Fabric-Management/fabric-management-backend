@@ -67,7 +67,9 @@ public class PlaygroundTTLReaperService {
    * Runs daily at 4 AM, one hour after the soft-delete reaper.
    *
    * <p>The deletion itself exists: common_tenant.purge_tenant (V20261031120000) removes one tenant
-   * completely, as fabric_system. Only scheduling it is still open.
+   * completely. It refuses the application's own fabric_system login (V20261031130000), so
+   * scheduling it here also needs a data source that logs in as an operator role and runs SET ROLE
+   * fabric_system.
    */
   @Scheduled(cron = "${playground.purge.cron:0 0 4 * * ?}")
   public void purgeInactivePlaygrounds() {
@@ -75,8 +77,8 @@ public class PlaygroundTTLReaperService {
     // TODO(CR4-3): schedule the hard delete of expired playground tenants.
     // Steps:
     //   1. Find tenants WHERE type=PLAYGROUND AND isActive=false AND updatedAt < now()-30d
-    //   2. For each tenant, as fabric_system and in its own transaction:
-    //      SELECT * FROM common_tenant.purge_tenant(id, name, true)
+    //   2. For each tenant, on an operator login switched to fabric_system, in its own
+    //      transaction: SELECT * FROM common_tenant.purge_tenant(id, name, true)
     //   3. Log count of purged tenants
     log.info("Hard purge not yet implemented — skipping.");
   }

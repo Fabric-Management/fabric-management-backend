@@ -38,11 +38,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(QualityDecisionController.class)
 @EnableMethodSecurity
+@ActiveProfiles("test")
 class QualityDecisionControllerSecurityTest {
 
   private static final UUID TENANT_ID = UUID.randomUUID();
