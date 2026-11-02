@@ -1,11 +1,12 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.ValidateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.client.GoogleMapsClient;
-import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>Validate addresses using Google Geocoding API
  *   <li>Normalize address data from Google response
- *   <li>Persist verified addresses
+ *   <li>Persist addresses through the common write policy
  *   <li>Handle validation errors gracefully
  * </ul>
  */
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AddressValidationService {
 
   private final GoogleMapsClient googleMapsClient;
-  private final AddressRepository addressRepository;
+  private final AddressService addressService;
 
   /** Validate address by placeId (recommended method). */
   @Transactional
@@ -52,10 +53,15 @@ public class AddressValidationService {
       // Fallback: validate by address string
       validationResponse = googleMapsClient.validateByAddress(request.getAddress());
     } else {
-      throw new IllegalArgumentException("Either placeId or address must be provided");
+      throw new PlatformDomainException(
+          "Either placeId or address must be provided", "ADDRESS_LOOKUP_INPUT_REQUIRED", 400);
     }
 
-    // Only persist if validation was successful (VERIFIED or PARTIAL)
+    if (validationResponse == null || validationResponse.getVerificationStatus() == null) {
+      throw new PlatformDomainException(
+          "Address lookup returned no result", "ADDRESS_LOOKUP_FAILED", 400);
+    }
+    // Lookup completeness is separate from delivery verification.
     if (validationResponse.getVerificationStatus()
         != AddressValidationResponse.VerificationStatus.FAILED) {
       log.debug(
@@ -79,39 +85,19 @@ public class AddressValidationService {
     AddressValidationResponse validation = validateAddress(request);
 
     if (validation.getVerificationStatus() == AddressValidationResponse.VerificationStatus.FAILED) {
-      throw new IllegalArgumentException(
-          "Address validation failed: " + validation.getErrorMessage());
+      throw new PlatformDomainException("Address lookup failed", "ADDRESS_LOOKUP_FAILED", 400);
     }
 
-    // Parse address type
-    AddressType addressType =
-        request.getAddressType() != null
-            ? AddressType.valueOf(request.getAddressType().toUpperCase())
-            : AddressType.HOME;
-
-    // Create normalized address entity
-    Address address =
-        Address.builder()
-            .streetAddress(validation.getStreetAddress())
-            .city(validation.getCity())
-            .state(validation.getState())
-            .district(validation.getDistrict())
-            .postalCode(validation.getPostalCode())
-            .country(validation.getCountry())
-            .countryCode(validation.getCountryCode())
-            .addressType(addressType)
-            .label(request.getLabel())
-            .formattedAddress(validation.getFormattedAddress())
-            .placeId(validation.getPlaceId())
-            .latitude(validation.getLatitude())
-            .longitude(validation.getLongitude())
-            .build();
-
-    Address saved = addressRepository.save(address);
-    log.info(
-        "Address created and saved: addressId={}, placeId={}", saved.getId(), saved.getPlaceId());
-
-    return saved;
+    AddressType addressType;
+    try {
+      addressType =
+          request.getAddressType() != null
+              ? AddressType.valueOf(request.getAddressType().trim().toUpperCase(Locale.ROOT))
+              : AddressType.HOME;
+    } catch (IllegalArgumentException invalidType) {
+      throw new PlatformDomainException("Unknown address type", "ADDRESS_TYPE_INVALID", 400);
+    }
+    return addressService.createFromLookup(validation, addressType, request.getLabel());
   }
 
   /** Validate existing address by placeId and update if needed. */
@@ -119,38 +105,13 @@ public class AddressValidationService {
   public Address revalidateAddress(UUID addressId) {
     log.info("Revalidating address: addressId={}", addressId);
 
-    Address address =
-        addressRepository
-            .findById(addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
-
+    Address address = addressService.requireActiveAddress(addressId);
     if (address.getPlaceId() == null || address.getPlaceId().isBlank()) {
-      throw new IllegalArgumentException("Address does not have placeId for revalidation");
+      throw new PlatformDomainException(
+          "Address has no lookup reference", "ADDRESS_LOOKUP_REFERENCE_REQUIRED", 400);
     }
-
     AddressValidationResponse validation =
         googleMapsClient.validateByPlaceId(address.getPlaceId(), null);
-
-    if (validation.getVerificationStatus() == AddressValidationResponse.VerificationStatus.FAILED) {
-      throw new IllegalArgumentException(
-          "Address revalidation failed: " + validation.getErrorMessage());
-    }
-
-    // Update address with latest normalized data
-    address.setStreetAddress(validation.getStreetAddress());
-    address.setCity(validation.getCity());
-    address.setState(validation.getState());
-    address.setDistrict(validation.getDistrict());
-    address.setPostalCode(validation.getPostalCode());
-    address.setCountry(validation.getCountry());
-    address.setCountryCode(validation.getCountryCode());
-    address.setFormattedAddress(validation.getFormattedAddress());
-    address.setLatitude(validation.getLatitude());
-    address.setLongitude(validation.getLongitude());
-
-    Address saved = addressRepository.save(address);
-    log.info("Address revalidated and updated: addressId={}", saved.getId());
-
-    return saved;
+    return addressService.replaceFromLookup(addressId, validation);
   }
 }

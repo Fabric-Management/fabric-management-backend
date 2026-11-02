@@ -65,10 +65,13 @@ public class UserAddressAutoService {
               sourceAddr.getStreetAddress(),
               sourceAddr.getCity(),
               sourceAddr.getState(),
+              sourceAddr.getDistrict(),
               sourceAddr.getPostalCode(),
               sourceAddr.getCountry(),
+              sourceAddr.getCountryCode(),
               AddressType.OFFICE,
-              "Work Address");
+              "Work Address",
+              sourceAddr.getAddressLine2());
 
       userAddressAssignmentService.assignAddress(userId, userWorkAddress.getId(), true, true);
 

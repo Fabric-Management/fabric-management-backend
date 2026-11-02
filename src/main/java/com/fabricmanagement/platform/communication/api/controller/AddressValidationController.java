@@ -17,6 +17,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
  * </ul>
  */
 @RestController
+@PreAuthorize("isAuthenticated()")
 @RequestMapping("/api/v1/common/addresses/validation")
 @RequiredArgsConstructor
 @Slf4j
@@ -149,8 +151,8 @@ public class AddressValidationController {
    *   <li><b>If omitted:</b> Searches globally across all countries
    * </ul>
    *
-   * <p><b>Country Format:</b> Accepts both ISO code ("GB", "TR") or country name ("United Kingdom",
-   * "Turkey")
+   * <p><b>Country Format:</b> Accepts both ISO code ("GB", "DE") or country name ("United Kingdom",
+   * "Germany")
    *
    * <p><b>Use Cases:</b>
    *
@@ -162,16 +164,16 @@ public class AddressValidationController {
    * <p><b>Examples:</b>
    *
    * <ul>
-   *   <li>Global: <code>GET /search-by-postcode?postcode=34000</code> (searches worldwide)
-   *   <li>Country-specific: <code>GET /search-by-postcode?postcode=34000&country=TR</code> (Turkey
-   *       only)
+   *   <li>Global: <code>GET /search-by-postcode?postcode=LS1%201AA</code> (searches worldwide)
+   *   <li>Country-specific: <code>GET /search-by-postcode?postcode=LS1%201AA&country=GB</code>
+   *       (United Kingdom only)
    *   <li>Country name: <code>GET /search-by-postcode?postcode=MK5 7GE&country=United Kingdom
    *       </code>
    * </ul>
    *
    * @param postcode Postal/ZIP code (required)
-   * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "TR", "GB") or country name
-   *     (e.g., "Turkey", "United Kingdom"). If omitted, searches globally across all countries.
+   * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "DE", "GB") or country name
+   *     (e.g., "Germany", "United Kingdom"). If omitted, searches globally across all countries.
    * @return List of addresses matching the postcode
    */
   @GetMapping("/search-by-postcode")
@@ -230,8 +232,8 @@ public class AddressValidationController {
   }
 
   /**
-   * Extracts ISO country code from country parameter. Handles both ISO codes ("GB", "TR") and
-   * country names ("United Kingdom", "Turkey").
+   * Extracts ISO country code from country parameter. Handles both ISO codes ("GB", "DE") and
+   * country names ("United Kingdom", "Germany").
    */
   private String extractCountryCode(String country) {
     if (country == null || country.isBlank()) {
@@ -271,7 +273,7 @@ public class AddressValidationController {
    *
    * @param houseNumber House number or street name (optional, can be combined with postcode)
    * @param postcode Postal/ZIP code (required)
-   * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "GB", "TR")
+   * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "GB", "DE")
    * @return Complete address with all fields filled
    */
   @InternalEndpoint(
