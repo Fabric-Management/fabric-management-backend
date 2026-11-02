@@ -20,7 +20,7 @@ import com.fabricmanagement.sales.ownership.domain.OwnerResolutionReason;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -31,53 +31,18 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
-class QuoteObjectScopeIT {
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("quote_scope_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
+class QuoteObjectScopeIT extends AbstractIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
   @Autowired private QuoteRepository quotes;

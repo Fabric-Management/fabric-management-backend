@@ -34,9 +34,9 @@ org:
 
 logging:
   level:
-    com.fabricmanagement.common.infrastructure.persistence.TenantConnectionProvider: TRACE
-    com.fabricmanagement.common.infrastructure.config.TenantRestoringEventListenerAspect: TRACE
-    com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor: DEBUG
+    # One line per Spring test context cache lookup: "hitCount" is a context reused, "missCount" one
+    # started from scratch. Each start costs tens of seconds, so missCount is what to watch.
+    org.springframework.test.context.cache: DEBUG
 
 management:
   otlp:

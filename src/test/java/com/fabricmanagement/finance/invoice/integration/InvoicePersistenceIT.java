@@ -9,7 +9,7 @@ import com.fabricmanagement.finance.invoice.dto.CreateInvoiceLineRequest;
 import com.fabricmanagement.finance.invoice.dto.CreateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.dto.InvoiceDto;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,46 +19,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("Invoice Persistence Integration Test")
-class InvoicePersistenceIT {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class InvoicePersistenceIT extends AbstractIntegrationTest {
 
   @Autowired private InvoiceService invoiceService;
   @Autowired private InvoiceRepository invoiceRepository;
@@ -71,6 +36,7 @@ class InvoicePersistenceIT {
   private final UUID tenantId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final UUID partnerId = UUID.randomUUID();
+  private final UUID registryId = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
@@ -87,14 +53,13 @@ class InvoicePersistenceIT {
             "test-tenant-" + UUID.randomUUID().toString().substring(0, 8),
             "Test Tenant");
 
-    UUID registryId = UUID.randomUUID();
     jdbc.getJdbcOperations()
         .update(
             "INSERT INTO common_company.trading_partner_registry (id, uid, tax_id, official_name, verified_status, is_active, created_at, updated_at, version) "
                 + "VALUES (?, ?, ?, ?, 'UNVERIFIED', true, now(), now(), 0)",
             registryId,
             UUID.randomUUID().toString(),
-            "1234567890",
+            "INV-" + registryId,
             "Test Official Name");
 
     // Insert a trading partner to satisfy the foreign key
@@ -112,10 +77,14 @@ class InvoicePersistenceIT {
   @AfterEach
   void tearDown() {
     TenantContext.clear();
-    invoiceRepository.deleteAll();
+    invoiceRepository.deleteAll(
+        invoiceRepository.findAll().stream()
+            .filter(row -> tenantId.equals(row.getTenantId()))
+            .toList());
     jdbc.getJdbcOperations()
         .update("DELETE FROM common_company.common_trading_partner WHERE id = ?", partnerId);
-    jdbc.getJdbcOperations().update("DELETE FROM common_company.trading_partner_registry");
+    jdbc.getJdbcOperations()
+        .update("DELETE FROM common_company.trading_partner_registry WHERE id = ?", registryId);
     jdbc.getJdbcOperations()
         .update("DELETE FROM common_tenant.common_tenant WHERE id = ?", tenantId);
   }

@@ -31,7 +31,7 @@ import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderWorkKind;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -43,51 +43,16 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Two planners taking the same order in real, overlapping transactions: exactly one becomes
  * responsible, the other is told someone else took it, and the order moves into planning once.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
-class OrderPlanningClaimConcurrencyIT {
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("planning_claim_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
+class OrderPlanningClaimConcurrencyIT extends AbstractIntegrationTest {
 
   @Autowired private TenantRepository tenants;
   @Autowired private OrganizationRepository organizations;

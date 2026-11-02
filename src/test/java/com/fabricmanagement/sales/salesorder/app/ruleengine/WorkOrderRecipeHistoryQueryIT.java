@@ -14,61 +14,35 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("WorkOrderRecipeHistoryQuery Integration Test")
-class WorkOrderRecipeHistoryQueryIT {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class WorkOrderRecipeHistoryQueryIT extends AbstractIntegrationTest {
 
   @Autowired private NamedParameterJdbcTemplate jdbc;
 
   private final UUID tenantId = UUID.randomUUID();
+
+  @AfterEach
+  void removeOwnRows() {
+    jdbc.getJdbcOperations()
+        .update("DELETE FROM production.prod_recipe_component WHERE tenant_id = ?", tenantId);
+    jdbc.getJdbcOperations()
+        .update("DELETE FROM production.prod_recipe WHERE tenant_id = ?", tenantId);
+  }
 
   @Test
   @DisplayName(
@@ -241,7 +215,9 @@ class WorkOrderRecipeHistoryQueryIT {
         .update(
             "UPDATE production.prod_recipe_component "
                 + "SET certification = NULLIF(UPPER(TRIM(certification)), '') "
-                + "WHERE certification IS DISTINCT FROM NULLIF(UPPER(TRIM(certification)), '')");
+                + "WHERE tenant_id = ? "
+                + "AND certification IS DISTINCT FROM NULLIF(UPPER(TRIM(certification)), '')",
+            tenantId);
   }
 
   private int applyOriginBackfill() {
@@ -249,6 +225,8 @@ class WorkOrderRecipeHistoryQueryIT {
         .update(
             "UPDATE production.prod_recipe_component "
                 + "SET origin = NULLIF(UPPER(TRIM(origin)), '') "
-                + "WHERE origin IS DISTINCT FROM NULLIF(UPPER(TRIM(origin)), '')");
+                + "WHERE tenant_id = ? "
+                + "AND origin IS DISTINCT FROM NULLIF(UPPER(TRIM(origin)), '')",
+            tenantId);
   }
 }

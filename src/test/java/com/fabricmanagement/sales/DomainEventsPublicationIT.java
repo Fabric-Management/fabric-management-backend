@@ -1,7 +1,7 @@
 package com.fabricmanagement.sales;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -32,7 +32,7 @@ import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -40,47 +40,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("Domain events publication (SalesOrder / WorkOrder)")
-class DomainEventsPublicationIT {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class DomainEventsPublicationIT extends AbstractIntegrationTest {
 
   @Autowired private SalesOrderService salesOrderService;
   @Autowired private WorkOrderService workOrderService;
@@ -89,6 +55,7 @@ class DomainEventsPublicationIT {
   @Autowired private OrganizationRepository organizationRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private JdbcTemplate jdbc;
 
   @MockitoSpyBean private DomainEventPublisher domainEventPublisher;
   @MockitoSpyBean private EventRouterService eventRouterService;
@@ -123,6 +90,12 @@ class DomainEventsPublicationIT {
   @AfterEach
   void tearDown() {
     TenantContext.clear();
+    // The database is shared and Modulith replays unfinished publications on every context start.
+    // The partner created below has no sales ownership policy, so its
+    // CustomerRelationshipEstablishedEvent can never complete. Do not leave it behind.
+    jdbc.update(
+        "delete from event_publication where completion_date is null and serialized_event like ?",
+        "%" + tenantId + "%");
   }
 
   @Test
@@ -152,8 +125,10 @@ class DomainEventsPublicationIT {
 
     assertThat(confirmed.getStatus().name()).isEqualTo("CONFIRMED");
 
-    verify(domainEventPublisher).publish(any(SalesOrderConfirmedEvent.class));
-    verify(eventRouterService, timeout(15_000)).route(any(SalesOrderConfirmedEvent.class));
+    UUID orderId = created.getId();
+    verify(domainEventPublisher).publish(argThat(event -> isConfirmationOf(event, orderId)));
+    verify(eventRouterService, timeout(15_000))
+        .route(argThat(event -> isConfirmationOf(event, orderId)));
   }
 
   @Test
@@ -175,7 +150,20 @@ class DomainEventsPublicationIT {
     workOrderService.changeStatus(draft.id(), WorkOrderStatus.PENDING_APPROVAL);
     workOrderService.changeStatus(draft.id(), WorkOrderStatus.APPROVED);
 
-    verify(domainEventPublisher).publish(any(WorkOrderApprovedEvent.class));
-    verify(eventRouterService, timeout(15_000)).route(any(WorkOrderApprovedEvent.class));
+    UUID workOrderId = draft.id();
+    verify(domainEventPublisher).publish(argThat(event -> isApprovalOf(event, workOrderId)));
+    verify(eventRouterService, timeout(15_000))
+        .route(argThat(event -> isApprovalOf(event, workOrderId)));
+  }
+
+  /** Match this test's own aggregate: the shared database may replay other classes' events. */
+  private static boolean isConfirmationOf(Object event, UUID salesOrderId) {
+    return event instanceof SalesOrderConfirmedEvent confirmed
+        && salesOrderId.equals(confirmed.getSalesOrderId());
+  }
+
+  private static boolean isApprovalOf(Object event, UUID workOrderId) {
+    return event instanceof WorkOrderApprovedEvent approved
+        && workOrderId.equals(approved.getWorkOrderId());
   }
 }

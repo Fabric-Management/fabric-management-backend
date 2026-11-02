@@ -36,7 +36,7 @@ import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.DeliveryTermInpu
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.PartyInput;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.infra.repository.OrderDeliveryRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -44,54 +44,19 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * CONSIGNEE-1 S2 on a real database: the verification columns map, a save by a user without the
  * permission waits, verifying confirms the delivery and the partner and address card it uses, a
  * stale version verifies nothing, and rows that predate the rule are verified.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
-class OrderDeliveryVerificationIT {
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("delivery_verification_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
+class OrderDeliveryVerificationIT extends AbstractIntegrationTest {
 
   @Autowired private TenantRepository tenants;
   @Autowired private TradingPartnerRegistryRepository registries;

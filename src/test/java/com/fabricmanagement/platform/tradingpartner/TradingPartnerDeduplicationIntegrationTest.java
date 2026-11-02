@@ -14,7 +14,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRegistryRepository;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
-import com.fabricmanagement.testsupport.PostgresImage;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,14 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Integration tests for TradingPartner deduplication (Registry golden record).
@@ -42,30 +35,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *   <li>Partner type upgrade: Adding same partner with different type → BOTH
  * </ul>
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
 @DisplayName("TradingPartner deduplication")
-class TradingPartnerDeduplicationIntegrationTest {
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      PostgresImage.container()
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.flyway.url", postgres::getJdbcUrl);
-    registry.add("spring.flyway.user", postgres::getUsername);
-    registry.add("spring.flyway.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class TradingPartnerDeduplicationIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private TradingPartnerService tradingPartnerService;
   @Autowired private TradingPartnerRepository partnerRepository;
