@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Step 4: Assign contact and address to organization (sales-led only).
@@ -41,16 +42,19 @@ public class AssignContactAndAddressStep implements OnboardingStep {
       return;
     }
 
-    // Create and assign address if provided
-    if (context.getAddress() != null || context.getCity() != null || context.getCountry() != null) {
+    // Partial signup facts are retained by CaptureSignupEvidenceStep. Only complete postal
+    // content becomes an address card; missing fields must not be invented or abort signup.
+    if (StringUtils.hasText(context.getAddress())
+        && StringUtils.hasText(context.getCity())
+        && StringUtils.hasText(context.getCountry())) {
       CreateAddressRequest createRequest =
           CreateAddressRequest.builder()
-              .streetAddress(context.getAddress() != null ? context.getAddress() : "")
-              .city(context.getCity() != null ? context.getCity() : "")
+              .streetAddress(context.getAddress())
+              .city(context.getCity())
               .state(context.getState())
               .district(context.getDistrict())
               .postalCode(context.getPostalCode())
-              .country(context.getCountry() != null ? context.getCountry() : "")
+              .country(context.getCountry())
               .addressType(AddressType.HEADQUARTERS)
               .label("Organization")
               .build();

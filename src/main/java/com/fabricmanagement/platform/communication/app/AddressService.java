@@ -6,7 +6,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.DeliveryVerificationPolicy;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
+import com.fabricmanagement.platform.communication.domain.AddressContent;
 import com.fabricmanagement.platform.communication.domain.AddressType;
+import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
@@ -14,7 +16,6 @@ import com.fabricmanagement.platform.organization.infra.repository.OrganizationA
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -69,29 +70,22 @@ public class AddressService {
                     new PlatformDomainException(
                         "Headquarters address not found", "ONBOARDING_HQ_ADDRESS_NOT_FOUND", 404));
     requireExclusiveOnboardingAddress(addressId, organizationId);
-    boolean locationChanged =
-        !Objects.equals(address.getStreetAddress(), request.getStreetAddress())
-            || !Objects.equals(address.getAddressLine2(), request.getAddressLine2())
-            || !Objects.equals(address.getCity(), request.getCity())
-            || !Objects.equals(address.getState(), request.getState())
-            || !Objects.equals(address.getDistrict(), request.getDistrict())
-            || !Objects.equals(address.getPostalCode(), request.getPostalCode())
-            || !Objects.equals(address.getCountry(), request.getCountry());
-    if (!Objects.equals(address.getCountry(), request.getCountry())) address.setCountryCode(null);
-    if (locationChanged) {
-      address.setLatitude(null);
-      address.setLongitude(null);
-      address.setPlaceId(null);
-      address.setFormattedAddress(null);
-    }
-    address.setStreetAddress(request.getStreetAddress());
-    address.setAddressLine2(request.getAddressLine2());
-    address.setCity(request.getCity());
-    address.setState(request.getState());
-    address.setDistrict(request.getDistrict());
-    address.setPostalCode(request.getPostalCode());
-    address.setCountry(request.getCountry());
-    address.setLabel(request.getLabel());
+    address.replaceContent(
+        new AddressContent(
+            request.getStreetAddress(),
+            request.getAddressLine2(),
+            request.getCity(),
+            request.getState(),
+            request.getDistrict(),
+            request.getPostalCode(),
+            request.getCountry(),
+            request.getCountryCode() != null
+                ? request.getCountryCode()
+                : java.util.Objects.equals(address.getCountry(), request.getCountry())
+                    ? address.getCountryCode()
+                    : null,
+            address.getAddressType(),
+            request.getLabel()));
     address.setVerification(verificationPolicy.forCurrentActor());
     return addressRepository.save(address);
   }
@@ -188,22 +182,19 @@ public class AddressService {
     UUID tenantId = TenantContext.requireTenantId();
     log.debug("Creating address: tenantId={}, type={}, city={}", tenantId, addressType, city);
 
-    Address address =
-        Address.builder()
-            .streetAddress(streetAddress)
-            .city(city)
-            .state(state)
-            .district(district)
-            .postalCode(postalCode)
-            .country(country)
-            .countryCode(countryCode)
-            .addressType(addressType)
-            .label(label)
-            .addressLine2(addressLine2)
-            .verification(verificationPolicy.forCurrentActor())
-            .build();
-
-    return addressRepository.save(address);
+    return saveNew(
+        new AddressContent(
+            streetAddress,
+            addressLine2,
+            city,
+            state,
+            district,
+            postalCode,
+            country,
+            countryCode,
+            addressType,
+            label),
+        null);
   }
 
   @Transactional(readOnly = true)
@@ -257,25 +248,39 @@ public class AddressService {
     UUID tenantId = TenantContext.requireTenantId();
     log.info("Updating address: tenantId={}, addressId={}", tenantId, addressId);
 
-    Address address =
-        addressRepository
-            .findById(addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+    Address address = requireActiveAddress(addressId);
 
-    if (!address.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Address does not belong to current tenant");
+    // Historical cards can lack postal fields now required for new cards. A contact-only
+    // edit must not silently turn into a postal replacement or require invented missing data.
+    boolean postalUpdate =
+        streetAddress != null
+            || addressLine2 != null
+            || city != null
+            || state != null
+            || district != null
+            || postalCode != null
+            || country != null
+            || countryCode != null
+            || addressType != null
+            || label != null;
+    if (postalUpdate) {
+      String nextCountryCode = countryCode != null ? countryCode : address.getCountryCode();
+      if (country != null && !country.trim().equals(address.getCountry()) && countryCode == null) {
+        nextCountryCode = null;
+      }
+      address.replaceContent(
+          new AddressContent(
+              streetAddress != null ? streetAddress : address.getStreetAddress(),
+              addressLine2 != null ? addressLine2 : address.getAddressLine2(),
+              city != null ? city : address.getCity(),
+              state != null ? state : address.getState(),
+              district != null ? district : address.getDistrict(),
+              postalCode != null ? postalCode : address.getPostalCode(),
+              country != null ? country : address.getCountry(),
+              nextCountryCode,
+              addressType != null ? addressType : address.getAddressType(),
+              label != null ? label : address.getLabel()));
     }
-
-    if (streetAddress != null) address.setStreetAddress(streetAddress);
-    if (addressLine2 != null) address.setAddressLine2(addressLine2);
-    if (city != null) address.setCity(city);
-    if (state != null) address.setState(state);
-    if (district != null) address.setDistrict(district);
-    if (postalCode != null) address.setPostalCode(postalCode);
-    if (country != null) address.setCountry(country);
-    if (countryCode != null) address.setCountryCode(countryCode);
-    if (addressType != null) address.setAddressType(addressType);
-    if (label != null) address.setLabel(label);
     if (contactPerson != null) address.setContactPerson(contactPerson);
     if (contactPhone != null) address.setContactPhone(contactPhone);
     if (contactEmail != null) address.setContactEmail(contactEmail);
@@ -283,6 +288,87 @@ public class AddressService {
     address.setVerification(verificationPolicy.forCurrentActor());
 
     return addressRepository.save(address);
+  }
+
+  /** Google supplies postal content; it never supplies delivery approval. */
+  @Transactional
+  public Address createFromLookup(
+      AddressValidationResponse result, AddressType type, String label) {
+    return saveNew(
+        lookupContent(result, type, label, result == null ? null : result.getFlatNumber()), result);
+  }
+
+  private Address saveNew(AddressContent content, AddressValidationResponse lookup) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Address address = Address.builder().verification(verificationPolicy.forCurrentActor()).build();
+    address.setTenantId(tenantId);
+    address.replaceContent(content);
+    if (lookup != null) applyLookup(address, lookup);
+    return addressRepository.save(address);
+  }
+
+  @Transactional
+  public Address replaceFromLookup(UUID id, AddressValidationResponse result) {
+    Address address = requireActiveAddress(id);
+    if (result == null) {
+      throw new PlatformDomainException("Address lookup failed", "ADDRESS_LOOKUP_FAILED", 400);
+    }
+    // A provider refresh must not erase a user's flat, floor or entrance instructions.
+    String secondLine =
+        address.getAddressLine2() != null ? address.getAddressLine2() : result.getFlatNumber();
+    address.replaceContent(
+        lookupContent(result, address.getAddressType(), address.getLabel(), secondLine));
+    applyLookup(address, result);
+    address.setVerification(verificationPolicy.forCurrentActor());
+    return addressRepository.save(address);
+  }
+
+  @Transactional(readOnly = true)
+  public Address requireActiveAddress(UUID id) {
+    return findById(id)
+        .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
+        .orElseThrow(
+            () -> new PlatformDomainException("Address not found", "ADDRESS_NOT_FOUND", 404));
+  }
+
+  private AddressContent lookupContent(
+      AddressValidationResponse result, AddressType type, String label, String secondLine) {
+    if (result == null
+        || result.getVerificationStatus() == null
+        || result.getVerificationStatus() == AddressValidationResponse.VerificationStatus.FAILED) {
+      throw new PlatformDomainException("Address lookup failed", "ADDRESS_LOOKUP_FAILED", 400);
+    }
+    return new AddressContent(
+        result.getStreetAddress(),
+        secondLine,
+        result.getCity(),
+        result.getState(),
+        result.getDistrict(),
+        result.getPostalCode(),
+        result.getCountry(),
+        result.getCountryCode(),
+        type,
+        label);
+  }
+
+  private void applyLookup(Address address, AddressValidationResponse result) {
+    Double latitude = result.getLatitude();
+    Double longitude = result.getLongitude();
+    if ((latitude == null) != (longitude == null)
+        || (latitude != null
+            && (!Double.isFinite(latitude)
+                || latitude < -90
+                || latitude > 90
+                || !Double.isFinite(longitude)
+                || longitude < -180
+                || longitude > 180))) {
+      throw new PlatformDomainException(
+          "Invalid address coordinates", "ADDRESS_COORDINATES_INVALID", 400);
+    }
+    address.setPlaceId(result.getPlaceId());
+    address.setLatitude(latitude);
+    address.setLongitude(longitude);
+    address.setFormattedAddress(result.getFormattedAddress());
   }
 
   /**

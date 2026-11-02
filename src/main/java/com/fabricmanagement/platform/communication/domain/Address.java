@@ -5,6 +5,7 @@ import com.fabricmanagement.common.domain.vo.Verification;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.*;
 
@@ -28,22 +29,22 @@ import lombok.*;
  * <pre>{@code
  * // User's home address
  * Address homeAddress = Address.builder()
- *     .streetAddress("123 Main St, Apt 4B")
- *     .city("Istanbul")
- *     .state("Istanbul")
- *     .postalCode("34000")
- *     .country("Turkey")
+ *     .streetAddress("14 Mill Lane, Flat 4B")
+ *     .city("Leeds")
+ *     .state("Leeds")
+ *     .postalCode("LS1 1AA")
+ *     .country("United Kingdom")
  *     .addressType(AddressType.HOME)
  *     .label("Home")
  *     .build();
  *
  * // Company headquarters
  * Address hqAddress = Address.builder()
- *     .streetAddress("456 Business Ave, Floor 10")
- *     .city("Istanbul")
- *     .state("Istanbul")
- *     .postalCode("34000")
- *     .country("Turkey")
+ *     .streetAddress("26 Dock Road, Floor 2")
+ *     .city("Leeds")
+ *     .state("Leeds")
+ *     .postalCode("LS1 1AA")
+ *     .country("United Kingdom")
  *     .addressType(AddressType.HEADQUARTERS)
  *     .isPrimary(true)
  *     .label("Main Headquarters")
@@ -70,7 +71,7 @@ public class Address extends BaseEntity {
   /**
    * Street address (full street address with building/apartment number)
    *
-   * <p>Example: "123 Main St, Apt 4B" or "456 Business Ave, Floor 10"
+   * <p>Example: "14 Mill Lane, Flat 4B" or "26 Dock Road, Floor 2"
    */
   @Column(name = "street_address", nullable = false, length = 500)
   private String streetAddress;
@@ -82,7 +83,7 @@ public class Address extends BaseEntity {
   /**
    * State/Province/Region
    *
-   * <p>Examples: "Istanbul", "California", "Ontario"
+   * <p>Examples: "West Yorkshire", "Greater Manchester"
    */
   @Column(name = "state", length = 100)
   private String state;
@@ -94,7 +95,7 @@ public class Address extends BaseEntity {
   /**
    * Country name
    *
-   * <p>Examples: "Turkey", "United States", "Canada"
+   * <p>Examples: "United Kingdom"
    */
   @Column(name = "country", nullable = false, length = 100)
   private String country;
@@ -102,7 +103,7 @@ public class Address extends BaseEntity {
   /**
    * ISO 3166-1 alpha-2 country code
    *
-   * <p>Examples: "TR", "GB", "DE", "FR", "US"
+   * <p>Examples: "GB", "DE", "FR", "US"
    *
    * <p>Required for address validation and standardization
    */
@@ -112,7 +113,7 @@ public class Address extends BaseEntity {
   /**
    * District/County/Sub-administrative area
    *
-   * <p>Examples: "Brooklyn", "Westminster", "Bavaria"
+   * <p>Examples: "Westminster", "North Yorkshire"
    */
   @Column(name = "district", length = 100)
   private String district;
@@ -184,6 +185,9 @@ public class Address extends BaseEntity {
     // Otherwise, construct from components
     StringBuilder sb = new StringBuilder();
     sb.append(streetAddress);
+    if (addressLine2 != null && !addressLine2.isBlank()) {
+      sb.append(", ").append(addressLine2);
+    }
     if (district != null && !district.isBlank()) {
       sb.append(", ").append(district);
     }
@@ -200,6 +204,35 @@ public class Address extends BaseEntity {
       sb.append(", ").append(country);
     }
     return sb.toString();
+  }
+
+  /** Replace postal content; a changed location cannot retain an earlier map match. */
+  public void replaceContent(AddressContent content) {
+    boolean locationChanged =
+        !Objects.equals(streetAddress, content.streetAddress())
+            || !Objects.equals(addressLine2, content.addressLine2())
+            || !Objects.equals(city, content.city())
+            || !Objects.equals(state, content.state())
+            || !Objects.equals(district, content.district())
+            || !Objects.equals(postalCode, content.postalCode())
+            || !Objects.equals(country, content.country())
+            || !Objects.equals(countryCode, content.countryCode());
+    if (locationChanged) {
+      latitude = null;
+      longitude = null;
+      placeId = null;
+      formattedAddress = null;
+    }
+    streetAddress = content.streetAddress();
+    addressLine2 = content.addressLine2();
+    city = content.city();
+    state = content.state();
+    district = content.district();
+    postalCode = content.postalCode();
+    country = content.country();
+    countryCode = content.countryCode();
+    addressType = content.addressType();
+    label = content.label();
   }
 
   /**

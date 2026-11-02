@@ -3423,6 +3423,8 @@ paths:
       - Auth
   /api/v1/common/addresses:
     post:
+      description: Manual entry works without Google. Delivery verification follows
+        the current actor policy.
       operationId: createAddress
       requestBody:
         content:
@@ -3488,6 +3490,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
+      summary: Create a postal address
       tags:
       - Address
   /api/v1/common/addresses/type/{type}:
@@ -4134,6 +4137,8 @@ paths:
       tags:
       - Address
     put:
+      description: Null or omitted fields are unchanged. Empty optional text clears
+        it. Location changes invalidate the previous Google match.
       operationId: updateAddress
       parameters:
       - in: path
@@ -4206,6 +4211,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
+      summary: Update a postal address
       tags:
       - Address
   /api/v1/common/ai/chat:
@@ -76395,6 +76401,10 @@ components:
       properties:
         addressLine2:
           type: string
+          description: "Flat, floor, suite, building or entrance details; kept separate\
+            \ from streetAddress."
+          maxLength: 255
+          minLength: 0
         addressType:
           type: string
           enum:
@@ -76413,24 +76423,46 @@ components:
           - REMOTE
         city:
           type: string
-          minLength: 1
+          description: city
+          maxLength: 100
+          minLength: 0
         country:
           type: string
-          minLength: 1
+          description: country
+          maxLength: 100
+          minLength: 0
         countryCode:
           type: string
+          description: Optional two-letter country code. Omit when unknown; never
+            inferred from UI language.
+          maxLength: 2
+          minLength: 0
+          pattern: "(?:[A-Za-z]{2})?"
         district:
           type: string
+          description: district
+          maxLength: 100
+          minLength: 0
         label:
           type: string
-          minLength: 1
+          description: label
+          maxLength: 100
+          minLength: 0
         postalCode:
           type: string
+          description: postalCode
+          maxLength: 20
+          minLength: 0
         state:
           type: string
+          description: state
+          maxLength: 100
+          minLength: 0
         streetAddress:
           type: string
-          minLength: 1
+          description: streetAddress
+          maxLength: 500
+          minLength: 0
       required:
       - addressType
       - city
@@ -101426,6 +101458,10 @@ components:
       properties:
         addressLine2:
           type: string
+          description: "Flat, floor, suite, building or entrance details; kept separate\
+            \ from streetAddress."
+          maxLength: 255
+          minLength: 0
         addressType:
           type: string
           enum:
@@ -101444,26 +101480,61 @@ components:
           - REMOTE
         city:
           type: string
+          description: city
+          maxLength: 100
+          minLength: 0
         contactEmail:
           type: string
+          description: contactEmail
+          maxLength: 255
+          minLength: 0
         contactPerson:
           type: string
+          description: contactPerson
+          maxLength: 100
+          minLength: 0
         contactPhone:
           type: string
+          description: contactPhone
+          maxLength: 50
+          minLength: 0
         country:
           type: string
+          description: country
+          maxLength: 100
+          minLength: 0
         countryCode:
           type: string
+          description: Optional two-letter country code. Omit when unknown; never
+            inferred from UI language.
+          maxLength: 2
+          minLength: 0
+          pattern: "(?:[A-Za-z]{2})?"
         district:
           type: string
+          description: district
+          maxLength: 100
+          minLength: 0
         label:
           type: string
+          description: label
+          maxLength: 100
+          minLength: 0
         postalCode:
           type: string
+          description: postalCode
+          maxLength: 20
+          minLength: 0
         state:
           type: string
+          description: state
+          maxLength: 100
+          minLength: 0
         streetAddress:
           type: string
+          description: streetAddress
+          maxLength: 500
+          minLength: 0
     UpdateApprovalPolicyRequest:
       type: object
       properties:
@@ -103128,14 +103199,30 @@ components:
       properties:
         address:
           type: string
+          description: address
+          maxLength: 1000
+          minLength: 0
         addressType:
           type: string
+          description: addressType
+          maxLength: 50
+          minLength: 0
         label:
           type: string
+          description: Location label; required when persisting a lookup result.
+          maxLength: 100
+          minLength: 0
         originalInput:
           type: string
+          description: originalInput
+          maxLength: 1000
+          minLength: 0
         placeId:
           type: string
+          description: Google lookup reference. Recognition is separate from delivery
+            verification.
+          maxLength: 255
+          minLength: 0
     ValidateHrPolicyPackRequest:
       type: object
       properties:

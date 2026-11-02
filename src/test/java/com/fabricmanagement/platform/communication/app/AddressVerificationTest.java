@@ -62,6 +62,7 @@ class AddressVerificationTest {
     Address address =
         Address.builder()
             .streetAddress("1 Mill Lane")
+            .label("Dock")
             .city("Leeds")
             .country("United Kingdom")
             .addressType(AddressType.SHIPPING)
