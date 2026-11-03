@@ -32,8 +32,8 @@ public class GoogleMapsProperties {
   /** Request timeout in milliseconds */
   private Integer timeout = 10000;
 
-  /** Region bias for autocomplete (comma-separated country codes: TR,GB,DE,FR,IT,ES) */
-  private String regionBias = "TR,GB,DE,FR,IT,ES";
+  /** Soft region preference for autocomplete (first code is used, default GB) */
+  private String regionBias = "GB";
 
   /** Component restrictions (country codes for Places API) */
   private String componentRestrictions;

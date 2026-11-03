@@ -403,13 +403,19 @@ public class UserCreationService {
                 : (isWorkType ? "Work Address" : "Home Address");
         Address address =
             addressService.createAddress(
-                addressData.getStreetAddress(),
-                addressData.getCity(),
-                addressData.getState(),
-                addressData.getPostalCode(),
-                addressData.getCountry(),
-                addressType,
-                addressLabel);
+                com.fabricmanagement.platform.communication.dto.CreateAddressRequest.builder()
+                    .streetAddress(addressData.getStreetAddress())
+                    .addressLine2(addressData.getAddressLine2())
+                    .city(addressData.getCity())
+                    .state(addressData.getState())
+                    .district(addressData.getDistrict())
+                    .postalCode(addressData.getPostalCode())
+                    .country(addressData.getCountry())
+                    .countryCode(addressData.getCountryCode())
+                    .addressType(addressType)
+                    .label(addressLabel)
+                    .placeId(addressData.getPlaceId())
+                    .build());
 
         boolean isPrimary;
         if (hasExplicitPrimary) {

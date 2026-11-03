@@ -69,4 +69,11 @@ public class CreateAddressRequest {
   @Size(max = 100)
   @Schema(description = "label", maxLength = 100, requiredMode = Schema.RequiredMode.REQUIRED)
   private String label;
+
+  @Size(max = 255)
+  @Schema(
+      description =
+          "Optional Google place reference. Resolved by the server; never grants delivery approval.",
+      maxLength = 255)
+  private String placeId;
 }

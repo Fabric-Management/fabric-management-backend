@@ -45,22 +45,7 @@ public class AddressFacade {
 
   @Transactional
   public AddressDto updateAddress(UUID id, UpdateAddressRequest request) {
-    Address address =
-        addressService.updateAddress(
-            id,
-            request.getStreetAddress(),
-            request.getAddressLine2(),
-            request.getCity(),
-            request.getState(),
-            request.getDistrict(),
-            request.getPostalCode(),
-            request.getCountry(),
-            request.getCountryCode(),
-            request.getAddressType(),
-            request.getLabel(),
-            request.getContactPerson(),
-            request.getContactPhone(),
-            request.getContactEmail());
+    Address address = addressService.updateAddress(id, request);
     return mapper.toDto(address);
   }
 

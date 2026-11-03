@@ -45,4 +45,8 @@ public class AddressData {
 
   /** Whether this is the primary address. Default: false (first address becomes primary) */
   @Builder.Default private Boolean isPrimary = false;
+
+  private String addressLine2;
+  private String district;
+  private String countryCode;
 }

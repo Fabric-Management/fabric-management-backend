@@ -10,12 +10,19 @@ import com.fabricmanagement.platform.communication.domain.AddressContent;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
+import com.fabricmanagement.platform.communication.infra.client.GoogleMapsClient;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
+import com.fabricmanagement.platform.communication.util.CountryCodeMapper;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
+import java.text.Normalizer;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +52,7 @@ public class AddressService {
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
   private final DeliveryVerificationPolicy verificationPolicy;
+  private final GoogleMapsClient googleMapsClient;
 
   @Transactional(readOnly = true)
   public void requireExclusiveOnboardingAddress(UUID addressId, UUID organizationId) {
@@ -102,17 +110,20 @@ public class AddressService {
   public Address createAddress(CreateAddressRequest request) {
     String label =
         (request.getLabel() != null && !request.getLabel().isBlank()) ? request.getLabel() : "";
-    return createAddress(
-        request.getStreetAddress(),
-        request.getCity(),
-        request.getState(),
-        request.getDistrict(),
-        request.getPostalCode(),
-        request.getCountry(),
-        request.getCountryCode(),
-        request.getAddressType(),
-        label,
-        request.getAddressLine2());
+    Address address =
+        createAddress(
+            request.getStreetAddress(),
+            request.getCity(),
+            request.getState(),
+            request.getDistrict(),
+            request.getPostalCode(),
+            request.getCountry(),
+            request.getCountryCode(),
+            request.getAddressType(),
+            label,
+            request.getAddressLine2());
+    attachLookup(address, request.getPlaceId());
+    return address;
   }
 
   @Transactional
@@ -288,6 +299,77 @@ public class AddressService {
     address.setVerification(verificationPolicy.forCurrentActor());
 
     return addressRepository.save(address);
+  }
+
+  @Transactional
+  public Address updateAddress(UUID id, UpdateAddressRequest request) {
+    Address address =
+        updateAddress(
+            id,
+            request.getStreetAddress(),
+            request.getAddressLine2(),
+            request.getCity(),
+            request.getState(),
+            request.getDistrict(),
+            request.getPostalCode(),
+            request.getCountry(),
+            request.getCountryCode(),
+            request.getAddressType(),
+            request.getLabel(),
+            request.getContactPerson(),
+            request.getContactPhone(),
+            request.getContactEmail());
+    attachLookup(address, request.getPlaceId());
+    return address;
+  }
+
+  private void attachLookup(Address address, String placeId) {
+    if (placeId == null || placeId.isBlank()) return;
+    AddressValidationResponse found = googleMapsClient.validateByPlaceId(placeId.trim(), null);
+    if (found == null) {
+      throw new PlatformDomainException("Address lookup failed", "ADDRESS_LOOKUP_FAILED", 400);
+    }
+    AddressContent content =
+        lookupContent(
+            found, address.getAddressType(), address.getLabel(), address.getAddressLine2());
+    if (!Objects.equals(address.getStreetAddress(), content.streetAddress())
+        || !Objects.equals(address.getCity(), content.city())
+        || !Objects.equals(address.getPostalCode(), content.postalCode())
+        || !Objects.equals(address.getCountryCode(), content.countryCode())
+        || !Objects.equals(normalisedRegion(address.getState()), normalisedRegion(content.state()))
+        || !Objects.equals(
+            normalisedRegion(address.getDistrict()), normalisedRegion(content.district()))
+        || !countryMatchesCode(address.getCountry(), content.countryCode())) {
+      throw new PlatformDomainException(
+          "Selected map address differs from the postal address. Search again or save manually.",
+          "ADDRESS_LOOKUP_MISMATCH",
+          409);
+    }
+    applyLookup(address, found);
+  }
+
+  private static String normalisedRegion(String value) {
+    if (value == null || value.isBlank()) return null;
+    return Normalizer.normalize(value.trim(), Normalizer.Form.NFKC)
+        .replaceAll("\\s+", " ")
+        .toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * Country names may be localised; compare their meaning, never infer a country from UI locale.
+   */
+  private static boolean countryMatchesCode(String name, String code) {
+    if (name == null || code == null || !Arrays.asList(Locale.getISOCountries()).contains(code))
+      return false;
+    String normalised = normalisedRegion(name);
+    if (code.equalsIgnoreCase(name.trim())
+        || code.equals(CountryCodeMapper.mapToIsoCode(name.trim().toUpperCase(Locale.ROOT))))
+      return true;
+    Locale country = Locale.forLanguageTag("und-" + code);
+    return Arrays.stream(Locale.getAvailableLocales())
+        .map(country::getDisplayCountry)
+        .map(AddressService::normalisedRegion)
+        .anyMatch(displayName -> Objects.equals(normalised, displayName));
   }
 
   /** Google supplies postal content; it never supplies delivery approval. */

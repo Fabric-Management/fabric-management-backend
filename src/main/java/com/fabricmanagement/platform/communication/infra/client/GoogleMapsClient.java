@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.infra.client;
 
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.config.GoogleMapsProperties;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.AutocompleteResponse;
@@ -33,7 +34,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * <ul>
  *   <li>✅ Places Autocomplete API (New)
  *   <li>✅ Geocoding API (address validation)
- *   <li>✅ Region bias (Europe, Turkey, UK)
+ *   <li>✅ Soft region preference (UK by default)
  *   <li>✅ Error handling & logging
  * </ul>
  */
@@ -68,22 +69,26 @@ public class GoogleMapsClient {
   /**
    * Get autocomplete suggestions from Google Places API.
    *
-   * <p>User-friendly: No country filter - Google's smart relevance handles country detection
-   * automatically. This allows users to search globally without restrictions (e.g., "Akkayalar
-   * London" works from anywhere).
+   * <p>An explicit country restricts results; the configured region is only a soft preference.
    *
    * @param input Address input text (required)
-   * @param country Optional country code (deprecated - not used, kept for backward compatibility)
+   * @param country Optional two-letter country restriction
    */
   public AutocompleteResponse autocomplete(String input, String country) {
+    return autocomplete(input, country, null);
+  }
+
+  public AutocompleteResponse autocomplete(String input, String country, String sessionToken) {
     if (!properties.getEnabled()) {
       log.warn("Google Maps features are disabled");
-      return AutocompleteResponse.builder().predictions(new ArrayList<>()).build();
+      throw new PlatformDomainException(
+          "Address search is unavailable", "ADDRESS_SEARCH_UNAVAILABLE", 503);
     }
 
     if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
       log.warn("Google Maps API key is not configured");
-      return AutocompleteResponse.builder().predictions(new ArrayList<>()).build();
+      throw new PlatformDomainException(
+          "Address search is unavailable", "ADDRESS_SEARCH_UNAVAILABLE", 503);
     }
 
     try {
@@ -100,19 +105,19 @@ public class GoogleMapsClient {
       Map<String, Object> requestBody = new java.util.HashMap<>();
       requestBody.put("input", input);
 
-      // Note: Google Places API (New) v1 doesn't support maxResultCount parameter
-      // API returns results based on relevance (typically 5-10 suggestions)
-      // For what3words-style behavior, we rely on API's default result set
-
-      // Region bias (from properties) - soft preference, doesn't restrict results
-      // Google's smart relevance will still return relevant results from other regions
-      if (properties.getRegionBias() != null && !properties.getRegionBias().isBlank()) {
-        requestBody.put("includedRegionCodes", List.of(properties.getRegionBias().split(",")));
+      if (sessionToken != null && !sessionToken.isBlank())
+        requestBody.put("sessionToken", sessionToken);
+      if (country != null && !country.isBlank()) {
+        if (!country.matches("[A-Za-z]{2}")) {
+          throw new PlatformDomainException(
+              "Invalid country code", "ADDRESS_COUNTRY_CODE_INVALID", 400);
+        }
+        requestBody.put("includedRegionCodes", List.of(country.toLowerCase(java.util.Locale.ROOT)));
+      } else if (properties.getRegionBias() != null && !properties.getRegionBias().isBlank()) {
+        requestBody.put(
+            "regionCode",
+            properties.getRegionBias().split(",")[0].trim().toLowerCase(java.util.Locale.ROOT));
       }
-
-      // Note: Country filter removed - Google's smart relevance handles country detection
-      // automatically
-      // This allows users to search globally (e.g., "Akkayalar London" works from anywhere)
 
       // Include comprehensive address types: buildings, businesses, streets, landmarks
       // Google API limit: Maximum 5 included_primary_types
@@ -122,9 +127,9 @@ public class GoogleMapsClient {
           "includedPrimaryTypes",
           List.of(
               "street_address", // Normal addresses (e.g., 10 Downing St)
-              "premise", // Building or apartment names (e.g., Akkayalar Plaza) - includes
+              "premise", // Building or apartment names (e.g., Hawthorn Plaza) - includes
               // subpremise
-              "point_of_interest", // Known businesses or landmarks (e.g., Starbucks, Big Ben)
+              "point_of_interest", // Known businesses or landmarks (e.g., a mill or goods entrance)
               "route", // Street or avenue names
               "establishment" // General business or building category
               ));
@@ -142,7 +147,8 @@ public class GoogleMapsClient {
         body = mapper.readValue(rawResponse.getBody(), PlacesAutocompleteResponse.class);
       } catch (Exception e) {
         log.error("Failed to parse Google Places API response: {}", e.getMessage(), e);
-        return AutocompleteResponse.builder().predictions(new ArrayList<>()).build();
+        throw new PlatformDomainException(
+            "Address search response is invalid", "ADDRESS_SEARCH_UNAVAILABLE", 503);
       }
 
       if (body == null || body.getSuggestions() == null || body.getSuggestions().isEmpty()) {
@@ -177,13 +183,12 @@ public class GoogleMapsClient {
 
       return AutocompleteResponse.builder().predictions(new ArrayList<>()).build();
 
+    } catch (PlatformDomainException e) {
+      throw e;
     } catch (Exception e) {
-      log.error("Error calling Google Places Autocomplete API: {}", e.getMessage(), e);
-      // Re-throw IllegalStateException for API configuration errors (REQUEST_DENIED, etc.)
-      if (e instanceof IllegalStateException) {
-        throw e;
-      }
-      return AutocompleteResponse.builder().predictions(new ArrayList<>()).build();
+      log.error("Google address search failed: {}", e.getClass().getSimpleName());
+      throw new PlatformDomainException(
+          "Address search is unavailable", "ADDRESS_SEARCH_UNAVAILABLE", 503);
     }
   }
 
@@ -198,6 +203,11 @@ public class GoogleMapsClient {
    *     extraction)
    */
   public AddressValidationResponse validateByPlaceId(String placeId, String originalInput) {
+    return validateByPlaceId(placeId, originalInput, null);
+  }
+
+  public AddressValidationResponse validateByPlaceId(
+      String placeId, String originalInput, String sessionToken) {
     if (!properties.getEnabled()) {
       throw new IllegalStateException("Google Maps features are disabled");
     }
@@ -210,7 +220,11 @@ public class GoogleMapsClient {
       log.debug("Validating address by placeId using Places API (New) v1: placeId={}", placeId);
 
       // New Places API (New) v1 Place Details endpoint
-      String url = PLACES_DETAILS_URL + placeId;
+      UriComponentsBuilder detailsUrl =
+          UriComponentsBuilder.fromHttpUrl(PLACES_DETAILS_URL).pathSegment(placeId);
+      if (sessionToken != null && !sessionToken.isBlank())
+        detailsUrl.queryParam("sessionToken", sessionToken);
+      String url = detailsUrl.build().encode().toUriString();
 
       HttpHeaders headers = new HttpHeaders();
       headers.set("X-Goog-Api-Key", properties.getApiKey());

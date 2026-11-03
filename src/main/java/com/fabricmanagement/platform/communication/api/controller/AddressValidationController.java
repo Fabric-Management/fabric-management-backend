@@ -56,17 +56,24 @@ public class AddressValidationController {
    */
   @GetMapping("/autocomplete")
   public ResponseEntity<ApiResponse<AutocompleteResponse>> autocomplete(
-      @RequestParam String input, @RequestParam(required = false) String country) {
+      @RequestParam String input,
+      @RequestParam(required = false) String country,
+      @RequestParam(required = false) String sessionToken) {
     log.debug("Autocomplete request: input={}, country={}", input, country);
 
-    if (input == null || input.isBlank()) {
+    if (input == null
+        || input.isBlank()
+        || input.length() > 500
+        || (sessionToken != null && sessionToken.length() > 36)) {
       return ResponseEntity.badRequest()
           .body(ApiResponse.error("INPUT_REQUIRED", "Input parameter is required"));
     }
 
     try {
-      AutocompleteResponse response = googleMapsClient.autocomplete(input, country);
+      AutocompleteResponse response = googleMapsClient.autocomplete(input, country, sessionToken);
       return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (com.fabricmanagement.platform.common.exception.PlatformDomainException e) {
+      throw e;
     } catch (IllegalStateException e) {
       // Handle Google Maps API configuration errors (REQUEST_DENIED,
       // OVER_QUERY_LIMIT, etc.)

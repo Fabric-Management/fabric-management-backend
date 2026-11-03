@@ -12,6 +12,7 @@ import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.communication.dto.ValidateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.client.GoogleMapsClient;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
@@ -21,6 +22,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class AddressLookupWriteTest {
   private final UUID tenant = UUID.randomUUID();
@@ -32,7 +35,8 @@ class AddressLookupWriteTest {
           repository,
           mock(OrganizationAddressRepository.class),
           mock(UserWorkLocationRepository.class),
-          policy);
+          policy,
+          google);
   private final AddressValidationService service = new AddressValidationService(google, addresses);
 
   @BeforeEach
@@ -234,5 +238,89 @@ class AddressLookupWriteTest {
         .isInstanceOf(PlatformDomainException.class);
     assertThat(address.getStreetAddress()).isEqualTo("14 Mill Lane");
     verify(repository, never()).save(any());
+  }
+
+  @Test
+  void normalCreateRetainsAServerResolvedMapMatch() {
+    when(google.validateByPlaceId("google-place-reference", null)).thenReturn(found());
+    Address saved =
+        addresses.createAddress(
+            com.fabricmanagement.platform.communication.dto.CreateAddressRequest.builder()
+                .streetAddress("14 Mill Lane")
+                .city("Leeds")
+                .country("United Kingdom")
+                .countryCode("GB")
+                .postalCode("LS1 1AA")
+                .addressLine2("Loading bay 2")
+                .addressType(AddressType.WAREHOUSE)
+                .label("Dispatch")
+                .placeId("google-place-reference")
+                .build());
+    assertThat(saved.getPlaceId()).isEqualTo("google-place-reference");
+    assertThat(saved.getLatitude()).isEqualTo(53.8);
+    assertThat(saved.getAddressLine2()).isEqualTo("Loading bay 2");
+    assertThat(saved.getVerificationStatus()).isEqualTo(DeliveryVerificationStatus.UNVERIFIED);
+  }
+
+  @Test
+  void mismatchedMapReferenceCannotBeAttachedToAnotherStreet() {
+    when(google.validateByPlaceId("google-place-reference", null)).thenReturn(found());
+    assertThatThrownBy(
+            () ->
+                addresses.createAddress(
+                    com.fabricmanagement.platform.communication.dto.CreateAddressRequest.builder()
+                        .streetAddress("26 Dock Road")
+                        .city("Leeds")
+                        .country("United Kingdom")
+                        .countryCode("GB")
+                        .postalCode("LS1 1AA")
+                        .addressType(AddressType.WAREHOUSE)
+                        .label("Dispatch")
+                        .placeId("google-place-reference")
+                        .build()))
+        .isInstanceOf(PlatformDomainException.class);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"country", "state", "district"})
+  void normalUpdateCannotReattachAReferenceAfterContradictingItsPostalRegion(String changed) {
+    Address address = existing();
+    address.setPostalCode("LS1 1AA");
+    address.setState("West Yorkshire");
+    address.setDistrict("Holbeck");
+    AddressValidationResponse mapped = found();
+    mapped.setState("West Yorkshire");
+    mapped.setDistrict("Holbeck");
+    when(google.validateByPlaceId("google-place-reference", null)).thenReturn(mapped);
+    UpdateAddressRequest update =
+        UpdateAddressRequest.builder().placeId("google-place-reference").countryCode("GB").build();
+    switch (changed) {
+      case "country" -> update.setCountry("France");
+      case "state" -> update.setState("Greater Manchester");
+      case "district" -> update.setDistrict("Hunslet");
+      default -> throw new AssertionError(changed);
+    }
+    assertThatThrownBy(() -> addresses.updateAddress(address.getId(), update))
+        .isInstanceOf(PlatformDomainException.class)
+        .hasMessageContaining("Selected map address differs");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"United Kingdom", "Royaume-Uni", "UK"})
+  void normalUpdateAcceptsCountryNamesWithTheSameMeaningAndKeepsTheEnteredLanguage(String country) {
+    Address address = existing();
+    address.setPostalCode("LS1 1AA");
+    when(google.validateByPlaceId("google-place-reference", null)).thenReturn(found());
+    Address saved =
+        addresses.updateAddress(
+            address.getId(),
+            UpdateAddressRequest.builder()
+                .country(country)
+                .countryCode("GB")
+                .placeId("google-place-reference")
+                .build());
+    assertThat(saved.getCountry()).isEqualTo(country);
+    assertThat(saved.getPlaceId()).isEqualTo("google-place-reference");
+    assertThat(saved.getVerificationStatus()).isEqualTo(DeliveryVerificationStatus.UNVERIFIED);
   }
 }

@@ -109,3 +109,6 @@ The agent did not execute these checks. The second run validates the correction 
 it was a focused test/check run, not a new full-suite verify. The earlier failed verify must not be
 recorded as a successful complete verify gate. The remaining Checker Framework annotation-class
 messages did not fail the reported SpotBugs check.
+
+
+Second slice: see [ADDRESS-FOUNDATION-2.md](ADDRESS-FOUNDATION-2.md). New code is prepared; the previous operator results do not validate the second slice.
