@@ -49,4 +49,10 @@ public class ValidateAddressRequest {
       description = "Location label; required when persisting a lookup result.",
       maxLength = 100)
   private String label;
+
+  @Size(max = 36)
+  @Schema(
+      description = "Autocomplete session token, shared with the selection request.",
+      maxLength = 36)
+  private String sessionToken;
 }

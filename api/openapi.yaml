@@ -3576,6 +3576,11 @@ paths:
         required: false
         schema:
           type: string
+      - in: query
+        name: sessionToken
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -76448,6 +76453,12 @@ components:
           description: label
           maxLength: 100
           minLength: 0
+        placeId:
+          type: string
+          description: Optional Google place reference. Resolved by the server; never
+            grants delivery approval.
+          maxLength: 255
+          minLength: 0
         postalCode:
           type: string
           description: postalCode
@@ -101520,6 +101531,12 @@ components:
           description: label
           maxLength: 100
           minLength: 0
+        placeId:
+          type: string
+          description: Optional Google place reference. Resolved by the server; never
+            grants delivery approval.
+          maxLength: 255
+          minLength: 0
         postalCode:
           type: string
           description: postalCode
@@ -102823,6 +102840,8 @@ components:
     UserAddressData:
       type: object
       properties:
+        addressLine2:
+          type: string
         addressType:
           type: string
         city:
@@ -102831,6 +102850,10 @@ components:
         country:
           type: string
           minLength: 1
+        countryCode:
+          type: string
+        district:
+          type: string
         isPrimary:
           type: boolean
         label:
@@ -103222,6 +103245,11 @@ components:
           description: Google lookup reference. Recognition is separate from delivery
             verification.
           maxLength: 255
+          minLength: 0
+        sessionToken:
+          type: string
+          description: "Autocomplete session token, shared with the selection request."
+          maxLength: 36
           minLength: 0
     ValidateHrPolicyPackRequest:
       type: object

@@ -48,7 +48,10 @@ public class AddressValidationService {
     if (request.getPlaceId() != null && !request.getPlaceId().isBlank()) {
       // Recommended: validate by placeId
       validationResponse =
-          googleMapsClient.validateByPlaceId(request.getPlaceId(), request.getOriginalInput());
+          request.getSessionToken() == null
+              ? googleMapsClient.validateByPlaceId(request.getPlaceId(), request.getOriginalInput())
+              : googleMapsClient.validateByPlaceId(
+                  request.getPlaceId(), request.getOriginalInput(), request.getSessionToken());
     } else if (request.getAddress() != null && !request.getAddress().isBlank()) {
       // Fallback: validate by address string
       validationResponse = googleMapsClient.validateByAddress(request.getAddress());

@@ -285,8 +285,8 @@ application:
       api-key: ${GOOGLE_MAPS_API_KEY:}
       enabled: ${GOOGLE_MAPS_ENABLED:true}
       timeout: ${GOOGLE_MAPS_TIMEOUT:10000}
-      region-bias: ${GOOGLE_MAPS_REGION_BIAS:TR,GB,DE,FR,IT,ES}
-      max-result-count: ${GOOGLE_MAPS_MAX_RESULT_COUNT:20} # what3words-style: show all matching addresses (1-20)
+      region-bias: ${GOOGLE_MAPS_REGION_BIAS:GB}
+      max-result-count: ${GOOGLE_MAPS_MAX_RESULT_COUNT:20} # Legacy setting; Places autocomplete controls its own result count
 
   # WhatsApp Business API Configuration
   whatsapp:

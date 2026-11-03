@@ -71,4 +71,11 @@ public class UpdateAddressRequest {
   @Size(max = 255)
   @Schema(description = "contactEmail", maxLength = 255)
   private String contactEmail;
+
+  @Size(max = 255)
+  @Schema(
+      description =
+          "Optional Google place reference. Resolved by the server; never grants delivery approval.",
+      maxLength = 255)
+  private String placeId;
 }
