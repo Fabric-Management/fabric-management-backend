@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,33 @@ class JwtRoundTripIntegrationTest extends AbstractIntegrationTest {
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
 
+  /** The administrator that signup created, with the tenant it belongs to. */
+  private record SignupAccount(UUID userId, UUID tenantId) {}
+
+  /**
+   * Finds the signup administrator through the contact it owns.
+   *
+   * <p>Signup seeds the tenant with demonstration users, so a lookup by tenant alone matches all of
+   * them and returns an arbitrary one. A contact belongs to exactly one user.
+   */
+  private SignupAccount findSignupAccount(String email) {
+    List<SignupAccount> accounts =
+        systemExecutor.executeQuery(
+            """
+            SELECT u.id, u.tenant_id
+              FROM common_user.common_user u
+              JOIN common_user.common_user_contact uc ON uc.user_id = u.id
+              JOIN common_communication.common_contact c ON c.id = uc.contact_id
+             WHERE c.contact_value = ?
+            """,
+            (rs, rowNum) ->
+                new SignupAccount(
+                    rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class)),
+            email);
+    assertThat(accounts).as("users owning the signup contact").hasSize(1);
+    return accounts.getFirst();
+  }
+
   @Test
   @DisplayName("Login returns JWT with correct tenant_id, organization_id, and user_id claims")
   void login_returnsJwt_withCorrectClaims() throws Exception {
@@ -113,19 +141,9 @@ class JwtRoundTripIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isOk());
 
     // Step 2: Setup password directly in DB (simulating password setup flow)
-    UUID signupUserId =
-        systemExecutor.executeQueryForObject(
-            "SELECT u.id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
-            (rs, rowNum) -> rs.getObject("id", UUID.class),
-            email);
-    UUID signupTenantId =
-        systemExecutor.executeQueryForObject(
-            "SELECT u.tenant_id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
-            (rs, rowNum) -> rs.getObject("tenant_id", UUID.class),
-            email);
-    if (signupUserId == null || signupTenantId == null) {
-      throw new AssertionError("User not found after signup");
-    }
+    SignupAccount signupAccount = findSignupAccount(email);
+    UUID signupUserId = signupAccount.userId();
+    UUID signupTenantId = signupAccount.tenantId();
 
     // Set TenantContext for BaseEntity.onCreate
     com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
@@ -252,19 +270,9 @@ class JwtRoundTripIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isOk());
 
     // Setup password
-    UUID signupUserId =
-        systemExecutor.executeQueryForObject(
-            "SELECT u.id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
-            (rs, rowNum) -> rs.getObject("id", UUID.class),
-            email);
-    UUID signupTenantId =
-        systemExecutor.executeQueryForObject(
-            "SELECT u.tenant_id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
-            (rs, rowNum) -> rs.getObject("tenant_id", UUID.class),
-            email);
-    if (signupUserId == null || signupTenantId == null) {
-      throw new AssertionError("User not found after signup");
-    }
+    SignupAccount signupAccount = findSignupAccount(email);
+    UUID signupUserId = signupAccount.userId();
+    UUID signupTenantId = signupAccount.tenantId();
 
     com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
         signupTenantId);
