@@ -1,0 +1,26 @@
+name: PostgreSQL Image Freshness
+
+# BUILD-5: Docker Hub republishes postgres tags when it rebuilds them, and publishes new maintenance
+# releases. Neither makes the pinned digest wrong, so neither belongs in the pull request gate; this
+# job reports them instead. A failed run is the signal to refresh <postgres.image> in pom.xml.
+
+on:
+  schedule:
+    # Scheduled runs are best-effort: GitHub may delay, drop, or disable them. Public repositories
+    # may also have schedules disabled after 60 days without activity.
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: PostgreSQL image freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Compare the pin with Docker Hub
+        run: python3 -B scripts/postgres_image.py --check-freshness

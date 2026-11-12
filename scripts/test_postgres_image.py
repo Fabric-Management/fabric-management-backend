@@ -4,7 +4,13 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from postgres_image import guard_tree, render_compose
+from postgres_image import (
+    evaluate_freshness,
+    evaluate_pinned_index,
+    guard_tree,
+    next_maintenance_tag,
+    render_compose,
+)
 
 
 IMAGE = (
@@ -94,6 +100,65 @@ class PostgresImageGuardTest(unittest.TestCase):
         generated = render_compose(stale, IMAGE)
         self.assertIn(f"    image: {IMAGE}", generated)
         self.assertIn("GENERATED from pom.xml", generated)
+
+
+
+PINNED = IMAGE.split("@", 1)[1]
+OCI_INDEX = "application/vnd.oci.image.index.v1+json"
+
+
+def _index(*platforms):
+    return {
+        "mediaType": OCI_INDEX,
+        "manifests": [
+            {"platform": {"os": os_name, "architecture": architecture}}
+            for os_name, architecture in platforms
+        ],
+    }
+
+
+class PinnedIndexTest(unittest.TestCase):
+    def test_multi_architecture_index_passes(self):
+        document = _index(("linux", "amd64"), ("linux", "arm64"), ("unknown", "unknown"))
+        self.assertEqual([], evaluate_pinned_index(OCI_INDEX, document))
+
+    def test_platform_specific_manifest_fails(self):
+        document = {"mediaType": "application/vnd.oci.image.manifest.v1+json"}
+        errors = evaluate_pinned_index("application/vnd.oci.image.manifest.v1+json", document)
+        self.assertTrue(any("not a multi-architecture" in error for error in errors))
+
+    def test_missing_architecture_fails(self):
+        errors = evaluate_pinned_index(OCI_INDEX, _index(("linux", "amd64")))
+        self.assertEqual(["Pinned index has no linux/arm64 manifest"], errors)
+
+    def test_header_media_type_is_used_when_the_body_omits_it(self):
+        document = _index(("linux", "amd64"), ("linux", "arm64"))
+        del document["mediaType"]
+        self.assertEqual([], evaluate_pinned_index(OCI_INDEX, document))
+
+
+class FreshnessTest(unittest.TestCase):
+    def test_next_maintenance_tag(self):
+        self.assertEqual("16.16-alpine", next_maintenance_tag(IMAGE))
+
+    def test_current_pin_reports_nothing(self):
+        self.assertEqual([], evaluate_freshness(IMAGE, PINNED, None))
+
+    def test_republished_tag_is_reported(self):
+        notices = evaluate_freshness(IMAGE, "sha256:" + "a" * 64, None)
+        self.assertEqual(1, len(notices))
+        self.assertIn("republished 16.15-alpine", notices[0])
+
+    def test_newer_maintenance_release_is_reported(self):
+        notices = evaluate_freshness(IMAGE, PINNED, "sha256:" + "b" * 64)
+        self.assertEqual(1, len(notices))
+        self.assertIn("16.16-alpine is published", notices[0])
+
+    def test_withdrawn_tag_is_reported(self):
+        self.assertEqual(
+            ["Docker Hub no longer publishes 16.15-alpine."],
+            evaluate_freshness(IMAGE, None, None),
+        )
 
 
 if __name__ == "__main__":

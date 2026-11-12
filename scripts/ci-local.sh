@@ -50,7 +50,8 @@ step() {
 
 echo "== Code Quality =="
 step python3 -B -m unittest discover -s scripts -p 'test_*.py'
-# Contacts Docker Hub to confirm the pinned PostgreSQL image digest.
+# Reads the pinned PostgreSQL index from the Docker registry. Tag drift and newer maintenance
+# releases are reported by the weekly freshness workflow (BUILD-5), not here.
 step python3 -B scripts/postgres_image.py --check
 step "$MVN" fmt:check
 step "$MVN" checkstyle:check
