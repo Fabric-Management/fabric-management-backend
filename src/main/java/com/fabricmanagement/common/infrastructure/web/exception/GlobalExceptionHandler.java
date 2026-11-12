@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.HandlerMapping;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
@@ -66,6 +67,23 @@ public class GlobalExceptionHandler {
     log.info("Resource not found: {}", failureForLog(ex, req).getMessage());
     return buildProblemDetail(
         HttpStatus.NOT_FOUND, "Not Found", "NOT_FOUND", ex.getMessage(), req.getRequestURI());
+  }
+
+  /**
+   * No controller maps the request, so Spring looked for a static resource and found none: the
+   * route does not exist. That is the client's mistake, answered as 404 and logged at INFO, never
+   * the generic 500 with an ERROR line.
+   */
+  @ExceptionHandler(NoResourceFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiProblemDetail handleNoRoute(NoResourceFoundException ex, HttpServletRequest req) {
+    log.info("No route: {} {}", ex.getHttpMethod(), req.getRequestURI());
+    return buildProblemDetail(
+        HttpStatus.NOT_FOUND,
+        "Not Found",
+        "NOT_FOUND",
+        "No endpoint for " + ex.getHttpMethod() + " " + req.getRequestURI(),
+        req.getRequestURI());
   }
 
   @ExceptionHandler(DomainException.class)
