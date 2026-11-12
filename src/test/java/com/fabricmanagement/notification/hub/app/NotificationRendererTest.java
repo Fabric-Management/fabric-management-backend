@@ -124,10 +124,10 @@ class NotificationRendererTest {
   }
 
   @Test
-  @DisplayName("values are HTML-escaped and an unknown placeholder stays visible")
-  void escapesAndKeepsUnknown() {
-    var rendered = render("EN", "x", "{note} {missing}", Map.of("note", "<b>A & B</b>"));
+  @DisplayName("values stay plain text and an unknown placeholder stays visible")
+  void keepsPlainTextAndUnknown() {
+    var rendered = render("EN", "x", "{note} {missing}", Map.of("note", "Smith & Sons <Ltd>"));
 
-    assertThat(rendered.body()).isEqualTo("&lt;b&gt;A &amp; B&lt;/b&gt; {missing}");
+    assertThat(rendered.body()).isEqualTo("Smith & Sons <Ltd> {missing}");
   }
 }

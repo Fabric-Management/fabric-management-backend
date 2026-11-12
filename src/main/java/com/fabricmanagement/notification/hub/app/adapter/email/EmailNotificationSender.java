@@ -5,6 +5,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * EMAIL kanalı — mevcut EmailOutboxService (Transactional Outbox pattern) üzerine köprü.
@@ -25,7 +26,7 @@ public class EmailNotificationSender {
    *
    * @param recipientEmail Alıcı email adresi
    * @param title Email subject (i18n'den render edilmiş)
-   * @param body Email body (HTML formatlanabilir)
+   * @param body Email body as plain text; escaped here when it is wrapped in HTML
    */
   public void send(UUID tenantId, String recipientEmail, String title, String body) {
     if (recipientEmail == null || recipientEmail.isBlank()) {
@@ -57,7 +58,8 @@ public class EmailNotificationSender {
         </body>
         </html>
         """
-        .formatted(plainBody.replace("\n", "<br>"));
+        // The rendered text is plain (names, notes); escape it before it becomes HTML.
+        .formatted(HtmlUtils.htmlEscape(plainBody).replace("\n", "<br>"));
   }
 
   private String maskEmail(String email) {
