@@ -74,6 +74,15 @@ public class TenantSeeder implements DataSeeder {
                   tenantClonerService.cloneReferenceDataInCallerTransaction(tenant.getId());
               log.info("Cloned {} reference data tables into Nexus Fabrics", refTables);
 
+              // The notification catalogue: Nexus Fabrics is the source playground tenants are
+              // cloned from, so a template missing here is missing from every playground.
+              if (goldenTemplateId != null) {
+                int clonedTemplates =
+                    tenantClonerService.cloneNotificationDataInCallerTransaction(
+                        goldenTemplateId, tenant.getId());
+                log.info("Cloned {} notification templates into Nexus Fabrics", clonedTemplates);
+              }
+
               // Return tenant ID to seed transactions outside this transaction boundary
               return tenant.getId();
             });

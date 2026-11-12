@@ -9,6 +9,8 @@ import java.util.UUID;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,7 +96,8 @@ public class NotificationHubService {
    */
   @Transactional
   public void notify(NotificationContext ctx) {
-    List<NotificationTemplate> templates = templateRepo.findAllByEventType(ctx.eventType());
+    List<NotificationTemplate> templates =
+        templateRepo.findAllByTenantIdAndEventTypeAndIsActiveTrue(ctx.tenantId(), ctx.eventType());
 
     if (templates.isEmpty()) {
       log.warn("No notification template found for eventType={} — skipping", ctx.eventType());
@@ -142,7 +145,18 @@ public class NotificationHubService {
     }
   }
 
-  /** Bildirim okundu olarak işaret. */
+  /**
+   * The notification centre's list: the user's in-app notifications, newest first. E-mail and push
+   * rows of the same event are delivery history and are not listed.
+   */
+  @Transactional(readOnly = true)
+  public Page<NotificationLog> list(UUID recipientId, boolean unreadOnly, Pageable pageable) {
+    return unreadOnly
+        ? logRepo.findUnreadByRecipientAndChannel(recipientId, NotificationChannel.IN_APP, pageable)
+        : logRepo.findByRecipientAndChannel(recipientId, NotificationChannel.IN_APP, pageable);
+  }
+
+  /** Bildirim okundu olarak işaret. Yalnızca kendi bildirimi; başkasınınki sessizce yok sayılır. */
   @Transactional
   public void markRead(UUID notificationLogId, UUID recipientId) {
     logRepo
@@ -151,54 +165,60 @@ public class NotificationHubService {
         .ifPresent(NotificationLog::markRead);
   }
 
-  /** Tüm bildirimleri okundu işaret. */
+  /** Tüm uygulama içi bildirimleri okundu işaret. */
   @Transactional
   public int markAllRead(UUID recipientId) {
-    return logRepo.markAllReadForRecipient(recipientId);
+    return logRepo.markAllReadForRecipientAndChannel(recipientId, NotificationChannel.IN_APP);
   }
 
-  /** Kullanıcının okunmamış bildirim sayısı. */
+  /** Kullanıcının okunmamış (uygulama içi) bildirim sayısı. */
   @Transactional(readOnly = true)
   public long countUnread(UUID recipientId) {
-    return logRepo.countUnreadByRecipient(recipientId);
-  }
-
-  /** Kullanıcının bildirim tercihini günceller. */
-  @Transactional
-  public void updatePreference(
-      UUID tenantId, UUID userId, String eventType, boolean inApp, boolean email, boolean push) {
-    prefRepo
-        .findByUserIdAndEventType(userId, eventType)
-        .ifPresentOrElse(
-            pref -> {
-              pref.update(inApp, email, push);
-              prefRepo.save(pref);
-            },
-            () -> {
-              var pref = UserNotificationPreference.createDefault(tenantId, userId, eventType);
-              pref.update(inApp, email, push);
-              prefRepo.save(pref);
-            });
+    return logRepo.countUnreadByRecipientAndChannel(recipientId, NotificationChannel.IN_APP);
   }
 
   // ---- Yardımcı metodlar ----
 
+  /**
+   * Whether this channel is used for this recipient.
+   *
+   * <ul>
+   *   <li>{@code CRITICAL}: every channel, always.
+   *   <li>In-app: always. It is the record of what needs attention, so a user cannot switch it off.
+   *   <li>E-mail and push: the user's own choice when there is one, otherwise the template's
+   *       default.
+   * </ul>
+   */
   private boolean shouldSend(UserNotificationPreference preference, NotificationTemplate template) {
-    // CRITICAL → tercih yok sayılır, her zaman gönder
     if (template.getImportance() == NotificationImportance.CRITICAL) {
       return true;
     }
 
-    // Tercih kaydı yoksa varsayılan: gönder
-    if (preference == null) {
-      return true;
-    }
-
     return switch (template.getChannel()) {
-      case IN_APP -> preference.isInApp();
-      case EMAIL -> preference.isEmail();
-      case PUSH -> preference.isPush();
+      case IN_APP -> true;
+      case EMAIL -> preference != null ? preference.isEmail() : template.isEnabledByDefault();
+      case PUSH -> preference != null ? preference.isPush() : template.isEnabledByDefault();
     };
+  }
+
+  /**
+   * The processor reads the log's reference from the payload ({@code referenceId}, {@code
+   * referenceType}). Callers that pass the reference as separate arguments would otherwise lose it
+   * and the notification would have no link. An explicit payload entry wins.
+   */
+  static Map<String, String> payloadWithReference(NotificationContext ctx) {
+    if (ctx.referenceId() == null && ctx.referenceType() == null) {
+      return ctx.payload();
+    }
+    Map<String, String> payload =
+        new java.util.HashMap<>(ctx.payload() == null ? Map.of() : ctx.payload());
+    if (ctx.referenceId() != null) {
+      payload.putIfAbsent("referenceId", ctx.referenceId().toString());
+    }
+    if (ctx.referenceType() != null) {
+      payload.putIfAbsent("referenceType", ctx.referenceType());
+    }
+    return payload;
   }
 
   private void enqueue(NotificationContext ctx, NotificationTemplate template, String locale) {
@@ -210,7 +230,7 @@ public class NotificationHubService {
             template.getChannel(),
             template.getImportance(),
             template.getDeliveryType(),
-            ctx.payload(),
+            payloadWithReference(ctx),
             locale);
     queueRepo.save(queue);
 

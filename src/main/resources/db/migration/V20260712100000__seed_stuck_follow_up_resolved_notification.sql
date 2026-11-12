@@ -4,10 +4,10 @@ INSERT INTO i18n.translation_key
 VALUES
     (gen_random_uuid(), '00000000-0000-0000-ffff-000000000001',
      'notification.stuck_follow_up_resolved.title', 'NOTIFICATION',
-     'Sorted — {entityRef} is fixed', 'Resolved stuck follow-up notification title'),
+     '{entityRef} is fixed', 'Resolved stuck follow-up notification title'),
     (gen_random_uuid(), '00000000-0000-0000-ffff-000000000001',
      'notification.stuck_follow_up_resolved.body', 'NOTIFICATION',
-     'The follow-up for {entityRef} didn''t complete earlier, but it''s now resolved. Please try again.',
+     'The step that didn''t finish earlier for {entityRef} can now be done. Please try again.',
      'Resolved stuck follow-up notification body')
 ON CONFLICT (tenant_id, key_code) DO NOTHING;
 
@@ -19,9 +19,9 @@ SELECT gen_random_uuid(),
        'TR',
        CASE tk.key_code
          WHEN 'notification.stuck_follow_up_resolved.title'
-           THEN 'Çözüldü — {entityRef} düzeltildi'
+           THEN '{entityRef} için sorun giderildi'
          WHEN 'notification.stuck_follow_up_resolved.body'
-           THEN '{entityRef} için takip işlemi daha önce tamamlanamamıştı, ancak sorun artık çözüldü. Lütfen tekrar deneyin.'
+           THEN '{entityRef} ile ilgili daha önce yarım kalan işlem artık yapılabilir. Lütfen tekrar deneyin.'
        END,
        FALSE
 FROM i18n.translation_key tk
@@ -42,6 +42,8 @@ VALUES
      'HIGH', 'INSTANT')
 ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
 
+-- The platform's own tenant is not an operational tenant, but its type is REGULAR (there is no
+-- SYSTEM tenant type), so it is excluded by id; without this it received these templates too.
 -- Backfill the two keys into every existing real tenant.
 INSERT INTO i18n.translation_key
     (id, tenant_id, uid, key_code, module, default_value, description,
@@ -60,6 +62,7 @@ SELECT gen_random_uuid(),
 FROM common_tenant.common_tenant tenant
 CROSS JOIN i18n.translation_key source_key
 WHERE tenant.type NOT IN ('TEMPLATE', 'SYSTEM')
+  AND tenant.id <> '00000000-0000-0000-0000-000000000000'
   AND source_key.tenant_id = '00000000-0000-0000-ffff-000000000001'
   AND source_key.key_code IN (
     'notification.stuck_follow_up_resolved.title',
@@ -93,6 +96,7 @@ SELECT gen_random_uuid(),
 FROM common_tenant.common_tenant tenant
 CROSS JOIN notification.notification_template source_template
 WHERE tenant.type NOT IN ('TEMPLATE', 'SYSTEM')
+  AND tenant.id <> '00000000-0000-0000-0000-000000000000'
   AND source_template.tenant_id = '00000000-0000-0000-ffff-000000000001'
   AND source_template.event_type = 'STUCK_FOLLOW_UP_RESOLVED'
   AND source_template.channel = 'IN_APP'
@@ -133,6 +137,7 @@ JOIN i18n.translation_key destination_key
   ON destination_key.tenant_id = tenant.id
  AND destination_key.key_code = source_key.key_code
 WHERE tenant.type NOT IN ('TEMPLATE', 'SYSTEM')
+  AND tenant.id <> '00000000-0000-0000-0000-000000000000'
   AND NOT EXISTS (
     SELECT 1
     FROM i18n.translation_value destination_value

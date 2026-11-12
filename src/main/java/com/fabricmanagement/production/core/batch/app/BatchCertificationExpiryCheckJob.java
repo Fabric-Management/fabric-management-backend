@@ -1,35 +1,32 @@
 package com.fabricmanagement.production.core.batch.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
-import com.fabricmanagement.common.infrastructure.web.LocalizationService;
-import com.fabricmanagement.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.platform.communication.domain.NotificationType;
-import com.fabricmanagement.production.core.batch.domain.BatchCertification;
+import com.fabricmanagement.production.core.batch.domain.event.BatchCertificationsExpiringEvent;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchCertificationRepository;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Scheduled job: finds active batch certifications that are expired or expiring within the
- * configured threshold (default 30 days) and notifies tenant users (e.g. ADMIN, MANAGER) via in-app
- * notification so they appear in dashboard / badge.
+ * configured threshold (default 30 days) and tells each tenant, through the notification hub, how
+ * many need renewing ({@link BatchCertificationsExpiringEvent}).
  *
- * <p>Runs nightly; tenant filter is mandatory (each tenant's data is queried and notified
- * separately).
+ * <p>Runs nightly. Each tenant is checked in its own context and its own transaction: the session
+ * of a transaction is bound to the tenant it started in, and the event must be published inside a
+ * writable transaction for the hub's listener to receive it after commit.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class BatchCertificationExpiryCheckJob {
 
@@ -38,15 +35,26 @@ public class BatchCertificationExpiryCheckJob {
 
   private final TenantQueryPort tenantQueryPort;
   private final BatchCertificationRepository batchCertificationRepository;
-  private final InAppNotificationService inAppNotificationService;
-  private final LocalizationService localizationService;
+  private final DomainEventPublisher eventPublisher;
+  private final TransactionTemplate tenantTransaction;
+
+  public BatchCertificationExpiryCheckJob(
+      TenantQueryPort tenantQueryPort,
+      BatchCertificationRepository batchCertificationRepository,
+      DomainEventPublisher eventPublisher,
+      PlatformTransactionManager transactionManager) {
+    this.tenantQueryPort = tenantQueryPort;
+    this.batchCertificationRepository = batchCertificationRepository;
+    this.eventPublisher = eventPublisher;
+    this.tenantTransaction = new TransactionTemplate(transactionManager);
+    this.tenantTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  }
 
   /**
    * Runs every night at 2 AM by default; override with
    * application.batch-certification.expiry-check-cron
    */
   @Scheduled(cron = "${application.batch-certification.expiry-check-cron:0 0 2 * * ?}")
-  @Transactional(readOnly = true)
   public void checkExpiringCertifications() {
     LocalDate threshold = LocalDate.now().plusDays(expiryWarningDays);
     List<TenantReference> tenants = tenantQueryPort.findAllActiveTenants();
@@ -56,23 +64,8 @@ public class BatchCertificationExpiryCheckJob {
       try {
         TenantContext.executeInTenantContext(
             tenantId,
-            () -> {
-              List<BatchCertification> expiring =
-                  batchCertificationRepository.findByTenantIdAndIsActiveTrueAndValidUntilBeforeOrOn(
-                      tenantId, threshold);
-              if (expiring.isEmpty()) {
-                log.debug(
-                    "Batch certification expiry check: tenant {} has no expiring certs.", tenantId);
-                return null;
-              }
-              notifyTenantOfExpiringCerts(tenantId, expiring, threshold);
-              log.info(
-                  "Batch certification expiry: tenant {}, {} cert(s) expired or expiring by {}",
-                  tenantId,
-                  expiring.size(),
-                  threshold);
-              return null;
-            });
+            () ->
+                tenantTransaction.executeWithoutResult(status -> checkTenant(tenantId, threshold)));
       } catch (Exception e) {
         log.warn(
             "Batch certification expiry check failed for tenant {}: {}",
@@ -83,34 +76,20 @@ public class BatchCertificationExpiryCheckJob {
     }
   }
 
-  private void notifyTenantOfExpiringCerts(
-      UUID tenantId, List<BatchCertification> expiring, LocalDate threshold) {
-    int count = expiring.size();
-
-    // Resolve tenant's preferred locale (scheduler has no HTTP request / user context)
-    Locale locale = localizationService.resolveLocaleForTenant(tenantId);
-    String title =
-        localizationService.getMessage(
-            "notification.batch.certification.expiry.title", null, locale);
-    String message =
-        count == 1
-            ? localizationService.getMessage(
-                "notification.batch.certification.expiry.message.single",
-                new Object[] {expiryWarningDays, threshold},
-                locale)
-            : localizationService.getMessage(
-                "notification.batch.certification.expiry.message.multiple",
-                new Object[] {count, expiryWarningDays, threshold},
-                locale);
-
-    inAppNotificationService.sendToTenantRoles(
+  private void checkTenant(UUID tenantId, LocalDate threshold) {
+    int count =
+        batchCertificationRepository
+            .findByTenantIdAndIsActiveTrueAndValidUntilBeforeOrOn(tenantId, threshold)
+            .size();
+    if (count == 0) {
+      log.debug("Batch certification expiry check: tenant {} has no expiring certs.", tenantId);
+      return;
+    }
+    eventPublisher.publish(new BatchCertificationsExpiringEvent(tenantId, count, threshold));
+    log.info(
+        "Batch certification expiry: tenant {}, {} cert(s) expired or expiring by {}",
         tenantId,
-        InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
-        NotificationType.BATCH_CERTIFICATION_EXPIRING,
-        title,
-        message,
-        null,
-        "BATCH_CERTIFICATION_EXPIRING",
-        NotificationDeliveryChannel.IN_APP);
+        count,
+        threshold);
   }
 }

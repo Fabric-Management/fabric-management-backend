@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.ownership.app;
 
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
+import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipTriageAgedEvent;
 import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipTriageOpenedEvent;
 import com.fabricmanagement.sales.ownership.infra.repository.OwnershipTriageCaseLogRepository;
 import com.fabricmanagement.sales.ownership.infra.repository.OwnershipTriageQueryRepository;
@@ -22,7 +23,6 @@ public class OwnershipTriageProcessor {
 
   private final OwnershipTriageQueryRepository queryRepository;
   private final OwnershipTriageCaseLogRepository caseLogRepository;
-  private final OwnershipTriageAgingEmailAdapter agingEmailAdapter;
   private final ApplicationEventPublisher eventPublisher;
   private final Clock clock;
 
@@ -50,7 +50,16 @@ public class OwnershipTriageProcessor {
       if (ageHours >= triageCase.agingThresholdHours()
           && caseLogRepository.tryMarkAgingAlertQueued(
               tenantId, triageCase.customerId(), triageCase.gapStartedAt(), now)) {
-        agingEmailAdapter.queue(tenantId, triageCase);
+        // Same transaction as the stamp: the event publication registry records it, so the
+        // stamp and the escalation commit or roll back together. Routing stays in the tenant.
+        eventPublisher.publishEvent(
+            new CustomerOwnershipTriageAgedEvent(
+                tenantId,
+                triageCase.customerId(),
+                triageCase.customerName(),
+                triageCase.gapStartedAt(),
+                triageCase.unassignedOpenQuoteCount(),
+                ageHours));
         agingAlertsQueued++;
       }
     }

@@ -1147,6 +1147,7 @@ class ConstitutionArchTest {
       // reconciliation
       //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
       // (golden-template / playground source are other tenants); explicit tenant_id filter
+      //   - NotificationQueueScanner     : Scheduled hub queue worker: due rows across tenants
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -1202,6 +1203,12 @@ class ConstitutionArchTest {
               // reported an empty queue. It reads its due list as fabric_system, then processes
               // each row inside that row's own tenant context.
               .doNotHaveSimpleName("EmailOutboxService")
+              .and()
+              // The notification queue worker is the same kind of job and had the same blindness:
+              // it read its queue through JPA on a thread with no tenant and never saw a row. The
+              // scanner reads only the identities of due rows (id, tenant, event type) as
+              // fabric_system; each row is then processed inside its own tenant context.
+              .doNotHaveSimpleName("NotificationQueueScanner")
               .and()
               // TASK-TEMPLATE-TENANCY-1: reads another tenant's keyed task templates (golden or the
               // playground source), read-only, filtered by tenant_id. Target writes stay on

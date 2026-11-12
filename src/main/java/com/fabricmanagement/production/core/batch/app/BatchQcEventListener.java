@@ -1,10 +1,10 @@
 package com.fabricmanagement.production.core.batch.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.platform.communication.domain.NotificationType;
+import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionCommand;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
@@ -12,6 +12,7 @@ import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOu
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
 import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fabricmanagement.production.quality.result.domain.event.BatchConcessionReviewRequiredEvent;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import java.util.Set;
 import java.util.UUID;
@@ -27,7 +28,8 @@ import org.springframework.stereotype.Component;
 public class BatchQcEventListener {
 
   private final QualityDecisionService qualityDecisionService;
-  private final InAppNotificationService notificationService;
+  private final BatchRepository batchRepository;
+  private final DomainEventPublisher eventPublisher;
   private final IdempotentEventHandler idempotentHandler;
 
   @ApplicationModuleListener
@@ -73,16 +75,15 @@ public class BatchQcEventListener {
             null));
   }
 
+  /** The people who decide on concessions hear of it through the notification hub. */
   private void notifyConcessionReview(FiberTestResultApprovedEvent event) {
-    notificationService.sendToTenantRoles(
-        event.getTenantId(),
-        InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
-        NotificationType.BATCH_QUARANTINE,
-        "Concession review required",
-        "Conditional QC acceptance requires a scoped concession review",
-        event.getBatchId(),
-        "BATCH",
-        NotificationDeliveryChannel.IN_APP);
+    String batchCode =
+        batchRepository
+            .findById(event.getBatchId())
+            .map(Batch::getBatchCode)
+            .orElse(event.getBatchId().toString());
+    eventPublisher.publish(
+        new BatchConcessionReviewRequiredEvent(event.getTenantId(), event.getBatchId(), batchCode));
     log.info("Conditional QC result left pending: batchId={}", event.getBatchId());
   }
 }

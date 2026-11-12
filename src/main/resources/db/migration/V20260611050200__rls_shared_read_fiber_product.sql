@@ -9,6 +9,8 @@
 --   1. prod_fiber + prod_product — canonical platform fibers (PF4)
 --   2. prod_fiber_iso_code, prod_fiber_category, prod_fiber_certification
 --      — FK-referenced by shared fibers; carve-out needed for JPA FK resolution
+--   3. costing.cost_item — the system-defined cost items (RAW_PRODUCT, LABOR, ...) that every
+--      tenant's cost templates point at (added 2026-11-12, development-period in-place change)
 -- ============================================================================
 
 -- ── prod_fiber ──────────────────────────────────────────────────────────────
@@ -154,5 +156,36 @@ CREATE POLICY rls_tenant_update ON production.prod_fiber_certification
     WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
 CREATE POLICY rls_tenant_delete ON production.prod_fiber_certification
+    FOR DELETE
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+
+-- ── cost_item ─────────────────────────────────────────────
+
+-- The cost items are system-defined and shared: their code is globally unique and tenants cannot
+-- add rows. They are owned by the TEMPLATE tenant (V20260603142000 moved them there from NULL),
+-- so under the strict single-tenant policy no other tenant could read them and every cost
+-- calculation skipped every line ("CostItem ... in template not found", planned cost 0).
+
+DROP POLICY IF EXISTS rls_tenant_isolation ON costing.cost_item;
+
+-- READ: tenant's own + template tenant's shared cost items
+CREATE POLICY rls_tenant_read ON costing.cost_item
+    FOR SELECT
+    USING (
+        tenant_id = current_setting('app.current_tenant', true)::uuid
+        OR tenant_id = '00000000-0000-0000-ffff-000000000001'
+    );
+
+CREATE POLICY rls_tenant_insert ON costing.cost_item
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+CREATE POLICY rls_tenant_update ON costing.cost_item
+    FOR UPDATE
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
+CREATE POLICY rls_tenant_delete ON costing.cost_item
     FOR DELETE
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid);

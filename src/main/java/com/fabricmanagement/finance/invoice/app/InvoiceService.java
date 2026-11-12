@@ -355,7 +355,8 @@ public class InvoiceService {
               invoice.getId(),
               invoice.getInvoiceNumber(),
               invoice.getTradingPartnerId(),
-              invoice.getDaysOverdue()));
+              invoice.getDaysOverdue(),
+              invoice.getInvoiceType().isPayable() ? "PAYABLE" : "RECEIVABLE"));
       count++;
     }
     if (count > 0) {

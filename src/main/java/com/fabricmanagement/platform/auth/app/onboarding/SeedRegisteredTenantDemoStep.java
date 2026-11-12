@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * the signup facts and the persisted tenant; demo mode alone never qualifies, and reset or other
  * generic demo seeding never reaches this step.
  */
-@Order(13) // After ProvisionTenantCatalogueStep (12): demo data may publish template events.
+@Order(14) // After CloneTemplateNotificationsStep (13): demo data may publish template events.
 @Component
 @RequiredArgsConstructor
 @Slf4j

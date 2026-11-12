@@ -3,11 +3,8 @@ package com.fabricmanagement.notification.hub.infra.repository;
 import com.fabricmanagement.notification.hub.domain.NotificationQueue;
 import com.fabricmanagement.notification.hub.domain.NotificationQueueStatus;
 import jakarta.persistence.LockModeType;
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -20,26 +17,6 @@ public interface NotificationQueueRepository extends JpaRepository<NotificationQ
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT q FROM NotificationQueue q WHERE q.id = :id")
   Optional<NotificationQueue> findByIdWithWriteLock(@Param("id") UUID id);
-
-  @Query(
-      """
-      SELECT q FROM NotificationQueue q
-      WHERE q.status = :status
-        AND q.retryCount < 3
-        AND q.isActive = true
-      ORDER BY q.createdAt ASC
-      """)
-  List<NotificationQueue> findPendingForProcessing(
-      @Param("status") NotificationQueueStatus status, Pageable pageable);
-
-  @Query(
-      """
-      SELECT q FROM NotificationQueue q
-      WHERE q.status = 'PROCESSING'
-        AND q.updatedAt < :threshold
-        AND q.isActive = true
-      """)
-  List<NotificationQueue> findStuckProcessing(@Param("threshold") Instant threshold);
 
   @Query(
       """

@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.auth.onboarding;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -10,14 +11,18 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
 import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
+import com.fabricmanagement.costing.domain.item.CostItem;
+import com.fabricmanagement.costing.infra.repository.CostItemRepository;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
 import com.fabricmanagement.platform.auth.app.onboarding.PublishSelfSignupCompletedStep;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,7 +61,8 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
           "production.prod_yarn_test_method",
           "production.prod_fabric_construction",
           "production.prod_fabric_finishing_process",
-          "production.prod_fabric_finishing_price_class");
+          "production.prod_fabric_finishing_price_class",
+          "notification.notification_template");
 
   @Autowired private MockMvc mockMvc;
 
@@ -67,7 +73,9 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
 
   @Autowired private TenantAccessPort tenantAccessPort;
 
-  /** The last onboarding step (order 14): everything before it, every clone included, has run. */
+  @Autowired private CostItemRepository costItemRepository;
+
+  /** The last onboarding step (order 15): everything before it, every clone included, has run. */
   @MockitoSpyBean private PublishSelfSignupCompletedStep lastStep;
 
   @MockitoBean private NotificationService notificationService;
@@ -139,6 +147,52 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
                     + " WHERE tenant_id = ? AND customer_reference LIKE 'SO-DEMO-%'",
                 Long.class, tenantId))
         .isEqualTo(3L);
+  }
+
+  /**
+   * OBS-SIGNUP-COST-1: a signed-up tenant must be able to cost its demo work orders. The system
+   * cost items are owned by the template tenant; under {@code fabric_app} the tenant sees them only
+   * through the shared-read policy, and without them every calculation line is skipped and the
+   * planned cost is 0.
+   */
+  @Test
+  void aSignedUpTenantSeesTheSharedCostItemsAndItsDemoWorkOrdersGetAPlannedCost() throws Exception {
+    stubEmailRendering();
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    String name = "Birch Spinners Ltd " + suffix;
+
+    mockMvc.perform(signup(signupBody(name, suffix, "PLAYGROUND"))).andExpect(status().isOk());
+
+    UUID tenantId = tenantIdByName(name);
+
+    // Read as the tenant, on the runtime role: the shared items resolve.
+    List<String> codes =
+        TenantContext.executeInTenantContext(
+            tenantId,
+            () ->
+                costItemRepository.findActiveForModule("GENERIC").stream()
+                    .map(CostItem::getCode)
+                    .toList());
+    assertThat(codes).contains("RAW_PRODUCT", "OVERHEAD");
+
+    // The demo setup was written on the same role: default templates exist for the tenant.
+    assertThat(count("costing.cost_template", tenantId, "AND is_default = true")).isPositive();
+
+    // The demo work orders are approved asynchronously; each gets a planned cost above zero.
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        systemJdbc.queryForObject(
+                            "SELECT count(*) FROM costing.cost_calculation"
+                                + " WHERE tenant_id = ? AND entity_type = 'WORK_ORDER'"
+                                + " AND stage = 'PLANNED' AND total_cost > 0",
+                            Long.class,
+                            tenantId))
+                    .as("demo work orders with a planned cost above zero")
+                    .isPositive());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -227,6 +281,9 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
         filterArgs = new Object[] {explicitKeys};
       } else if (table.equals("sales.ownership_policy")) {
         filter = "";
+      } else if (table.equals("notification.notification_template")) {
+        // NOTIF-UNIFY-1 G13: the hub skips an event for a tenant that has no template for it.
+        filter = "AND deleted_at IS NULL";
       } else {
         filter = systemOwned;
       }

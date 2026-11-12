@@ -3,10 +3,12 @@ package com.fabricmanagement.sales.ownership.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
+import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipTriageAgedEvent;
 import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipTriageOpenedEvent;
 import com.fabricmanagement.sales.ownership.infra.repository.OwnershipTriageCaseLogRepository;
 import com.fabricmanagement.sales.ownership.infra.repository.OwnershipTriageQueryRepository;
@@ -32,7 +34,6 @@ class OwnershipTriageProcessorTest {
 
   @Mock private OwnershipTriageQueryRepository queryRepository;
   @Mock private OwnershipTriageCaseLogRepository caseLogRepository;
-  @Mock private OwnershipTriageAgingEmailAdapter agingEmailAdapter;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private OwnershipTriageProcessor processor;
@@ -47,11 +48,7 @@ class OwnershipTriageProcessorTest {
             UUID.randomUUID(), "Acme", 2, NOW.minusSeconds(7_200), NOW.minusSeconds(90_000), 24);
     processor =
         new OwnershipTriageProcessor(
-            queryRepository,
-            caseLogRepository,
-            agingEmailAdapter,
-            eventPublisher,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            queryRepository, caseLogRepository, eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
     org.mockito.Mockito.lenient()
         .when(queryRepository.findAll(tenantId))
         .thenReturn(List.of(triageCase));
@@ -77,11 +74,26 @@ class OwnershipTriageProcessorTest {
     assertThat(first.agingAlertsQueued()).isEqualTo(1);
     assertThat(second.notificationsRequested()).isZero();
     assertThat(second.agingAlertsQueued()).isZero();
-    ArgumentCaptor<CustomerOwnershipTriageOpenedEvent> eventCaptor =
-        ArgumentCaptor.forClass(CustomerOwnershipTriageOpenedEvent.class);
-    verify(eventPublisher).publishEvent(eventCaptor.capture());
-    assertThat(eventCaptor.getValue().getCustomerId()).isEqualTo(triageCase.customerId());
-    verify(agingEmailAdapter).queue(tenantId, triageCase);
+    ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getAllValues())
+        .satisfiesExactly(
+            opened ->
+                assertThat(opened)
+                    .isInstanceOfSatisfying(
+                        CustomerOwnershipTriageOpenedEvent.class,
+                        event ->
+                            assertThat(event.getCustomerId()).isEqualTo(triageCase.customerId())),
+            aged ->
+                assertThat(aged)
+                    .isInstanceOfSatisfying(
+                        CustomerOwnershipTriageAgedEvent.class,
+                        event -> {
+                          assertThat(event.getTenantId()).isEqualTo(tenantId);
+                          assertThat(event.getCustomerId()).isEqualTo(triageCase.customerId());
+                          assertThat(event.getAgeHours()).isEqualTo(25);
+                          assertThat(event.getUnassignedOpenQuoteCount()).isEqualTo(2);
+                        }));
   }
 
   @Test
@@ -97,6 +109,6 @@ class OwnershipTriageProcessorTest {
     processor.processTenant(tenantId);
 
     verify(caseLogRepository, never()).tryMarkAgingAlertQueued(any(), any(), any(), any());
-    verify(agingEmailAdapter, never()).queue(any(), any());
+    verify(eventPublisher, never()).publishEvent(any(CustomerOwnershipTriageAgedEvent.class));
   }
 }

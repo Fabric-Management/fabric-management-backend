@@ -4424,6 +4424,9 @@ CREATE TABLE IF NOT EXISTS notification.notification_template
     importance             VARCHAR(20)  NOT NULL    DEFAULT 'NORMAL', -- NORMAL, HIGH, CRITICAL
     delivery_type          VARCHAR(20)  NOT NULL    DEFAULT 'INSTANT', -- INSTANT, SCHEDULED, DIGEST
     grouping_window_minutes INT                     DEFAULT 5,
+    -- Whether a user who never chose gets this channel. Meaningful for EMAIL (in-app is always
+    -- delivered; CRITICAL always uses every channel). A user's own choice always wins.
+    enabled_by_default     BOOLEAN      NOT NULL    DEFAULT FALSE,
     is_active              BOOLEAN      NOT NULL    DEFAULT TRUE,
     deleted_at             TIMESTAMPTZ,
     created_at             TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),

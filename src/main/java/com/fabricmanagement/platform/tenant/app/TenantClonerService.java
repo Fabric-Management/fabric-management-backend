@@ -291,6 +291,62 @@ public class TenantClonerService {
       "INSERT INTO %1$s (id, tenant_id, %2$s, created_at, updated_at, version) "
           + "SELECT gen_random_uuid(), ?, %2$s, now(), now(), 0 FROM %3$s WHERE tenant_id = ?";
 
+  /** Notification catalogue (golden template → tenant): keys, their values, then the templates. */
+  private static final String NOTIFICATION_KEY_FILTER =
+      "AND s.key_code LIKE 'notification.%' AND s.deleted_at IS NULL";
+
+  private static final String NOTIFICATION_VALUE_FILTER =
+      "AND s.is_active = TRUE AND s.deleted_at IS NULL AND s.translation_key_id IN ("
+          + "SELECT k.id FROM i18n.translation_key k "
+          + "WHERE k.tenant_id = s.tenant_id AND k.key_code LIKE 'notification.%')";
+
+  private static final String NOTIFICATION_KEY_COPY_SQL =
+      """
+      INSERT INTO i18n.translation_key
+        (id, tenant_id, uid, key_code, module, default_value, description,
+         is_active, created_at, updated_at, version)
+      SELECT gen_random_uuid(), ?, gen_random_uuid()::varchar, s.key_code, s.module,
+             s.default_value, s.description, s.is_active, now(), now(), 0
+      FROM %1$s s
+      WHERE s.tenant_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM i18n.translation_key d
+          WHERE d.tenant_id = ? AND d.key_code = s.key_code)
+      """;
+
+  /** Each source value is attached to the target tenant's own copy of its key. */
+  private static final String NOTIFICATION_VALUE_COPY_SQL =
+      """
+      INSERT INTO i18n.translation_value
+        (id, tenant_id, uid, translation_key_id, locale, value, is_override, is_active,
+         created_at, updated_at, version)
+      SELECT gen_random_uuid(), ?, gen_random_uuid()::varchar, dk.id, sv.locale, sv.value,
+             sv.is_override, sv.is_active, now(), now(), 0
+      FROM %1$s sv
+      JOIN %2$s sk ON sk.id = sv.translation_key_id
+      JOIN i18n.translation_key dk ON dk.tenant_id = ? AND dk.key_code = sk.key_code
+      WHERE sv.tenant_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM i18n.translation_value dv
+          WHERE dv.tenant_id = ? AND dv.translation_key_id = dk.id AND dv.locale = sv.locale)
+      """;
+
+  private static final String NOTIFICATION_TEMPLATE_COPY_SQL =
+      """
+      INSERT INTO notification.notification_template
+        (id, tenant_id, uid, event_type, channel, title_key, body_key, importance,
+         delivery_type, grouping_window_minutes, enabled_by_default, is_active,
+         created_at, updated_at, version)
+      SELECT gen_random_uuid(), ?, gen_random_uuid()::varchar, s.event_type, s.channel,
+             s.title_key, s.body_key, s.importance, s.delivery_type, s.grouping_window_minutes,
+             s.enabled_by_default, s.is_active, now(), now(), 0
+      FROM %1$s s
+      WHERE s.tenant_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM notification.notification_template d
+          WHERE d.tenant_id = ? AND d.event_type = s.event_type AND d.channel = s.channel)
+      """;
+
   private static final String PRODUCT_ATTRIBUTE_TABLE = "production.prod_product_attribute";
 
   private static final String PRODUCT_ATTRIBUTE_COLUMNS =
@@ -894,7 +950,7 @@ public class TenantClonerService {
               cloneTableWithoutFKs(
                   jdbc,
                   "notification.notification_template",
-                  "uid, event_type, channel, title_key, body_key, importance, delivery_type, grouping_window_minutes, is_active",
+                  "uid, event_type, channel, title_key, body_key, importance, delivery_type, grouping_window_minutes, enabled_by_default, is_active",
                   templateTenantId,
                   newTenantId);
 
@@ -1314,6 +1370,63 @@ public class TenantClonerService {
         copyMissingSystemFabricRows(callerJdbc, goldenTemplateId, targetTenantId) > 0 ? 1 : 0;
     tablesCloned += cloneOwnershipPolicyFromRows(callerJdbc, goldenTemplateId, targetTenantId);
     return tablesCloned;
+  }
+
+  /**
+   * Gives a tenant the notification catalogue: the golden template's notification translation keys
+   * and values, and its notification templates. The hub reads templates and wording per tenant
+   * under row-level security, so a tenant without them gets no notification at all (the event is
+   * skipped), or one whose text is the raw key.
+   *
+   * <p>Written on the caller's transaction, like the other onboarding copies. Idempotent: only what
+   * the tenant does not have yet is copied, so a template added to the golden tenant later reaches
+   * a tenant the next time this runs. A tenant's own rows are never changed.
+   *
+   * @return the number of templates copied
+   */
+  public int cloneNotificationDataInCallerTransaction(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    JdbcTemplate callerJdbc = prepareCallerConnection(targetTenantId);
+    String keys =
+        readTemplateRowsAsJson("i18n.translation_key", NOTIFICATION_KEY_FILTER, sourceTenantId);
+    String values =
+        readTemplateRowsAsJson("i18n.translation_value", NOTIFICATION_VALUE_FILTER, sourceTenantId);
+    String templates =
+        readTemplateRowsAsJson(
+            "notification.notification_template", "AND s.deleted_at IS NULL", sourceTenantId);
+
+    callerJdbc.update(
+        NOTIFICATION_KEY_COPY_SQL.formatted(templateRowsRelation("i18n.translation_key")),
+        targetTenantId,
+        keys,
+        sourceTenantId,
+        targetTenantId);
+    callerJdbc.update(
+        NOTIFICATION_VALUE_COPY_SQL.formatted(
+            templateRowsRelation("i18n.translation_value"),
+            templateRowsRelation("i18n.translation_key")),
+        targetTenantId,
+        values,
+        keys,
+        targetTenantId,
+        sourceTenantId,
+        targetTenantId);
+    int copied =
+        callerJdbc.update(
+            NOTIFICATION_TEMPLATE_COPY_SQL.formatted(
+                templateRowsRelation("notification.notification_template")),
+            targetTenantId,
+            templates,
+            sourceTenantId,
+            targetTenantId);
+    log.info(
+        "Cloned {} notification template(s) into tenant {} (source={})",
+        copied,
+        targetTenantId,
+        sourceTenantId);
+    return copied;
   }
 
   private int cloneIfEmptyFromRows(

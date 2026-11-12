@@ -1,17 +1,17 @@
 package com.fabricmanagement.product.fiber.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
-import com.fabricmanagement.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.platform.communication.domain.NotificationType;
-import com.fabricmanagement.platform.communication.dto.NotificationRequest;
 import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.product.fiber.domain.FiberRequest;
 import com.fabricmanagement.product.fiber.domain.FiberRequestStatus;
 import com.fabricmanagement.product.fiber.domain.MaterialSource;
+import com.fabricmanagement.product.fiber.domain.event.FiberRequestApprovedEvent;
+import com.fabricmanagement.product.fiber.domain.event.FiberRequestRejectedEvent;
+import com.fabricmanagement.product.fiber.domain.event.FiberRequestSubmittedEvent;
 import com.fabricmanagement.product.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
@@ -64,7 +64,7 @@ public class FiberRequestService {
   private final FiberReferenceQueryService referenceQueryService;
   private final FiberRepository fiberRepository;
   private final FiberSourceVariantService sourceVariantService;
-  private final InAppNotificationService notificationService;
+  private final DomainEventPublisher eventPublisher;
   private final TenantQueryPort tenantQueryPort;
   private final TenantSessionBinder tenantSessionBinder;
 
@@ -119,8 +119,7 @@ public class FiberRequestService {
     } catch (DataIntegrityViolationException exception) {
       throw duplicateRequest(isoCode, materialSource);
     }
-    sendOnSubmitNotification(
-        saved.getId(), saved.getTenantId(), saved.getIsoCode(), saved.getFiberName());
+    publishSubmitted(saved);
 
     log.info(
         "Fiber request submitted: id={}, isoCode={}, fiberName={}",
@@ -195,12 +194,14 @@ public class FiberRequestService {
     request.setReviewNote(reviewNote.trim());
     FiberRequest saved = fiberRequestRepository.save(request);
 
-    sendOnRejectNotification(
-        saved.getId(),
-        saved.getTenantId(),
-        saved.getIsoCode(),
-        saved.getFiberName(),
-        saved.getReviewNote());
+    eventPublisher.publish(
+        new FiberRequestRejectedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getRequestedBy(),
+            saved.getIsoCode(),
+            saved.getFiberName(),
+            saved.getReviewNote()));
 
     log.info("Fiber request rejected: id={}, isoCode={}", requestId, saved.getIsoCode());
     return FiberRequestDto.from(saved);
@@ -302,11 +303,13 @@ public class FiberRequestService {
       request.setReviewNote(null);
       FiberRequest saved = fiberRequestRepository.saveAndFlush(request);
 
-      sendOnApproveNotification(
-          saved.getId(), saved.getTenantId(), saved.getIsoCode(), saved.getFiberName());
-      // Flush any notification side effects while both the Java and PostgreSQL tenant contexts
-      // still point at the request tenant.
-      fiberRequestRepository.flush();
+      eventPublisher.publish(
+          new FiberRequestApprovedEvent(
+              saved.getTenantId(),
+              saved.getId(),
+              saved.getRequestedBy(),
+              saved.getIsoCode(),
+              saved.getFiberName()));
 
       log.info("Fiber request approved: id={}, isoCode={}", saved.getId(), saved.getIsoCode());
       FiberRequestDto result = FiberRequestDto.from(saved);
@@ -399,72 +402,23 @@ public class FiberRequestService {
         new Object[] {isoCode, materialSource});
   }
 
-  private void sendOnSubmitNotification(
-      UUID fiberRequestId, UUID tenantId, String isoCode, String fiberName) {
+  /**
+   * The platform administrators hear of the request through the notification hub (NOTIF-UNIFY-1
+   * B4); the requesting tenant's name travels with the event so the wording can name it.
+   */
+  private void publishSubmitted(FiberRequest saved) {
     String tenantName =
-        tenantQueryPort.findById(tenantId).map(TenantReference::name).orElse(tenantId.toString());
-    String message = isoCode + " — " + fiberName + " requested by " + tenantName;
-
-    notificationService.send(
-        NotificationRequest.builder()
-            .tenantId(TenantContext.SYSTEM_TENANT_ID)
-            .recipientId(null)
-            .type(NotificationType.FIBER_REQUEST_SUBMITTED)
-            .title("New Fiber Request")
-            .message(message)
-            .referenceId(fiberRequestId)
-            .referenceType("FIBER_REQUEST")
-            .channel(NotificationDeliveryChannel.IN_APP)
-            .build());
-
-    log.info(
-        "Fiber request submitted notification sent: fiberRequestId={}, tenant={}",
-        fiberRequestId,
-        tenantName);
-  }
-
-  private void sendOnApproveNotification(
-      UUID fiberRequestId, UUID tenantId, String isoCode, String fiberName) {
-    String message = isoCode + " — " + fiberName + " has been added to the catalog";
-
-    notificationService.send(
-        NotificationRequest.builder()
-            .tenantId(tenantId)
-            .recipientId(null)
-            .type(NotificationType.FIBER_REQUEST_APPROVED)
-            .title("Fiber Request Approved")
-            .message(message)
-            .referenceId(fiberRequestId)
-            .referenceType("FIBER_REQUEST")
-            .channel(NotificationDeliveryChannel.BOTH)
-            .build());
-
-    log.info(
-        "Fiber request approved notification sent: fiberRequestId={}, tenantId={}",
-        fiberRequestId,
-        tenantId);
-  }
-
-  private void sendOnRejectNotification(
-      UUID fiberRequestId, UUID tenantId, String isoCode, String fiberName, String reviewNote) {
-    String message =
-        isoCode + " — " + fiberName + ": " + (reviewNote != null ? reviewNote : "Request rejected");
-
-    notificationService.send(
-        NotificationRequest.builder()
-            .tenantId(tenantId)
-            .recipientId(null)
-            .type(NotificationType.FIBER_REQUEST_REJECTED)
-            .title("Fiber Request Rejected")
-            .message(message)
-            .referenceId(fiberRequestId)
-            .referenceType("FIBER_REQUEST")
-            .channel(NotificationDeliveryChannel.BOTH)
-            .build());
-
-    log.info(
-        "Fiber request rejected notification sent: fiberRequestId={}, tenantId={}",
-        fiberRequestId,
-        tenantId);
+        tenantQueryPort
+            .findById(saved.getTenantId())
+            .map(TenantReference::name)
+            .orElse(saved.getTenantId().toString());
+    eventPublisher.publish(
+        new FiberRequestSubmittedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getRequestedBy(),
+            saved.getIsoCode(),
+            saved.getFiberName(),
+            tenantName));
   }
 }

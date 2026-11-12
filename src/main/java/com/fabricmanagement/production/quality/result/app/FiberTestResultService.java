@@ -1,15 +1,13 @@
 package com.fabricmanagement.production.quality.result.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fabricmanagement.production.quality.result.domain.event.BatchQualityStandardMissingEvent;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
@@ -17,6 +15,7 @@ import com.fabricmanagement.production.quality.result.dto.UpdateApprovalRequest;
 import com.fabricmanagement.production.quality.result.infra.repository.FiberTestResultRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +33,6 @@ public class FiberTestResultService {
   private final StockUnitRepository stockUnitRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final FiberQcAutoEvaluator qcAutoEvaluator;
-  private final InAppNotificationService notificationService;
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
@@ -99,18 +97,15 @@ public class FiberTestResultService {
               TenantContext.getCurrentUserId()));
     } else if (eval.diagnosticCode() != null) {
       String target = eval.targetLabel() != null ? eval.targetLabel() : batch.getBatchCode();
-      notificationService.sendToTenantRoles(
-          tenantId,
-          InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
-          NotificationType.BATCH_NO_QUALITY_STANDARD,
-          "No Applicable Quality Standard",
-          String.format(
-              "%s: %s. Manual review required.", target, manualReviewReason(eval.diagnosticCode())),
-          batchId,
-          "BATCH",
-          NotificationDeliveryChannel.IN_APP);
+      applicationEventPublisher.publishEvent(
+          new BatchQualityStandardMissingEvent(
+              tenantId,
+              batchId,
+              batch.getBatchCode(),
+              target,
+              manualReviewReasonCode(eval.diagnosticCode())));
       log.info(
-          "BATCH_NO_QUALITY_STANDARD notification sent: batchId={}, target={}, reason={}",
+          "No applicable quality standard, manual review requested: batchId={}, target={}, reason={}",
           batchId,
           target,
           eval.diagnosticCode());
@@ -119,20 +114,26 @@ public class FiberTestResultService {
     return FiberTestResultDto.from(saved);
   }
 
-  /** Actionable wording for the manual-review notification; the code stays in the logs. */
-  private static String manualReviewReason(String diagnosticCode) {
-    if (diagnosticCode == null) {
-      return "no quality profile applies to this fibre and composition";
-    }
-    return switch (diagnosticCode) {
-      case "BATCH_COMPOSITION_UNKNOWN" ->
-          "the batch composition is unknown, so no quality profile can be matched";
-      case "FIBER_PRODUCT_NOT_FOUND" -> "the batch product has no fibre definition";
-      case "QUALITY_PROFILE_UNAVAILABLE" -> "the batch's quality profile is no longer active";
-      case "QUALITY_PROFILE_NOT_APPLICABLE" ->
-          "the batch's quality profile does not match its composition";
-      default -> "no quality profile applies to this fibre and composition";
-    };
+  /**
+   * The reasons the notification has wording for; any other diagnostic reads as the general one.
+   */
+  static final Set<String> MANUAL_REVIEW_REASONS =
+      Set.of(
+          "BATCH_COMPOSITION_UNKNOWN",
+          "FIBER_PRODUCT_NOT_FOUND",
+          "QUALITY_PROFILE_UNAVAILABLE",
+          "QUALITY_PROFILE_NOT_APPLICABLE");
+
+  static final String GENERAL_MANUAL_REVIEW_REASON = "NO_QUALITY_PROFILE";
+
+  /**
+   * The reason code the notification translates ({@code notification.label.reason.*}); the
+   * diagnostic code itself stays in the logs.
+   */
+  static String manualReviewReasonCode(String diagnosticCode) {
+    return diagnosticCode != null && MANUAL_REVIEW_REASONS.contains(diagnosticCode)
+        ? diagnosticCode
+        : GENERAL_MANUAL_REVIEW_REASON;
   }
 
   @Transactional(readOnly = true)

@@ -2,20 +2,25 @@ package com.fabricmanagement.production.core.batch.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
-import com.fabricmanagement.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.production.core.batch.domain.Batch;
+import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionCommand;
 import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.decision.app.TrustedDecisionContext;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fabricmanagement.production.quality.result.domain.event.BatchConcessionReviewRequiredEvent;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +33,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class BatchQcEventListenerTest {
 
   @Mock private QualityDecisionService decisionService;
-  @Mock private InAppNotificationService notificationService;
+  @Mock private BatchRepository batchRepository;
+  @Mock private DomainEventPublisher eventPublisher;
   @Mock private IdempotentEventHandler idempotentEventHandler;
   @InjectMocks private BatchQcEventListener listener;
 
@@ -60,6 +66,9 @@ class BatchQcEventListenerTest {
   @Test
   void conditionalAcceptLeavesDispositionPendingAndNotifiesForConcessionReview() {
     executeHandlerBody();
+    Batch batch = mock(Batch.class);
+    when(batch.getBatchCode()).thenReturn("B-2026-0042");
+    when(batchRepository.findById(any())).thenReturn(Optional.of(batch));
     FiberTestResultApprovedEvent event =
         new FiberTestResultApprovedEvent(
             UUID.randomUUID(),
@@ -71,16 +80,12 @@ class BatchQcEventListenerTest {
     listener.onFiberTestResultApproved(event);
 
     verify(decisionService, never()).recordDecision(any(), any());
-    verify(notificationService)
-        .sendToTenantRoles(
-            eq(event.getTenantId()),
-            eq(InAppNotificationService.QUARANTINE_NOTIFY_ROLES),
-            any(),
-            eq("Concession review required"),
-            any(),
-            eq(event.getBatchId()),
-            eq("BATCH"),
-            any());
+    ArgumentCaptor<BatchConcessionReviewRequiredEvent> published =
+        ArgumentCaptor.forClass(BatchConcessionReviewRequiredEvent.class);
+    verify(eventPublisher).publish(published.capture());
+    assertThat(published.getValue().getTenantId()).isEqualTo(event.getTenantId());
+    assertThat(published.getValue().getBatchId()).isEqualTo(event.getBatchId());
+    assertThat(published.getValue().getBatchCode()).isEqualTo("B-2026-0042");
   }
 
   @Test

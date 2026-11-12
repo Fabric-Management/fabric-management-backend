@@ -47,6 +47,14 @@ public class NotificationTemplate extends BaseEntity {
   @Column(name = "grouping_window_minutes")
   private Integer groupingWindowMinutes = 5;
 
+  /**
+   * Whether a user who never chose receives this channel. Only e-mail (and push) are a choice: an
+   * in-app notification is always delivered and {@code CRITICAL} uses every channel. A user's own
+   * preference always wins over this default.
+   */
+  @Column(name = "enabled_by_default", nullable = false)
+  private boolean enabledByDefault = false;
+
   @Override
   protected String getModuleCode() {
     return "NTMPL";
@@ -59,7 +67,19 @@ public class NotificationTemplate extends BaseEntity {
       String bodyKey,
       NotificationImportance importance,
       NotificationDeliveryType deliveryType) {
+    return create(eventType, channel, titleKey, bodyKey, importance, deliveryType, false);
+  }
+
+  public static NotificationTemplate create(
+      String eventType,
+      NotificationChannel channel,
+      String titleKey,
+      String bodyKey,
+      NotificationImportance importance,
+      NotificationDeliveryType deliveryType,
+      boolean enabledByDefault) {
     var tmpl = new NotificationTemplate();
+    tmpl.enabledByDefault = enabledByDefault;
     tmpl.eventType = eventType;
     tmpl.channel = channel;
     tmpl.titleKey = titleKey;

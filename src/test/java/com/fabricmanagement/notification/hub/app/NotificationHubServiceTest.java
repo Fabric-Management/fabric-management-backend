@@ -22,6 +22,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(
@@ -49,7 +52,8 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("şablon bulunamazsa kuyruk oluşturulmaz")
     void should_skip_when_no_template_found() {
-      when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of());
+      when(templateRepo.findAllByTenantIdAndEventTypeAndIsActiveTrue(TENANT_ID, EVENT_TYPE))
+          .thenReturn(List.of());
 
       notificationHubService.notify(
           NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
@@ -58,16 +62,25 @@ class NotificationHubServiceTest {
     }
 
     @Test
-    @DisplayName("CRITICAL importance → tercih yok sayılır, kuyruklanır")
-    void should_queue_critical_regardless_of_preference() {
+    @DisplayName("şablonlar yalnızca olayın tenant'ından aranır")
+    void should_look_up_templates_for_the_events_tenant() {
+      when(templateRepo.findAllByTenantIdAndEventTypeAndIsActiveTrue(any(), any()))
+          .thenReturn(List.of());
+
+      notificationHubService.notify(
+          NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
+
+      verify(templateRepo).findAllByTenantIdAndEventTypeAndIsActiveTrue(TENANT_ID, EVENT_TYPE);
+    }
+
+    @Test
+    @DisplayName("CRITICAL importance → e-posta kapalı olsa bile kuyruklanır")
+    void should_queue_critical_email_regardless_of_preference() {
       when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
-      var template = mockTemplate(NotificationImportance.CRITICAL, NotificationChannel.IN_APP);
-      when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
-      // Kullanıcı IN_APP kapattıysa bile CRITICAL gönderir
-      var pref = mock(UserNotificationPreference.class);
-      when(pref.isInApp()).thenReturn(false);
-      when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
-          .thenReturn(Optional.of(pref));
+      var template =
+          mockTemplate(NotificationImportance.CRITICAL, NotificationChannel.EMAIL, false);
+      stubTemplates(template);
+      stubPreference(emailPreference(false));
 
       notificationHubService.notify(
           NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
@@ -76,16 +89,27 @@ class NotificationHubServiceTest {
     }
 
     @Test
-    @DisplayName("NORMAL importance + kullanıcı IN_APP kapatmış → kuyruklanmaz")
-    void should_not_queue_when_user_disabled_in_app() {
+    @DisplayName("uygulama içi bildirim kapatılamaz: tercih inApp=false olsa da kuyruklanır")
+    void should_always_queue_in_app() {
       when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
-      var template = mockTemplate(NotificationImportance.NORMAL, NotificationChannel.IN_APP);
-      when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
-
+      var template = mockTemplate(NotificationImportance.NORMAL, NotificationChannel.IN_APP, false);
+      stubTemplates(template);
       var pref = mock(UserNotificationPreference.class);
       when(pref.isInApp()).thenReturn(false);
-      when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
-          .thenReturn(Optional.of(pref));
+      stubPreference(pref);
+
+      notificationHubService.notify(
+          NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
+
+      verify(queueRepo).save(any(NotificationQueue.class));
+    }
+
+    @Test
+    @DisplayName("e-posta: tercih yok + şablon varsayılanı kapalı → kuyruklanmaz")
+    void should_not_queue_email_when_default_is_off_and_user_never_chose() {
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
+      stubTemplates(mockTemplate(NotificationImportance.NORMAL, NotificationChannel.EMAIL, false));
+      stubNoPreference();
 
       notificationHubService.notify(
           NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
@@ -94,13 +118,11 @@ class NotificationHubServiceTest {
     }
 
     @Test
-    @DisplayName("tercih yoksa varsayılan true → kuyruklanır")
-    void should_queue_when_no_preference_exists() {
+    @DisplayName("e-posta: tercih yok + şablon varsayılanı açık → kuyruklanır")
+    void should_queue_email_when_default_is_on_and_user_never_chose() {
       when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
-      var template = mockTemplate(NotificationImportance.NORMAL, NotificationChannel.EMAIL);
-      when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
-      when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
-          .thenReturn(Optional.empty());
+      stubTemplates(mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL, true));
+      stubNoPreference();
 
       notificationHubService.notify(
           NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
@@ -111,19 +133,82 @@ class NotificationHubServiceTest {
     }
 
     @Test
-    @DisplayName("birden fazla kanal şablonu → her biri ayrı kuyruklanır")
-    void should_queue_for_each_channel_template() {
+    @DisplayName("e-posta: kullanıcı açtıysa varsayılan kapalı olsa da kuyruklanır")
+    void should_queue_email_when_user_turned_it_on() {
       when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
-      var inAppTemplate = mockTemplate(NotificationImportance.HIGH, NotificationChannel.IN_APP);
-      var emailTemplate = mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL);
-      when(templateRepo.findAllByEventType(EVENT_TYPE))
-          .thenReturn(List.of(inAppTemplate, emailTemplate));
-      when(prefRepo.findByUserIdAndEventType(any(), any())).thenReturn(Optional.empty());
+      stubTemplates(mockTemplate(NotificationImportance.NORMAL, NotificationChannel.EMAIL, false));
+      stubPreference(emailPreference(true));
+
+      notificationHubService.notify(
+          NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
+
+      verify(queueRepo).save(any(NotificationQueue.class));
+    }
+
+    @Test
+    @DisplayName("e-posta: kullanıcı kapattıysa varsayılan açık olsa da kuyruklanmaz")
+    void should_not_queue_email_when_user_turned_it_off() {
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
+      stubTemplates(mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL, true));
+      stubPreference(emailPreference(false));
+
+      notificationHubService.notify(
+          NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
+
+      verify(queueRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("uygulama içi + e-posta şablonu: varsayılan kapalıysa yalnızca uygulama içi")
+    void should_queue_only_in_app_when_email_default_is_off() {
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
+      stubTemplates(
+          mockTemplate(NotificationImportance.HIGH, NotificationChannel.IN_APP, false),
+          mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL, false));
+      stubNoPreference();
+
+      notificationHubService.notify(
+          NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
+
+      ArgumentCaptor<NotificationQueue> captor = ArgumentCaptor.forClass(NotificationQueue.class);
+      verify(queueRepo).save(captor.capture());
+      assertThat(captor.getValue().getChannel()).isEqualTo(NotificationChannel.IN_APP);
+    }
+
+    @Test
+    @DisplayName("birden fazla kanal şablonu → varsayılanı açık olan her biri kuyruklanır")
+    void should_queue_for_each_enabled_channel_template() {
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
+      stubTemplates(
+          mockTemplate(NotificationImportance.HIGH, NotificationChannel.IN_APP, false),
+          mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL, true));
+      stubNoPreference();
 
       notificationHubService.notify(
           NotificationContext.of(TENANT_ID, RECIPIENT_ID, EVENT_TYPE, Map.of()));
 
       verify(queueRepo, times(2)).save(any(NotificationQueue.class));
+    }
+
+    private void stubTemplates(NotificationTemplate... templates) {
+      when(templateRepo.findAllByTenantIdAndEventTypeAndIsActiveTrue(TENANT_ID, EVENT_TYPE))
+          .thenReturn(List.of(templates));
+    }
+
+    private void stubNoPreference() {
+      when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
+          .thenReturn(Optional.empty());
+    }
+
+    private void stubPreference(UserNotificationPreference pref) {
+      when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
+          .thenReturn(Optional.of(pref));
+    }
+
+    private UserNotificationPreference emailPreference(boolean email) {
+      var pref = mock(UserNotificationPreference.class);
+      when(pref.isEmail()).thenReturn(email);
+      return pref;
     }
   }
 
@@ -158,12 +243,56 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("markAllRead — repository'ye doğru recipientId gönderilir")
     void should_call_mark_all_read_with_correct_recipient() {
-      when(logRepo.markAllReadForRecipient(RECIPIENT_ID)).thenReturn(5);
+      when(logRepo.markAllReadForRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP))
+          .thenReturn(5);
 
       int result = notificationHubService.markAllRead(RECIPIENT_ID);
 
       assertThat(result).isEqualTo(5);
-      verify(logRepo).markAllReadForRecipient(RECIPIENT_ID);
+      verify(logRepo).markAllReadForRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP);
+    }
+  }
+
+  @Nested
+  @DisplayName("list() / countUnread() — the centre shows in-app rows only")
+  class CentreReadTests {
+
+    private final Pageable page = PageRequest.of(0, 20);
+
+    @Test
+    @DisplayName("liste yalnızca uygulama içi satırları okur")
+    void should_list_in_app_rows() {
+      when(logRepo.findByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP, page))
+          .thenReturn(Page.empty());
+
+      notificationHubService.list(RECIPIENT_ID, false, page);
+
+      verify(logRepo).findByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP, page);
+      verify(logRepo, never()).findUnreadByRecipientAndChannel(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("unread=true → yalnızca okunmamış uygulama içi satırlar")
+    void should_list_only_unread_in_app_rows() {
+      when(logRepo.findUnreadByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP, page))
+          .thenReturn(Page.empty());
+
+      notificationHubService.list(RECIPIENT_ID, true, page);
+
+      verify(logRepo)
+          .findUnreadByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP, page);
+      verify(logRepo, never()).findByRecipientAndChannel(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("okunmamış sayısı e-posta satırlarını saymaz")
+    void should_count_in_app_rows_only() {
+      when(logRepo.countUnreadByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.IN_APP))
+          .thenReturn(3L);
+
+      assertThat(notificationHubService.countUnread(RECIPIENT_ID)).isEqualTo(3L);
+      verify(logRepo, never())
+          .countUnreadByRecipientAndChannel(RECIPIENT_ID, NotificationChannel.EMAIL);
     }
   }
 
@@ -220,11 +349,12 @@ class NotificationHubServiceTest {
   // ---- Helpers ----
 
   private NotificationTemplate mockTemplate(
-      NotificationImportance importance, NotificationChannel channel) {
+      NotificationImportance importance, NotificationChannel channel, boolean enabledByDefault) {
     var template = mock(NotificationTemplate.class);
     when(template.getImportance()).thenReturn(importance);
     when(template.getChannel()).thenReturn(channel);
     when(template.getDeliveryType()).thenReturn(NotificationDeliveryType.INSTANT);
+    when(template.isEnabledByDefault()).thenReturn(enabledByDefault);
     return template;
   }
 }

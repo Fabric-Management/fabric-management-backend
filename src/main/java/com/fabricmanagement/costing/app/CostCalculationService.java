@@ -8,6 +8,7 @@ import com.fabricmanagement.costing.app.port.TenantCostingSettingsPort;
 import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.*;
 import com.fabricmanagement.costing.domain.event.CostVarianceDetectedEvent;
+import com.fabricmanagement.costing.domain.exception.CostTemplateNotFoundException;
 import com.fabricmanagement.costing.domain.exception.CostingDomainException;
 import com.fabricmanagement.costing.domain.exception.PriceListNotFoundException;
 import com.fabricmanagement.costing.domain.item.CalculationBase;
@@ -584,14 +585,7 @@ public class CostCalculationService {
     CostTemplate template =
         costTemplateRepo
             .findDefault(tenantId, moduleType)
-            .orElseThrow(
-                () ->
-                    new CostingDomainException(
-                        "No default cost template configured for module: "
-                            + moduleType
-                            + " (tenantId="
-                            + tenantId
-                            + ")"));
+            .orElseThrow(() -> new CostTemplateNotFoundException(tenantId, moduleType));
 
     String targetCurrency = getTargetCurrency(tenantId);
 

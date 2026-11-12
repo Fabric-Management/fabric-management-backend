@@ -146,24 +146,26 @@ BEGIN
 END $$;
 
 -- The existing notification mechanism seeds template and operational tenants; onboarding clones these.
+-- The platform's own tenant is not an operational tenant, but its type is REGULAR (there is no
+-- SYSTEM tenant type), so it is excluded by id; without this it received these templates too.
 INSERT INTO i18n.translation_key (id, tenant_id, uid, key_code, module, default_value, description)
 SELECT gen_random_uuid(), t.id, gen_random_uuid()::text, k.code, 'NOTIFICATION', k.value, k.value
 FROM common_tenant.common_tenant t
 CROSS JOIN (VALUES
-    ('notification.routing_failure.title', 'Routing requires attention'),
-    ('notification.routing_failure.body', 'Task {taskId} has routing failure {failureId}.')
+    ('notification.routing_failure.title', 'A task couldn''t be assigned automatically'),
+    ('notification.routing_failure.body', 'No suitable person or team was found for "{taskTitle}". Assign it yourself.')
 ) k(code, value)
-WHERE t.type <> 'SYSTEM'
+WHERE t.type <> 'SYSTEM' AND t.id <> '00000000-0000-0000-0000-000000000000'
 ON CONFLICT (tenant_id, key_code) DO NOTHING;
 INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
 SELECT gen_random_uuid(), tenant_id, id, 'TR',
-    CASE key_code WHEN 'notification.routing_failure.title' THEN 'Yönlendirme müdahale gerektiriyor'
-    ELSE '{taskId} görevinin yönlendirme hatası: {failureId}.' END, false
+    CASE key_code WHEN 'notification.routing_failure.title' THEN 'Bir görev otomatik atanamadı'
+    ELSE '"{taskTitle}" görevi için uygun kişi ya da ekip bulunamadı. Görevi elle atayın.' END, false
 FROM i18n.translation_key WHERE key_code IN ('notification.routing_failure.title','notification.routing_failure.body')
 ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
 INSERT INTO notification.notification_template
     (id, tenant_id, uid, event_type, channel, title_key, body_key, importance, delivery_type)
 SELECT gen_random_uuid(), id, gen_random_uuid()::text, 'ROUTING_FAILURE', 'IN_APP',
     'notification.routing_failure.title', 'notification.routing_failure.body', 'CRITICAL', 'INSTANT'
-FROM common_tenant.common_tenant WHERE type <> 'SYSTEM'
+FROM common_tenant.common_tenant WHERE type <> 'SYSTEM' AND id <> '00000000-0000-0000-0000-000000000000'
 ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;

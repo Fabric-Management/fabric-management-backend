@@ -50,6 +50,8 @@ public class FinanceNotificationListener {
               Map.of(
                   "invoiceNumber", event.getInvoiceNumber(),
                   "daysOverdue", String.valueOf(event.getDaysOverdue()),
+                  "invoiceSide",
+                      event.getInvoiceSide() != null ? event.getInvoiceSide() : "RECEIVABLE",
                   "tradingPartnerId", event.getTradingPartnerId().toString()),
               event.getInvoiceId(),
               "INVOICE");

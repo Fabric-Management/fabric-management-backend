@@ -48,13 +48,26 @@ public class CostingNotificationListener {
               Map.of(
                   "entityType", event.getEntityType().name(),
                   "currentStage", event.getCurrentStage().name(),
-                  "previousStage",
-                      event.getPreviousStage() != null ? event.getPreviousStage().name() : "NONE",
-                  "varianceRatio", event.getVarianceRatio().toString(),
-                  "currentTotal", event.getCurrentTotal().toString(),
+                  "previousStage", event.getPreviousStage().name(),
+                  "variancePercent", variancePercent(event.getVarianceRatio()),
+                  "difference", event.getVarianceRatio().signum() >= 0 ? "HIGHER" : "LOWER",
+                  "currentTotal", event.getCurrentTotal().toPlainString(),
                   "currency", event.getCurrency()),
               event.getEntityId(),
               event.getEntityType().name());
         });
+  }
+
+  /**
+   * The signed ratio (0.153 = 15.3% over) as the whole percentage people read; the direction is
+   * carried separately as {@code difference}. A comparison exists only when there is a previous
+   * stage, which the costing module guarantees before it publishes the event.
+   */
+  static String variancePercent(java.math.BigDecimal ratio) {
+    return ratio
+        .abs()
+        .movePointRight(2)
+        .setScale(0, java.math.RoundingMode.HALF_UP)
+        .toPlainString();
   }
 }

@@ -135,6 +135,35 @@ class WorkOrderPlannedCostListenerTest {
     }
 
     @Test
+    @DisplayName("reports unconfigured costing as WARN, not ERROR")
+    void unconfiguredCostingIsAWarning() {
+      doThrow(
+              new com.fabricmanagement.production.core.workorder.domain.exception
+                  .PlannedCostConfigurationMissingException(
+                  "No active price list found for module: SPINNING"))
+          .when(plannedCostTriggerService)
+          .triggerPlannedCost(any());
+      ch.qos.logback.classic.Logger logger =
+          (ch.qos.logback.classic.Logger)
+              org.slf4j.LoggerFactory.getLogger(WorkOrderPlannedCostListener.class);
+      ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+          new ch.qos.logback.core.read.ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+      try {
+        assertThatCode(() -> listener.handleWorkOrderApprovedEvent(buildEvent()))
+            .doesNotThrowAnyException();
+      } finally {
+        logger.detachAppender(appender);
+      }
+
+      org.assertj.core.api.Assertions.assertThat(appender.list)
+          .extracting(ch.qos.logback.classic.spi.ILoggingEvent::getLevel)
+          .contains(ch.qos.logback.classic.Level.WARN)
+          .doesNotContain(ch.qos.logback.classic.Level.ERROR);
+    }
+
+    @Test
     @DisplayName("swallows unexpected exception so approval flow is not failed by costing")
     void swallowsUnexpectedNPE() {
       doThrow(new NullPointerException("unexpected"))

@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.costing.app.DemoCostingSetupService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
@@ -47,6 +48,7 @@ public class DemoTransactionSeeder {
   private final WorkOrderService workOrderService;
   private final BatchService batchService;
   private final FinanceDemoSeeder financeDemoSeeder;
+  private final DemoCostingSetupService demoCostingSetupService;
   private final SalesDemoSeeder salesDemoSeeder;
   private final ProcurementDemoSeeder procurementDemoSeeder;
   private final SalesQuoteDemoSeeder salesQuoteDemoSeeder;
@@ -93,6 +95,7 @@ public class DemoTransactionSeeder {
           tradingPartnerService.searchByName(tenantId, DEMO_CUSTOMER_NAME);
       if (!existing.isEmpty()) {
         log.info("Demo transactions already exist for tenant: {}. Skipping.", tenantId);
+        seedCostingDemo(tenantId);
         seedProcurementDemo(tenantId);
         seedSalesQuoteDemo(tenantId);
         seedPartnerNetworkDemo(tenantId);
@@ -115,6 +118,11 @@ public class DemoTransactionSeeder {
       // Independent of the fiber-dependent production demo below, so it still runs when no template
       // fibers exist. Reuses the customer created above; same tenant context.
       financeDemoSeeder.seedFor(tenantId);
+
+      // 2b'. Costing setup: a price list and a default cost template per work-order module, in
+      // the reporting currency set above. Inline, before any demo work order is approved below or
+      // in the procurement demo, so the planned-cost listener (after commit) finds it.
+      seedCostingDemo(tenantId);
 
       // 2c. Sales demo orders (DEMO-2a): CONFIRMED orders so Margin + Backlog views show real data.
       // Runs in its own transaction (REQUIRES_NEW), after the caller's transaction commits when
@@ -269,6 +277,10 @@ public class DemoTransactionSeeder {
                 salesEx);
           }
         });
+  }
+
+  private void seedCostingDemo(UUID tenantId) {
+    demoCostingSetupService.seedFor(tenantId, FinanceDemoSeeder.REPORTING_CURRENCY);
   }
 
   private void seedProcurementDemo(UUID tenantId) {

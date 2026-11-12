@@ -1,6 +1,7 @@
 package com.fabricmanagement.notification.hub.infra.repository;
 
 import com.fabricmanagement.notification.hub.domain.UserNotificationPreference;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,4 +12,6 @@ public interface UserNotificationPreferenceRepository
     extends JpaRepository<UserNotificationPreference, UUID> {
 
   Optional<UserNotificationPreference> findByUserIdAndEventType(UUID userId, String eventType);
+
+  List<UserNotificationPreference> findAllByUserId(UUID userId);
 }

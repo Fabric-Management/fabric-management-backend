@@ -80,7 +80,8 @@ public class NotificationItemProcessor {
 
     try {
       var templateOpt =
-          templateRepo.findByEventTypeAndChannel(item.getEventType(), item.getChannel());
+          templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              item.getTenantId(), item.getEventType(), item.getChannel());
 
       if (templateOpt.isEmpty()) {
         item.markFailed(

@@ -7,6 +7,8 @@ import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,6 +65,46 @@ class SalesTriageNotificationSeedIT extends AbstractIntegrationTest {
 
     assertThat(templates).isEqualTo(1);
     assertThat(keys).isEqualTo(2);
+    assertThat(turkishValues).isEqualTo(2);
+  }
+
+  @Test
+  void goldenTemplateEscalatesInAppAndOffersEmailAsAnOptionalChannel() {
+    List<Map<String, Object>> rows =
+        jdbc.queryForList(
+            """
+            SELECT channel, importance, title_key, body_key
+            FROM notification.notification_template
+            WHERE tenant_id = ? AND event_type = 'CUSTOMER_OWNERSHIP_TRIAGE_AGED'
+            ORDER BY channel
+            """,
+            TenantContext.TEMPLATE_TENANT_ID);
+    Integer turkishValues =
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM i18n.translation_value value
+            JOIN i18n.translation_key translation_key
+              ON translation_key.id = value.translation_key_id
+             AND translation_key.tenant_id = value.tenant_id
+            WHERE value.tenant_id = ?
+              AND value.locale = 'TR'
+              AND translation_key.key_code IN (
+                'notification.customer_ownership_triage_aged.title',
+                'notification.customer_ownership_triage_aged.body'
+              )
+            """,
+            Integer.class,
+            TenantContext.TEMPLATE_TENANT_ID);
+
+    assertThat(rows).extracting(row -> row.get("channel")).containsExactly("EMAIL", "IN_APP");
+    // Not CRITICAL: CRITICAL ignores the user's preference, and e-mail must stay optional.
+    assertThat(rows).allSatisfy(row -> assertThat(row.get("importance")).isEqualTo("HIGH"));
+    assertThat(rows)
+        .allSatisfy(
+            row ->
+                assertThat(row.get("title_key"))
+                    .isEqualTo("notification.customer_ownership_triage_aged.title"));
     assertThat(turkishValues).isEqualTo(2);
   }
 
