@@ -1,15 +1,13 @@
 package com.fabricmanagement.notification.hub.app;
 
-import com.fabricmanagement.notification.hub.domain.NotificationQueue;
-import com.fabricmanagement.notification.hub.domain.NotificationQueueStatus;
-import com.fabricmanagement.notification.hub.infra.repository.NotificationQueueRepository;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.notification.hub.app.NotificationQueueScanner.QueueRef;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +17,10 @@ import org.springframework.stereotype.Component;
  * <p>Periyodik olarak PENDING kayıtları alır ve {@link NotificationItemProcessor} ile işler.
  *
  * <p>Ayrıca 5+ dakikadır PROCESSING statüsünde kalan kayıtları kurtarır (stuck recovery).
+ *
+ * <p>Bu iş bir tenant'a ait bir thread'de çalışmaz. Vadesi gelen kayıtlar {@link
+ * NotificationQueueScanner} ile tenant'lar arası okunur; her kayıt kendi tenant bağlamında işlenir.
+ * Kuyruğu doğrudan JPA ile sorgulamak RLS altında hiçbir satır döndürmez ve kuyruk boş görünür.
  *
  * <p>İşleme mantığı ayrı bir {@code @Service}'te tutulur — böylece Spring AOP proxy üzerinden
  * {@code @Transactional} doğru çalışır.
@@ -34,19 +36,27 @@ public class NotificationQueueProcessor {
   @Value("${application.notification.queue.stuck-threshold-minutes:5}")
   private int stuckThresholdMinutes;
 
-  private final NotificationQueueRepository queueRepo;
+  private final NotificationQueueScanner scanner;
   private final NotificationItemProcessor itemProcessor;
 
   /** Ana kuyruk işleme döngüsü — her 10 saniyede bir çalışır. */
   @Scheduled(fixedDelayString = "${application.notification.queue.poll-interval-ms:10000}")
   public void processQueue() {
     // 1. Stuck recovery — PROCESSING'de takılı kalmış kayıtları kurtar
-    recoverStuckItems();
+    try {
+      recoverStuckItems();
+    } catch (Exception ex) {
+      log.error("Notification stuck-recovery scan failed: {}", ex.getMessage(), ex);
+    }
 
     // 2. PENDING kayıtları al ve işle
-    List<NotificationQueue> pending =
-        queueRepo.findPendingForProcessing(
-            NotificationQueueStatus.PENDING, PageRequest.of(0, batchSize));
+    List<QueueRef> pending;
+    try {
+      pending = scanner.pending(batchSize);
+    } catch (Exception ex) {
+      log.error("Notification queue scan failed: {}", ex.getMessage(), ex);
+      return;
+    }
 
     if (pending.isEmpty()) {
       return;
@@ -54,16 +64,15 @@ public class NotificationQueueProcessor {
 
     log.info("Processing {} pending notification(s)", pending.size());
 
-    for (NotificationQueue item : pending) {
+    for (QueueRef item : pending) {
       try {
-        itemProcessor.processItem(item.getId());
+        TenantContext.executeInTenantContext(
+            item.tenantId(), () -> itemProcessor.processItem(item.id()));
       } catch (Exception ex) {
         // itemProcessor kendi içinde hataları yönetiyor,
         // ama beklenmedik bir hata olursa (ör: DB bağlantısı) diğer kayıtları engellemesin
         log.error(
-            "Unexpected error processing notification queueId={}: {}",
-            item.getId(),
-            ex.getMessage());
+            "Unexpected error processing notification queueId={}: {}", item.id(), ex.getMessage());
       }
     }
   }
@@ -76,7 +85,7 @@ public class NotificationQueueProcessor {
    */
   private void recoverStuckItems() {
     Instant threshold = Instant.now().minus(stuckThresholdMinutes, ChronoUnit.MINUTES);
-    List<NotificationQueue> stuck = queueRepo.findStuckProcessing(threshold);
+    List<QueueRef> stuck = scanner.stuck(threshold);
 
     if (!stuck.isEmpty()) {
       log.warn(
@@ -84,16 +93,16 @@ public class NotificationQueueProcessor {
           stuck.size(),
           stuckThresholdMinutes);
 
-      for (NotificationQueue item : stuck) {
+      for (QueueRef item : stuck) {
         try {
-          itemProcessor.recoverStuckProcessingItem(item.getId(), threshold);
+          TenantContext.executeInTenantContext(
+              item.tenantId(),
+              () -> itemProcessor.recoverStuckProcessingItem(item.id(), threshold));
           log.warn(
-              "Recovered stuck notification: queueId={} event={}",
-              item.getId(),
-              item.getEventType());
+              "Recovered stuck notification: queueId={} event={}", item.id(), item.eventType());
         } catch (Exception ex) {
           log.error(
-              "Failed to recover stuck notification queueId={}: {}", item.getId(), ex.getMessage());
+              "Failed to recover stuck notification queueId={}: {}", item.id(), ex.getMessage());
         }
       }
     }

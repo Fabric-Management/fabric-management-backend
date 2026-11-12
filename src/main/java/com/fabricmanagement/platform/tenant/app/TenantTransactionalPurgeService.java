@@ -411,10 +411,28 @@ public class TenantTransactionalPurgeService {
         "SELECT set_config('app.collection_purge_tenant', ?, true)",
         String.class,
         tenantId.toString());
+    lockCostTemplatesAgainstInFlightCalculations(jdbc, tenantId);
     deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
       delete(jdbc, rows, table, "DELETE FROM " + table + " WHERE tenant_id = ?", tenantId);
     }
+  }
+
+  /**
+   * Makes the purge wait for planned-cost calculations that are still being written.
+   *
+   * <p>A calculation is computed by an asynchronous listener after a work order is approved. Its
+   * insert into {@code costing.cost_calculation} holds {@code FOR KEY SHARE} on the tenant's cost
+   * template until it commits. Locking the templates first ({@code FOR UPDATE} conflicts with that
+   * lock) means the purge waits for such an insert, so the {@code DELETE} of the calculations that
+   * follows sees the committed row. An insert that starts after this lock waits for the purge and
+   * then fails its foreign key check, which is harmless: its work order is being deleted.
+   */
+  private void lockCostTemplatesAgainstInFlightCalculations(JdbcTemplate jdbc, UUID tenantId) {
+    jdbc.queryForList(
+        "SELECT id FROM costing.cost_template WHERE tenant_id = ? FOR UPDATE",
+        UUID.class,
+        tenantId);
   }
 
   /**

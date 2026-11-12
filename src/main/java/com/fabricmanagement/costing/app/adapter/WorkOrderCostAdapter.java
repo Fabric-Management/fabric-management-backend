@@ -2,10 +2,13 @@ package com.fabricmanagement.costing.app.adapter;
 
 import com.fabricmanagement.costing.app.CostCalculationService;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
+import com.fabricmanagement.costing.domain.exception.CostTemplateNotFoundException;
+import com.fabricmanagement.costing.domain.exception.PriceListNotFoundException;
 import com.fabricmanagement.production.core.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.core.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.core.workorder.app.port.WorkOrderCostEnginePort;
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.core.workorder.domain.exception.PlannedCostConfigurationMissingException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -64,14 +67,20 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
         moduleType,
         outputProductId);
 
-    CostCalculation calculation =
-        costCalculationService.computePlanned(
-            tenantId,
-            workOrderId,
-            moduleType.name(),
-            outputProductId,
-            plannedQuantity,
-            tradingPartnerId);
+    CostCalculation calculation;
+    try {
+      calculation =
+          costCalculationService.computePlanned(
+              tenantId,
+              workOrderId,
+              moduleType.name(),
+              outputProductId,
+              plannedQuantity,
+              tradingPartnerId);
+    } catch (PriceListNotFoundException | CostTemplateNotFoundException missing) {
+      // Unconfigured costing is a tenant state, not a fault; production decides how to report it.
+      throw new PlannedCostConfigurationMissingException(missing.getMessage());
+    }
 
     return new ComputedCostSnapshot(
         workOrderId, calculation.getTotalCost(), calculation.getCurrency());

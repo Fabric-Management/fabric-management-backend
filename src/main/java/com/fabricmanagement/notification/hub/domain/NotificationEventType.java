@@ -32,10 +32,13 @@ public final class NotificationEventType {
   public static final String INVOICE_DISPUTED = "INVOICE_DISPUTED";
   public static final String COST_VARIANCE_DETECTED = "COST_VARIANCE_DETECTED";
   public static final String CUSTOMER_OWNERSHIP_TRIAGE_OPENED = "CUSTOMER_OWNERSHIP_TRIAGE_OPENED";
+  public static final String CUSTOMER_OWNERSHIP_TRIAGE_AGED = "CUSTOMER_OWNERSHIP_TRIAGE_AGED";
+  public static final String BATCH_CONCESSION_REVIEW = "BATCH_CONCESSION_REVIEW";
+  public static final String BATCH_NO_QUALITY_STANDARD = "BATCH_NO_QUALITY_STANDARD";
+  public static final String BATCH_CERTIFICATION_EXPIRING = "BATCH_CERTIFICATION_EXPIRING";
 
   // ---- NORMAL ----
   public static final String WORK_ORDER_APPROVED = "WORK_ORDER_APPROVED";
-  public static final String WORK_ORDER_DEADLINE_SET = "WORK_ORDER_DEADLINE_SET";
   public static final String BATCH_QC_PENDING = "BATCH_QC_PENDING";
   public static final String APPROVAL_APPROVED = "APPROVAL_APPROVED";
   public static final String GOODS_RECEIPT_CONFIRMED = "GOODS_RECEIPT_CONFIRMED";
@@ -43,7 +46,13 @@ public final class NotificationEventType {
   public static final String PO_PARTIALLY_RECEIVED = "PO_PARTIALLY_RECEIVED";
   public static final String RFQ_SENT = "RFQ_SENT";
   public static final String SUPPLIER_QUOTE_RECEIVED = "SUPPLIER_QUOTE_RECEIVED";
-  public static final String TASK_BLOCKED = "TASK_BLOCKED";
   public static final String AUTOMATION_ALERT = "AUTOMATION_ALERT";
+  public static final String STUCK_FOLLOW_UP_RESOLVED = "STUCK_FOLLOW_UP_RESOLVED";
   public static final String PAYMENT_RECEIVED = "PAYMENT_RECEIVED";
+  public static final String FIBER_REQUEST_APPROVED = "FIBER_REQUEST_APPROVED";
+  public static final String FIBER_REQUEST_REJECTED = "FIBER_REQUEST_REJECTED";
+
+  // ---- Platform administrators only (B4) ----
+  public static final String FIBER_REQUEST_SUBMITTED = "FIBER_REQUEST_SUBMITTED";
+  public static final String NEW_TENANT_ONBOARDED = "NEW_TENANT_ONBOARDED";
 }

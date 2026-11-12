@@ -27876,6 +27876,12 @@ paths:
           type: integer
           format: int32
           default: 20
+      - in: query
+        name: unread
+        required: false
+        schema:
+          type: boolean
+          default: false
       responses:
         "200":
           content:
@@ -27938,13 +27944,121 @@ paths:
       tags:
       - Notifications
   /api/v1/notifications/preferences:
+    get:
+      description: "What can be configured, grouped for the preferences screen, with\
+        \ the signed-in user's current e-mail choice. In-app notifications are always\
+        \ delivered and are not listed; critical ones are locked."
+      operationId: preferences
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseNotificationPreferencesResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Notification preferences
+      tags:
+      - Notifications
+  /api/v1/notifications/preferences/events/{eventType}:
     put:
-      operationId: updatePreference
+      description: "Rejected for a critical notification, which is always sent."
+      operationId: updateEvent
+      parameters:
+      - in: path
+        name: eventType
+        required: true
+        schema:
+          type: string
+          enum:
+          - APPROVAL_PENDING
+          - APPROVAL_APPROVED
+          - APPROVAL_REJECTED
+          - WORK_ORDER_PENDING_APPROVAL
+          - FIBER_REQUEST_APPROVED
+          - FIBER_REQUEST_REJECTED
+          - CUSTOMER_OWNERSHIP_TRIAGE_OPENED
+          - CUSTOMER_OWNERSHIP_TRIAGE_AGED
+          - WORK_ORDER_APPROVED
+          - BATCH_QC_FAILED
+          - BATCH_QC_PENDING
+          - BATCH_CONCESSION_REVIEW
+          - BATCH_NO_QUALITY_STANDARD
+          - BATCH_CERTIFICATION_EXPIRING
+          - GOODS_RECEIPT_CONFIRMED
+          - PO_CONFIRMED
+          - PO_PARTIALLY_RECEIVED
+          - PO_DELIVERY_LATE
+          - RFQ_SENT
+          - RETURN_RATE_EXCEEDED
+          - RFQ_DEADLINE_APPROACHING
+          - RFQ_NO_RESPONSE
+          - SUPPLIER_QUOTE_RECEIVED
+          - INVOICE_OVERDUE
+          - INVOICE_DISPUTED
+          - PAYMENT_RECEIVED
+          - COST_VARIANCE_DETECTED
+          - MIN_STOCK_ALERT
+          - ROUTING_FAILURE
+          - AUTOMATION_ALERT
+          - STUCK_FOLLOW_UP_RESOLVED
+          - FIBER_REQUEST_SUBMITTED
+          - NEW_TENANT_ONBOARDED
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateNotificationPreferenceRequest"
+              $ref: "#/components/schemas/UpdateEmailPreferenceRequest"
         required: true
       responses:
         "200":
@@ -28000,7 +28114,89 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Update notification channel preference
+      summary: Set e-mail for one notification
+      tags:
+      - Notifications
+  /api/v1/notifications/preferences/groups/{group}:
+    put:
+      description: Applies to every notification in the group that can be changed.
+      operationId: updateGroup
+      parameters:
+      - in: path
+        name: group
+        required: true
+        schema:
+          type: string
+          enum:
+          - APPROVALS
+          - SALES
+          - PRODUCTION
+          - QUALITY
+          - PROCUREMENT
+          - FINANCE
+          - INVENTORY
+          - SYSTEM
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmailPreferenceRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Set e-mail for a notification group
       tags:
       - Notifications
   /api/v1/notifications/read-all:
@@ -70603,6 +70799,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseNotificationPreferencesResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationPreferencesResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseOnboardingJourneyResponse:
       type: object
       properties:
@@ -81334,6 +81548,55 @@ components:
       - SAME
       - DIFFERENT
       - UNKNOWN
+    EventPreference:
+      type: object
+      properties:
+        emailEnabled:
+          type: boolean
+        eventType:
+          type: string
+          enum:
+          - APPROVAL_PENDING
+          - APPROVAL_APPROVED
+          - APPROVAL_REJECTED
+          - WORK_ORDER_PENDING_APPROVAL
+          - FIBER_REQUEST_APPROVED
+          - FIBER_REQUEST_REJECTED
+          - CUSTOMER_OWNERSHIP_TRIAGE_OPENED
+          - CUSTOMER_OWNERSHIP_TRIAGE_AGED
+          - WORK_ORDER_APPROVED
+          - BATCH_QC_FAILED
+          - BATCH_QC_PENDING
+          - BATCH_CONCESSION_REVIEW
+          - BATCH_NO_QUALITY_STANDARD
+          - BATCH_CERTIFICATION_EXPIRING
+          - GOODS_RECEIPT_CONFIRMED
+          - PO_CONFIRMED
+          - PO_PARTIALLY_RECEIVED
+          - PO_DELIVERY_LATE
+          - RFQ_SENT
+          - RETURN_RATE_EXCEEDED
+          - RFQ_DEADLINE_APPROACHING
+          - RFQ_NO_RESPONSE
+          - SUPPLIER_QUOTE_RECEIVED
+          - INVOICE_OVERDUE
+          - INVOICE_DISPUTED
+          - PAYMENT_RECEIVED
+          - COST_VARIANCE_DETECTED
+          - MIN_STOCK_ALERT
+          - ROUTING_FAILURE
+          - AUTOMATION_ALERT
+          - STUCK_FOLLOW_UP_RESOLVED
+          - FIBER_REQUEST_SUBMITTED
+          - NEW_TENANT_ONBOARDED
+        importance:
+          type: string
+          enum:
+          - CRITICAL
+          - HIGH
+          - NORMAL
+        locked:
+          type: boolean
     ExchangeRateResponse:
       type: object
       properties:
@@ -84767,6 +85030,34 @@ components:
       - email
       - representativeName
       - validFrom
+    GroupPreference:
+      type: object
+      properties:
+        criticalAlwaysEmailed:
+          type: boolean
+        emailAvailable:
+          type: boolean
+        emailState:
+          type: string
+          enum:
+          - "ON"
+          - "OFF"
+          - MIXED
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventPreference"
+        group:
+          type: string
+          enum:
+          - APPROVALS
+          - SALES
+          - PRODUCTION
+          - QUALITY
+          - PROCUREMENT
+          - FINANCE
+          - INVENTORY
+          - SYSTEM
     HistoryEstimate:
       type: object
       properties:
@@ -86267,6 +86558,13 @@ components:
           format: date-time
         title:
           type: string
+    NotificationPreferencesResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupPreference"
     NumericBounds:
       type: object
       additionalProperties: false
@@ -101820,6 +102118,13 @@ components:
       properties:
         department:
           type: string
+    UpdateEmailPreferenceRequest:
+      type: object
+      properties:
+        email:
+          type: boolean
+      required:
+      - email
     UpdateFabricConstructionRequest:
       type: object
       description: "Code, family and formation never change; articles reason on them"
@@ -102130,20 +102435,6 @@ components:
           type: string
           maxLength: 50
           minLength: 0
-    UpdateNotificationPreferenceRequest:
-      type: object
-      properties:
-        email:
-          type: boolean
-        eventType:
-          type: string
-          minLength: 1
-        inApp:
-          type: boolean
-        push:
-          type: boolean
-      required:
-      - eventType
     UpdateOrganizationCertificationRequest:
       type: object
       properties:

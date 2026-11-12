@@ -49,7 +49,8 @@ class FinanceNotificationListenerTest {
   @Test
   void onInvoiceOverdue_whenNotProcessed_sendsNotification() {
     InvoiceOverdueEvent event =
-        new InvoiceOverdueEvent(tenantId, UUID.randomUUID(), "INV-01", UUID.randomUUID(), 10);
+        new InvoiceOverdueEvent(
+            tenantId, UUID.randomUUID(), "INV-01", UUID.randomUUID(), 10, "RECEIVABLE");
 
     when(processedEventRepository.tryInsert(eq(event.getEventId()), any())).thenReturn(1);
     when(departmentRecipientPort.findManagersByDepartmentKeyword(tenantId, "FINANCE", "MANAGEMENT"))
@@ -70,7 +71,8 @@ class FinanceNotificationListenerTest {
   @Test
   void onInvoiceOverdue_whenRedelivered_dedupesAndIgnores() {
     InvoiceOverdueEvent event =
-        new InvoiceOverdueEvent(tenantId, UUID.randomUUID(), "INV-01", UUID.randomUUID(), 10);
+        new InvoiceOverdueEvent(
+            tenantId, UUID.randomUUID(), "INV-01", UUID.randomUUID(), 10, "RECEIVABLE");
 
     // Simulate first delivery success
     when(processedEventRepository.tryInsert(eq(event.getEventId()), any()))

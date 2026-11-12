@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.core.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.core.workorder.domain.exception.PlannedCostConfigurationMissingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -51,6 +52,15 @@ public class WorkOrderPlannedCostListener {
 
                   try {
                     plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
+                  } catch (PlannedCostConfigurationMissingException missing) {
+                    // Expected until the tenant configures costing: WARN without a stack trace.
+                    log.warn(
+                        "Planned cost not calculated for WorkOrder {}: {}. Configure a price list"
+                            + " and a default cost template, then POST"
+                            + " /api/v1/production/work-orders/{}/recalculate-planned.",
+                        event.getWorkOrderId(),
+                        missing.getMessage(),
+                        event.getWorkOrderId());
                   } catch (Exception e) {
                     log.error(
                         "Automatic planned cost calculation failed for WorkOrder {}. "

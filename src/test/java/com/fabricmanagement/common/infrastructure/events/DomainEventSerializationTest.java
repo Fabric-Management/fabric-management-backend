@@ -219,7 +219,7 @@ class DomainEventSerializationTest {
                 .varianceRatio(new BigDecimal("0.15"))
                 .currency("USD")
                 .build()),
-        event(new InvoiceOverdueEvent(tenantId, uuid(), "INV-1", uuid(), 7)),
+        event(new InvoiceOverdueEvent(tenantId, uuid(), "INV-1", uuid(), 7, "PAYABLE")),
         event(
             new PaymentReceivedEvent(
                 tenantId,

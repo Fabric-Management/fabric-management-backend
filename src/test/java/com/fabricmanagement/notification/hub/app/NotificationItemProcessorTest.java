@@ -71,10 +71,10 @@ class NotificationItemProcessorTest {
       var item = createQueueItem(NotificationChannel.IN_APP);
       var template = mockTemplate();
 
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.IN_APP))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any()))
-          .thenReturn("Rendered text");
+      when(translationService.translate(any(), any(), any())).thenReturn("Rendered text");
       stubLockedQueueRow(item);
 
       processor.processItem(item.getId());
@@ -93,10 +93,10 @@ class NotificationItemProcessorTest {
       var item = createQueueItem(NotificationChannel.EMAIL);
       var template = mockTemplate();
 
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.EMAIL))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.EMAIL))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any()))
-          .thenReturn("Email body");
+      when(translationService.translate(any(), any(), any())).thenReturn("Email body");
       when(userQueryService.findEmailByUserId(RECIPIENT_ID))
           .thenReturn(Optional.of("user@test.com"));
       stubLockedQueueRow(item);
@@ -111,7 +111,9 @@ class NotificationItemProcessorTest {
     @DisplayName("Template bulunamazsa → FAILED")
     void should_mark_failed_when_no_template() {
       var item = createQueueItem(NotificationChannel.IN_APP);
-      when(templateRepo.findByEventTypeAndChannel(anyString(), any())).thenReturn(Optional.empty());
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              any(), anyString(), any()))
+          .thenReturn(Optional.empty());
       stubLockedQueueRow(item);
 
       processor.processItem(item.getId());
@@ -128,9 +130,10 @@ class NotificationItemProcessorTest {
       var item = createQueueItem(NotificationChannel.IN_APP);
       var template = mockTemplate();
 
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.IN_APP))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Title");
+      when(translationService.translate(any(), any(), any())).thenReturn("Title");
       doThrow(new RuntimeException("WebSocket down")).when(inAppSender).send(any(), anyMap());
       stubLockedQueueRow(item);
 
@@ -146,9 +149,10 @@ class NotificationItemProcessorTest {
       var item = createQueueItem(NotificationChannel.IN_APP);
       var template = mockTemplate();
 
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.IN_APP))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Title");
+      when(translationService.translate(any(), any(), any())).thenReturn("Title");
       String longError = "X".repeat(600);
       doThrow(new RuntimeException(longError)).when(inAppSender).send(any(), anyMap());
       stubLockedQueueRow(item);
@@ -165,10 +169,10 @@ class NotificationItemProcessorTest {
       var item = createQueueItem(NotificationChannel.PUSH);
       var template = mockTemplate();
 
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.PUSH))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.PUSH))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any()))
-          .thenReturn("Push text");
+      when(translationService.translate(any(), any(), any())).thenReturn("Push text");
       when(userQueryService.findPushTokenByUserId(RECIPIENT_ID)).thenReturn(Optional.empty());
       stubLockedQueueRow(item);
 
@@ -200,9 +204,10 @@ class NotificationItemProcessorTest {
               "EN");
 
       var template = mockTemplate();
-      when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))
+      when(templateRepo.findByTenantIdAndEventTypeAndChannelAndIsActiveTrue(
+              TENANT_ID, EVENT_TYPE, NotificationChannel.IN_APP))
           .thenReturn(Optional.of(template));
-      when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Text");
+      when(translationService.translate(any(), any(), any())).thenReturn("Text");
       item.setId(UUID.randomUUID());
       stubLockedQueueRow(item);
 

@@ -313,17 +313,17 @@ ON CONFLICT (code) DO NOTHING;
   INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
   VALUES
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.batch_qc_failed.title', 'NOTIFICATION',
-     'QC Failed: Batch {batchCode}', 'BatchQcFailed event title'),
+     'Batch {batchCode} failed quality control', 'BatchQcFailed event title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.batch_qc_failed.body', 'NOTIFICATION',
-     'Batch {batchCode} failed quality control. Immediate action required.', 'BatchQcFailed event body'),
+     'Check the test results and decide what to do before the batch is used.', 'BatchQcFailed event body'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_pending_approval.title', 'NOTIFICATION',
-     'Approval Required: {workOrderNumber}', 'WorkOrderPendingApproval title'),
+     'Work order {workOrderNumber} needs your approval', 'WorkOrderPendingApproval title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_pending_approval.body', 'NOTIFICATION',
-     'Work order {workOrderNumber} is waiting for your approval.', 'WorkOrderPendingApproval body'),
+     'Check work order {workOrderNumber} and approve it so production can start.', 'WorkOrderPendingApproval body'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.goods_receipt_confirmed.title', 'NOTIFICATION',
-     'Goods Received: {receiptNumber}', 'GoodsReceiptConfirmed title'),
+     'Goods received: {receiptNumber}', 'GoodsReceiptConfirmed title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.goods_receipt_confirmed.body', 'NOTIFICATION',
-     'Receipt {receiptNumber} confirmed. {itemCount} item(s) added to stock.', 'GoodsReceiptConfirmed body'),
+     'Receipt {receiptNumber} was confirmed and {itemCount} item(s) were added to stock.', 'GoodsReceiptConfirmed body'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.task_blocked.title', 'NOTIFICATION',
      'Task Blocked: {taskTitle}', 'TaskBlocked title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.task_blocked.body', 'NOTIFICATION',
@@ -332,12 +332,12 @@ ON CONFLICT (code) DO NOTHING;
   INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
   SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
     CASE tk.key_code
-      WHEN 'notification.batch_qc_failed.title'                  THEN 'KK Başarısız: Parti {batchCode}'
-      WHEN 'notification.batch_qc_failed.body'                   THEN '{batchCode} partisi kalite kontrolünü geçemedi. Acil müdahale gerekiyor.'
-      WHEN 'notification.work_order_pending_approval.title'       THEN 'Onay Gerekiyor: {workOrderNumber}'
-      WHEN 'notification.work_order_pending_approval.body'        THEN '{workOrderNumber} numaralı iş emri onayınızı bekliyor.'
-      WHEN 'notification.goods_receipt_confirmed.title'           THEN 'Mal Teslim Alındı: {receiptNumber}'
-      WHEN 'notification.goods_receipt_confirmed.body'            THEN '{receiptNumber} girişi onaylandı. {itemCount} kalem stoğa eklendi.'
+      WHEN 'notification.batch_qc_failed.title'                  THEN '{batchCode} partisi kalite kontrolden geçmedi'
+      WHEN 'notification.batch_qc_failed.body'                   THEN 'Bu partiyi kullanmadan önce test sonuçlarına bakıp ne yapılacağına karar verin.'
+      WHEN 'notification.work_order_pending_approval.title'       THEN '{workOrderNumber} iş emri onayınızı bekliyor'
+      WHEN 'notification.work_order_pending_approval.body'        THEN 'Üretime başlamak için {workOrderNumber} numaralı iş emrini kontrol edip onaylamanız gerekiyor.'
+      WHEN 'notification.goods_receipt_confirmed.title'           THEN 'Mal kabul tamamlandı: {receiptNumber}'
+      WHEN 'notification.goods_receipt_confirmed.body'            THEN '{receiptNumber} numaralı mal kabul onaylandı, {itemCount} kalem stoğa girdi.'
       WHEN 'notification.task_blocked.title'                      THEN 'Görev Engellendi: {taskTitle}'
       WHEN 'notification.task_blocked.body'                       THEN '"{taskTitle}" görevi engellendi. Neden: {reason}'
     END,
@@ -356,45 +356,45 @@ ON CONFLICT (code) DO NOTHING;
   VALUES
     -- WorkOrderPendingApproval
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_pending_approval.title', 'NOTIFICATION',
-     'Approval Required: {workOrderNumber}', 'WorkOrderPendingApproval title'),
+     'Work order {workOrderNumber} needs your approval', 'WorkOrderPendingApproval title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_pending_approval.body', 'NOTIFICATION',
-     'Work order {workOrderNumber} is waiting for your approval.', 'WorkOrderPendingApproval body'),
+     'Check work order {workOrderNumber} and approve it so production can start.', 'WorkOrderPendingApproval body'),
 
     -- ApprovalPending
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_pending.title', 'NOTIFICATION',
-     'Approval Required: {entityCode}', 'ApprovalPending title'),
+     '{entityCode} needs your approval', 'ApprovalPending title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_pending.body', 'NOTIFICATION',
-     '{entityType} {entityCode} requires your approval.', 'ApprovalPending body'),
+     '{entityTypeLabel} {entityCode} is waiting for your approval. Open it to approve or reject.', 'ApprovalPending body'),
 
     -- ApprovalRejected
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_rejected.title', 'NOTIFICATION',
-     'Rejected: {entityCode}', 'ApprovalRejected title'),
+     '{entityCode} was rejected', 'ApprovalRejected title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_rejected.body', 'NOTIFICATION',
-     'Your request {entityCode} was rejected. Reason: {rejectionReason}', 'ApprovalRejected body'),
+     '{entityTypeLabel} {entityCode} was rejected. [[Reason: {rejectionReason}. ]]You can fix it and send it again.', 'ApprovalRejected body'),
 
     -- MinStockAlert
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.min_stock_alert.title', 'NOTIFICATION',
-     'Low Stock: {productCode}', 'MinStockAlert title'),
+     '{productCode} is running low', 'MinStockAlert title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.min_stock_alert.body', 'NOTIFICATION',
-     'Product {productCode} - {productName} is below minimum stock level. Current: {currentStock} {unit}, Min: {minimumStock} {unit}.', 'MinStockAlert body'),
+     '{productName} ({productCode}) is below its minimum: {currentStock} {unit} in stock, minimum {minimumStock} {unit}. Consider reordering.', 'MinStockAlert body'),
 
     -- PoDeliveryLate
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_delivery_late.title', 'NOTIFICATION',
-     'Delivery Overdue: {poNumber}', 'PoDeliveryLate title'),
+     'Purchase order {poNumber} is late', 'PoDeliveryLate title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_delivery_late.body', 'NOTIFICATION',
-     'Purchase order {poNumber} from {supplierName} is {lateDays} day(s) overdue.', 'PoDeliveryLate body'),
+     'Purchase order {poNumber} from {supplierName} is {lateDays} day(s) late. Contact the supplier.', 'PoDeliveryLate body'),
 
     -- RfqDeadlineApproaching
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_deadline_approaching.title', 'NOTIFICATION',
-     'RFQ Deadline Soon: {rfqNumber}', 'RfqDeadlineApproaching title'),
+     'Price request {rfqNumber} closes soon', 'RfqDeadlineApproaching title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_deadline_approaching.body', 'NOTIFICATION',
-     'RFQ {rfqNumber} deadline is in {hoursRemaining} hour(s). Please review pending responses.', 'RfqDeadlineApproaching body'),
+     'Suppliers have {hoursRemaining} hour(s) left to reply. Review the quotes you have.', 'RfqDeadlineApproaching body'),
 
     -- RfqNoResponse
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_no_response.title', 'NOTIFICATION',
-     'No Response: {supplierName}', 'RfqNoResponse title'),
+     '{supplierName} hasn''t replied', 'RfqNoResponse title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_no_response.body', 'NOTIFICATION',
-     'Supplier {supplierName} has not responded to RFQ {rfqNumber}.', 'RfqNoResponse body'),
+     '{supplierName} hasn''t replied to price request {rfqNumber}. You can send a reminder or ask another supplier.', 'RfqNoResponse body'),
 
     -- =========================================================
     -- Translation Keys — NORMAL eventler
@@ -402,92 +402,92 @@ ON CONFLICT (code) DO NOTHING;
 
     -- WorkOrderApproved
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_approved.title', 'NOTIFICATION',
-     'Approved: {workOrderNumber}', 'WorkOrderApproved title'),
+     'Work order {workOrderNumber} approved', 'WorkOrderApproved title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.work_order_approved.body', 'NOTIFICATION',
-     'Work order {workOrderNumber} has been approved. Production can begin.', 'WorkOrderApproved body'),
+     'Work order {workOrderNumber} was approved. Production can start.', 'WorkOrderApproved body'),
 
     -- ApprovalApproved
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_approved.title', 'NOTIFICATION',
-     'Approved: {entityCode}', 'ApprovalApproved title'),
+     '{entityCode} was approved', 'ApprovalApproved title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.approval_approved.body', 'NOTIFICATION',
-     'Your request {entityCode} has been approved.', 'ApprovalApproved body'),
+     '{entityTypeLabel} {entityCode} was approved. You can carry on with it.', 'ApprovalApproved body'),
 
     -- BatchQcPending
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.batch_qc_pending.title', 'NOTIFICATION',
-     'QC Required: Batch {batchCode}', 'BatchQcPending title'),
+     'Batch {batchCode} is ready for quality control', 'BatchQcPending title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.batch_qc_pending.body', 'NOTIFICATION',
-     'Batch {batchCode} is ready for quality control inspection.', 'BatchQcPending body'),
+     'Test batch {batchCode} and record the result.', 'BatchQcPending body'),
 
     -- GoodsReceiptConfirmed
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.goods_receipt_confirmed.title', 'NOTIFICATION',
-     'Goods Received: {receiptNumber}', 'GoodsReceiptConfirmed title'),
+     'Goods received: {receiptNumber}', 'GoodsReceiptConfirmed title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.goods_receipt_confirmed.body', 'NOTIFICATION',
-     'Receipt {receiptNumber} confirmed. {itemCount} item(s) added to stock.', 'GoodsReceiptConfirmed body'),
+     'Receipt {receiptNumber} was confirmed and {itemCount} item(s) were added to stock.', 'GoodsReceiptConfirmed body'),
 
     -- PoConfirmed
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_confirmed.title', 'NOTIFICATION',
-     'PO Confirmed: {poNumber}', 'PoConfirmed title'),
+     'Supplier confirmed purchase order {poNumber}', 'PoConfirmed title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_confirmed.body', 'NOTIFICATION',
-     'Purchase order {poNumber} has been confirmed by supplier.', 'PoConfirmed body'),
+     'The supplier confirmed purchase order {poNumber}.', 'PoConfirmed body'),
 
     -- PoPartiallyReceived
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_partially_received.title', 'NOTIFICATION',
-     'Partial Delivery: {poNumber}', 'PoPartiallyReceived title'),
+     'Part of purchase order {poNumber} has arrived', 'PoPartiallyReceived title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.po_partially_received.body', 'NOTIFICATION',
-     '{receivedItemCount} of {totalItemCount} items received for PO {poNumber}.', 'PoPartiallyReceived body'),
+     '{receivedItemCount} of {totalItemCount} items on purchase order {poNumber} have been received.', 'PoPartiallyReceived body'),
 
     -- ReturnRateExceeded (CRITICAL)
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.return_rate_exceeded.title', 'NOTIFICATION',
-     'CRITICAL: Return Rate Exceeded — {supplierName}', 'ReturnRateExceeded title'),
+     '{supplierName}''s return rate is over the limit', 'ReturnRateExceeded title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.return_rate_exceeded.body', 'NOTIFICATION',
-     'Supplier {supplierName} return rate is {returnRate}% (threshold: {thresholdRate}%) over {periodDays} days.', 'ReturnRateExceeded body')
+     'In the last {periodDays} days, {returnRate}% of goods from {supplierName} were returned. The limit is {thresholdRate}%. Consider talking to the supplier.', 'ReturnRateExceeded body')
 
   ON CONFLICT (key_code) DO NOTHING;
   INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
   SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
     CASE tk.key_code
       -- WorkOrderPendingApproval
-      WHEN 'notification.work_order_pending_approval.title'  THEN 'Onay Gerekiyor: {workOrderNumber}'
-      WHEN 'notification.work_order_pending_approval.body'   THEN '{workOrderNumber} numaralı iş emri onayınızı bekliyor.'
+      WHEN 'notification.work_order_pending_approval.title'  THEN '{workOrderNumber} iş emri onayınızı bekliyor'
+      WHEN 'notification.work_order_pending_approval.body'   THEN 'Üretime başlamak için {workOrderNumber} numaralı iş emrini kontrol edip onaylamanız gerekiyor.'
       -- ApprovalPending
-      WHEN 'notification.approval_pending.title'             THEN 'Onay Gerekiyor: {entityCode}'
-      WHEN 'notification.approval_pending.body'              THEN '{entityType} {entityCode} onayınızı bekliyor.'
+      WHEN 'notification.approval_pending.title'             THEN '{entityCode} onayınızı bekliyor'
+      WHEN 'notification.approval_pending.body'              THEN '{entityTypeLabel} {entityCode} onayınızı bekliyor. Açıp onaylayabilir ya da reddedebilirsiniz.'
       -- ApprovalRejected
-      WHEN 'notification.approval_rejected.title'            THEN 'Reddedildi: {entityCode}'
-      WHEN 'notification.approval_rejected.body'             THEN '{entityCode} talebiniz reddedildi. Neden: {rejectionReason}'
+      WHEN 'notification.approval_rejected.title'            THEN '{entityCode} reddedildi'
+      WHEN 'notification.approval_rejected.body'             THEN '{entityTypeLabel} {entityCode} reddedildi. [[Neden: {rejectionReason}. ]]Düzeltip yeniden gönderebilirsiniz.'
       -- ApprovalApproved
-      WHEN 'notification.approval_approved.title'            THEN 'Onaylandı: {entityCode}'
-      WHEN 'notification.approval_approved.body'             THEN '{entityCode} talebiniz onaylandı.'
+      WHEN 'notification.approval_approved.title'            THEN '{entityCode} onaylandı'
+      WHEN 'notification.approval_approved.body'             THEN '{entityTypeLabel} {entityCode} onaylandı. İşleme devam edebilirsiniz.'
       -- MinStockAlert
-      WHEN 'notification.min_stock_alert.title'              THEN 'Düşük Stok: {productCode}'
-      WHEN 'notification.min_stock_alert.body'               THEN '{productCode} - {productName} malzemesi minimum stok seviyesinin altında. Mevcut: {currentStock} {unit}, Min: {minimumStock} {unit}.'
+      WHEN 'notification.min_stock_alert.title'              THEN '{productCode} stoğu azaldı'
+      WHEN 'notification.min_stock_alert.body'               THEN '{productName} ({productCode}) en az olması gereken miktarın altına düştü: elde {currentStock} {unit} var, en az {minimumStock} {unit} olmalı. Sipariş vermeyi düşünün.'
       -- PoDeliveryLate
-      WHEN 'notification.po_delivery_late.title'             THEN 'Teslimat Gecikti: {poNumber}'
-      WHEN 'notification.po_delivery_late.body'              THEN '{supplierName} tedarikçisinden {poNumber} numaralı PO {lateDays} gün gecikmeli.'
+      WHEN 'notification.po_delivery_late.title'             THEN '{poNumber} siparişi gecikti'
+      WHEN 'notification.po_delivery_late.body'              THEN '{supplierName} tedarikçisinden beklenen {poNumber} numaralı sipariş {lateDays} gündür gecikiyor. Tedarikçiyle iletişime geçin.'
       -- RfqDeadlineApproaching
-      WHEN 'notification.rfq_deadline_approaching.title'     THEN 'RFQ Deadline Yaklaşıyor: {rfqNumber}'
-      WHEN 'notification.rfq_deadline_approaching.body'      THEN '{rfqNumber} RFQ''nin deadline''ına {hoursRemaining} saat kaldı. Bekleyen yanıtları inceleyin.'
+      WHEN 'notification.rfq_deadline_approaching.title'     THEN '{rfqNumber} fiyat talebinin süresi doluyor'
+      WHEN 'notification.rfq_deadline_approaching.body'      THEN 'Tedarikçilerin yanıt vermesi için {hoursRemaining} saat kaldı. Gelen teklifleri inceleyin.'
       -- RfqNoResponse
-      WHEN 'notification.rfq_no_response.title'              THEN 'Yanıt Yok: {supplierName}'
-      WHEN 'notification.rfq_no_response.body'               THEN '{supplierName} tedarikçisi {rfqNumber} RFQ için yanıt vermedi.'
+      WHEN 'notification.rfq_no_response.title'              THEN '{supplierName} yanıt vermedi'
+      WHEN 'notification.rfq_no_response.body'               THEN '{supplierName}, {rfqNumber} numaralı fiyat talebine yanıt vermedi. Hatırlatabilir ya da başka bir tedarikçiye sorabilirsiniz.'
       -- WorkOrderApproved
-      WHEN 'notification.work_order_approved.title'          THEN 'Onaylandı: {workOrderNumber}'
-      WHEN 'notification.work_order_approved.body'           THEN '{workOrderNumber} numaralı iş emri onaylandı. Üretim başlayabilir.'
+      WHEN 'notification.work_order_approved.title'          THEN '{workOrderNumber} iş emri onaylandı'
+      WHEN 'notification.work_order_approved.body'           THEN '{workOrderNumber} numaralı iş emri onaylandı, üretim başlayabilir.'
       -- BatchQcPending
-      WHEN 'notification.batch_qc_pending.title'             THEN 'KK Gerekiyor: Parti {batchCode}'
-      WHEN 'notification.batch_qc_pending.body'              THEN '{batchCode} partisi kalite kontrol incelemesine hazır.'
+      WHEN 'notification.batch_qc_pending.title'             THEN '{batchCode} partisi kalite kontrol bekliyor'
+      WHEN 'notification.batch_qc_pending.body'              THEN '{batchCode} partisi teste hazır. Kontrolü yapıp sonucu girin.'
       -- GoodsReceiptConfirmed
-      WHEN 'notification.goods_receipt_confirmed.title'      THEN 'Mal Teslim Alındı: {receiptNumber}'
-      WHEN 'notification.goods_receipt_confirmed.body'       THEN '{receiptNumber} girişi onaylandı. {itemCount} kalem stoğa eklendi.'
+      WHEN 'notification.goods_receipt_confirmed.title'      THEN 'Mal kabul tamamlandı: {receiptNumber}'
+      WHEN 'notification.goods_receipt_confirmed.body'       THEN '{receiptNumber} numaralı mal kabul onaylandı, {itemCount} kalem stoğa girdi.'
       -- PoConfirmed
-      WHEN 'notification.po_confirmed.title'                 THEN 'PO Onaylandı: {poNumber}'
+      WHEN 'notification.po_confirmed.title'                 THEN 'Tedarikçi {poNumber} siparişini onayladı'
       WHEN 'notification.po_confirmed.body'                  THEN '{poNumber} numaralı satın alma siparişi tedarikçi tarafından onaylandı.'
       -- PoPartiallyReceived
-      WHEN 'notification.po_partially_received.title'        THEN 'Kısmi Teslim: {poNumber}'
-      WHEN 'notification.po_partially_received.body'         THEN '{poNumber} PO için {receivedItemCount}/{totalItemCount} kalem teslim alındı.'
+      WHEN 'notification.po_partially_received.title'        THEN '{poNumber} siparişinin bir kısmı geldi'
+      WHEN 'notification.po_partially_received.body'         THEN '{poNumber} numaralı satın alma siparişinin {totalItemCount} kaleminden {receivedItemCount} tanesi teslim alındı.'
       -- ReturnRateExceeded
-      WHEN 'notification.return_rate_exceeded.title'         THEN 'KRİTİK: İade Oranı Aşıldı — {supplierName}'
-      WHEN 'notification.return_rate_exceeded.body'          THEN '{supplierName} tedarikçisinin iade oranı {periodDays} günde %{returnRate} (eşik: %{thresholdRate}).'
+      WHEN 'notification.return_rate_exceeded.title'         THEN '{supplierName} iade oranı sınırı aştı'
+      WHEN 'notification.return_rate_exceeded.body'          THEN 'Son {periodDays} günde {supplierName} tedarikçisinden gelen malların %{returnRate} kadarı iade edildi. Sınır %{thresholdRate}. Tedarikçiyle görüşmenizi öneririz.'
     END,
     FALSE
   FROM i18n.translation_key tk
@@ -556,6 +556,12 @@ ON CONFLICT (code) DO NOTHING;
      'notification.approval_pending.title', 'notification.approval_pending.body',
      'HIGH', 'INSTANT')
   ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  -- E-mail is off unless a user turns it on, except where something waits for that user's
+  -- decision (B1, Fatih 2026-11-12). CRITICAL events use every channel regardless.
+  UPDATE notification.notification_template
+     SET enabled_by_default = TRUE
+   WHERE channel = 'EMAIL'
+     AND event_type IN ('APPROVAL_PENDING', 'WORK_ORDER_PENDING_APPROVAL');
   INSERT INTO notification.notification_template
     (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
   VALUES
@@ -847,14 +853,14 @@ WHERE NOT EXISTS (
   INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
   VALUES
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.automation_alert.title', 'NOTIFICATION',
-     'Automation Alert!', 'AutomationAlertRequested title'),
+     'Alert from your automation rule', 'AutomationAlertRequested title'),
     (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.automation_alert.body', 'NOTIFICATION',
      '{message}', 'AutomationAlertRequested body')
   ON CONFLICT (key_code) DO NOTHING;
   INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
   SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
     CASE tk.key_code
-      WHEN 'notification.automation_alert.title' THEN 'Otomasyon Uyarısı!'
+      WHEN 'notification.automation_alert.title' THEN 'Otomasyon kuralınızdan uyarı'
       WHEN 'notification.automation_alert.body'  THEN '{message}'
     END,
     FALSE
@@ -863,3 +869,182 @@ WHERE NOT EXISTS (
     'notification.automation_alert.title', 'notification.automation_alert.body'
   )
   ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+
+-- ===================== Notification templates for events the listeners emit but no seed covered =====================
+-- RFQ_SENT, SUPPLIER_QUOTE_RECEIVED, INVOICE_OVERDUE, INVOICE_DISPUTED, PAYMENT_RECEIVED and
+-- COST_VARIANCE_DETECTED were published to the hub with no template, so each was skipped. E-mail forms
+-- exist for the three that wait on someone; they are off unless a user turns them on (enabled_by_default).
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_sent.title', 'NOTIFICATION',
+     'Price request sent: {rfqNumber}', 'RfqSent title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.rfq_sent.body', 'NOTIFICATION',
+     'Price request {rfqNumber} was sent to {supplierCount} supplier(s).', 'RfqSent body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.rfq_sent.title' THEN 'Fiyat talebi gönderildi: {rfqNumber}'
+      WHEN 'notification.rfq_sent.body'  THEN '{rfqNumber} numaralı fiyat talebi {supplierCount} tedarikçiye gönderildi.'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.rfq_sent.title', 'notification.rfq_sent.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'RFQ_SENT', 'IN_APP',
+     'notification.rfq_sent.title', 'notification.rfq_sent.body',
+     'NORMAL', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.supplier_quote_received.title', 'NOTIFICATION',
+     '{supplierName} sent a quote', 'SupplierQuoteReceived title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.supplier_quote_received.body', 'NOTIFICATION',
+     '{supplierName} sent a quote for your price request. You can compare it with the others.', 'SupplierQuoteReceived body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.supplier_quote_received.title' THEN '{supplierName} teklif gönderdi'
+      WHEN 'notification.supplier_quote_received.body'  THEN '{supplierName}, fiyat talebiniz için teklif gönderdi. Diğer tekliflerle karşılaştırabilirsiniz.'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.supplier_quote_received.title', 'notification.supplier_quote_received.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'SUPPLIER_QUOTE_RECEIVED', 'IN_APP',
+     'notification.supplier_quote_received.title', 'notification.supplier_quote_received.body',
+     'NORMAL', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.invoice_overdue.title', 'NOTIFICATION',
+     'Invoice {invoiceNumber} is overdue', 'InvoiceOverdue title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.invoice_overdue.body', 'NOTIFICATION',
+     '{invoiceSideLabel} {invoiceNumber} was due {daysOverdue} day(s) ago. {invoiceSideHint}', 'InvoiceOverdue body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.invoice_overdue.title' THEN '{invoiceNumber} faturasının vadesi geçti'
+      WHEN 'notification.invoice_overdue.body'  THEN '{invoiceNumber} numaralı {invoiceSideLabel} vadesi {daysOverdue} gün önce doldu. {invoiceSideHint}'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.invoice_overdue.title', 'notification.invoice_overdue.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'INVOICE_OVERDUE', 'IN_APP',
+     'notification.invoice_overdue.title', 'notification.invoice_overdue.body',
+     'HIGH', 'INSTANT'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'INVOICE_OVERDUE', 'EMAIL',
+     'notification.invoice_overdue.title', 'notification.invoice_overdue.body',
+     'HIGH', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.invoice_disputed.title', 'NOTIFICATION',
+     'Invoice {invoiceNumber} has been disputed', 'InvoiceDisputed title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.invoice_disputed.body', 'NOTIFICATION',
+     'A dispute was opened on invoice {invoiceNumber}. Review it with the other party.', 'InvoiceDisputed body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.invoice_disputed.title' THEN '{invoiceNumber} faturasına itiraz edildi'
+      WHEN 'notification.invoice_disputed.body'  THEN '{invoiceNumber} numaralı faturaya itiraz açıldı. Karşı tarafla birlikte inceleyin.'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.invoice_disputed.title', 'notification.invoice_disputed.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'INVOICE_DISPUTED', 'IN_APP',
+     'notification.invoice_disputed.title', 'notification.invoice_disputed.body',
+     'HIGH', 'INSTANT'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'INVOICE_DISPUTED', 'EMAIL',
+     'notification.invoice_disputed.title', 'notification.invoice_disputed.body',
+     'HIGH', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.payment_received.title', 'NOTIFICATION',
+     'Payment recorded: {paymentNumber} ({directionLabel})', 'PaymentReceived title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.payment_received.body', 'NOTIFICATION',
+     '{amount} {currency} was recorded as {directionLabel}.', 'PaymentReceived body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.payment_received.title' THEN 'Yeni {directionLabel}: {paymentNumber}'
+      WHEN 'notification.payment_received.body'  THEN '{amount} {currency} tutarındaki {directionLabel} kaydedildi.'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.payment_received.title', 'notification.payment_received.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'PAYMENT_RECEIVED', 'IN_APP',
+     'notification.payment_received.title', 'notification.payment_received.body',
+     'NORMAL', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;
+  INSERT INTO i18n.translation_key (id, tenant_id, key_code, module, default_value, description)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.cost_variance_detected.title', 'NOTIFICATION',
+     'Cost difference: {entityTypeLabel}[[ {entityCode}]]', 'CostVarianceDetected title'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'notification.cost_variance_detected.body', 'NOTIFICATION',
+     '{entityTypeLabel}[[ {entityCode}]]: the {currentStageLabel} cost is {variancePercent}% {differenceLabel} than the {previousStageLabel} cost. It is now {currentTotal} {currency}.', 'CostVarianceDetected body')
+  ON CONFLICT (key_code) DO NOTHING;
+  INSERT INTO i18n.translation_value (id, tenant_id, translation_key_id, locale, value, is_override)
+  SELECT gen_random_uuid(), '00000000-0000-0000-0000-000000000000', tk.id, 'TR',
+    CASE tk.key_code
+      WHEN 'notification.cost_variance_detected.title' THEN 'Maliyet farkı: {entityTypeLabel}[[ {entityCode}]]'
+      WHEN 'notification.cost_variance_detected.body'  THEN '{entityTypeLabel}[[ {entityCode}]]: {currentStageLabel} maliyet {previousStageLabel} maliyetten %{variancePercent} {differenceLabel}. Güncel tutar {currentTotal} {currency}.'
+    END,
+    FALSE
+  FROM i18n.translation_key tk
+  WHERE tk.key_code IN (
+    'notification.cost_variance_detected.title', 'notification.cost_variance_detected.body'
+  )
+  ON CONFLICT (translation_key_id, locale, tenant_id) DO NOTHING;
+  INSERT INTO notification.notification_template
+    (id, tenant_id, event_type, channel, title_key, body_key, importance, delivery_type)
+  VALUES
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'COST_VARIANCE_DETECTED', 'IN_APP',
+     'notification.cost_variance_detected.title', 'notification.cost_variance_detected.body',
+     'HIGH', 'INSTANT'),
+    (gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+     'COST_VARIANCE_DETECTED', 'EMAIL',
+     'notification.cost_variance_detected.title', 'notification.cost_variance_detected.body',
+     'HIGH', 'INSTANT')
+  ON CONFLICT (tenant_id, event_type, channel) DO NOTHING;

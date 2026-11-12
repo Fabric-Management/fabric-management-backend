@@ -26,6 +26,7 @@ import lombok.Data;
  *   <li>Step 10 (CloneTemplatePermissionsStep): Clones permission templates
  *   <li>Step 11 (CloneTemplatePropertyDefinitionsStep): Clones system Property Registry rows, then
  *       dependent yarn catalogue rows
+ *   <li>Step 13 (CloneTemplateNotificationsStep): Copies the notification templates and wording
  * </ul>
  */
 @Data

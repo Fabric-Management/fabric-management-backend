@@ -2,6 +2,7 @@ package com.fabricmanagement.notification.hub.app;
 
 import com.fabricmanagement.common.infrastructure.events.FollowUpResolutionNotifier;
 import com.fabricmanagement.common.infrastructure.events.ResolvedFollowUp;
+import com.fabricmanagement.notification.hub.domain.NotificationEventType;
 import com.fabricmanagement.notification.hub.domain.port.DepartmentRecipientPort;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class FollowUpResolutionNotificationAdapter implements FollowUpResolutionNotifier {
 
-  static final String EVENT_TYPE = "STUCK_FOLLOW_UP_RESOLVED";
+  static final String EVENT_TYPE = NotificationEventType.STUCK_FOLLOW_UP_RESOLVED;
 
   private final NotificationHubService notificationHub;
   private final DepartmentRecipientPort departmentRecipientPort;

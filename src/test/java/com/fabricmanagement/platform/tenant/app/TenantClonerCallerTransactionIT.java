@@ -130,6 +130,75 @@ class TenantClonerCallerTransactionIT extends AbstractIntegrationTest {
     assertThat(rows("common_user.common_role", tenant)).isZero();
   }
 
+  @Test
+  @DisplayName("give a tenant the notification catalogue, once, with its wording and defaults")
+  void copiesTheNotificationCatalogueOnce() {
+    UUID template = cloner.findTemplateTenantId();
+    UUID tenant = newTenant();
+
+    int[] copied = new int[2];
+    transactionTemplate.executeWithoutResult(
+        status -> copied[0] = cloner.cloneNotificationDataInCallerTransaction(template, tenant));
+    transactionTemplate.executeWithoutResult(
+        status -> copied[1] = cloner.cloneNotificationDataInCallerTransaction(template, tenant));
+
+    long goldenTemplates = rows("notification.notification_template", template);
+    assertThat(goldenTemplates).as("golden notification templates").isPositive();
+    assertThat(copied[0]).isEqualTo((int) goldenTemplates);
+    assertThat(rows("notification.notification_template", tenant)).isEqualTo(goldenTemplates);
+    assertThat(copied[1]).as("a second run copies nothing").isZero();
+
+    // The wording travels with the templates: no template points at a key the tenant lacks,
+    // beyond what the golden tenant itself lacks.
+    assertThat(templatesWithoutKey(tenant)).isEqualTo(templatesWithoutKey(template));
+    assertThat(notificationValues(tenant))
+        .as("notification wording values")
+        .isEqualTo(notificationValues(template))
+        .isPositive();
+    assertThat(notificationKeys(tenant)).isEqualTo(notificationKeys(template));
+
+    // The e-mail defaults (B1) are copied, not reset.
+    assertThat(emailsOnByDefault(template)).isPositive();
+    assertThat(emailsOnByDefault(tenant)).isEqualTo(emailsOnByDefault(template));
+  }
+
+  @Test
+  @DisplayName("fill in only what is missing, and leave a tenant's own template alone")
+  void aTenantsOwnTemplateIsNotOverwritten() {
+    UUID template = cloner.findTemplateTenantId();
+    UUID tenant = newTenant();
+    transactionTemplate.executeWithoutResult(
+        status -> cloner.cloneNotificationDataInCallerTransaction(template, tenant));
+
+    jdbc.update(
+        "UPDATE notification.notification_template SET enabled_by_default = NOT enabled_by_default"
+            + " WHERE tenant_id = ? AND event_type = 'APPROVAL_PENDING' AND channel = 'EMAIL'",
+        tenant);
+    jdbc.update(
+        "DELETE FROM notification.notification_template"
+            + " WHERE tenant_id = ? AND event_type = 'MIN_STOCK_ALERT' AND channel = 'EMAIL'",
+        tenant);
+
+    int[] copied = new int[1];
+    transactionTemplate.executeWithoutResult(
+        status -> copied[0] = cloner.cloneNotificationDataInCallerTransaction(template, tenant));
+
+    assertThat(copied[0]).as("only the deleted template comes back").isEqualTo(1);
+    Boolean flag =
+        jdbc.queryForObject(
+            "SELECT enabled_by_default FROM notification.notification_template"
+                + " WHERE tenant_id = ? AND event_type = 'APPROVAL_PENDING' AND channel = 'EMAIL'",
+            Boolean.class,
+            tenant);
+    Boolean golden =
+        jdbc.queryForObject(
+            "SELECT enabled_by_default FROM notification.notification_template"
+                + " WHERE tenant_id = ? AND event_type = 'APPROVAL_PENDING' AND channel = 'EMAIL'",
+            Boolean.class,
+            template);
+    assertThat(flag).as("the tenant's own choice survives a re-run").isNotEqualTo(golden);
+  }
+
   private UUID newTenant() {
     UUID id = UUID.randomUUID();
     String suffix = id.toString().substring(0, 8);
@@ -151,5 +220,44 @@ class TenantClonerCallerTransactionIT extends AbstractIntegrationTest {
 
   private long totalRows(UUID tenantId) {
     return COPIED_TABLES.stream().mapToLong(table -> rows(table, tenantId)).sum();
+  }
+
+  private long templatesWithoutKey(UUID tenantId) {
+    return jdbc.queryForObject(
+        """
+        SELECT count(*) FROM notification.notification_template t
+        WHERE t.tenant_id = ?
+          AND (NOT EXISTS (SELECT 1 FROM i18n.translation_key k
+                           WHERE k.tenant_id = t.tenant_id AND k.key_code = t.title_key)
+            OR NOT EXISTS (SELECT 1 FROM i18n.translation_key k
+                           WHERE k.tenant_id = t.tenant_id AND k.key_code = t.body_key))
+        """,
+        Long.class,
+        tenantId);
+  }
+
+  private long notificationKeys(UUID tenantId) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM i18n.translation_key"
+            + " WHERE tenant_id = ? AND key_code LIKE 'notification.%'",
+        Long.class, tenantId);
+  }
+
+  private long notificationValues(UUID tenantId) {
+    return jdbc.queryForObject(
+        """
+        SELECT count(*) FROM i18n.translation_value v
+        JOIN i18n.translation_key k ON k.id = v.translation_key_id
+        WHERE v.tenant_id = ? AND k.tenant_id = v.tenant_id AND k.key_code LIKE 'notification.%'
+        """,
+        Long.class, tenantId);
+  }
+
+  private long emailsOnByDefault(UUID tenantId) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM notification.notification_template"
+            + " WHERE tenant_id = ? AND channel = 'EMAIL' AND enabled_by_default",
+        Long.class,
+        tenantId);
   }
 }

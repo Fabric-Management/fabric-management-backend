@@ -6,9 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.sales.ownership.app.OwnershipTriageAgingEmailAdapter;
 import com.fabricmanagement.sales.ownership.app.OwnershipTriageProcessor;
 import com.fabricmanagement.sales.ownership.domain.OwnershipTriageCase;
+import com.fabricmanagement.sales.ownership.domain.event.CustomerOwnershipTriageAgedEvent;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.time.Clock;
 import java.time.Instant;
@@ -81,7 +81,7 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void anEmailFailureRollsBackTheAgingStamp() {
+  void anEscalationPublicationFailureRollsBackTheAgingStamp() {
     UUID tenantId = UUID.randomUUID();
     UUID customerId = UUID.randomUUID();
     Instant gapStartedAt = NOW.minusSeconds(172_800);
@@ -92,21 +92,16 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
                 tenantId, customerId, gapStartedAt, NOW.minusSeconds(86_400)));
 
     OwnershipTriageQueryRepository queryRepository = mock(OwnershipTriageQueryRepository.class);
-    OwnershipTriageAgingEmailAdapter emailAdapter = mock(OwnershipTriageAgingEmailAdapter.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     OwnershipTriageCase triageCase =
         new OwnershipTriageCase(customerId, "Acme", 1, NOW.minusSeconds(3_600), gapStartedAt, 24);
     when(queryRepository.findAll(tenantId)).thenReturn(List.of(triageCase));
     org.mockito.Mockito.doThrow(new IllegalStateException("outbox unavailable"))
-        .when(emailAdapter)
-        .queue(tenantId, triageCase);
+        .when(publisher)
+        .publishEvent(org.mockito.ArgumentMatchers.any(CustomerOwnershipTriageAgedEvent.class));
     OwnershipTriageProcessor processor =
         new OwnershipTriageProcessor(
-            queryRepository,
-            caseLogRepository,
-            emailAdapter,
-            publisher,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            queryRepository, caseLogRepository, publisher, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThatThrownBy(
             () ->
@@ -136,7 +131,6 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
     Instant gapStartedAt = NOW.minusSeconds(3_600);
     TenantContext.setCurrentTenantId(tenantId);
     OwnershipTriageQueryRepository queryRepository = mock(OwnershipTriageQueryRepository.class);
-    OwnershipTriageAgingEmailAdapter emailAdapter = mock(OwnershipTriageAgingEmailAdapter.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     OwnershipTriageCase triageCase =
         new OwnershipTriageCase(customerId, "Acme", 0, null, gapStartedAt, 24);
@@ -146,11 +140,7 @@ class OwnershipTriageDedupIT extends AbstractIntegrationTest {
         .publishEvent(org.mockito.ArgumentMatchers.any(Object.class));
     OwnershipTriageProcessor processor =
         new OwnershipTriageProcessor(
-            queryRepository,
-            caseLogRepository,
-            emailAdapter,
-            publisher,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            queryRepository, caseLogRepository, publisher, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThatThrownBy(
             () ->
