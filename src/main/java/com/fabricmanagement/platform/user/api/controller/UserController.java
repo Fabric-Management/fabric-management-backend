@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.PlatformAuthority;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
@@ -291,7 +292,7 @@ public class UserController {
 
     CurrentUserResponse response = CurrentUserResponse.from(user, tenantService.getMyTenant());
     // Platform staff are not bound by a tenant's packages; everyone else is, administrators too.
-    if (!"PLATFORM_ADMIN".equals(user.getRoleCode())) {
+    if (!PlatformAuthority.isPlatformAdmin(user.getRoleCode(), tenantId)) {
       response.setClosedResources(List.copyOf(packageAccess.closedResources(tenantId)));
     }
     return ResponseEntity.ok(ApiResponse.success(response));

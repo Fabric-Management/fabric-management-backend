@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.domain.LoginIdentity;
 import com.fabricmanagement.platform.auth.domain.Membership;
 import com.fabricmanagement.platform.auth.domain.MembershipStatus;
@@ -14,6 +15,7 @@ import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.infra.repository.LoginIdentityRepository;
 import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -264,6 +266,72 @@ class IdentityProvisioningServiceTest {
 
     verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
     verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  @Test
+  void shouldRefuseToJoinPlatformStaffToACompanyTenant() {
+    UUID identityId = UUID.randomUUID();
+    UUID customerTenant = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+    LoginIdentity identity = identity(identityId, "staff@example.com", "hash");
+
+    when(loginIdentityRepository.findByEmail("staff@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByLoginIdentityId(identityId))
+        .thenReturn(List.of(membership(identityId, TenantContext.SYSTEM_TENANT_ID)));
+
+    assertThatThrownBy(
+            () ->
+                service.provisionMembershipForExistingIdentity(
+                    "staff@example.com", customerTenant, userId))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            error ->
+                assertThat(error.getErrorCode()).isEqualTo("AUTH_IDENTITY_PLATFORM_SEPARATION"));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  @Test
+  void shouldRefuseToJoinACompanyPersonToThePlatformTenant() {
+    UUID identityId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+    LoginIdentity identity = identity(identityId, "owner@example.com", "hash");
+
+    when(loginIdentityRepository.findByEmail("owner@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByLoginIdentityId(identityId))
+        .thenReturn(List.of(membership(identityId, UUID.randomUUID())));
+
+    assertThatThrownBy(
+            () ->
+                service.provisionCredential(
+                    "owner@example.com",
+                    "hash",
+                    false,
+                    MfaType.NONE,
+                    null,
+                    true,
+                    TenantContext.SYSTEM_TENANT_ID,
+                    userId))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            error ->
+                assertThat(error.getErrorCode()).isEqualTo("AUTH_IDENTITY_PLATFORM_SEPARATION"));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  private static Membership membership(UUID identityId, UUID tenantId) {
+    return Membership.builder()
+        .loginIdentityId(identityId)
+        .tenantId(tenantId)
+        .userId(UUID.randomUUID())
+        .status(MembershipStatus.ACTIVE)
+        .isDefault(true)
+        .build();
   }
 
   private LoginIdentity identity(UUID identityId, String email, String passwordHash) {

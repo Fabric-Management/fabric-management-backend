@@ -49,8 +49,12 @@ public class PermissionEvaluator {
       return new PermissionResult(Map.of(), false);
     }
 
-    // Fast-path: Super user bypasses all complex calculations
-    if ("ADMIN".equals(roleCode) || "PLATFORM_ADMIN".equals(roleCode)) {
+    // Fast-path: Super user bypasses all complex calculations. The platform role counts only in
+    // the platform tenant (PLATFORM-BOUNDARY-1); anywhere else it grants nothing.
+    if (PlatformAuthority.isPlatformRoleCode(roleCode)) {
+      return new PermissionResult(Map.of(), PlatformAuthority.isPlatformTenant(tenantId));
+    }
+    if ("ADMIN".equals(roleCode)) {
       return new PermissionResult(Map.of(), true);
     }
 

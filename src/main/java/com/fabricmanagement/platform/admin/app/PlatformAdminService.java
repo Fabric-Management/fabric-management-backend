@@ -1,12 +1,15 @@
 package com.fabricmanagement.platform.admin.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.admin.dto.PlatformTenantKind;
+import com.fabricmanagement.platform.admin.dto.PlatformTenantSummary;
 import com.fabricmanagement.platform.admin.dto.TenantStatistics;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
@@ -14,16 +17,18 @@ import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Platform Admin Service - Cross-tenant management operations.
@@ -64,50 +69,54 @@ public class PlatformAdminService {
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
+  private final PlatformTransactionManager transactionManager;
 
   /**
-   * Get all tenants in the system (unpaginated).
+   * Every active tenant, as the platform screen lists it: customers first, then Playground copies,
+   * then the platform's own tenants; by name within a section (PLATFORM-BOUNDARY-1).
    *
-   * <p><b>Platform Admin Only:</b> Returns all tenants regardless of tenant context.
-   *
-   * @return List of all tenants
+   * @return all active tenants with their kind and section
    */
-  public List<TenantDto> getAllTenants() {
+  public List<PlatformTenantSummary> listTenants() {
     log.info("Platform admin: Listing all tenants in system");
-
-    List<TenantDto> tenants = tenantSystemService.getAllActive();
-
-    log.info("Found {} tenants in system", tenants.size());
-
-    return tenants;
+    return tenantSystemService.getAllActive().stream()
+        .map(PlatformAdminService::summarise)
+        .sorted(
+            Comparator.comparing(PlatformTenantSummary::group)
+                .thenComparing(PlatformTenantSummary::name, String.CASE_INSENSITIVE_ORDER))
+        .toList();
   }
 
-  /**
-   * Get all tenants in the system with pagination.
-   *
-   * <p><b>Platform Admin Only:</b> Returns paginated tenants regardless of tenant context.
-   *
-   * @param pageable page, size and sort parameters
-   * @return Page of tenants
-   */
-  public Page<TenantDto> getAllTenants(Pageable pageable) {
-    log.info(
-        "Platform admin: Listing tenants (page={}, size={})",
-        pageable.getPageNumber(),
-        pageable.getPageSize());
+  /** What a tenant is to the platform. Decided here, never by the screen. */
+  static PlatformTenantKind classify(TenantDto tenant) {
+    if (TenantContext.SYSTEM_TENANT_ID.equals(tenant.getId())) {
+      return PlatformTenantKind.PLATFORM_OWNER;
+    }
+    if (TenantContext.TEMPLATE_TENANT_ID.equals(tenant.getId())) {
+      return PlatformTenantKind.ONBOARDING_TEMPLATE;
+    }
+    if (tenant.getType() == TenantType.TEMPLATE) {
+      return PlatformTenantKind.SAMPLE_COMPANY;
+    }
+    if (tenant.getType() == TenantType.PLAYGROUND) {
+      return PlatformTenantKind.PLAYGROUND_COPY;
+    }
+    return PlatformTenantKind.CUSTOMER;
+  }
 
-    // TenantSystemService.getAllActive() returns unpaginated List<TenantDto>.
-    // For admin pagination, we do in-memory paging. Acceptable because tenant
-    // count is O(hundreds) not O(millions). If this becomes a bottleneck,
-    // add a paginated JDBC query to TenantSystemService.
-    List<TenantDto> all = tenantSystemService.getAllActive();
-    int start = (int) pageable.getOffset();
-    int end = Math.min(start + pageable.getPageSize(), all.size());
-    List<TenantDto> pageContent = start >= all.size() ? List.of() : all.subList(start, end);
-
-    log.debug("Found {} tenants on page {}", pageContent.size(), pageable.getPageNumber());
-
-    return new org.springframework.data.domain.PageImpl<>(pageContent, pageable, all.size());
+  static PlatformTenantSummary summarise(TenantDto tenant) {
+    PlatformTenantKind kind = classify(tenant);
+    return new PlatformTenantSummary(
+        tenant.getId(),
+        tenant.getUid(),
+        tenant.getName(),
+        kind,
+        kind.group(),
+        tenant.getStatus(),
+        tenant.isDemoMode(),
+        tenant.getTrialEndsAt(),
+        tenant.getLastActivityAt(),
+        tenant.getCreatedAt());
   }
 
   /**
@@ -132,12 +141,11 @@ public class PlatformAdminService {
    * @param tenantId The tenant ID to query
    * @return List of users in that tenant
    */
-  @Transactional(readOnly = true)
   public List<UserDto> getTenantUsers(UUID tenantId) {
     log.info("Platform admin: Getting users for tenant: {}", tenantId);
     validateTenantExists(tenantId);
 
-    return TenantContext.executeInTenantContext(
+    return readInTenant(
         tenantId,
         () -> {
           List<User> users = userRepository.findByTenantIdAndIsActiveTrue(tenantId);
@@ -163,12 +171,11 @@ public class PlatformAdminService {
    * @param tenantId The tenant ID to query
    * @return List of organizations in that tenant
    */
-  @Transactional(readOnly = true)
   public List<OrganizationDto> getTenantOrganizations(UUID tenantId) {
     log.info("Platform admin: Getting organizations for tenant: {}", tenantId);
     validateTenantExists(tenantId);
 
-    return TenantContext.executeInTenantContext(
+    return readInTenant(
         tenantId,
         () -> {
           List<Organization> orgs = organizationRepository.findByTenantIdAndIsActiveTrue(tenantId);
@@ -186,11 +193,10 @@ public class PlatformAdminService {
    * @param userId The user ID
    * @return UserDto
    */
-  @Transactional(readOnly = true)
   public UserDto getTenantUser(UUID tenantId, UUID userId) {
     log.info("Platform admin: Getting user {} from tenant {}", userId, tenantId);
 
-    return TenantContext.executeInTenantContext(
+    return readInTenant(
         tenantId,
         () -> {
           User user =
@@ -213,11 +219,10 @@ public class PlatformAdminService {
    * @param organizationId The organization ID
    * @return OrganizationDto
    */
-  @Transactional(readOnly = true)
   public OrganizationDto getTenantOrganization(UUID tenantId, UUID organizationId) {
     log.info("Platform admin: Getting organization {} from tenant {}", organizationId, tenantId);
 
-    return TenantContext.executeInTenantContext(
+    return readInTenant(
         tenantId,
         () -> {
           Organization org =
@@ -235,21 +240,6 @@ public class PlatformAdminService {
   }
 
   /**
-   * Execute any operation within a specific tenant context.
-   *
-   * <p>Utility method for platform admin to execute operations in any tenant context.
-   *
-   * @param tenantId The tenant ID to switch to
-   * @param operation The operation to execute
-   * @param <T> Return type
-   * @return Result of the operation
-   */
-  public <T> T executeInTenant(UUID tenantId, java.util.function.Supplier<T> operation) {
-    log.debug("Platform admin: Executing operation in tenant context: {}", tenantId);
-    return TenantContext.executeInTenantContext(tenantId, operation);
-  }
-
-  /**
    * Get tenant statistics.
    *
    * @param tenantId The tenant ID
@@ -264,7 +254,7 @@ public class PlatformAdminService {
             .findById(tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
-    return TenantContext.executeInTenantContext(
+    return readInTenant(
         tenantId,
         () -> {
           long userCount = userRepository.countByTenantIdAndIsActiveTrue(tenantId);
@@ -284,6 +274,25 @@ public class PlatformAdminService {
               .isActive(tenant.getIsActive())
               .build();
         });
+  }
+
+  /**
+   * Runs a read as the target tenant. The tenant is entered BEFORE the transaction opens: row-level
+   * security binds the connection when the transaction starts, so a transaction opened first (for
+   * example by {@code @Transactional} on the method) would stay bound to the caller's tenant and
+   * every read of the target tenant would come back empty.
+   */
+  private <T> T readInTenant(UUID tenantId, Supplier<T> read) {
+    return TenantContext.executeInTenantContext(
+        tenantId, () -> readOnlyTransaction().execute(status -> read.get()));
+  }
+
+  private TransactionTemplate readOnlyTransaction() {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setReadOnly(true);
+    // Always a fresh transaction: joining a caller's would keep the caller's tenant binding.
+    template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    return template;
   }
 
   // ========================================

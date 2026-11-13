@@ -1,6 +1,7 @@
 package com.fabricmanagement.notification.hub.infra.websocket;
 
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
+import com.fabricmanagement.common.infrastructure.security.PlatformAuthority;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import java.util.List;
 import java.util.UUID;
@@ -84,12 +85,18 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
       List<String> departmentCodes = jwtService.getDepartmentCodesFromToken(token);
       String primaryDepartment = jwtService.getPrimaryDepartmentFromToken(token);
+      // PLATFORM-BOUNDARY-1: the same rule as JwtAuthenticationFilter.
+      JwtService.AuthTokenClaims claims = jwtService.extractAuthContext(token);
+      roleCode =
+          PlatformAuthority.effectiveRoleCode(
+              roleCode, tenantId, claims.isPlayground(), claims.demoImpersonation());
 
       AuthenticatedUserContext userContext =
           new AuthenticatedUserContext(
               userId, roleCode, departmentCodes, primaryDepartment, tenantId);
 
-      var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + roleCode));
+      List<SimpleGrantedAuthority> authorities =
+          roleCode == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + roleCode));
       var authentication = new UsernamePasswordAuthenticationToken(userContext, null, authorities);
       authentication.setDetails(userContext);
 

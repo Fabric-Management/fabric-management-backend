@@ -4,13 +4,11 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
-import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
@@ -20,12 +18,9 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserContact;
 import com.fabricmanagement.platform.user.domain.UserDepartment;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
-import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
-import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,146 +35,6 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JwtService jwtService;
-  @Autowired private TaskTemplateCatalogueBackfillRunner catalogueRunner;
-
-  @BeforeEach
-  void setUpTemplateTenant() {
-    // The playground source with its catalogue (see PlaygroundSourceFixture); the users below
-    // are what /playground/init and /personas read back.
-    UUID templateTenantId = PlaygroundSourceFixture.ensureWithCatalogue(jdbc, catalogueRunner);
-
-    // If Jane Smith already exists, we have already seeded for this test class
-    Long janeCount =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM common_user.common_user WHERE first_name = 'Jane' AND tenant_id = ?",
-            Long.class,
-            templateTenantId);
-    if (janeCount != null && janeCount > 0) {
-      return;
-    }
-
-    UUID orgId;
-    List<UUID> existingOrgs =
-        jdbc.queryForList(
-            "SELECT id FROM common_company.common_organization WHERE tenant_id = ? LIMIT 1",
-            UUID.class,
-            templateTenantId);
-    if (!existingOrgs.isEmpty()) {
-      orgId = existingOrgs.get(0);
-    } else {
-      orgId = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, tax_id, organization_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, 'Test Org', '1234567890', 'VERTICAL_MILL', true, now(), now(), 0)",
-          orgId,
-          templateTenantId,
-          UUID.randomUUID().toString());
-    }
-
-    UUID roleId;
-    List<UUID> existingRoles =
-        jdbc.queryForList(
-            "SELECT id FROM common_user.common_role WHERE tenant_id = ? AND role_code = 'ROLE-001' LIMIT 1",
-            UUID.class,
-            templateTenantId);
-    if (!existingRoles.isEmpty()) {
-      roleId = existingRoles.get(0);
-    } else {
-      roleId = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO common_user.common_role (id, tenant_id, uid, role_name, role_code, role_scope, is_system_role, is_active, created_at, updated_at, version) VALUES (?, ?, ?, 'Test Role', 'ROLE-001', 'INTERNAL', false, true, now(), now(), 0)",
-          roleId,
-          templateTenantId,
-          UUID.randomUUID().toString());
-    }
-
-    UUID userId1 = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, 'John', 'Doe', 'INTERNAL', true, now(), now(), 0)",
-        userId1,
-        templateTenantId,
-        UUID.randomUUID().toString(),
-        orgId,
-        roleId);
-
-    UUID userId2 = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, 'Jane', 'Smith', 'INTERNAL', true, now(), now(), 0)",
-        userId2,
-        templateTenantId,
-        UUID.randomUUID().toString(),
-        orgId,
-        roleId);
-  }
-
-  @Test
-  @DisplayName("Full Playground flow: Init -> Impersonate")
-  void playgroundFlowTest() throws Exception {
-    // 1. Initialize playground
-    MvcResult initResult =
-        mockMvc
-            .perform(
-                post("/api/v1/playground/init")
-                    .param("guestId", "integration-test-guest")
-                    .with(
-                        request -> {
-                          request.setRemoteAddr("10.99.99.10");
-                          return request;
-                        }))
-            .andDo(print())
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.token").exists())
-            .andExpect(jsonPath("$.tenantId").exists())
-            .andExpect(jsonPath("$.organizationType").exists())
-            .andReturn();
-
-    String responseStr = initResult.getResponse().getContentAsString();
-    String token = JsonPath.read(responseStr, "$.token");
-
-    // 2. Fetch Personas (using the token we just got)
-    MvcResult personasResult =
-        mockMvc
-            .perform(get("/api/v1/playground/personas").header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(2))))
-            .andExpect(jsonPath("$[0].userType").exists())
-            .andExpect(jsonPath("$[0].organizationName").exists())
-            .andReturn();
-
-    String personasStr = personasResult.getResponse().getContentAsString();
-    String targetUserId = JsonPath.read(personasStr, "$[1].id");
-
-    // 3. Impersonate another user
-    mockMvc
-        .perform(
-            post("/api/v1/playground/impersonate/" + targetUserId)
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").exists())
-        .andExpect(jsonPath("$.userId").value(targetUserId));
-  }
-
-  @Test
-  @DisplayName("Should return 429 when initializing too frequently from same IP")
-  void shouldReturn429OnRateLimit() throws Exception {
-    mockMvc.perform(
-        post("/api/v1/playground/init")
-            .param("guestId", "guest-rate-1")
-            .with(
-                request -> {
-                  request.setRemoteAddr("10.99.99.20");
-                  return request;
-                }));
-    mockMvc
-        .perform(
-            post("/api/v1/playground/init")
-                .param("guestId", "guest-rate-2")
-                .with(
-                    request -> {
-                      request.setRemoteAddr("10.99.99.20");
-                      return request;
-                    }))
-        .andExpect(status().isTooManyRequests());
-  }
 
   @Test
   @DisplayName("Should return 401 when impersonating with invalid token")
@@ -243,22 +98,6 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("Anonymous playground impersonation keeps access-only cookie behavior")
-  void anonymousPlaygroundImpersonationKeepsAccessOnlyCookieBehavior() throws Exception {
-    DemoTenantFixture fixture = createDemoTenantFixture(true, "TRIAL");
-    String token =
-        jwtService.generatePlaygroundAccessToken(fixture.owner(), "guest-1", "owner@example.com");
-
-    mockMvc
-        .perform(
-            post("/api/v1/playground/impersonate/" + fixture.worker().getId())
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andExpect(cookie().exists("access_token"))
-        .andExpect(cookie().doesNotExist(AuthCookieSupport.REFRESH_TOKEN_COOKIE_NAME));
-  }
-
-  @Test
   @DisplayName("Authenticated non-demo ACTIVE tenant is refused with DEMO_MODE_REQUIRED")
   void authenticatedActiveTenantCannotImpersonate() throws Exception {
     DemoTenantFixture fixture = createDemoTenantFixture(false, "ACTIVE");
@@ -278,8 +117,8 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("ACTIVE and EXPIRED tenants cannot impersonate even with playground token claims")
-  void activeAndExpiredTenantsCannotImpersonateEvenWithPlaygroundClaims() throws Exception {
+  @DisplayName("ACTIVE and EXPIRED non-demo tenants cannot impersonate")
+  void activeAndExpiredTenantsCannotImpersonate() throws Exception {
     assertImpersonationRefusedForStatus("ACTIVE");
     assertImpersonationRefusedForStatus("EXPIRED");
   }
@@ -296,8 +135,7 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
 
   private void assertImpersonationRefusedForStatus(String status) throws Exception {
     DemoTenantFixture fixture = createDemoTenantFixture(false, status);
-    String token =
-        jwtService.generatePlaygroundAccessToken(fixture.owner(), "guest-1", "owner@example.com");
+    String token = jwtService.generateAccessToken(fixture.owner());
 
     mockMvc
         .perform(
@@ -305,6 +143,20 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("DEMO_MODE_REQUIRED"));
+  }
+
+  @Test
+  @DisplayName("The anonymous Playground entry is retired")
+  void anonymousPlaygroundInitIsGone() throws Exception {
+    // PLATFORM-BOUNDARY-1: no endpoint hands out a session without registration.
+    mockMvc.perform(post("/api/v1/playground/init")).andExpect(status().isUnauthorized());
+
+    // And it is gone, not merely protected: a signed-in caller finds nothing there.
+    DemoTenantFixture fixture = createDemoTenantFixture(true, "TRIAL");
+    String token = jwtService.generateAccessToken(fixture.owner());
+    mockMvc
+        .perform(post("/api/v1/playground/init").header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound());
   }
 
   private DemoTenantFixture createDemoTenantFixture(boolean demoMode, String tenantStatus) {

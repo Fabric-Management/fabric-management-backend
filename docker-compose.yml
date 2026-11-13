@@ -73,6 +73,14 @@ services:
       GOOGLE_MAPS_ENABLED: ${GOOGLE_MAPS_ENABLED:-true}
       GOOGLE_MAPS_TIMEOUT: ${GOOGLE_MAPS_TIMEOUT:-10000}
       GOOGLE_MAPS_REGION_BIAS: ${GOOGLE_MAPS_REGION_BIAS:-GB}
+      # Development platform operator (PlatformOperatorDevSeeder, docker/dev profiles only):
+      # a Longward staff account in the platform tenant. Set these in .env (never committed);
+      # leave them empty and no platform account is created. Use an address that no customer or
+      # demo tenant uses. Created once: a changed value needs a database reset.
+      FABRICOS_DEV_PLATFORM_ADMIN_EMAIL: ${FABRICOS_DEV_PLATFORM_ADMIN_EMAIL:-}
+      FABRICOS_DEV_PLATFORM_ADMIN_PASSWORD: ${FABRICOS_DEV_PLATFORM_ADMIN_PASSWORD:-}
+      FABRICOS_DEV_PLATFORM_ADMIN_FIRST_NAME: ${FABRICOS_DEV_PLATFORM_ADMIN_FIRST_NAME:-}
+      FABRICOS_DEV_PLATFORM_ADMIN_LAST_NAME: ${FABRICOS_DEV_PLATFORM_ADMIN_LAST_NAME:-}
     ports:
       - "${APP_PORT:-8080}:8080"
     networks:

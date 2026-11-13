@@ -12,7 +12,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Seeder for the initial Tenant. */
+/**
+ * Seeder for Nexus Fabrics, the development sample company.
+ *
+ * <p>PLATFORM-BOUNDARY-1: a full sample mill with every persona, kept for development and visual
+ * checks only. {@link DevSeedDataRunner} runs it in the {@code dev} and {@code docker} profiles, so
+ * it never exists in a live installation. It holds business personas only: platform staff belong to
+ * Longward's platform tenant. Companies trying FabricOS get their own demo tenant at registration,
+ * with personas for their line of work; nothing is copied from this tenant any more.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -67,15 +75,13 @@ public class TenantSeeder implements DataSeeder {
               }
 
               // Clone production reference data, then missing system Property Registry and yarn
-              // catalogue rows from Golden Template. This provisions the demo company so
-              // playground cloning produces complete tenants. Chain: golden-template →
-              // nexus-fabrics → playground.
+              // catalogue rows from Golden Template, so the sample company is complete.
               int refTables =
                   tenantClonerService.cloneReferenceDataInCallerTransaction(tenant.getId());
               log.info("Cloned {} reference data tables into Nexus Fabrics", refTables);
 
-              // The notification catalogue: Nexus Fabrics is the source playground tenants are
-              // cloned from, so a template missing here is missing from every playground.
+              // The notification catalogue, so the sample company's notifications read as in
+              // any registered company.
               if (goldenTemplateId != null) {
                 int clonedTemplates =
                     tenantClonerService.cloneNotificationDataInCallerTransaction(

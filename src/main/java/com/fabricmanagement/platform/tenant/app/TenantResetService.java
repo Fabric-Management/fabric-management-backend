@@ -109,7 +109,8 @@ public class TenantResetService {
           "Seeded demo users cannot reset demo data", "RESET_REQUIRES_OWNER", 403);
     }
     String roleCode = caller.getRole() != null ? caller.getRole().getRoleCode() : null;
-    if (!"ADMIN".equalsIgnoreCase(roleCode) && !"PLATFORM_ADMIN".equalsIgnoreCase(roleCode)) {
+    // Only the tenant's own administrator: platform staff are never users of a demo tenant.
+    if (!"ADMIN".equalsIgnoreCase(roleCode)) {
       throw new PlatformDomainException(
           "Only a tenant owner or admin can reset demo data", "RESET_REQUIRES_OWNER", 403);
     }

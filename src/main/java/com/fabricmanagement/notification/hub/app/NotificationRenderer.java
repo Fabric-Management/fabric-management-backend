@@ -36,7 +36,9 @@ import java.util.regex.Pattern;
  *       blank (for example "Neden: …" when no reason was given).
  * </ul>
  *
- * <p>Every value is HTML-escaped, as the e-mail body is HTML.
+ * <p>The result is plain text. The bell shows it as text (the browser escapes it there), so it is
+ * not HTML-escaped here; the e-mail channel escapes the body when it wraps it in HTML ({@code
+ * EmailNotificationSender}).
  */
 public final class NotificationRenderer {
 
@@ -82,7 +84,7 @@ public final class NotificationRenderer {
     while (placeholder.find()) {
       String value = resolver.value(placeholder.group(1));
       placeholder.appendReplacement(
-          out, Matcher.quoteReplacement(value == null ? placeholder.group() : escapeHtml(value)));
+          out, Matcher.quoteReplacement(value == null ? placeholder.group() : value));
     }
     placeholder.appendTail(out);
     return out.toString().replaceAll("[ \\t]{2,}", " ").trim();
@@ -209,14 +211,5 @@ public final class NotificationRenderer {
       return Locale.UK;
     }
     return "EN".equalsIgnoreCase(locale) ? Locale.UK : Locale.forLanguageTag(locale.toLowerCase());
-  }
-
-  private static String escapeHtml(String value) {
-    return value
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&#39;");
   }
 }

@@ -98,12 +98,13 @@ class EffectivePermissionUserQueryIT extends AbstractIntegrationTest {
 
     assertThat(result)
         .containsExactlyInAnyOrder(
-            lineageGrant.getId(),
-            departmentless.getId(),
-            grantingOverride.getId(),
-            admin.getId(),
-            platformAdmin.getId())
-        .doesNotContain(revokingOverride.getId(), inactive.getId(), tenantBHolder.getId());
+            lineageGrant.getId(), departmentless.getId(), grantingOverride.getId(), admin.getId())
+        // PLATFORM-BOUNDARY-1: the platform role grants nothing inside a customer tenant.
+        .doesNotContain(
+            platformAdmin.getId(),
+            revokingOverride.getId(),
+            inactive.getId(),
+            tenantBHolder.getId());
   }
 
   private TenantFixture tenant(String suffix) {

@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.user.domain.DataScope;
@@ -126,6 +127,10 @@ class PermissionEvaluatorDepartmentlessUserTest {
     PermissionResult nullRoleResult = evaluator.evaluate(TENANT_ID, null, departmentCodes, USER_ID);
     PermissionResult adminResult = evaluator.evaluate(TENANT_ID, "ADMIN", departmentCodes, USER_ID);
     PermissionResult platformAdminResult =
+        evaluator.evaluate(
+            TenantContext.SYSTEM_TENANT_ID, "PLATFORM_ADMIN", departmentCodes, USER_ID);
+    // PLATFORM-BOUNDARY-1: the platform role outside the platform tenant grants nothing.
+    PermissionResult strayPlatformRole =
         evaluator.evaluate(TENANT_ID, "PLATFORM_ADMIN", departmentCodes, USER_ID);
 
     assertThat(nullRoleResult.permissions()).isEmpty();
@@ -140,6 +145,10 @@ class PermissionEvaluatorDepartmentlessUserTest {
     assertThat(platformAdminResult.can("finance", "read")).isTrue();
     assertThat(platformAdminResult.scopeOf("finance", "read")).isEqualTo(DataScope.GLOBAL);
     assertThat(platformAdminResult.isSuperAdmin()).isTrue();
+
+    assertThat(strayPlatformRole.isSuperAdmin()).isFalse();
+    assertThat(strayPlatformRole.can("finance", "read")).isFalse();
+    assertThat(strayPlatformRole.permissions()).isEmpty();
   }
 
   private static Stream<Arguments> departmentlessDepartmentCodes() {

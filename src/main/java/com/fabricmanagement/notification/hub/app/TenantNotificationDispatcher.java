@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class TenantNotificationDispatcher {
   /** The transactional half; a separate bean so the new transaction starts in the target tenant. */
   @Component
   @RequiredArgsConstructor
+  @Slf4j
   public static class InTenantTransaction {
 
     private final NotificationHubService hub;
@@ -63,6 +65,14 @@ public class TenantNotificationDispatcher {
         String referenceType) {
       List<UUID> to = recipients.get().stream().distinct().sorted().toList();
       if (to.isEmpty()) {
+        // Not an error, but a notification that reaches nobody is a gap worth seeing: a role
+        // nobody holds, or a lookup that row-level security emptied.
+        log.warn(
+            "No recipient in tenant {} for {} (reference {} {}); nothing was queued",
+            tenantId,
+            eventType,
+            referenceType,
+            referenceId);
         return;
       }
       hub.notifyAll(to, tenantId, eventType, payload, referenceId, referenceType);

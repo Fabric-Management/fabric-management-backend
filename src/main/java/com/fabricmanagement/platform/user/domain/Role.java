@@ -75,6 +75,22 @@ public class Role extends BaseEntity {
     return create(roleName, roleCode, description, RoleScope.INTERNAL);
   }
 
+  /**
+   * Whether this is the platform staff role (PLATFORM-BOUNDARY-1). Such a role lives only in the
+   * platform tenant and is never assigned, listed or created through the tenant user screens.
+   */
+  public boolean isPlatformScope() {
+    return roleScope == RoleScope.SYSTEM || isPlatformRoleCode(roleCode);
+  }
+
+  /**
+   * Whether the code is the reserved platform staff role code (case-insensitive). Mirrors {@code
+   * PlatformAuthority.isPlatformRoleCode}, which security code uses.
+   */
+  public static boolean isPlatformRoleCode(String code) {
+    return "PLATFORM_ADMIN".equalsIgnoreCase(code);
+  }
+
   @Override
   protected String getModuleCode() {
     return "ROLE";

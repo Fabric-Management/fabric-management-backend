@@ -2933,47 +2933,8 @@ CREATE INDEX idx_notif_created_at ON common_communication.common_notification(cr
 -- 1. common_tenant (V081 — SYSTEM_TENANT_ID)
 -- ============================================================================
 
--- ============================================================================
--- 2. common_org / user (V017 — Platform System org + platform admin user)
---    Sıra: organization → role → user → contact → user_contact → auth_user
--- ============================================================================
-DO $$
-DECLARE
-    system_tenant_id UUID := '00000000-0000-0000-0000-000000000000'::uuid;
-    platform_org_id UUID;
-    platform_role_id UUID;
-    platform_user_id UUID;
-    platform_contact_id UUID;
-    platform_auth_id UUID;
-    platform_admin_email VARCHAR := 'superadmin@fabricmanagement.com';
-    platform_admin_password_hash VARCHAR := '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'; -- user's existing hash
-BEGIN
-    -- Organization: Platform System (idempotent by uk_organization_tenant_tax_id)
-
-    SELECT id INTO platform_org_id FROM common_company.common_organization
-    WHERE tenant_id = system_tenant_id AND tax_id = 'PLATFORM-SYSTEM-001' LIMIT 1;
-    IF platform_org_id IS NULL THEN RETURN; END IF;
-
-    -- Role: PLATFORM_ADMIN (idempotent by uq_role_tenant_code)
-
-    SELECT id INTO platform_role_id FROM common_user.common_role
-    WHERE tenant_id = system_tenant_id AND role_code = 'PLATFORM_ADMIN' LIMIT 1;
-    IF platform_role_id IS NULL THEN RETURN; END IF;
-
-    -- User: platform admin (skip if already exists by contact)
-    IF EXISTS (
-        SELECT 1 FROM common_user.common_user u
-        JOIN common_user.common_user_contact uc ON u.id = uc.user_id
-        JOIN common_communication.common_contact c ON uc.contact_id = c.id
-        WHERE u.tenant_id = system_tenant_id AND c.contact_value = platform_admin_email
-    ) THEN RETURN; END IF;
-
-    platform_user_id := gen_random_uuid();
-    platform_contact_id := gen_random_uuid();
-    platform_auth_id := gen_random_uuid();
-
-
-END $$;
+-- 2. (removed, PLATFORM-BOUNDARY-1) The platform tenant's organisation and role are seeded in V002;
+--    no platform user is seeded by any migration.
 
 -- ============================================================================
 -- 3. Fiber reference (V008 — prod_fiber_category, prod_product_attribute, prod_fiber_certification, prod_fiber_iso_code)

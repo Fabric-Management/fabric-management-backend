@@ -21,8 +21,8 @@ public interface TenantQueryPort {
   List<TenantReference> findAllLiveTenants();
 
   /**
-   * The tenant that playground tenants are cloned from, resolved exactly as the playground clone
-   * resolves it; empty if it does not exist or is deleted.
+   * The development sample company (Nexus Fabrics, once the source of the retired anonymous
+   * Playground copies); empty if it does not exist or is deleted, as in a live installation.
    */
   Optional<TenantReference> findPlaygroundSourceTenant();
 

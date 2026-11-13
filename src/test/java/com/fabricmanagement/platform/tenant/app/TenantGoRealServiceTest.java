@@ -123,6 +123,24 @@ class TenantGoRealServiceTest {
     verifyNoInteractions(userOnboardingService, purgeService);
   }
 
+  @Test
+  void shouldRefuseAPlatformRoleCallerWithoutPurging() {
+    // PLATFORM-BOUNDARY-1: only the tenant's own administrator switches the tenant to real mode.
+    User platformRole = owner();
+    platformRole.setRole(Role.create("Platform", "PLATFORM_ADMIN", "Platform"));
+    when(tenantSystemService.findById(TENANT_ID))
+        .thenReturn(Optional.of(TenantDto.builder().id(TENANT_ID).demoMode(true).build()));
+    when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID))
+        .thenReturn(Optional.of(platformRole));
+
+    assertThatThrownBy(() -> service.goReal(context("PLATFORM_ADMIN"), null))
+        .isInstanceOf(PlatformDomainException.class)
+        .extracting("errorCode", "httpStatus")
+        .containsExactly("GO_REAL_REQUIRES_OWNER", 403);
+
+    verifyNoInteractions(userOnboardingService, purgeService);
+  }
+
   private AuthenticatedUserContext context(String roleCode) {
     return new AuthenticatedUserContext(USER_ID, roleCode, List.of(), null, TENANT_ID);
   }

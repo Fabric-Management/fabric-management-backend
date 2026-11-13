@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
@@ -76,8 +77,14 @@ class UserSeederTest {
     UUID tenantId = UUID.randomUUID();
     UUID organizationId = UUID.randomUUID();
     stubTransactionTemplate();
+    // An integrated mill: the core personas plus every production area (14).
     when(organizationService.getRootOrganization())
-        .thenReturn(Optional.of(OrganizationDto.builder().id(organizationId).build()));
+        .thenReturn(
+            Optional.of(
+                OrganizationDto.builder()
+                    .id(organizationId)
+                    .organizationType(OrganizationType.VERTICAL_MILL)
+                    .build()));
     when(userRepository.existsByTenantIdAndContactValue(Mockito.eq(tenantId), anyString()))
         .thenReturn(false);
     when(roleService.findByCode(anyString())).thenAnswer(invocation -> Optional.of(role()));
@@ -104,17 +111,17 @@ class UserSeederTest {
 
     ArgumentCaptor<CreateInternalUserRequest> requestCaptor =
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
-    verify(userCreationService, Mockito.times(15)).createInternalUser(requestCaptor.capture());
-    verify(authUserRepository, Mockito.times(15)).save(any());
+    verify(userCreationService, Mockito.times(14)).createInternalUser(requestCaptor.capture());
+    verify(authUserRepository, Mockito.times(14)).save(any());
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-    verify(userRepository, Mockito.times(15)).save(userCaptor.capture());
+    verify(userRepository, Mockito.times(14)).save(userCaptor.capture());
     List<String> contactValues =
         requestCaptor.getAllValues().stream()
             .map(CreateInternalUserRequest::getContactValue)
             .toList();
-    assertThat(seeded).isEqualTo(15);
+    assertThat(seeded).isEqualTo(14);
     assertThat(contactValues)
-        .hasSize(15)
+        .hasSize(14)
         .allSatisfy(
             email -> {
               assertThat(email).startsWith("owner+");
@@ -125,7 +132,7 @@ class UserSeederTest {
     assertThat(requestCaptor.getAllValues())
         .allSatisfy(request -> assertThat(request.isInvitationEmailSuppressed()).isTrue());
     assertThat(userCaptor.getAllValues())
-        .hasSize(15)
+        .hasSize(14)
         .allSatisfy(user -> assertThat(user.isDemoSeed()).isTrue());
   }
 
@@ -144,6 +151,94 @@ class UserSeederTest {
     assertThat(seeded).isZero();
     verify(userCreationService, never()).createInternalUser(any());
     verify(authUserRepository, never()).save(any());
+  }
+
+  @Test
+  void aWeaverGetsTheCorePersonasAndItsOwnProductionArea() {
+    // PLATFORM-BOUNDARY-1: personas follow the company's own work, nothing it does not do.
+    List<String> weaver = UserSeeder.personaEmailsFor(OrganizationType.WEAVER);
+
+    assertThat(weaver)
+        .hasSize(8)
+        .startsWith(UserSeeder.CORE_PERSONA_EMAILS.toArray(String[]::new))
+        .contains("weav.mgr@nexusfabrics.com", "weaver@nexusfabrics.com")
+        .doesNotContain(
+            "spin.mgr@nexusfabrics.com", "knit.mgr@nexusfabrics.com", "dye.mgr@nexusfabrics.com");
+  }
+
+  @Test
+  void anIntegratedMillGetsEveryProductionArea() {
+    assertThat(UserSeeder.personaEmailsFor(OrganizationType.VERTICAL_MILL))
+        .hasSize(14)
+        .contains(
+            "spin.op@nexusfabrics.com",
+            "weaver@nexusfabrics.com",
+            "knitter@nexusfabrics.com",
+            "jet.op@nexusfabrics.com");
+    assertThat(UserSeeder.personaEmailsFor(null)).hasSize(14);
+  }
+
+  @Test
+  void aGarmentMakerGetsTheCorePersonasOnly() {
+    assertThat(UserSeeder.personaEmailsFor(OrganizationType.GARMENT_MANUFACTURER))
+        .containsExactlyElementsOf(UserSeeder.CORE_PERSONA_EMAILS);
+  }
+
+  @Test
+  void theCoreKeepsThePersonasTheDemoDataIsRecordedAs() {
+    // The sales demo data is Sandra Deal's work and the purchasing demo data Yolanda Bidwell's.
+    assertThat(UserSeeder.CORE_PERSONA_EMAILS)
+        .contains("sales.rep@nexusfabrics.com", "yarn.buyer@nexusfabrics.com");
+    for (OrganizationType type : OrganizationType.values()) {
+      assertThat(UserSeeder.personaEmailsFor(type))
+          .as("%s", type)
+          .doesNotHaveDuplicates()
+          .containsAll(UserSeeder.CORE_PERSONA_EMAILS);
+    }
+  }
+
+  @Test
+  void seedsTheWeaverSetForAWeavingCompany() {
+    UUID tenantId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
+    stubTransactionTemplate();
+    when(organizationService.getRootOrganization())
+        .thenReturn(
+            Optional.of(
+                OrganizationDto.builder()
+                    .id(organizationId)
+                    .organizationType(OrganizationType.WEAVER)
+                    .build()));
+    when(userRepository.existsByTenantIdAndContactValue(Mockito.eq(tenantId), anyString()))
+        .thenReturn(false);
+    when(roleService.findByCode(anyString())).thenAnswer(invocation -> Optional.of(role()));
+    when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentCode(
+            Mockito.eq(tenantId), Mockito.eq(organizationId), anyString()))
+        .thenAnswer(invocation -> Optional.of(department(organizationId)));
+    when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
+        .thenAnswer(invocation -> UserDto.builder().id(UUID.randomUUID()).build());
+    when(userRepository.findByTenantIdAndId(Mockito.eq(tenantId), ArgumentMatchers.any(UUID.class)))
+        .thenAnswer(
+            invocation -> {
+              User user = User.create("Seed", "Persona", organizationId);
+              user.setId(invocation.getArgument(1));
+              user.setTenantId(tenantId);
+              return Optional.of(user);
+            });
+    when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+    when(contactRepository.findByTenantIdAndContactValue(Mockito.eq(tenantId), anyString()))
+        .thenReturn(Optional.empty());
+
+    int seeded = userSeeder.seedFor(tenantId, "owner@example.com", PersonaSubset.REPRESENTATIVE);
+
+    ArgumentCaptor<CreateInternalUserRequest> requests =
+        ArgumentCaptor.forClass(CreateInternalUserRequest.class);
+    verify(userCreationService, Mockito.times(8)).createInternalUser(requests.capture());
+    assertThat(seeded).isEqualTo(8);
+    assertThat(requests.getAllValues())
+        .extracting(CreateInternalUserRequest::getContactValue)
+        .contains("owner+weav-mgr@example.com", "owner+sales-rep@example.com")
+        .doesNotContain("owner+spin-mgr@example.com");
   }
 
   private void stubTransactionTemplate() {

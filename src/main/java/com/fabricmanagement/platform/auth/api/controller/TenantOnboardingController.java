@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Tenant Onboarding Controller - Internal admin endpoints for tenant creation.
  *
- * <p><b>Security:</b> These endpoints should be protected with PLATFORM_ADMIN role
+ * <p><b>Security:</b> platform staff only: the PLATFORM_ADMIN role in the platform tenant
+ * (PLATFORM-BOUNDARY-1)
  *
  * <p>Used by sales team to onboard new enterprise customers.
  *
@@ -48,7 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Tenant Onboarding (Admin)",
     description =
-        "Sales-led tenant creation. Creates tenant and organization, admin user, subscriptions, and sends welcome email with setup link. Requires platform admin in production.")
+        "Sales-led tenant creation. Creates tenant and organization, admin user, subscriptions, and sends welcome email with setup link. Platform staff only.")
 public class TenantOnboardingController {
 
   private final TenantOnboardingService onboardingService;
@@ -56,7 +58,7 @@ public class TenantOnboardingController {
   @Operation(
       summary = "Create tenant (sales-led)",
       description =
-          "Creates a new tenant and organization, admin user, selected OS subscriptions (trial), and registration token. Sends welcome email to admin with setup link. In production this endpoint should be protected with PLATFORM_ADMIN role.")
+          "Creates a new tenant and organization, admin user, selected OS subscriptions (trial), and registration token. Sends welcome email to admin with setup link. Platform staff only.")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "200",
       description = "Tenant created successfully; welcome email sent to admin",
@@ -66,8 +68,7 @@ public class TenantOnboardingController {
               schema = @Schema(implementation = TenantOnboardingResponse.class)))
   @PostMapping("/tenant")
   @SensitiveLogData
-  // @PreAuthorize("hasRole('PLATFORM_ADMIN')")  // Enable in production after creating first
-  // platform admin
+  @PreAuthorize("hasRole('PLATFORM_ADMIN')")
   public ResponseEntity<ApiResponse<TenantOnboardingResponse>> createTenant(
       @Valid @RequestBody TenantOnboardingRequest request) {
 

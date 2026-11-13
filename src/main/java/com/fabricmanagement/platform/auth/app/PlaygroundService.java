@@ -3,18 +3,16 @@ package com.fabricmanagement.platform.auth.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import com.fabricmanagement.platform.auth.dto.PlaygroundImpersonateResponse;
-import com.fabricmanagement.platform.auth.dto.PlaygroundInitResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundPersonaDto;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
-import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.app.TenantClonerService;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -22,24 +20,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PlaygroundService {
 
-  private final TenantClonerService tenantClonerService;
   private final JwtService jwtService;
   private final UserRepository userRepository;
   private final OrganizationRepository organizationRepository;
-  private final TransactionTemplate transactionTemplate;
   private final TenantAccessPort tenantAccessPort;
 
   private static final Map<String, String> PLAYGROUND_JOB_TITLES =
       Map.ofEntries(
           Map.entry("admin@nexusfabrics.com", "System Admin"),
-          Map.entry("admin@fabricos.io", "Platform Admin"),
           Map.entry("spin.mgr@nexusfabrics.com", "Spinning Mill Manager"),
           Map.entry("spin.super@nexusfabrics.com", "Spinning Supervisor"),
           Map.entry("blow.op@nexusfabrics.com", "Blow Room Operator"),
@@ -113,102 +107,15 @@ public class PlaygroundService {
           Map.entry("finance@centraltextile.com", "Partner Accountant"));
 
   /**
-   * Initializes a playground session by cloning the template tenant and selecting a default
-   * persona.
-   *
-   * <p><b>Why no @Transactional here:</b> The clone step uses BYPASSRLS (SystemTransactionExecutor)
-   * with its own JDBC connection. If we wrapped this method in @Transactional, Spring would open a
-   * Hibernate Session (and DB connection) BEFORE TenantContext is set — binding it to
-   * SYSTEM_TENANT_ID. The subsequent JPA read would reuse that connection, and RLS would filter out
-   * all rows for the new playground tenant, returning an empty user list.
-   *
-   * <p>Instead, we let the clone run in its own transaction, then set TenantContext and open a NEW
-   * read-only transaction via TransactionTemplate so the connection is bound to the correct tenant.
-   *
-   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
-   *     anonymous init is retired pending FE migration.
-   */
-  @Deprecated
-  public PlaygroundInitResponse initPlayground(String guestId) {
-    // 1. Clone the template (runs in its own BYPASSRLS transaction)
-    Tenant playgroundTenant = tenantClonerService.cloneTemplateToPlayground();
-
-    // 2. Find the CEO / Platform Admin to be the default persona.
-    //    Must open a NEW transaction AFTER setting TenantContext so Hibernate binds
-    //    the connection to the correct playground tenant for RLS.
-    return TenantContext.executeInTenantContext(
-        playgroundTenant.getId(),
-        () ->
-            transactionTemplate.execute(
-                status -> {
-                  // Two-pass fetch to avoid MultipleBagFetchException.
-                  List<User> activeUsers =
-                      userRepository.findByTenantIdWithRelations(playgroundTenant.getId());
-                  userRepository.findByTenantIdWithContacts(playgroundTenant.getId());
-
-                  // Try preferred roles first, then fall back to any user
-                  User defaultUser =
-                      activeUsers.stream()
-                          .filter(
-                              u ->
-                                  u.getRole() != null
-                                      && ("PLATFORM_ADMIN".equals(u.getRole().getRoleCode())
-                                          || "MANAGER".equals(u.getRole().getRoleCode())))
-                          .findFirst()
-                          .or(
-                              () ->
-                                  activeUsers.stream().filter(u -> u.getRole() != null).findFirst())
-                          .or(() -> activeUsers.stream().findFirst())
-                          .orElseThrow(
-                              () ->
-                                  new IllegalStateException(
-                                      "No active users found in cloned playground tenant"));
-
-                  String contactValue = resolvePlaygroundContact(defaultUser);
-                  String token =
-                      jwtService.generatePlaygroundAccessToken(defaultUser, guestId, contactValue);
-
-                  String roleName =
-                      defaultUser.getRole() != null
-                          ? defaultUser.getRole().getRoleName()
-                          : "No Role";
-
-                  Organization org =
-                      organizationRepository
-                          .findByTenantIdAndIsActiveTrue(playgroundTenant.getId())
-                          .stream()
-                          .filter(o -> o.getOrganizationType() != OrganizationType.EXTERNAL_PARTNER)
-                          .findFirst()
-                          .orElse(null);
-
-                  return new PlaygroundInitResponse(
-                      guestId,
-                      token,
-                      playgroundTenant.getId(),
-                      defaultUser.getId(),
-                      defaultUser.getDisplayName(),
-                      roleName,
-                      (org != null && org.getOrganizationType() != null)
-                          ? org.getOrganizationType().name()
-                          : "VERTICAL_MILL");
-                }));
-  }
-
-  @Transactional
-  public PlaygroundImpersonateResponse impersonate(UUID tenantId, UUID userId, String guestId) {
-    return impersonate(tenantId, userId, guestId, false);
-  }
-
-  /**
    * A token for viewing the demo as {@code userId}, an active user of the same demo tenant.
    *
-   * <p>{@code preserveRealSession}: the caller is a signed-in owner. The token is then a normal
-   * lifetime demo-impersonation token that the caller's browser tab holds for itself; the owner's
-   * own session (cookies) is not touched. Otherwise it is an anonymous playground token.
+   * <p>The caller is the tenant's signed-in owner. The token is a normal-lifetime demo-persona
+   * token that the caller's browser tab holds for itself; the owner's own session (cookies) is not
+   * touched. The anonymous Playground session, which used a cookie instead, is retired
+   * (PLATFORM-BOUNDARY-1).
    */
   @Transactional
-  public PlaygroundImpersonateResponse impersonate(
-      UUID tenantId, UUID userId, String guestId, boolean preserveRealSession) {
+  public PlaygroundImpersonateResponse impersonate(UUID tenantId, UUID userId, String guestId) {
     requireDemoMode(tenantId);
 
     return TenantContext.executeInTenantContext(
@@ -228,10 +135,7 @@ public class PlaygroundService {
 
           String contactValue = resolvePlaygroundContact(targetUser);
           String newToken =
-              preserveRealSession
-                  ? jwtService.generateDemoImpersonationAccessToken(
-                      targetUser, guestId, contactValue)
-                  : jwtService.generatePlaygroundAccessToken(targetUser, guestId, contactValue);
+              jwtService.generateDemoImpersonationAccessToken(targetUser, guestId, contactValue);
 
           String roleName =
               targetUser.getRole() != null ? targetUser.getRole().getRoleName() : "No Role";
@@ -266,7 +170,7 @@ public class PlaygroundService {
                     Organization org = orgMap.get(u.getOrganizationId());
                     String email = extractPrimaryEmail(u);
                     String roleName = u.getRole() != null ? u.getRole().getRoleName() : "no role";
-                    String jobTitle = PLAYGROUND_JOB_TITLES.getOrDefault(email, roleName);
+                    String jobTitle = jobTitleFor(email).orElse(roleName);
 
                     return new PlaygroundPersonaDto(
                         u.getId(),
@@ -283,6 +187,47 @@ public class PlaygroundService {
                   })
               .toList();
         });
+  }
+
+  /**
+   * A persona's job title. Registered demo companies give their personas aliases of the owner's own
+   * address ({@code owner+weav-mgr@company.example}), so the title is found by the persona's slug
+   * as well as by the sample company's address.
+   */
+  static Optional<String> jobTitleFor(String email) {
+    if (email == null) {
+      return Optional.empty();
+    }
+    String normalised = email.trim().toLowerCase(Locale.ROOT);
+    String direct = PLAYGROUND_JOB_TITLES.get(normalised);
+    if (direct != null) {
+      return Optional.of(direct);
+    }
+    int at = normalised.indexOf('@');
+    // The persona slug is the last tag: the owner's own address may already carry one.
+    int plus = normalised.lastIndexOf('+');
+    if (plus < 0 || at < plus) {
+      return Optional.empty();
+    }
+    return Optional.ofNullable(JOB_TITLES_BY_SLUG.get(normalised.substring(plus + 1, at)));
+  }
+
+  private static final Map<String, String> JOB_TITLES_BY_SLUG =
+      PLAYGROUND_JOB_TITLES.entrySet().stream()
+          .collect(
+              Collectors.toMap(
+                  entry -> slug(entry.getKey()),
+                  Map.Entry::getValue,
+                  (first, second) -> {
+                    throw new IllegalStateException("Two personas share a slug: " + first);
+                  }));
+
+  private static String slug(String email) {
+    return email
+        .substring(0, email.indexOf('@'))
+        .toLowerCase(Locale.ROOT)
+        .replaceAll("[^a-z0-9]+", "-")
+        .replaceAll("^-|-$", "");
   }
 
   private void requireDemoMode(UUID tenantId) {

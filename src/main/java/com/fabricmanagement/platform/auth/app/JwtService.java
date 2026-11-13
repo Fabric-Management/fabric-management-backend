@@ -93,39 +93,6 @@ public class JwtService {
   }
 
   /**
-   * Generates a JWT token for a playground guest session. Includes is_playground and guest_id
-   * claims.
-   *
-   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
-   *     anonymous init is retired pending FE migration.
-   */
-  @Deprecated
-  public String generatePlaygroundAccessToken(User user, String guestId) {
-    String contactValue = getVerifiedContactOrThrow(user);
-    return generatePlaygroundAccessToken(user, guestId, contactValue);
-  }
-
-  /**
-   * Overload that accepts a pre-resolved contactValue. Use this when the caller has already fetched
-   * the contact (e.g. via a direct query) to avoid LazyInitializationException on
-   * User.userContacts.
-   *
-   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
-   *     anonymous init is retired pending FE migration.
-   */
-  @Deprecated
-  public String generatePlaygroundAccessToken(User user, String guestId, String contactValue) {
-    log.debug(
-        "Generating playground access token for user: {}, guestId: {}", contactValue, guestId);
-
-    Map<String, Object> claims = buildCommonClaims(user);
-    claims.put("is_playground", true);
-    claims.put("guest_id", guestId);
-
-    return buildToken(contactValue, claims, playgroundTokenExpiration);
-  }
-
-  /**
    * Generates a normal-session access token for demo impersonation.
    *
    * <p>This keeps the real-login session model: regular access-token lifetime and no {@code
@@ -596,6 +563,8 @@ public class JwtService {
     // playground claims
     boolean isPlayground = Boolean.TRUE.equals(claims.get("is_playground", Boolean.class));
     String guestId = claims.get("guest_id", String.class);
+    boolean demoImpersonation =
+        Boolean.TRUE.equals(claims.get("demo_impersonation", Boolean.class));
 
     // partner_id
     UUID partnerId = null;
@@ -617,7 +586,8 @@ public class JwtService {
         tenantId,
         isPlayground,
         guestId,
-        partnerId);
+        partnerId,
+        demoImpersonation);
   }
 
   /** Bundle of all authentication-relevant claims extracted from a JWT token in a single parse. */
@@ -630,7 +600,8 @@ public class JwtService {
       UUID tenantId,
       boolean isPlayground,
       String guestId,
-      UUID partnerId) {}
+      UUID partnerId,
+      boolean demoImpersonation) {}
 
   private Claims extractClaims(String token) {
     return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();

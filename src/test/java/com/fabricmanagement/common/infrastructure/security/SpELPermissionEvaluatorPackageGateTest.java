@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.tenant.PackageAccessPort;
 import com.fabricmanagement.platform.user.domain.DataScope;
@@ -81,10 +82,19 @@ class SpELPermissionEvaluatorPackageGateTest {
 
   @Test
   void platformStaffAreNotBoundByATenantsPackages() {
-    grant("PLATFORM_ADMIN", new PermissionResult(Map.of(), true));
+    grant("PLATFORM_ADMIN", TenantContext.SYSTEM_TENANT_ID, new PermissionResult(Map.of(), true));
     when(packages.isResourceOpen(any(), any())).thenReturn(false);
 
     assertThat(evaluator().can(authentication, "yarn", "read")).isTrue();
+  }
+
+  @Test
+  void thePlatformRoleInACustomerTenantStaysBoundByThePackages() {
+    // PLATFORM-BOUNDARY-1: even if the evaluator said yes, the package gate still applies.
+    grant("PLATFORM_ADMIN", new PermissionResult(Map.of(), true));
+    when(packages.isResourceOpen(TENANT, "yarn")).thenReturn(false);
+
+    assertThat(evaluator().can(authentication, "yarn", "read")).isFalse();
   }
 
   @Test
@@ -100,10 +110,15 @@ class SpELPermissionEvaluatorPackageGateTest {
   }
 
   private void grant(String role, PermissionResult result) {
+    grant(role, TENANT, result);
+  }
+
+  private void grant(String role, UUID tenantId, PermissionResult result) {
     var context =
-        new AuthenticatedUserContext(UUID.randomUUID(), role, List.of(), null, TENANT, false, null);
+        new AuthenticatedUserContext(
+            UUID.randomUUID(), role, List.of(), null, tenantId, false, null);
     when(resolver.resolve(authentication)).thenReturn(Optional.of(context));
-    when(permissions.evaluate(TENANT, role, List.of(), context.userId())).thenReturn(result);
+    when(permissions.evaluate(tenantId, role, List.of(), context.userId())).thenReturn(result);
   }
 
   private static MockHttpServletRequest bindRequest() {

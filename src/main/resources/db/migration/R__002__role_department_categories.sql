@@ -8,7 +8,8 @@
 -- Scopes:
 --   INTERNAL = Tenant's own employees
 --   PARTNER  = Trading partner users
---   SYSTEM   = Platform admin (hidden from tenant UI)
+--   SYSTEM   = Platform staff role (PLATFORM_ADMIN). Never seeded here: it lives only in the
+--              platform (Longward) tenant, see V002 (PLATFORM-BOUNDARY-1).
 -- ============================================================================
 
 DO $$
@@ -18,8 +19,8 @@ BEGIN
     INSERT INTO common_user.common_role
         (tenant_id, uid, role_name, role_code, description, role_scope, is_system_role, display_order, is_active)
     VALUES
-        -- SYSTEM scope (hidden from tenant UI)
-        (template_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access — hidden from tenants', 'SYSTEM', TRUE, 0, TRUE),
+        -- No SYSTEM scope role here (PLATFORM-BOUNDARY-1): PLATFORM_ADMIN belongs to the platform
+        -- tenant (V002) and is never cloned into a tenant.
 
         -- INTERNAL scope (tenant employee roles)
         (template_tenant_id, 'SYS-ROLE-004', 'Administrator', 'ADMIN', 'Full tenant access — manage everything', 'INTERNAL', TRUE, 1, TRUE),

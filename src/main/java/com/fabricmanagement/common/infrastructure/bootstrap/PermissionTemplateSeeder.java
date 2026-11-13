@@ -154,11 +154,7 @@ public class PermissionTemplateSeeder {
             new GrantRule("ADMIN", PermissionKey.QUALITY_READ, DataScope.GLOBAL),
             new GrantRule("ADMIN", PermissionKey.QUALITY_WRITE, DataScope.GLOBAL),
             new GrantRule("ADMIN", PermissionKey.QUALITY_APPROVE, DataScope.GLOBAL),
-            new GrantRule("ADMIN", PermissionKey.QUALITY_MANAGE, DataScope.GLOBAL),
-            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_READ, DataScope.GLOBAL),
-            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_WRITE, DataScope.GLOBAL),
-            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_APPROVE, DataScope.GLOBAL),
-            new GrantRule("PLATFORM_ADMIN", PermissionKey.QUALITY_MANAGE, DataScope.GLOBAL)));
+            new GrantRule("ADMIN", PermissionKey.QUALITY_MANAGE, DataScope.GLOBAL)));
 
     // 2. SALES
     seedDepartment(

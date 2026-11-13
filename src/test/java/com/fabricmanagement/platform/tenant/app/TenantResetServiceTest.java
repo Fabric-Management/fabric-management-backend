@@ -74,13 +74,13 @@ class TenantResetServiceTest {
                 TENANT_ID,
                 Map.of("sales.quote", 2, "common_user.common_user(seed-demo-users)", 15)));
     when(userSeeder.seedFor(TENANT_ID, "owner@example.com", PersonaSubset.REPRESENTATIVE))
-        .thenReturn(15);
+        .thenReturn(14);
 
     ResetDemoResponse response = service.reset(context("ADMIN"));
 
     assertThat(response.tenantId()).isEqualTo(TENANT_ID);
     assertThat(response.demoMode()).isTrue();
-    assertThat(response.seededPersonaUsers()).isEqualTo(15);
+    assertThat(response.seededPersonaUsers()).isEqualTo(14);
     assertThat(response.purgedRows()).containsEntry("sales.quote", 2);
 
     InOrder ordered = inOrder(purgeService, userSeeder, demoTransactionSeeder);
@@ -150,6 +150,24 @@ class TenantResetServiceTest {
     when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID)).thenReturn(Optional.of(worker));
 
     assertThatThrownBy(() -> service.reset(context("WORKER")))
+        .isInstanceOf(PlatformDomainException.class)
+        .extracting("errorCode", "httpStatus")
+        .containsExactly("RESET_REQUIRES_OWNER", 403);
+
+    verifyNoInteractions(
+        userContactAssignmentService, purgeService, userSeeder, demoTransactionSeeder);
+  }
+
+  @Test
+  void shouldRefuseAPlatformRoleCallerWithoutPurgingOrSeeding() {
+    // PLATFORM-BOUNDARY-1: only the tenant's own administrator resets demo data.
+    User platformRole = owner();
+    platformRole.setRole(Role.create("Platform", "PLATFORM_ADMIN", "Platform"));
+    when(tenantAccessPort.isDemoMode(TENANT_ID)).thenReturn(true);
+    when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID))
+        .thenReturn(Optional.of(platformRole));
+
+    assertThatThrownBy(() -> service.reset(context("PLATFORM_ADMIN")))
         .isInstanceOf(PlatformDomainException.class)
         .extracting("errorCode", "httpStatus")
         .containsExactly("RESET_REQUIRES_OWNER", 403);

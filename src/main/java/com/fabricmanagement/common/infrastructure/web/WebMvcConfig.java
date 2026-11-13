@@ -65,10 +65,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     log.info("✅ TenantWriteGuardInterceptor registered globally");
 
-    registry
-        .addInterceptor(playgroundQuotaInterceptor)
-        .addPathPatterns("/api/v1/**")
-        .excludePathPatterns("/api/v1/playground/init");
+    registry.addInterceptor(playgroundQuotaInterceptor).addPathPatterns("/api/v1/**");
 
     log.info("✅ PlaygroundQuotaInterceptor registered globally");
   }
