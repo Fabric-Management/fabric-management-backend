@@ -9,6 +9,7 @@ import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.domain.event.OrganizationCreatedEvent;
 import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.platform.organization.infra.OrganizationTaxIdLookup;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import java.util.Currency;
 import java.util.List;
@@ -33,6 +34,7 @@ public class OrganizationService {
 
   private final OrganizationRepository organizationRepository;
   private final DomainEventPublisher eventPublisher;
+  private final OrganizationTaxIdLookup taxIdLookup;
 
   // ========================================
   // CREATE OPERATIONS
@@ -396,13 +398,14 @@ public class OrganizationService {
   }
 
   /**
-   * Check if any organization has the given tax ID (global uniqueness).
+   * Check if an organization in any tenant has the given tax ID (global uniqueness). Answered
+   * through the system role: the repository sees only the current tenant's rows (TD-17).
    *
    * @param taxId tax ID
    * @return true if tax ID already exists
    */
   public boolean existsByTaxId(String taxId) {
-    return organizationRepository.existsByTaxId(taxId);
+    return taxIdLookup.existsInAnyTenant(taxId);
   }
 
   private String normalizePreferredCurrency(String preferredCurrency) {

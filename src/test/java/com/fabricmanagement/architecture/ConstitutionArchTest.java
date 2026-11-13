@@ -1148,6 +1148,8 @@ class ConstitutionArchTest {
       //   - CatalogueSourceReader        : TASK-TEMPLATE-TENANCY-1 read-only catalogue source read
       // (golden-template / playground source are other tenants); explicit tenant_id filter
       //   - NotificationQueueScanner     : Scheduled hub queue worker: due rows across tenants
+      //   - OrganizationTaxIdLookup      : TD-17 signup duplicate check: does any tenant already
+      // have this tax ID; read-only EXISTS on one column, returns only yes or no
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -1209,6 +1211,11 @@ class ConstitutionArchTest {
               // scanner reads only the identities of due rows (id, tenant, event type) as
               // fabric_system; each row is then processed inside its own tenant context.
               .doNotHaveSimpleName("NotificationQueueScanner")
+              .and()
+              // TD-17: the public signup has no tenant, so "does any other tenant already have this
+              // company" can only be asked as the system role. One EXISTS on one column; it returns
+              // yes or no and never a row.
+              .doNotHaveSimpleName("OrganizationTaxIdLookup")
               .and()
               // TASK-TEMPLATE-TENANCY-1: reads another tenant's keyed task templates (golden or the
               // playground source), read-only, filtered by tenant_id. Target writes stay on

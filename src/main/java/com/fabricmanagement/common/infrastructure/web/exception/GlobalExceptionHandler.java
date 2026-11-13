@@ -147,6 +147,19 @@ public class GlobalExceptionHandler {
         req.getRequestURI());
   }
 
+  @ExceptionHandler(SignupAlreadyPendingException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiProblemDetail handleSignupAlreadyPending(
+      SignupAlreadyPendingException ex, HttpServletRequest req) {
+    log.info("Signup conflict (pending signup): {}", failureForLog(ex, req).getMessage());
+    return buildProblemDetail(
+        HttpStatus.BAD_REQUEST,
+        "Bad Request",
+        "SIGNUP_ALREADY_PENDING",
+        ex.getMessage(),
+        req.getRequestURI());
+  }
+
   @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiProblemDetail handleEntityNotFound(

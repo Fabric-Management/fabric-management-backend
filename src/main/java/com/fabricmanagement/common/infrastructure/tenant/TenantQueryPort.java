@@ -45,4 +45,12 @@ public interface TenantQueryPort {
    * BYPASSRLS system executor in the adapter.
    */
   Optional<UUID> findTenantIdByRefreshToken(String token);
+
+  /**
+   * Whether a signup for this contact (an e-mail address) is still waiting to be completed in any
+   * tenant: a registration token that is neither used nor expired. A public signup carries no
+   * tenant, so the tenant-scoped token table is invisible to a row-level-secured read; this runs
+   * through the BYPASSRLS system executor in the adapter and returns only the yes or no.
+   */
+  boolean hasPendingRegistrationFor(String contactValue);
 }
