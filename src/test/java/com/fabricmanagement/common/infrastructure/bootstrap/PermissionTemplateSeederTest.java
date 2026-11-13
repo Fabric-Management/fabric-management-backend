@@ -124,6 +124,15 @@ class PermissionTemplateSeederTest {
   }
 
   @Test
+  @DisplayName("never seeds a platform role: template rows are cloned into every tenant")
+  void seedsNoPlatformRoleRows() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    assertThat(saved).extracting(PermissionTemplate::getRoleCode).doesNotContain("PLATFORM_ADMIN");
+  }
+
+  @Test
   @DisplayName("seeds least-privilege quality permissions for the QUALITY department")
   void seedsQualityPermissionMatrix() {
     List<PermissionTemplate> saved = new ArrayList<>();
@@ -147,7 +156,7 @@ class PermissionTemplateSeederTest {
             Tuple.tuple("SUPERVISOR", "QUALITY", "approve", DataScope.ORGANIZATION),
             Tuple.tuple("MANAGER", "QUALITY", "manage", DataScope.ORGANIZATION),
             Tuple.tuple("ADMIN", null, "approve", DataScope.GLOBAL),
-            Tuple.tuple("PLATFORM_ADMIN", null, "manage", DataScope.GLOBAL))
+            Tuple.tuple("ADMIN", null, "manage", DataScope.GLOBAL))
         .doesNotContain(
             Tuple.tuple("WORKER", "QUALITY", "approve", DataScope.ORGANIZATION),
             Tuple.tuple("SUPERVISOR", "QUALITY", "manage", DataScope.ORGANIZATION),

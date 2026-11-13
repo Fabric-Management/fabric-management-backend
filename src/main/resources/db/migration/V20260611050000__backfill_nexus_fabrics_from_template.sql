@@ -1,12 +1,11 @@
 -- ============================================================================
 -- V20260611050000: Backfill nexus-fabrics demo tenant from golden-template
 -- ============================================================================
--- Architecture chain: golden-template → nexus-fabrics → playground tenants
---
 -- golden-template holds canonical master/reference data.
--- nexus-fabrics is the demo company used as playground clone source.
--- This migration provisions nexus-fabrics with reference data from
--- golden-template so that playground cloning produces complete tenants.
+-- nexus-fabrics is the development sample company (dev/docker only; once the source of the
+-- retired anonymous Playground copies, PLATFORM-BOUNDARY-1). This migration provisions it with
+-- reference data from golden-template when it already exists; on a fresh database it does not
+-- exist yet at migration time and nothing happens.
 --
 -- Fibers (prod_fiber, prod_product) and the fibre reference tables (categories, ISO codes,
 -- certification schemes) are NOT copied — they are one shared catalogue read through the

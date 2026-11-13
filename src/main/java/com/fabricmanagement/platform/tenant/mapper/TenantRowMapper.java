@@ -46,6 +46,10 @@ public class TenantRowMapper implements RowMapper<TenantDto> {
                 ? rs.getTimestamp("trial_ends_at").toInstant()
                 : null)
         .isActive(rs.getBoolean("is_active"))
+        .createdAt(
+            rs.getTimestamp("created_at") != null
+                ? rs.getTimestamp("created_at").toInstant()
+                : null)
         .build();
   }
 }

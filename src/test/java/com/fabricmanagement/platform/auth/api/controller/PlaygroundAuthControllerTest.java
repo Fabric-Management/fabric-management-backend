@@ -1,9 +1,6 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,8 +62,8 @@ class PlaygroundAuthControllerTest {
 
   @Test
   void signedInOwnerGetsThePersonaTokenInTheBodyAndKeepsItsCookies() throws Exception {
-    signIn(false);
-    when(playgroundService.impersonate(tenantId, personaId, null, true))
+    signIn();
+    when(playgroundService.impersonate(tenantId, personaId, null))
         .thenReturn(new PlaygroundImpersonateResponse("persona-token", personaId, "Emma", "W"));
 
     mockMvc
@@ -75,24 +72,14 @@ class PlaygroundAuthControllerTest {
         .andExpect(jsonPath("$.token").value("persona-token"))
         .andExpect(jsonPath("$.userId").value(personaId.toString()));
 
-    // Other tabs of the same browser share the cookies: they must stay the owner's.
+    // Other tabs of the same browser share the cookies: they must stay the owner's. The controller
+    // no longer touches cookies; this guards against a cookie write coming back.
     verifyNoInteractions(authCookieSupport);
   }
 
   @Test
-  void anonymousPlaygroundStillSwitchesThroughTheAccessCookie() throws Exception {
-    signIn(true);
-    when(playgroundService.impersonate(tenantId, personaId, "guest-1", false))
-        .thenReturn(new PlaygroundImpersonateResponse("guest-token", personaId, "Emma", "W"));
-
-    mockMvc.perform(post(PATH + personaId).with(csrf())).andExpect(status().isOk());
-
-    verify(authCookieSupport).addAuthCookies(any(), eq("guest-token"), isNull());
-  }
-
-  @Test
   void aPersonaTokenCannotMintPersonaTokens() throws Exception {
-    signIn(false);
+    signIn();
     when(jwtService.isDemoImpersonationToken("persona-token")).thenReturn(true);
 
     mockMvc
@@ -103,20 +90,13 @@ class PlaygroundAuthControllerTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("IMPERSONATION_FROM_PERSONA"));
 
-    verify(playgroundService, never()).impersonate(any(), any(), any(), anyBoolean());
+    verify(playgroundService, never()).impersonate(any(), any(), any());
     verifyNoInteractions(authCookieSupport);
   }
 
-  private void signIn(boolean anonymousPlayground) {
+  private void signIn() {
     AuthenticatedUserContext owner =
-        new AuthenticatedUserContext(
-            UUID.randomUUID(),
-            "ADMIN",
-            List.of(),
-            null,
-            tenantId,
-            anonymousPlayground,
-            anonymousPlayground ? "guest-1" : null);
+        new AuthenticatedUserContext(UUID.randomUUID(), "ADMIN", List.of(), null, tenantId);
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(owner, null, List.of()));
   }

@@ -145,10 +145,8 @@ public class SecurityConfig {
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/v1/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
-                    .requestMatchers("/api/v1/playground/init")
-                    .permitAll()
                     .requestMatchers("/api/v1/admin/**")
-                    .permitAll()
+                    .hasRole("PLATFORM_ADMIN") // as in production (PLATFORM-BOUNDARY-1)
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -187,8 +185,6 @@ public class SecurityConfig {
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/v1/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
-                    .requestMatchers("/api/v1/playground/init")
-                    .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")

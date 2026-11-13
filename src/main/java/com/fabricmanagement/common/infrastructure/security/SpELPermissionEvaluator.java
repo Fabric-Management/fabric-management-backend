@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 @Component("auth")
 public class SpELPermissionEvaluator {
 
-  private static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
-
   private final PermissionEvaluator permissionEvaluator;
   private final AuthenticatedUserContextResolver contextResolver;
   private final Optional<PackageAccessPort> packages;
@@ -89,7 +87,7 @@ public class SpELPermissionEvaluator {
   }
 
   private boolean packageOpens(AuthenticatedUserContext ctx, String resource) {
-    if (PLATFORM_ADMIN.equals(ctx.roleCode())) {
+    if (PlatformAuthority.isPlatformAdmin(ctx)) {
       return true;
     }
     boolean open = packages.map(port -> port.isResourceOpen(ctx.tenantId(), resource)).orElse(true);

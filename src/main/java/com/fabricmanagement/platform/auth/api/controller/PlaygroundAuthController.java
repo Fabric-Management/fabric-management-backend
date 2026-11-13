@@ -1,17 +1,12 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
-import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.JwtTokenExtractor;
-import com.fabricmanagement.common.infrastructure.web.exception.TooManyRequestsException;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.app.PlaygroundService;
 import com.fabricmanagement.platform.auth.dto.PlaygroundImpersonateResponse;
-import com.fabricmanagement.platform.auth.dto.PlaygroundInitResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundPersonaDto;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,11 +14,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -35,80 +27,15 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/playground")
-@Tag(name = "Playground Auth", description = "Endpoints for PLG Simulation Playground")
+@Tag(
+    name = "Playground Auth",
+    description = "Demo personas for a registered tenant in demo mode (the Playground)")
 @Slf4j
 @RequiredArgsConstructor
 public class PlaygroundAuthController {
 
   private final PlaygroundService playgroundService;
-  private final AuthCookieSupport authCookieSupport;
   private final JwtService jwtService;
-
-  /**
-   * IP-based rate limiter for playground initialization. Entries auto-expire after 10 seconds via
-   * Caffeine's expireAfterWrite — no manual cleanup needed.
-   *
-   * <p>Non-final: excluded from Lombok @RequiredArgsConstructor to avoid Spring DI failure (no
-   * Cache bean in context).
-   */
-  private Cache<String, Instant> rateLimitCache =
-      Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.SECONDS).maximumSize(10_000).build();
-
-  /**
-   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
-   *     anonymous init is retired pending FE migration.
-   */
-  @Deprecated
-  @PostMapping("/init")
-  @Operation(
-      summary = "Initialize a new playground session",
-      deprecated = true,
-      description =
-          "Clones the TEMPLATE tenant into an ephemeral PLAYGROUND tenant, "
-              + "assigns the first PLATFORM_ADMIN user as the default persona, "
-              + "and returns a JWT token scoped to the playground context. "
-              + "Rate limited to 1 request per IP per minute.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Playground initialized successfully"),
-    @ApiResponse(
-        responseCode = "429",
-        description = "Rate limit exceeded for initialization",
-        content = @Content)
-  })
-  @PreAuthorize("permitAll()")
-  public ResponseEntity<PlaygroundInitResponse> initPlayground(
-      @Parameter(
-              description = "Optional guest identifier. Auto-generated if omitted.",
-              example = "demo-visitor-42")
-          @RequestParam(required = false)
-          String guestId,
-      HttpServletRequest request,
-      HttpServletResponse response) {
-
-    // Rate Limiting — Caffeine auto-evicts entries after 1 minute
-    String clientIp = request.getRemoteAddr();
-    Instant lastInit = rateLimitCache.getIfPresent(clientIp);
-    if (lastInit != null) {
-      log.warn("Rate limit exceeded for playground init. IP: {}", clientIp);
-      throw new TooManyRequestsException(
-          "Too many playground initialization requests. Please wait a few seconds.");
-    }
-
-    final String finalGuestId =
-        (guestId == null || guestId.isBlank()) ? UUID.randomUUID().toString() : guestId;
-
-    log.info("Initializing playground session for guest: {} from IP: {}", finalGuestId, clientIp);
-
-    PlaygroundInitResponse initResponse = playgroundService.initPlayground(finalGuestId);
-
-    // Set JWT as HttpOnly cookie — frontend uses cookie-based auth exclusively
-    authCookieSupport.addAuthCookies(response, initResponse.token(), null);
-
-    // Success! Now record the rate limit to prevent spam
-    rateLimitCache.put(clientIp, Instant.now());
-
-    return ResponseEntity.ok(initResponse);
-  }
 
   @PostMapping("/impersonate/{userId}")
   @Operation(
@@ -118,8 +45,7 @@ public class PlaygroundAuthController {
               + " Signed-in session: the persona's access token is returned in the body and no"
               + " cookie is written; the calling browser tab sends it as an Authorization header"
               + " and asks again when it expires. The owner's own session stays as it is, so"
-              + " other tabs are unaffected. A persona token cannot call this endpoint."
-              + " Anonymous playground: the token is set as the access cookie, as before.")
+              + " other tabs are unaffected. A persona token cannot call this endpoint.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Persona token issued"),
     @ApiResponse(
@@ -138,8 +64,7 @@ public class PlaygroundAuthController {
               example = "550e8400-e29b-41d4-a716-446655440000")
           @PathVariable
           UUID userId,
-      HttpServletRequest request,
-      HttpServletResponse response) {
+      HttpServletRequest request) {
     AuthenticatedUserContext ctx = getAuthenticatedContextOrNull();
     if (ctx == null) {
       throw new AccessDeniedException("Authenticated user context is required");
@@ -161,23 +86,17 @@ public class PlaygroundAuthController {
         userId,
         ctx.tenantId());
 
-    boolean realSession = !ctx.isPlayground();
-    PlaygroundImpersonateResponse impersonateResponse =
-        playgroundService.impersonate(ctx.tenantId(), userId, ctx.guestId(), realSession);
-
-    if (!realSession) {
-      // Anonymous playground: access-only cookie, there is no refresh token to keep in step.
-      authCookieSupport.addAuthCookies(response, impersonateResponse.token(), null);
-    }
-
-    return ResponseEntity.ok(impersonateResponse);
+    // PLATFORM-BOUNDARY-1: the anonymous Playground is retired; only a signed-in owner of a demo
+    // tenant asks for a persona token, which the calling tab keeps for itself.
+    return ResponseEntity.ok(playgroundService.impersonate(ctx.tenantId(), userId, ctx.guestId()));
   }
 
   @GetMapping("/personas")
   @Operation(
-      summary = "List all available personas in the current playground session",
+      summary = "List the demo personas of the caller's tenant",
       description =
-          "Returns a list of all active users in the cloned playground tenant that can be impersonated.")
+          "Demo tenants only. Returns the tenant's active users that the signed-in owner can view"
+              + " the demo as.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "List of personas retrieved successfully"),
     @ApiResponse(responseCode = "403", description = "Demo mode is required", content = @Content)

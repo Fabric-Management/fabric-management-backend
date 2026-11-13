@@ -20,24 +20,34 @@ public class RoleService {
 
   private final RoleRepository roleRepository;
 
-  /** Returns all active roles for the current tenant. */
+  /**
+   * Returns all active roles for the current tenant that a tenant may see and assign. The platform
+   * staff role is never among them (PLATFORM-BOUNDARY-1).
+   */
   @Transactional(readOnly = true)
   public List<Role> findAll() {
     UUID tenantId = TenantContext.requireTenantId();
-    return roleRepository.findByTenantIdAndIsActiveTrue(tenantId);
+    return roleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        .filter(role -> !role.isPlatformScope())
+        .toList();
   }
 
   /** Returns active roles for the current tenant filtered by scope. */
   @Transactional(readOnly = true)
   public List<Role> findByScope(RoleScope scope) {
     UUID tenantId = TenantContext.requireTenantId();
-    return roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(tenantId, scope);
+    return roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(tenantId, scope).stream()
+        .filter(role -> !role.isPlatformScope())
+        .toList();
   }
 
+  /** A role a tenant may see and assign: the platform staff role is reported as absent. */
   @Transactional(readOnly = true)
   public Optional<Role> findById(UUID roleId) {
     UUID tenantId = TenantContext.requireTenantId();
-    return roleRepository.findByTenantIdAndId(tenantId, roleId);
+    return roleRepository
+        .findByTenantIdAndId(tenantId, roleId)
+        .filter(role -> !role.isPlatformScope());
   }
 
   @Transactional(readOnly = true)
@@ -75,7 +85,9 @@ public class RoleService {
   @Transactional
   public Role create(String roleName, String roleCode, String description) {
     UUID tenantId = TenantContext.requireTenantId();
-    if (roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
+    // The platform staff code is reserved: it already exists, as Longward's role.
+    if (Role.isPlatformRoleCode(roleCode)
+        || roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
       throw new PlatformDomainException(
           "Role with code already exists",
           "USER_ROLE_ALREADY_EXISTS",
@@ -92,6 +104,7 @@ public class RoleService {
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)
+            .filter(found -> !found.isPlatformScope())
             .orElseThrow(
                 () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
     role.setRoleName(roleName);
@@ -105,6 +118,7 @@ public class RoleService {
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)
+            .filter(found -> !found.isPlatformScope())
             .orElseThrow(
                 () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
     role.delete();

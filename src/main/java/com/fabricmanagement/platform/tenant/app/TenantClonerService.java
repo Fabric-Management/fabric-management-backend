@@ -46,7 +46,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Slf4j
 public class TenantClonerService {
 
-  /** The tenant playground tenants are cloned from (chain: golden-template → it → playground). */
+  /**
+   * The development sample company (Nexus Fabrics). It was the source of the retired anonymous
+   * Playground copies (golden-template → it → playground); it is now only a development showcase
+   * and a target of catalogue backfills (PLATFORM-BOUNDARY-1).
+   */
   public static final String PLAYGROUND_SOURCE_SLUG = "nexus-fabrics";
 
   private final SystemTransactionExecutor systemTransactionExecutor;

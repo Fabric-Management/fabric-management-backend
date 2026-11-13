@@ -200,7 +200,7 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
     assertThatThrownBy(() -> purge(templateId, templateName, true))
         .rootCause()
         .hasMessageContaining("TEMPLATE");
-    assertThatThrownBy(() -> purge(PLATFORM_TENANT, "Platform (System)", false))
+    assertThatThrownBy(() -> purge(PLATFORM_TENANT, "Longward", false))
         .rootCause()
         .hasMessageContaining("platform tenant");
     assertThatThrownBy(() -> purge(victim.getId(), victim.getName() + " ", true))

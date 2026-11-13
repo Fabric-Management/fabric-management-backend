@@ -87,6 +87,7 @@ class JwtContextInterceptorTest {
         tenantId,
         playground,
         playground ? "guest-123" : null,
-        partnerId);
+        partnerId,
+        false);
   }
 }

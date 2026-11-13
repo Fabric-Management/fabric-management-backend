@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
@@ -22,9 +23,12 @@ import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,9 +38,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Seeder for initial employees and users.
  *
- * <p>Generates 68 playground users (2 admins + 66 job-title-specific personas) for the Nexus
- * Fabrics demo tenant. Each user has a thematic name that hints at their role for intuitive
- * simulation UX.
+ * <p>Generates the persona users (one tenant administrator plus job-title-specific personas) for
+ * the Nexus Fabrics sample company, and the personas of registered demo companies. Each user has a
+ * thematic name that hints at their role for intuitive simulation UX.
  */
 @Component
 @RequiredArgsConstructor
@@ -57,7 +61,13 @@ public class UserSeeder implements DataSeeder {
 
   private static final String DEFAULT_PASSWORD = "password123";
 
+  /** Which personas a registered demo company receives. */
   public enum PersonaSubset {
+    /**
+     * The personas of one order's journey through this company (PLATFORM-BOUNDARY-1): a core set
+     * every company gets, plus a manager and an operator for each production area its organisation
+     * type works in. Chosen from the company's root organisation.
+     */
     REPRESENTATIVE
   }
 
@@ -67,7 +77,7 @@ public class UserSeeder implements DataSeeder {
    * @param firstName Thematic first name (hints at role)
    * @param lastName Thematic last name (hints at domain)
    * @param email Unique, code-derived email address
-   * @param roleCode ADMIN, MANAGER, SUPERVISOR, WORKER, or PLATFORM_ADMIN
+   * @param roleCode ADMIN, MANAGER, SUPERVISOR or WORKER (never a platform role)
    * @param departmentCode OrganizationSeeder department code (nullable for admins)
    * @param jobTitleCode JobTitleSeedData preset code (nullable for admins)
    */
@@ -95,16 +105,15 @@ public class UserSeeder implements DataSeeder {
   // ─── Thematic Persona Definitions ───
 
   /**
-   * All 62 seed user profiles. Names are chosen to be memorable and to subtly hint at the user's
-   * role in the textile value chain. For example, "Spencer Mills" is the Spinning Mill Manager
-   * (Spencer ≈ Spin, Mills = factory), "Dylan Hue" manages the Dyehouse (Dye ≈ Dylan, Hue = color).
+   * All seed user profiles. Names are chosen to be memorable and to subtly hint at the user's role
+   * in the textile value chain. For example, "Spencer Mills" is the Spinning Mill Manager (Spencer
+   * ≈ Spin, Mills = factory), "Dylan Hue" manages the Dyehouse (Dye ≈ Dylan, Hue = color).
    */
   private static final List<SeedUserProfile> ALL_PROFILES =
       List.of(
-          // ── System Admins ──
+          // ── Tenant administrator ── (platform staff never live in a demo tenant: they belong to
+          // Longward's platform tenant, see PlatformOperatorDevSeeder)
           new SeedUserProfile("Adrian", "Nexus", "admin@nexusfabrics.com", "ADMIN", null, null),
-          new SeedUserProfile(
-              "Platform", "Admin", "admin@fabricos.io", "PLATFORM_ADMIN", null, null),
 
           // ── 1. Fiber & Yarn (Spinning) — YARN ──
           new SeedUserProfile(
@@ -303,23 +312,56 @@ public class UserSeeder implements DataSeeder {
    */
   private static final String LAST_SEEDED_EMAIL = "budget@nexusfabrics.com";
 
-  private static final Set<String> REPRESENTATIVE_PROFILE_EMAILS =
-      Set.of(
-          "spin.mgr@nexusfabrics.com",
-          "blow.op@nexusfabrics.com",
-          "weav.mgr@nexusfabrics.com",
-          "weaver@nexusfabrics.com",
-          "knit.mgr@nexusfabrics.com",
-          "knitter@nexusfabrics.com",
-          "dye.mgr@nexusfabrics.com",
-          "jet.op@nexusfabrics.com",
-          "qa.mgr@nexusfabrics.com",
-          "wh.mgr@nexusfabrics.com",
-          "yarn.wh@nexusfabrics.com",
-          "proc.mgr@nexusfabrics.com",
+  /**
+   * Every company's personas, in the order an order passes them: sales, planning, purchasing,
+   * warehouse, finance and quality. Sandra Deal and Yolanda Bidwell are named on purpose: the sales
+   * and purchasing demo data are recorded as their work.
+   */
+  static final List<String> CORE_PERSONA_EMAILS =
+      List.of(
+          "sales.rep@nexusfabrics.com",
+          "planner@nexusfabrics.com",
           "yarn.buyer@nexusfabrics.com",
-          "sales.dir@nexusfabrics.com",
-          "sales.rep@nexusfabrics.com");
+          "wh.mgr@nexusfabrics.com",
+          "accountant@nexusfabrics.com",
+          "qa.mgr@nexusfabrics.com");
+
+  /** A manager and an operator for each production area. */
+  static final List<String> SPINNING_PERSONA_EMAILS =
+      List.of("spin.mgr@nexusfabrics.com", "spin.op@nexusfabrics.com");
+
+  static final List<String> WEAVING_PERSONA_EMAILS =
+      List.of("weav.mgr@nexusfabrics.com", "weaver@nexusfabrics.com");
+
+  static final List<String> KNITTING_PERSONA_EMAILS =
+      List.of("knit.mgr@nexusfabrics.com", "knitter@nexusfabrics.com");
+
+  static final List<String> DYEING_PERSONA_EMAILS =
+      List.of("dye.mgr@nexusfabrics.com", "jet.op@nexusfabrics.com");
+
+  /**
+   * The personas a company of this organisation type sees: the core set plus its production areas.
+   * An integrated mill works in every area. A garment maker gets the core set only, since garment
+   * production is not yet part of FabricOS. An unknown type gets every area rather than too few.
+   */
+  static List<String> personaEmailsFor(OrganizationType organizationType) {
+    List<List<String>> areas =
+        switch (organizationType == null ? OrganizationType.VERTICAL_MILL : organizationType) {
+          case SPINNER -> List.of(SPINNING_PERSONA_EMAILS);
+          case WEAVER -> List.of(WEAVING_PERSONA_EMAILS);
+          case KNITTER -> List.of(KNITTING_PERSONA_EMAILS);
+          case DYER_FINISHER -> List.of(DYEING_PERSONA_EMAILS);
+          case VERTICAL_MILL ->
+              List.of(
+                  SPINNING_PERSONA_EMAILS,
+                  WEAVING_PERSONA_EMAILS,
+                  KNITTING_PERSONA_EMAILS,
+                  DYEING_PERSONA_EMAILS);
+          case GARMENT_MANUFACTURER, EXTERNAL_PARTNER -> List.of();
+        };
+    return Stream.concat(CORE_PERSONA_EMAILS.stream(), areas.stream().flatMap(List::stream))
+        .toList();
+  }
 
   @Override
   public boolean isSeeded() {
@@ -382,7 +424,8 @@ public class UserSeeder implements DataSeeder {
                             .orElseThrow(
                                 () -> new IllegalStateException("Root organization missing"));
 
-                    List<SeedUserProfile> profiles = profilesFor(subset);
+                    List<SeedUserProfile> profiles =
+                        profilesFor(subset, rootOrg.getOrganizationType());
                     int seededCount = 0;
                     for (SeedUserProfile profile : profiles) {
                       SeedUserProfile tenantProfile =
@@ -402,13 +445,20 @@ public class UserSeeder implements DataSeeder {
         });
   }
 
-  private List<SeedUserProfile> profilesFor(PersonaSubset subset) {
-    if (subset == PersonaSubset.REPRESENTATIVE) {
-      return ALL_PROFILES.stream()
-          .filter(profile -> REPRESENTATIVE_PROFILE_EMAILS.contains(profile.email()))
-          .toList();
+  private List<SeedUserProfile> profilesFor(
+      PersonaSubset subset, OrganizationType organizationType) {
+    if (subset != PersonaSubset.REPRESENTATIVE) {
+      throw new IllegalArgumentException("Unsupported persona subset: " + subset);
     }
-    throw new IllegalArgumentException("Unsupported persona subset: " + subset);
+    Map<String, SeedUserProfile> byEmail =
+        ALL_PROFILES.stream()
+            .collect(Collectors.toMap(SeedUserProfile::email, Function.identity()));
+    return personaEmailsFor(organizationType).stream()
+        .map(
+            email ->
+                Optional.ofNullable(byEmail.get(email))
+                    .orElseThrow(() -> new IllegalStateException("Unknown persona: " + email)))
+        .toList();
   }
 
   private String ownerAliasEmail(String ownerEmail, SeedUserProfile profile) {

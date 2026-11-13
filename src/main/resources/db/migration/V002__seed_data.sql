@@ -11,7 +11,7 @@ INSERT INTO common_tenant.common_tenant (
     '00000000-0000-0000-0000-000000000000'::uuid,
     'SYS-000',
     'platform',
-    'Platform (System)',
+    'Longward',
     NULL,
     'ACTIVE',
     NULL,
@@ -25,15 +25,14 @@ INSERT INTO common_tenant.common_tenant (
     0
 )
 ON CONFLICT (id) DO NOTHING;
+-- PLATFORM-BOUNDARY-1: the platform (system) tenant is Longward, the owner of FabricOS. It holds
+-- Longward's organisation and the platform-scope PLATFORM_ADMIN role only. No platform user is
+-- seeded here: development creates one from environment variables (PlatformOperatorDevSeeder),
+-- and a live installation creates its platform staff by a separate, deliberate procedure.
 DO $$
 DECLARE
     platform_org_id UUID := gen_random_uuid();
     platform_role_id UUID := gen_random_uuid();
-    platform_user_id UUID := gen_random_uuid();
-    platform_contact_id UUID := gen_random_uuid();
-    platform_auth_id UUID := gen_random_uuid();
-    platform_admin_email VARCHAR := 'admin@fabricmanagement.com';
-    platform_admin_password_hash VARCHAR := '$2a$10$X/q4m5.2jR6L9.P6s7hWueq7O.0.1.2.3.4.5.6.7.8.9.0.1.2.3'; -- Dummy bcrypt hash
 BEGIN
     INSERT INTO common_company.common_organization (
         id, tenant_id, uid, name, tax_id, organization_type, is_active, created_at, updated_at, version
@@ -41,7 +40,7 @@ BEGIN
         platform_org_id,
         '00000000-0000-0000-0000-000000000000',
         'SYS-PLATFORM-001',
-        'Platform System',
+        'Longward',
         'PLATFORM-SYSTEM-001',
         'VERTICAL_MILL',
         TRUE,
@@ -58,8 +57,8 @@ BEGIN
         'SYS-ROLE-0001',
         'Platform Administrator',
         'PLATFORM_ADMIN',
-        'Full platform access',
-        'INTERNAL',
+        'Full platform access — Longward staff only',
+        'SYSTEM',
         TRUE,
         TRUE,
         CURRENT_TIMESTAMP,
@@ -67,64 +66,6 @@ BEGIN
         0
     )
     ON CONFLICT (tenant_id, role_code) DO NOTHING;
-    INSERT INTO common_user.common_user (
-        id, tenant_id, uid, first_name, last_name, organization_id, role_id, user_type, is_active, created_at, updated_at, version
-    ) VALUES (
-        platform_user_id,
-        '00000000-0000-0000-0000-000000000000',
-        'SYS-USER-0001',
-        'Platform',
-        'Admin',
-        platform_org_id,
-        platform_role_id,
-        'INTERNAL',
-        TRUE,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP,
-        0
-    );
-    INSERT INTO common_communication.common_contact (
-        id, tenant_id, uid, contact_value, contact_type, is_verified, is_personal, is_active, created_at, updated_at, version
-    ) VALUES (
-        platform_contact_id,
-        '00000000-0000-0000-0000-000000000000',
-        'SYS-CONTACT-0001',
-        platform_admin_email,
-        'EMAIL',
-        TRUE,
-        TRUE,
-        TRUE,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP,
-        0
-    );
-    INSERT INTO common_user.common_user_contact (
-        tenant_id, uid, user_id, contact_id, is_default, is_active, created_at, updated_at, version
-    ) VALUES (
-        '00000000-0000-0000-0000-000000000000',
-        'SYS-USER-CONTACT-0001',
-        platform_user_id,
-        platform_contact_id,
-        TRUE,
-        TRUE,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP,
-        0
-    );
-    INSERT INTO common_auth.common_auth_user (
-        id, tenant_id, uid, user_id, password_hash, is_verified, is_active, created_at, updated_at, version
-    ) VALUES (
-        platform_auth_id,
-        '00000000-0000-0000-0000-000000000000',
-        'SYS-AUTH-0001',
-        platform_user_id,
-        platform_admin_password_hash,
-        TRUE,
-        TRUE,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP,
-        0
-    );
 END $$;
 -- FIBER-CATALOG-1: the shared fibre reference catalogue (8 categories, 12 certification
 -- schemes, 52 ISO rows) carries fixed ids so every fresh installation publishes the same
@@ -792,21 +733,6 @@ VALUES ('00000000-0000-0000-0000-000000000000',
 ON CONFLICT DO NOTHING;
 
 -- ===================== FROM: V20260322130000__faz8_4_seeds.sql =====================
-        INSERT INTO flowboard.dashboard_config 
-        (id, tenant_id, user_id, name, is_default, layout_jsonb)
-        VALUES 
-        ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', (SELECT id FROM common_user.common_user WHERE uid = 'SYS-USER-0001' LIMIT 1), 'System Manager Dashboard', true, 
-         '{"breakpoints": {"lg": 1200, "md": 996}, "layouts": {"lg": [{"i": "widget-1", "x": 0, "y": 0, "w": 4, "h": 2}]}}'::jsonb);
-        INSERT INTO flowboard.dashboard_widget (id, tenant_id, dashboard_id, widget_type, title, display_order, config_jsonb) VALUES
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'TASK_COUNT', 'Total Open Tasks', 1, '{}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'OVERDUE_TASKS', 'Critical Overdue Tasks', 2, '{"severity": "CRITICAL"}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'WORKLOAD_CHART', 'Team Workload', 3, '{}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'LEADERBOARD', 'Top Performers', 4, '{"limit": 5}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'MY_TASKS', 'My Assigned Tasks', 5, '{}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'RECENT_ACTIVITY', 'Recent Board Activity', 6, '{"limit": 10}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'TEAM_PERFORMANCE', 'Weekly Team Stats', 7, '{}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'BOTTLENECKS', 'Process Bottlenecks', 8, '{}'),
-        (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'TIME_TRACKING_SUMMARY', 'Timesheet Overview', 9, '{}');
         INSERT INTO flowboard.board (id, tenant_id, uid, name, board_type)
         VALUES ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'SYS-BOARD-001', 'Global Default Board', 'GLOBAL')
         ON CONFLICT DO NOTHING;

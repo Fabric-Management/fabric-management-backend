@@ -60,7 +60,8 @@ public class TenantGoRealService {
           "Seeded demo users cannot switch the tenant to real mode", "GO_REAL_REQUIRES_OWNER", 403);
     }
     String roleCode = caller.getRole() != null ? caller.getRole().getRoleCode() : null;
-    if (!"ADMIN".equalsIgnoreCase(roleCode) && !"PLATFORM_ADMIN".equalsIgnoreCase(roleCode)) {
+    // Only the tenant's own administrator: platform staff are never users of a demo tenant.
+    if (!"ADMIN".equalsIgnoreCase(roleCode)) {
       throw new PlatformDomainException(
           "Only a tenant owner or admin can switch the tenant to real mode",
           "GO_REAL_REQUIRES_OWNER",

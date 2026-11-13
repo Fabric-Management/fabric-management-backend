@@ -105,6 +105,8 @@ public class UserProfileService {
       Role role =
           roleRepository
               .findByTenantIdAndId(TenantContext.requireTenantId(), request.getRoleId())
+              // PLATFORM-BOUNDARY-1: the platform staff role is never assigned here.
+              .filter(found -> !found.isPlatformScope())
               .orElseThrow(() -> new IllegalArgumentException("Role not found"));
       user.setRole(role);
     }

@@ -21,10 +21,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Startup backfill of the task-template catalogue into every target tenant (TASK-TEMPLATE-TENANCY-1
  * §6–§7).
  *
- * <p>Targets: live tenants of type REGULAR or PLAYGROUND, plus the playground clone source, minus
- * SYSTEM_TENANT_ID and golden-template (excluded by id; the SYSTEM row is typed REGULAR). Each
- * tenant is reconciled in its own primary transaction as {@code fabric_app}, with the tenant bound
- * before the transaction starts.
+ * <p>Targets: live tenants of type REGULAR or PLAYGROUND, plus the development sample company,
+ * minus SYSTEM_TENANT_ID and golden-template (excluded by id; the SYSTEM row is typed REGULAR).
+ * Each tenant is reconciled in its own primary transaction as {@code fabric_app}, with the tenant
+ * bound before the transaction starts.
  *
  * <p>Findings (R3, {@code UNKEYED_SIBLING}) are logged and startup continues. A technical failure
  * is logged with the tenant id and rethrown, which fails startup: an application that cannot

@@ -26,6 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = TenantOnboardingController.class)
+@org.springframework.security.test.context.support.WithMockUser(roles = "PLATFORM_ADMIN")
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 @DisplayName("TenantOnboardingController")
 @ActiveProfiles("test")

@@ -86,6 +86,10 @@ tags:
   name: Invoice
 - description: Partner-specific color codes and aliases
   name: Color Partner Reference
+- description: "Sales-led tenant creation. Creates tenant and organization, admin\
+    \ user, subscriptions, and sends welcome email with setup link. Platform staff\
+    \ only."
+  name: Tenant Onboarding (Admin)
 - description: Who may change which field of an open order
   name: Sales Order Edit Leases
 - description: Fiber Request operations
@@ -218,10 +222,6 @@ tags:
   name: User Profile
 - description: Stock Reservation API
   name: IWM Stock Reservation
-- description: "Sales-led tenant creation. Creates tenant and organization, admin\
-    \ user, subscriptions, and sends welcome email with setup link. Requires platform\
-    \ admin in production."
-  name: Tenant Onboarding (Admin)
 - description: Task Template operations
   name: Task Template
 - description: Tenant management operations (PLATFORM_ADMIN only)
@@ -269,8 +269,6 @@ tags:
   name: Customer Commercial Assignments
 - description: Whisper operations
   name: Whisper
-- description: Endpoints for PLG Simulation Playground
-  name: Playground Auth
 - description: Sample request and delivery management
   name: Sample Management
 - description: Production Output operations
@@ -301,6 +299,8 @@ tags:
   name: Sales Product
 - description: User Onboarding operations
   name: User Onboarding
+- description: Demo personas for a registered tenant in demo mode (the Playground)
+  name: Playground Auth
 - description: Platform Admin operations
   name: Platform Admin
 - description: User Address operations
@@ -318,8 +318,7 @@ paths:
     post:
       description: "Creates a new tenant and organization, admin user, selected OS\
         \ subscriptions (trial), and registration token. Sends welcome email to admin\
-        \ with setup link. In production this endpoint should be protected with PLATFORM_ADMIN\
-        \ role."
+        \ with setup link. Platform staff only."
       operationId: createTenant
       requestBody:
         content:
@@ -455,19 +454,13 @@ paths:
       - Tenant Admin
   /api/v1/admin/tenants:
     get:
-      operationId: getAllTenants
-      parameters:
-      - in: query
-        name: pageRequest
-        required: true
-        schema:
-          $ref: "#/components/schemas/PageRequestDto"
+      operationId: listTenants
       responses:
         "200":
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ApiResponsePagedResponseTenantDto"
+                $ref: "#/components/schemas/ApiResponseListPlatformTenantSummary"
           description: OK
         "400":
           content:
@@ -830,76 +823,6 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTenantStatistics"
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      tags:
-      - Platform Admin
-  /api/v1/admin/tenants/{tenantId}/switch:
-    post:
-      operationId: switchTenantContext
-      parameters:
-      - in: path
-        name: tenantId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseString"
           description: OK
         "400":
           content:
@@ -28822,8 +28745,7 @@ paths:
         \ tenant. Signed-in session: the persona's access token is returned in the\
         \ body and no cookie is written; the calling browser tab sends it as an Authorization\
         \ header and asks again when it expires. The owner's own session stays as\
-        \ it is, so other tabs are unaffected. A persona token cannot call this endpoint.\
-        \ Anonymous playground: the token is set as the access cookie, as before."
+        \ it is, so other tabs are unaffected. A persona token cannot call this endpoint."
       operationId: impersonate
       parameters:
       - description: Target user ID to impersonate
@@ -28889,84 +28811,10 @@ paths:
       summary: Get a token to view the demo as another user
       tags:
       - Playground Auth
-  /api/v1/playground/init:
-    post:
-      deprecated: true
-      description: "Clones the TEMPLATE tenant into an ephemeral PLAYGROUND tenant,\
-        \ assigns the first PLATFORM_ADMIN user as the default persona, and returns\
-        \ a JWT token scoped to the playground context. Rate limited to 1 request\
-        \ per IP per minute."
-      operationId: initPlayground
-      parameters:
-      - description: Optional guest identifier. Auto-generated if omitted.
-        example: demo-visitor-42
-        in: query
-        name: guestId
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PlaygroundInitResponse"
-          description: Playground initialized successfully
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content: {}
-          description: Rate limit exceeded for initialization
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Initialize a new playground session
-      tags:
-      - Playground Auth
   /api/v1/playground/personas:
     get:
-      description: Returns a list of all active users in the cloned playground tenant
-        that can be impersonated.
+      description: Demo tenants only. Returns the tenant's active users that the signed-in
+        owner can view the demo as.
       operationId: listPersonas
       responses:
         "200":
@@ -29025,7 +28873,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: List all available personas in the current playground session
+      summary: List the demo personas of the caller's tenant
       tags:
       - Playground Auth
   /api/v1/procurement/purchase-orders:
@@ -69684,6 +69532,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListPlatformTenantSummary:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformTenantSummary"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListPolicyDto:
       type: object
       properties:
@@ -71902,24 +71770,6 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseTaskResponse"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
-    ApiResponsePagedResponseTenantDto:
-      type: object
-      properties:
-        data:
-          $ref: "#/components/schemas/PagedResponseTenantDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -90822,37 +90672,6 @@ components:
       - size
       - totalElements
       - totalPages
-    PagedResponseTenantDto:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/TenantDto"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        page:
-          type: integer
-          format: int32
-        size:
-          type: integer
-          format: int32
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-      required:
-      - content
-      - first
-      - last
-      - page
-      - size
-      - totalElements
-      - totalPages
     PagedResponseWorkOrderConsumptionResponse:
       type: object
       properties:
@@ -91804,6 +91623,64 @@ components:
       - requestedDeliveryDate
       - requestedQty
       - unit
+    PlatformTenantSummary:
+      type: object
+      description: A tenant as the platform staff screen lists it
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: When the tenant was created
+        demoMode:
+          type: boolean
+          description: Whether the company is trying FabricOS with sample data
+        group:
+          type: string
+          description: The screen section the tenant belongs to
+          enum:
+          - CUSTOMER
+          - PLAYGROUND
+          - PLATFORM
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          description: What the tenant is
+          enum:
+          - PLATFORM_OWNER
+          - ONBOARDING_TEMPLATE
+          - SAMPLE_COMPANY
+          - PLAYGROUND_COPY
+          - CUSTOMER
+        lastActivityAt:
+          type: string
+          format: date-time
+          description: Last recorded activity; absent when none
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - TRIAL
+          - ACTIVE
+          - EXPIRED
+          - SUSPENDED
+          - CANCELLED
+        trialEndsAt:
+          type: string
+          format: date-time
+          description: When the trial ends; absent when there is no trial
+        uid:
+          type: string
+      required:
+      - demoMode
+      - group
+      - id
+      - kind
+      - name
+      - status
+      - uid
     PlaygroundImpersonateResponse:
       type: object
       description: Response returned after switching persona in a playground session
@@ -91827,48 +91704,6 @@ components:
           example: Jane Smith (Manager)
       required:
       - role
-      - token
-      - userId
-      - userName
-    PlaygroundInitResponse:
-      type: object
-      description: Response returned after a new playground session is initialized
-      properties:
-        guestId:
-          type: string
-          description: Unique identifier for the guest session
-          example: demo-guest-42
-        organizationType:
-          type: string
-          description: Organization type of the playground tenant
-          example: VERTICAL_MILL
-        role:
-          type: string
-          description: Role name of the default persona
-          example: Platform Admin
-        tenantId:
-          type: string
-          format: uuid
-          description: ID of the newly created playground tenant
-          example: 550e8400-e29b-41d4-a716-446655440000
-        token:
-          type: string
-          description: JWT access token for the playground session
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        userId:
-          type: string
-          format: uuid
-          description: User ID of the default persona
-          example: 123e4567-e89b-12d3-a456-426614174000
-        userName:
-          type: string
-          description: Display name of the default persona
-          example: John Doe (Admin)
-      required:
-      - guestId
-      - organizationType
-      - role
-      - tenantId
       - token
       - userId
       - userName

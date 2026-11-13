@@ -73,22 +73,6 @@ class JwtServiceTest {
   }
 
   @Test
-  @DisplayName("playground access token uses application.jwt.playground-expiration")
-  void generatePlaygroundAccessToken_usesPlaygroundTokenExpiration() {
-    User user = buildUser();
-    when(tenantQueryPort.findById(user.getTenantId()))
-        .thenReturn(
-            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
-
-    Claims claims =
-        parse(jwtService.generatePlaygroundAccessToken(user, "guest-123", "guest@example.com"));
-
-    assertTokenTtl(claims, PLAYGROUND_TOKEN_EXPIRATION);
-    assertThat(claims.get("is_playground", Boolean.class)).isTrue();
-    assertThat(claims.get("guest_id", String.class)).isEqualTo("guest-123");
-  }
-
-  @Test
   @DisplayName("demo impersonation access token preserves normal session lifetime")
   void generateDemoImpersonationAccessToken_usesRegularAccessTokenExpiration() {
     User user = buildUser();
@@ -166,21 +150,6 @@ class JwtServiceTest {
     long secondsUntilExpiry = jwtService.secondsUntilExpiry(jwtService.generateAccessToken(user));
 
     assertThat(secondsUntilExpiry).isBetween(895L, 900L);
-  }
-
-  @Test
-  @DisplayName("secondsUntilExpiry returns remaining playground access token lifetime")
-  void secondsUntilExpiry_returnsPlaygroundAccessTokenLifetime() {
-    User user = buildUser();
-    when(tenantQueryPort.findById(user.getTenantId()))
-        .thenReturn(
-            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
-
-    long secondsUntilExpiry =
-        jwtService.secondsUntilExpiry(
-            jwtService.generatePlaygroundAccessToken(user, "guest-123", "guest@example.com"));
-
-    assertThat(secondsUntilExpiry).isBetween(1_209_595L, 1_209_600L);
   }
 
   @Test

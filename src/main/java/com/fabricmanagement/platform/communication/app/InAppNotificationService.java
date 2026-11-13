@@ -34,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class InAppNotificationService {
 
-  private static final Set<String> ADMIN_ROLE_CODES = Set.of("ADMIN", "PLATFORM_ADMIN");
+  // A tenant's own administrators; platform staff never receive a tenant's business mail.
+  private static final Set<String> ADMIN_ROLE_CODES = Set.of("ADMIN");
 
   /** Roles notified when batch enters quarantine (TB-3: broadcast optimization later) */
   public static final Set<String> QUARANTINE_NOTIFY_ROLES = Set.of("ADMIN", "MANAGER");

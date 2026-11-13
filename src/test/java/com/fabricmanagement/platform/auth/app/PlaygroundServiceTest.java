@@ -16,7 +16,6 @@ import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.app.TenantClonerService;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserContact;
@@ -27,49 +26,35 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("PlaygroundService")
 class PlaygroundServiceTest {
 
-  private final TenantClonerService tenantClonerService =
-      org.mockito.Mockito.mock(TenantClonerService.class);
   private final JwtService jwtService = org.mockito.Mockito.mock(JwtService.class);
   private final UserRepository userRepository = org.mockito.Mockito.mock(UserRepository.class);
   private final OrganizationRepository organizationRepository =
       org.mockito.Mockito.mock(OrganizationRepository.class);
-  private final TransactionTemplate transactionTemplate =
-      org.mockito.Mockito.mock(TransactionTemplate.class);
   private final TenantAccessPort tenantAccessPort =
       org.mockito.Mockito.mock(TenantAccessPort.class);
 
   private final PlaygroundService service =
-      new PlaygroundService(
-          tenantClonerService,
-          jwtService,
-          userRepository,
-          organizationRepository,
-          transactionTemplate,
-          tenantAccessPort);
+      new PlaygroundService(jwtService, userRepository, organizationRepository, tenantAccessPort);
 
   @Test
-  @DisplayName("impersonate succeeds when tenant is in demo mode")
-  void impersonateSucceedsInDemoMode() {
-    UUID tenantId = UUID.randomUUID();
-    User user = user(tenantId, "Worker", "One", "worker@example.com");
-    when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
-    when(userRepository.findByTenantIdAndId(tenantId, user.getId())).thenReturn(Optional.of(user));
-    when(jwtService.generatePlaygroundAccessToken(user, "guest-1", "worker@example.com"))
-        .thenReturn("persona-token");
-
-    PlaygroundImpersonateResponse response = service.impersonate(tenantId, user.getId(), "guest-1");
-
-    assertThat(response.token()).isEqualTo("persona-token");
-    assertThat(response.userId()).isEqualTo(user.getId());
+  @DisplayName("a registered company's persona alias finds its job title")
+  void jobTitleForAliasAddresses() {
+    assertThat(PlaygroundService.jobTitleFor("owner+weav-mgr@thornbury.example"))
+        .contains("Weaving Manager");
+    assertThat(PlaygroundService.jobTitleFor("weav.mgr@nexusfabrics.com"))
+        .contains("Weaving Manager");
+    assertThat(PlaygroundService.jobTitleFor("jane+demo+weav-mgr@thornbury.example"))
+        .contains("Weaving Manager");
+    assertThat(PlaygroundService.jobTitleFor("owner@thornbury.example")).isEmpty();
+    assertThat(PlaygroundService.jobTitleFor(null)).isEmpty();
   }
 
   @Test
-  @DisplayName("impersonate uses normal-session token when preserving a real demo session")
+  @DisplayName("impersonate issues a demo-persona token with a normal session lifetime")
   void impersonatePreservesRealSessionTokenModel() {
     UUID tenantId = UUID.randomUUID();
     User user = user(tenantId, "Worker", "One", "worker@example.com");
@@ -78,11 +63,10 @@ class PlaygroundServiceTest {
     when(jwtService.generateDemoImpersonationAccessToken(user, null, "worker@example.com"))
         .thenReturn("demo-impersonation-token");
 
-    PlaygroundImpersonateResponse response =
-        service.impersonate(tenantId, user.getId(), null, true);
+    PlaygroundImpersonateResponse response = service.impersonate(tenantId, user.getId(), null);
 
     assertThat(response.token()).isEqualTo("demo-impersonation-token");
-    verify(jwtService, never()).generatePlaygroundAccessToken(any(), any(), any());
+    assertThat(response.userId()).isEqualTo(user.getId());
   }
 
   @Test
@@ -94,7 +78,7 @@ class PlaygroundServiceTest {
     when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
     when(userRepository.findByTenantIdAndId(tenantId, user.getId())).thenReturn(Optional.of(user));
 
-    assertThatThrownBy(() -> service.impersonate(tenantId, user.getId(), null, true))
+    assertThatThrownBy(() -> service.impersonate(tenantId, user.getId(), null))
         .isInstanceOf(PlatformDomainException.class)
         .extracting("errorCode", "httpStatus")
         .containsExactly("IMPERSONATION_TARGET_UNAVAILABLE", 404);
@@ -108,7 +92,7 @@ class PlaygroundServiceTest {
     UUID tenantId = UUID.randomUUID();
     when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
 
-    assertThatThrownBy(() -> service.impersonate(tenantId, UUID.randomUUID(), null, true))
+    assertThatThrownBy(() -> service.impersonate(tenantId, UUID.randomUUID(), null))
         .isInstanceOf(PlatformDomainException.class)
         .extracting("errorCode", "httpStatus")
         .containsExactly("IMPERSONATION_TARGET_UNAVAILABLE", 404);

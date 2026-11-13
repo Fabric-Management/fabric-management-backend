@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.domain.LoginIdentity;
 import com.fabricmanagement.platform.auth.domain.Membership;
 import com.fabricmanagement.platform.auth.domain.MembershipStatus;
@@ -66,6 +67,7 @@ public class IdentityProvisioningService {
       return identity;
     }
 
+    requirePlatformSeparation(identity, tenantId);
     if (existingIdentity && membershipCount > 0) {
       identity.setRequiresPasswordReset(true);
       identity = loginIdentityRepository.save(identity);
@@ -131,6 +133,7 @@ public class IdentityProvisioningService {
       return identity;
     }
 
+    requirePlatformSeparation(identity, tenantId);
     boolean firstMembership = membershipRepository.countByLoginIdentityId(identity.getId()) == 0;
     membershipRepository.save(
         Membership.builder()
@@ -142,6 +145,26 @@ public class IdentityProvisioningService {
             .build());
 
     return identity;
+  }
+
+  /**
+   * PLATFORM-BOUNDARY-1: a login identity is either platform staff (a member of the platform tenant
+   * only) or a tenant person, never both. An e-mail shared between the two would otherwise join
+   * platform staff to a customer or demo tenant, or a customer to the platform. Memberships of
+   * every status count, so a former staff address is never reused for a company account. The
+   * message is neutral: it must not tell a company that an address belongs to platform staff.
+   */
+  private void requirePlatformSeparation(LoginIdentity identity, UUID tenantId) {
+    boolean joiningPlatform = TenantContext.SYSTEM_TENANT_ID.equals(tenantId);
+    boolean conflict =
+        membershipRepository.findByLoginIdentityId(identity.getId()).stream()
+            .map(Membership::getTenantId)
+            .anyMatch(
+                existing -> TenantContext.SYSTEM_TENANT_ID.equals(existing) != joiningPlatform);
+    if (conflict) {
+      throw new PlatformDomainException(
+          "This e-mail address cannot be used here", "AUTH_IDENTITY_PLATFORM_SEPARATION", 409);
+    }
   }
 
   @Transactional

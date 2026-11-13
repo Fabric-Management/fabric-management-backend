@@ -92,15 +92,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return;
       }
 
-      List<SimpleGrantedAuthority> authorities =
-          buildAuthorities(tokenClaims.roleCode(), tokenClaims.userType());
+      // PLATFORM-BOUNDARY-1: the platform role counts only in the platform tenant on a real
+      // session; anywhere else the token acts with no role at all.
+      String roleCode =
+          PlatformAuthority.effectiveRoleCode(
+              tokenClaims.roleCode(),
+              tokenClaims.tenantId(),
+              tokenClaims.isPlayground(),
+              tokenClaims.demoImpersonation());
+      if (roleCode == null && tokenClaims.roleCode() != null) {
+        log.warn(
+            "Platform role ignored (not a real session in the platform tenant): userId={}, "
+                + "tenantId={}, path={}",
+            tokenClaims.userId(),
+            tokenClaims.tenantId(),
+            request.getRequestURI());
+      }
+
+      List<SimpleGrantedAuthority> authorities = buildAuthorities(roleCode, tokenClaims.userType());
 
       // Build the user context so downstream security checks (e.g. PermissionEvaluator)
       // can evaluate role + department without additional DB calls.
       AuthenticatedUserContext userContext =
           new AuthenticatedUserContext(
               tokenClaims.userId(),
-              tokenClaims.roleCode(),
+              roleCode,
               tokenClaims.departmentCodes(),
               tokenClaims.primaryDepartment(),
               tokenClaims.tenantId(),
