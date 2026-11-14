@@ -16,6 +16,7 @@ import com.fabricmanagement.platform.lead.domain.Lead;
 import com.fabricmanagement.platform.lead.infra.repository.LeadRepository;
 import com.fabricmanagement.platform.tenant.app.TenantResetService;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -74,16 +75,25 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
                 .content(body))
         .andExpect(status().isOk());
 
-    UUID tenantId =
-        jdbc.queryForObject(
-            "SELECT id FROM common_tenant.common_tenant WHERE name = ?",
-            UUID.class,
-            organizationName);
+    // The form alone records the lead, unverified: there is no tenant until the e-mail is proved.
+    assertThat(leadRepository.findByWorkEmail(email))
+        .singleElement()
+        .satisfies(
+            formLead -> {
+              assertThat(formLead.isVerified()).isFalse();
+              assertThat(formLead.getSignupTenantId()).isNull();
+              assertThat(formLead.getTrialTenantId()).isNull();
+            });
+
+    // The e-mailed link is used: the company is built and the same lead becomes verified.
+    UUID tenantId = PendingSignupFixtures.completeSignup(mockMvc, jdbc, email);
     UUID ownerId = findUserIdByContact(email);
 
     List<Lead> leadsByEmail = leadRepository.findByWorkEmail(email);
     assertThat(leadsByEmail).hasSize(1);
     Lead lead = leadsByEmail.get(0);
+    assertThat(lead.isVerified()).isTrue();
+    assertThat(lead.getSignupTenantId()).isEqualTo(tenantId);
     assertThat(lead.getCompanyName()).isEqualTo(organizationName);
     assertThat(lead.getTaxId()).isEqualTo(taxId);
     assertThat(lead.getFirstName()).isEqualTo("Eleanor");
@@ -116,7 +126,8 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  void leadFailureRollsBackSignupAndRetryCreatesOneDurableCompany() throws Exception {
+  void leadFailureRollsBackTheCompletionAndRetryOfTheSameLinkCreatesOneDurableCompany()
+      throws Exception {
     stubEmailRendering();
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     String name = "Willow Cloth Ltd " + suffix;
@@ -128,6 +139,15 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
          "selectedOS":["FabricOS"],"intent":"TRIAL","acceptedTerms":true}
         """
             .formatted(name, suffix, email);
+    mockMvc
+        .perform(
+            post("/api/v1/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    String link = PendingSignupFixtures.knownLinkToken(jdbc, email);
+
     org.mockito.Mockito.doAnswer(
             call -> {
               call.callRealMethod();
@@ -140,11 +160,7 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
         .capture(org.mockito.ArgumentMatchers.any());
     try {
       mockMvc
-          .perform(
-              post("/api/v1/public/signup")
-                  .with(csrf())
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body))
+          .perform(PendingSignupFixtures.useLink(link, PendingSignupFixtures.PASSWORD))
           .andExpect(status().isServiceUnavailable());
       assertThat(
               jdbc.queryForObject(
@@ -152,25 +168,38 @@ class LeadCaptureIntegrationTest extends AbstractIntegrationTest {
                   Long.class,
                   name))
           .isZero();
-      assertThat(leadRepository.findByWorkEmail(email)).isEmpty();
+      // The lead the form recorded is untouched: still one, still unverified.
+      assertThat(leadRepository.findByWorkEmail(email))
+          .singleElement()
+          .satisfies(
+              formLead -> {
+                assertThat(formLead.isVerified()).isFalse();
+                assertThat(formLead.getSignupTenantId()).isNull();
+                assertThat(formLead.getSignupSnapshot()).isNull();
+              });
       assertThat(
               jdbc.queryForObject(
                   "SELECT count(*) FROM common_communication.common_contact WHERE contact_value = ?",
                   Long.class,
                   email))
           .isZero();
+      // The signup is still open: the same link can be used again.
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM common_auth.pending_signup"
+                      + " WHERE email = ? AND completed_at IS NULL",
+                  Long.class,
+                  email))
+          .isEqualTo(1);
     } finally {
       org.mockito.Mockito.reset(AopTestUtils.<LeadService>getUltimateTargetObject(leadService));
     }
     mockMvc
-        .perform(
-            post("/api/v1/public/signup")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
+        .perform(PendingSignupFixtures.useLink(link, PendingSignupFixtures.PASSWORD))
         .andExpect(status().isOk());
     assertThat(leadRepository.findByWorkEmail(email)).hasSize(1);
     Lead lead = leadRepository.findByWorkEmail(email).get(0);
+    assertThat(lead.isVerified()).isTrue();
     assertThat(lead.getSignupId()).isNotNull();
     assertThat(lead.getSignupSnapshot()).isEqualTo(lead.getAcceptedSnapshot());
     assertThat(lead.getTermsAcceptedAt()).isNotNull();

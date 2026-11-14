@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.OrganizationTaxIdLookup;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.user.security.OnboardingAccessService;
 import java.util.Currency;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +36,8 @@ public class OrganizationService {
   private final OrganizationRepository organizationRepository;
   private final DomainEventPublisher eventPublisher;
   private final OrganizationTaxIdLookup taxIdLookup;
+  private final OrganizationNamingService naming;
+  private final OnboardingAccessService onboardingAccess;
 
   // ========================================
   // CREATE OPERATIONS
@@ -258,11 +261,15 @@ public class OrganizationService {
     UUID tenantId = TenantContext.requireTenantId();
     Organization organization =
         organizationRepository
-            .findByTenantIdAndId(tenantId, id)
+            .lockByTenantIdAndId(tenantId, id)
             .orElseThrow(
                 () ->
                     new PlatformDomainException(
                         "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
+
+    if (organization.isCompanyRoot()) {
+      onboardingAccess.requireCompanySetupForCurrentUser();
+    }
 
     // Validate tax ID uniqueness if changed
     if (taxId != null
@@ -271,8 +278,10 @@ public class OrganizationService {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
 
-    String effectiveTaxId = taxId != null ? taxId : organization.getTaxId();
-    organization.update(name, effectiveTaxId);
+    naming.rename(organization, name);
+    if (taxId != null) {
+      organization.setTaxId(taxId);
+    }
     if (legalName != null) {
       organization.setLegalName(legalName.trim().isEmpty() ? null : legalName.trim());
     }

@@ -57,6 +57,48 @@ class ConstitutionArchTest {
   }
 
   @Test
+  void organizationNamesHaveOneProductionWriter() {
+    organizationNameWriterRule().check(allClasses);
+  }
+
+  @Test
+  void organizationNameWriterRuleRejectsDirectCalls() {
+    for (Class<?> probe : List.of(DirectSetNameProbe.class, DirectUpdateProbe.class)) {
+      var classes = new ClassFileImporter().importClasses(probe);
+      assertThat(organizationNameWriterRule().evaluate(classes).hasViolation()).isTrue();
+    }
+  }
+
+  private static ArchRule organizationNameWriterRule() {
+    var organization = com.fabricmanagement.platform.organization.domain.Organization.class;
+    return noClasses()
+        .that()
+        .doNotHaveFullyQualifiedName(organization.getName())
+        .and()
+        .doNotHaveFullyQualifiedName(
+            "com.fabricmanagement.platform.organization.app.OrganizationNamingService")
+        .should()
+        .callMethod(organization, "setName", String.class)
+        .orShould()
+        .callMethod(organization, "update", String.class, String.class)
+        .because(
+            "Java callers must synchronise company names through OrganizationNamingService. "
+                + "This rule cannot detect SQL or JPQL writes");
+  }
+
+  static class DirectSetNameProbe {
+    void rename(com.fabricmanagement.platform.organization.domain.Organization organization) {
+      organization.setName("Willow Cloth Ltd");
+    }
+  }
+
+  static class DirectUpdateProbe {
+    void rename(com.fabricmanagement.platform.organization.domain.Organization organization) {
+      organization.update("Willow Cloth Ltd", "GB123456789");
+    }
+  }
+
+  @Test
   void frontendRouteLiteralsAreCentralizedInAppRoutes() throws Exception {
     List<Path> roots =
         List.of(
@@ -298,6 +340,8 @@ class ConstitutionArchTest {
       //   - LoginIdentity           : Platform-level pre-auth principal; no tenant_id by design
       //   - Membership              : Platform-level identity→tenant link; tenant_id is a plain FK,
       //                               not BaseEntity's RLS isolation column
+      //   - PendingSignup           : Pre-tenant signup row (SIGNUP-DEFER-1); global, no tenant_id
+      //                               until the e-mail link builds the tenant
 
       ArchRule rule =
           classes()
@@ -331,6 +375,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("LoginIdentity")
               .and()
               .doNotHaveSimpleName("Membership")
+              .and()
+              .doNotHaveSimpleName("PendingSignup")
               .should()
               .beAssignableTo(
                   com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class)

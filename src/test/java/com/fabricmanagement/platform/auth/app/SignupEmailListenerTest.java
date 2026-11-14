@@ -1,14 +1,21 @@
 package com.fabricmanagement.platform.auth.app;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.web.LocalizationContext;
 import com.fabricmanagement.common.infrastructure.web.LocalizationService;
+import com.fabricmanagement.platform.auth.domain.event.ExistingAccountSignupAttemptedEvent;
 import com.fabricmanagement.platform.auth.domain.event.SelfSignupCompletedEvent;
+import com.fabricmanagement.platform.auth.domain.event.SignupVerificationRequestedEvent;
+import com.fabricmanagement.platform.communication.app.EmailOutboxService;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -24,6 +31,7 @@ class SignupEmailListenerTest {
   @Mock private NotificationService notificationService;
   @Mock private EmailTemplateRenderer emailTemplateRenderer;
   @Mock private LocalizationService localizationService;
+  @Mock private EmailOutboxService emailOutboxService;
 
   @AfterEach
   void tearDown() {
@@ -31,9 +39,10 @@ class SignupEmailListenerTest {
   }
 
   @Test
-  void sendsSelfServiceSetupPasswordEmailFromEventPayload() {
+  void sendsNoMailForACompletedSelfServiceSignup() {
     SignupEmailListener listener =
-        new SignupEmailListener(notificationService, emailTemplateRenderer, localizationService);
+        new SignupEmailListener(
+            notificationService, emailTemplateRenderer, localizationService, emailOutboxService);
     SelfSignupCompletedEvent event =
         new SelfSignupCompletedEvent(
             UUID.randomUUID(),
@@ -43,48 +52,25 @@ class SignupEmailListenerTest {
             "Acme Textiles",
             "ACME-123",
             "SPINNER",
-            "https://app.example.com/setup?token=abc",
+            null,
             false,
             List.of("FabricOS"),
             "PLAYGROUND",
             UUID.randomUUID(),
             "en");
-    LocalizationContext.setLocale("tr");
-    when(localizationService.getMessage(
-            "email.registration.subject", null, Locale.forLanguageTag("en")))
-        .thenReturn("Set up your password");
-    when(emailTemplateRenderer.renderSetupPassword(
-            "Owner",
-            "Acme Textiles",
-            "owner@example.com",
-            "https://app.example.com/setup?token=abc"))
-        .thenReturn("setup body");
 
+    // The company is built after its e-mail link was used: the person already has what a setup
+    // mail would give them, so the completed event is only for the platform team's notice.
     listener.onSelfSignupCompleted(event);
 
-    verify(localizationService)
-        .getMessage("email.registration.subject", null, Locale.forLanguageTag("en"));
-    verify(emailTemplateRenderer)
-        .renderSetupPassword(
-            "Owner",
-            "Acme Textiles",
-            "owner@example.com",
-            "https://app.example.com/setup?token=abc");
-    verify(emailTemplateRenderer, never())
-        .renderWelcome(
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString());
-    verify(notificationService)
-        .sendNotificationSync(
-            event.getTenantId(), "owner@example.com", "Set up your password", "setup body");
+    verifyNoInteractions(notificationService, emailTemplateRenderer, localizationService);
   }
 
   @Test
   void sendsSalesLedWelcomeEmailFromEventPayload() {
     SignupEmailListener listener =
-        new SignupEmailListener(notificationService, emailTemplateRenderer, localizationService);
+        new SignupEmailListener(
+            notificationService, emailTemplateRenderer, localizationService, emailOutboxService);
     SelfSignupCompletedEvent event =
         new SelfSignupCompletedEvent(
             UUID.randomUUID(),
@@ -127,5 +113,86 @@ class SignupEmailListenerTest {
             org.mockito.ArgumentMatchers.anyString());
     verify(notificationService)
         .sendNotificationSync(event.getTenantId(), "admin@example.com", "Welcome", "welcome body");
+  }
+
+  @Test
+  void mailsTheSignupConfirmationLinkFromThePlatformTenant() {
+    SignupEmailListener listener =
+        new SignupEmailListener(
+            notificationService, emailTemplateRenderer, localizationService, emailOutboxService);
+    UUID platformTenant = UUID.randomUUID();
+    var event =
+        new SignupVerificationRequestedEvent(
+            platformTenant,
+            "owner@example.com",
+            "Owner",
+            "Acme Textiles",
+            "https://app.example.com/setup?token=abc",
+            "en");
+    when(localizationService.getMessage(
+            "email.registration.subject", null, Locale.forLanguageTag("en")))
+        .thenReturn("Complete Your FabricOS Registration");
+    when(emailTemplateRenderer.renderSignupConfirmation(
+            "Owner",
+            "Acme Textiles",
+            "owner@example.com",
+            "https://app.example.com/setup?token=abc"))
+        .thenReturn("<html>confirm</html>");
+
+    listener.onSignupVerificationRequested(event);
+
+    verify(notificationService)
+        .sendNotificationSync(
+            platformTenant,
+            "owner@example.com",
+            "Complete Your FabricOS Registration",
+            "<html>confirm</html>");
+  }
+
+  @Test
+  void tellsAnExistingAccountHolderToSignInUnlessTheDailyLimitIsReached() {
+    SignupEmailListener listener =
+        new SignupEmailListener(
+            notificationService, emailTemplateRenderer, localizationService, emailOutboxService);
+    UUID platformTenant = UUID.randomUUID();
+    var event =
+        new ExistingAccountSignupAttemptedEvent(
+            platformTenant, "owner@example.com", "Owner", "https://app.example.com/login", "en");
+    when(emailOutboxService.countQueuedTo(
+            eq(platformTenant), eq("owner@example.com"), any(Instant.class)))
+        .thenReturn((long) SignupEmailListener.MAX_EXISTING_ACCOUNT_NOTICES_PER_WINDOW - 1);
+    when(localizationService.getMessage(
+            "email.signup.existing.subject", null, Locale.forLanguageTag("en")))
+        .thenReturn("You already have a FabricOS account");
+    when(emailTemplateRenderer.renderExistingAccountNotice(
+            "Owner", "owner@example.com", "https://app.example.com/login"))
+        .thenReturn("<html>sign in</html>");
+
+    listener.onExistingAccountSignupAttempted(event);
+
+    verify(notificationService)
+        .sendNotificationSync(
+            platformTenant,
+            "owner@example.com",
+            "You already have a FabricOS account",
+            "<html>sign in</html>");
+  }
+
+  @Test
+  void sendsNoFurtherExistingAccountNoticeOnceTheDailyLimitIsReached() {
+    SignupEmailListener listener =
+        new SignupEmailListener(
+            notificationService, emailTemplateRenderer, localizationService, emailOutboxService);
+    UUID platformTenant = UUID.randomUUID();
+    var event =
+        new ExistingAccountSignupAttemptedEvent(
+            platformTenant, "owner@example.com", "Owner", "https://app.example.com/login", "en");
+    when(emailOutboxService.countQueuedTo(
+            eq(platformTenant), eq("owner@example.com"), any(Instant.class)))
+        .thenReturn((long) SignupEmailListener.MAX_EXISTING_ACCOUNT_NOTICES_PER_WINDOW);
+
+    listener.onExistingAccountSignupAttempted(event);
+
+    verify(notificationService, never()).sendNotificationSync(any(), any(), any(), any());
   }
 }

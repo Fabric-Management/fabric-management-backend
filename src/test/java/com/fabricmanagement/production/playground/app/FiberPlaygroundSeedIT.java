@@ -13,7 +13,6 @@ import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeede
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
-import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
@@ -25,6 +24,7 @@ import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisi
 import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisioningPort.RegisterFirstPlaygroundSignup;
 import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
 import java.util.List;
 import java.util.Map;
@@ -312,17 +312,15 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
   private UUID signup(SignupIntent intent) {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     return onboardingService
-        .createSelfServiceTenant(
-            SelfSignupRequest.builder()
-                .organizationName("Fibre Playground " + suffix)
-                .taxId("FPG" + suffix)
-                .organizationType(OrganizationType.SPINNER)
-                .firstName("Demo")
-                .lastName("Prospect")
-                .email("fibre-playground-" + suffix + "@example.com")
-                .intent(intent)
-                .acceptedTerms(true)
-                .build())
+        .createVerifiedSelfServiceTenant(
+            PendingSignupFixtures.pendingSignup(
+                "Fibre Playground " + suffix,
+                "FPG" + suffix,
+                OrganizationType.SPINNER,
+                "Demo",
+                "Prospect",
+                "fibre-playground-" + suffix + "@example.com",
+                intent))
         .getTenantId();
   }
 

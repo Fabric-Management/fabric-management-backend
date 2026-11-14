@@ -4,6 +4,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * Email Template Renderer - Backend template rendering service.
@@ -44,6 +45,32 @@ public class EmailTemplateRenderer {
             "email", email != null ? email : "",
             "setupUrl", setupUrl);
     return render("self-service-welcome.html", vars);
+  }
+
+  /**
+   * Render the "confirm your e-mail" mail of a pending signup. The company and first name come
+   * straight from a public form and go to an address the sender may not own, so they are HTML
+   * escaped here (the template engine only substitutes text).
+   */
+  public String renderSignupConfirmation(
+      String firstName, String companyName, String email, String setupUrl) {
+    Map<String, String> vars =
+        Map.of(
+            "firstName", firstName != null ? HtmlUtils.htmlEscape(firstName) : "there",
+            "companyName", companyName != null ? HtmlUtils.htmlEscape(companyName) : "",
+            "email", email != null ? HtmlUtils.htmlEscape(email) : "",
+            "setupUrl", setupUrl);
+    return render("signup-confirm-email.html", vars);
+  }
+
+  /** Render the "you already have an account" mail (same escaping as the confirmation mail). */
+  public String renderExistingAccountNotice(String firstName, String email, String signInUrl) {
+    Map<String, String> vars =
+        Map.of(
+            "firstName", firstName != null ? HtmlUtils.htmlEscape(firstName) : "there",
+            "email", email != null ? HtmlUtils.htmlEscape(email) : "",
+            "signInUrl", signInUrl);
+    return render("signup-existing-account.html", vars);
   }
 
   /** Render welcome email. */

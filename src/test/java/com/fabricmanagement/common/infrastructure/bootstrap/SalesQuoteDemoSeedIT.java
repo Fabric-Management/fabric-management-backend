@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
-import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
@@ -20,6 +19,7 @@ import com.fabricmanagement.sales.orderintake.app.OrderIntakeProductSearchServic
 import com.fabricmanagement.sales.orderintake.app.OrderIntakeStockPreviewService;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeAvailabilityDto;
 import com.fabricmanagement.sales.orderintake.dto.OrderIntakeStockPreviewRequest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import com.fabricmanagement.testsupport.PostgresImage;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -453,17 +453,15 @@ class SalesQuoteDemoSeedIT {
   private UUID signup(SignupIntent intent) {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     return onboardingService
-        .createSelfServiceTenant(
-            SelfSignupRequest.builder()
-                .organizationName("Colour Playground " + suffix)
-                .taxId("CPG" + suffix)
-                .organizationType(OrganizationType.SPINNER)
-                .firstName("Demo")
-                .lastName("Prospect")
-                .email("colour-playground-" + suffix + "@example.com")
-                .intent(intent)
-                .acceptedTerms(true)
-                .build())
+        .createVerifiedSelfServiceTenant(
+            PendingSignupFixtures.pendingSignup(
+                "Colour Playground " + suffix,
+                "CPG" + suffix,
+                OrganizationType.SPINNER,
+                "Demo",
+                "Prospect",
+                "colour-playground-" + suffix + "@example.com",
+                intent))
         .getTenantId();
   }
 

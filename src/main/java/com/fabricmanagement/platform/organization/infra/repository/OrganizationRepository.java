@@ -20,13 +20,26 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
 
+  String ACTIVE_ROOTS =
+      " FROM Organization o WHERE o.tenantId = :tenantId"
+          + " AND o.parentOrganizationId IS NULL AND o.isActive = true";
+
+  String COMPANY_ROOTS =
+      ACTIVE_ROOTS
+          + " AND o.organizationType != com.fabricmanagement.platform.organization.domain.OrganizationType.EXTERNAL_PARTNER";
+
   /** Company-wide command boundary, also serialising different administrators. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      "SELECT o FROM Organization o WHERE o.tenantId = :tenantId"
-          + " AND o.parentOrganizationId IS NULL AND o.isActive = true"
-          + " AND o.organizationType != com.fabricmanagement.platform.organization.domain.OrganizationType.EXTERNAL_PARTNER")
+  @Query("SELECT o" + COMPANY_ROOTS)
   Optional<Organization> lockRootForOnboarding(@Param("tenantId") UUID tenantId);
+
+  @Query("SELECT count(o)" + COMPANY_ROOTS)
+  long countCompanyRoots(@Param("tenantId") UUID tenantId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Organization o WHERE o.tenantId = :tenantId AND o.id = :id")
+  Optional<Organization> lockByTenantIdAndId(
+      @Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   /**
    * Find organization by tenant and ID.
@@ -152,11 +165,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
    *     OrganizationType#EXTERNAL_PARTNER})
    * @return Root organization if found
    */
-  @Query(
-      "SELECT o FROM Organization o WHERE o.tenantId = :tenantId"
-          + " AND o.parentOrganizationId IS NULL"
-          + " AND o.isActive = true"
-          + " AND o.organizationType != :excludeType")
+  @Query("SELECT o" + ACTIVE_ROOTS + " AND o.organizationType != :excludeType")
   Optional<Organization> findRootOrganization(
       @Param("tenantId") UUID tenantId, @Param("excludeType") OrganizationType excludeType);
 

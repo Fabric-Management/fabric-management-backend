@@ -80,18 +80,64 @@ class PublishSelfSignupCompletedStepTest {
   }
 
   @Test
-  void missingTokenOrEmailLogsWarningAndDoesNotPublish(CapturedOutput output) {
+  void aSalesLedSignupWithoutATokenLogsWarningAndDoesNotPublish(CapturedOutput output) {
     PublishSelfSignupCompletedStep step =
         new PublishSelfSignupCompletedStep(frontendUrlProvider, eventPublisher);
     OnboardingContext context = new OnboardingContext();
     context.setTenantId(UUID.randomUUID());
     context.setUserId(UUID.randomUUID());
     context.setAdminContact("owner@example.com");
+    context.setSalesLed(true);
 
     step.execute(context);
 
     verify(eventPublisher, never()).publish(org.mockito.ArgumentMatchers.any());
-    assertThat(output).contains("missing token or recipient email, skipping signup email event");
+    assertThat(output).contains("missing token, skipping signup email event");
+  }
+
+  @Test
+  void aSignupWithoutARecipientLogsWarningAndDoesNotPublish(CapturedOutput output) {
+    PublishSelfSignupCompletedStep step =
+        new PublishSelfSignupCompletedStep(frontendUrlProvider, eventPublisher);
+    OnboardingContext context = new OnboardingContext();
+    context.setTenantId(UUID.randomUUID());
+    context.setUserId(UUID.randomUUID());
+
+    step.execute(context);
+
+    verify(eventPublisher, never()).publish(org.mockito.ArgumentMatchers.any());
+    assertThat(output).contains("missing recipient email, skipping signup event");
+  }
+
+  @Test
+  void aSelfServiceSignupPublishesTheEventWithoutALink() {
+    UUID tenantId = UUID.randomUUID();
+    PublishSelfSignupCompletedStep step =
+        new PublishSelfSignupCompletedStep(frontendUrlProvider, eventPublisher);
+    OnboardingContext context = new OnboardingContext();
+    context.setTenantId(tenantId);
+    context.setUserId(UUID.randomUUID());
+    context.setAdminContact("owner@example.com");
+    context.setAdminFirstName("Owner");
+    context.setAdminLastName("Admin");
+    context.setOrganizationName("Acme Textiles");
+    context.setSalesLed(false);
+    context.setSignupIntent("PLAYGROUND");
+
+    step.execute(context);
+
+    // The company is built after its e-mail link was used: there is no further link to send, but
+    // the platform team is still told that a company joined.
+    verify(frontendUrlProvider, never()).buildUrl(org.mockito.ArgumentMatchers.anyString());
+    ArgumentCaptor<SelfSignupCompletedEvent> eventCaptor =
+        ArgumentCaptor.forClass(SelfSignupCompletedEvent.class);
+    verify(eventPublisher).publish(eventCaptor.capture());
+    SelfSignupCompletedEvent event = eventCaptor.getValue();
+    assertThat(event.getSetupUrl()).isNull();
+    assertThat(event.isSalesLed()).isFalse();
+    assertThat(event.getSignupIntent()).isEqualTo("PLAYGROUND");
+    assertThat(event.getTrialTenantId()).isEqualTo(tenantId);
+    assertThat(context.getSetupUrl()).isNull();
   }
 
   @Test

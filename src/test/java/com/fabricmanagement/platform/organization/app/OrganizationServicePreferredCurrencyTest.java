@@ -13,6 +13,7 @@ import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.user.security.OnboardingAccessService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +31,9 @@ class OrganizationServicePreferredCurrencyTest {
 
   @Mock private OrganizationRepository organizationRepository;
   @Mock private DomainEventPublisher eventPublisher;
+
+  @Mock private OrganizationNamingService naming;
+  @Mock private OnboardingAccessService onboardingAccess;
 
   @InjectMocks private OrganizationService organizationService;
 
@@ -74,7 +78,7 @@ class OrganizationServicePreferredCurrencyTest {
             .build();
     organization.setId(ORG_ID);
     organization.setTenantId(TENANT_ID);
-    when(organizationRepository.findByTenantIdAndId(TENANT_ID, ORG_ID))
+    when(organizationRepository.lockByTenantIdAndId(TENANT_ID, ORG_ID))
         .thenReturn(Optional.of(organization));
     when(organizationRepository.save(any(Organization.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -97,7 +101,7 @@ class OrganizationServicePreferredCurrencyTest {
             .build();
     organization.setId(ORG_ID);
     organization.setTenantId(TENANT_ID);
-    when(organizationRepository.findByTenantIdAndId(TENANT_ID, ORG_ID))
+    when(organizationRepository.lockByTenantIdAndId(TENANT_ID, ORG_ID))
         .thenReturn(Optional.of(organization));
 
     assertThatThrownBy(

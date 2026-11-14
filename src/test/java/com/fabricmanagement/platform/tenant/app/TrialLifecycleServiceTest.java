@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
@@ -33,12 +34,14 @@ class TrialLifecycleServiceTest {
 
   @Mock private SystemTransactionExecutor systemExecutor;
   @Mock private CacheManager cacheManager;
+  @Mock private TenantUnderCreation tenantUnderCreation;
+  @Mock private JdbcTemplate primaryJdbc;
 
   private TrialLifecycleService service;
 
   @BeforeEach
   void setUp() {
-    service = new TrialLifecycleService(systemExecutor, cacheManager);
+    service = new TrialLifecycleService(systemExecutor, cacheManager, tenantUnderCreation);
     ReflectionTestUtils.setField(service, "baseDays", 90);
     ReflectionTestUtils.setField(service, "dormancyWindowDays", 90);
     ReflectionTestUtils.setField(service, "hardCapMonths", 4);
@@ -60,6 +63,23 @@ class TrialLifecycleServiceTest {
     assertThat(sqlCaptor.getValue()).contains("status = 'TRIAL'");
     assertThat(sqlCaptor.getValue()).contains("trial_started_at IS NULL");
     assertThat(sqlCaptor.getValue()).contains("demo_mode = false");
+  }
+
+  @Test
+  @DisplayName("a tenant still being created starts its trial on the creating transaction")
+  void shouldStartTrialOnTheCreatingTransaction() {
+    UUID tenantId = UUID.randomUUID();
+    when(tenantUnderCreation.isUnderCreation(tenantId)).thenReturn(true);
+    when(tenantUnderCreation.primaryJdbc()).thenReturn(primaryJdbc);
+    when(primaryJdbc.update(anyString(), any(), any(), any(), eq(tenantId))).thenReturn(1);
+
+    int affected = service.startSelfServiceTrialIfNeeded(tenantId);
+
+    assertThat(affected).isEqualTo(1);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(primaryJdbc).update(sqlCaptor.capture(), any(), any(), any(), eq(tenantId));
+    assertThat(sqlCaptor.getValue()).contains("trial_started_at IS NULL");
+    verifyNoInteractions(systemExecutor);
   }
 
   @Test

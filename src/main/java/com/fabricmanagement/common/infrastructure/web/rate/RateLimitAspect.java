@@ -8,16 +8,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Aspect that enforces {@link RateLimited} on controller methods.
  *
- * <p>Uses per-principal (user) key. Unauthenticated requests are not rate-limited (handled by
- * auth). Throws {@link TooManyRequestsException} when limit exceeded (mapped to 429).
+ * <p>Each annotated endpoint keeps its own window per caller: a signed-in caller is counted per
+ * user, an anonymous caller per connecting address (see {@link #rateLimitKey(String)}). Throws
+ * {@link TooManyRequestsException} when the limit is exceeded (mapped to 429).
+ *
+ * <p>{@code application.rate-limit.enabled=false} switches the limit off. Only the test profile
+ * does that: every MockMvc request comes from the same loopback address, and integration test
+ * classes share one cached context, so unrelated tests would otherwise exhaust each other's
+ * windows.
  */
 @Aspect
 @Component
@@ -31,9 +41,15 @@ public class RateLimitAspect {
 
   private final ConcurrentHashMap<String, Window> windowByKey = new ConcurrentHashMap<>();
 
+  @Value("${application.rate-limit.enabled:true}")
+  private boolean enabled = true;
+
   @Around("@annotation(rateLimited)")
   public Object enforce(ProceedingJoinPoint joinPoint, RateLimited rateLimited) throws Throwable {
-    String key = rateLimitKey();
+    if (!enabled) {
+      return joinPoint.proceed();
+    }
+    String key = rateLimitKey(joinPoint.getSignature().toShortString());
     if (key == null) {
       return joinPoint.proceed();
     }
@@ -56,13 +72,32 @@ public class RateLimitAspect {
     return joinPoint.proceed();
   }
 
-  private static String rateLimitKey() {
+  /**
+   * The window key: the endpoint plus the caller, so a caller's use of one endpoint does not count
+   * against another endpoint's limit. Signed-in callers are limited per user. Callers without a
+   * login (the public signup) used to have no key and therefore no limit at all; they are now
+   * limited per connecting address. That is the socket address, not the first {@code
+   * X-Forwarded-For} hop, because the client writes that header and could rotate it to dodge the
+   * limit. Behind a reverse proxy the server must be set up to resolve the real client address (for
+   * example {@code server.forward-headers-strategy=native}), otherwise every caller shares the
+   * proxy's bucket. An anonymous token counts as no login, otherwise every anonymous caller would
+   * share one bucket.
+   */
+  static String rateLimitKey(String endpoint) {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
-      return null;
+    boolean signedIn =
+        auth != null
+            && auth.isAuthenticated()
+            && auth.getPrincipal() != null
+            && !(auth instanceof AnonymousAuthenticationToken);
+    if (signedIn) {
+      String name = auth.getName();
+      return "rate:" + endpoint + ":user:" + (name != null ? name : "anonymous");
     }
-    String name = auth.getName();
-    return "rate:" + (name != null ? name : "anonymous");
+    if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
+      return "rate:" + endpoint + ":ip:" + attrs.getRequest().getRemoteAddr();
+    }
+    return null;
   }
 
   @Scheduled(fixedRate = 300_000)

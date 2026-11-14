@@ -25,6 +25,13 @@ public class CreateRegistrationTokenStep implements OnboardingStep {
           context.getTenantId());
       return;
     }
+    // A self-service signup is built only after its e-mail link was used (SIGNUP-DEFER-1), so it
+    // has no further link to send. Only sales-led onboarding still mails a setup token.
+    if (!context.isSalesLed()) {
+      log.debug(
+          "CreateRegistrationTokenStep: skipping self-service tenantId={}", context.getTenantId());
+      return;
+    }
 
     UUID userId = context.getUserId();
     UUID organizationId = context.getOrganizationId();
@@ -32,9 +39,8 @@ public class CreateRegistrationTokenStep implements OnboardingStep {
     if (userId == null || organizationId == null || contactValue == null) {
       return;
     }
-    RegistrationTokenType tokenType =
-        context.isSalesLed() ? RegistrationTokenType.SALES_LED : RegistrationTokenType.SELF_SERVICE;
-    RegistrationToken token = RegistrationToken.create(contactValue, tokenType);
+    RegistrationToken token =
+        RegistrationToken.create(contactValue, RegistrationTokenType.SALES_LED);
     token.linkTo(userId, organizationId);
     tokenRepository.save(token);
     context.setRegistrationToken(token.getToken());

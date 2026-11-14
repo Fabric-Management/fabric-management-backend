@@ -30,27 +30,8 @@ public class TrialLifecycleService implements TrialLifecyclePort {
 
   private static final String TENANT_WRITABLE_CACHE = "tenant-writable";
 
-  private final SystemTransactionExecutor systemExecutor;
-  private final CacheManager cacheManager;
-
-  @Value("${application.trial.base-days:90}")
-  private int baseDays;
-
-  @Value("${application.trial.dormancy-window-days:90}")
-  private int dormancyWindowDays;
-
-  @Value("${application.trial.hard-cap-months:4}")
-  private int hardCapMonths;
-
-  @Override
-  public int startSelfServiceTrialIfNeeded(UUID tenantId) {
-    if (tenantId == null) {
-      return 0;
-    }
-    Instant now = Instant.now();
-    Instant trialEndsAt = now.plus(baseDays, ChronoUnit.DAYS);
-    return systemExecutor.executeUpdate(
-        """
+  private static final String START_TRIAL_SQL =
+      """
         UPDATE common_tenant.common_tenant
         SET trial_started_at = ?,
             last_activity_at = ?,
@@ -63,7 +44,50 @@ public class TrialLifecycleService implements TrialLifecyclePort {
           AND trial_started_at IS NULL
           AND demo_mode = false
           AND is_active = true
-        """,
+        """;
+
+  private final SystemTransactionExecutor systemExecutor;
+  private final CacheManager cacheManager;
+  private final TenantUnderCreation tenantUnderCreation;
+
+  @Value("${application.trial.base-days:90}")
+  private int baseDays;
+
+  @Value("${application.trial.dormancy-window-days:90}")
+  private int dormancyWindowDays;
+
+  @Value("${application.trial.hard-cap-months:4}")
+  private int hardCapMonths;
+
+  /**
+   * Starts the trial clock of a registered self-service trial that has not started yet.
+   *
+   * <p>When the current transaction is still creating the tenant (the e-mail link builds the
+   * company and starts the trial in one transaction, SIGNUP-DEFER-1), the row is not visible to the
+   * system connection yet, so the update runs on the transaction's own connection. The caller must
+   * have bound the session to {@code tenantId}: the tenant table has self-row RLS.
+   *
+   * @return the number of rows updated (0 when there was nothing to start)
+   */
+  @Override
+  public int startSelfServiceTrialIfNeeded(UUID tenantId) {
+    if (tenantId == null) {
+      return 0;
+    }
+    Instant now = Instant.now();
+    Instant trialEndsAt = now.plus(baseDays, ChronoUnit.DAYS);
+    if (tenantUnderCreation.isUnderCreation(tenantId)) {
+      return tenantUnderCreation
+          .primaryJdbc()
+          .update(
+              START_TRIAL_SQL,
+              Timestamp.from(now),
+              Timestamp.from(now),
+              Timestamp.from(trialEndsAt),
+              tenantId);
+    }
+    return systemExecutor.executeUpdate(
+        START_TRIAL_SQL,
         Timestamp.from(now),
         Timestamp.from(now),
         Timestamp.from(trialEndsAt),

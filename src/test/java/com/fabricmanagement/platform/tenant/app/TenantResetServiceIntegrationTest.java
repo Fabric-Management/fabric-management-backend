@@ -12,6 +12,7 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
@@ -71,6 +72,8 @@ class TenantResetServiceIntegrationTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());
+    // The form only asks for the e-mail link; the company exists once the link is used.
+    PendingSignupFixtures.completeSignup(mockMvc, jdbc, ownerEmail);
 
     UUID tenantId =
         jdbc.queryForObject(

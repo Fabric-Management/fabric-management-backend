@@ -4,6 +4,7 @@ import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,22 +23,27 @@ import lombok.NoArgsConstructor;
 public class SelfSignupRequest {
 
   @NotBlank(message = "Organization name is required")
+  @Size(max = 255, message = "Organization name is too long")
   private String organizationName;
 
   @NotBlank(message = "Tax ID is required")
+  @Size(max = 50, message = "Tax ID is too long")
   private String taxId;
 
   @NotNull(message = "Organization type is required")
   private OrganizationType organizationType;
 
   @NotBlank(message = "First name is required")
+  @Size(max = 100, message = "First name is too long")
   private String firstName;
 
   @NotBlank(message = "Last name is required")
+  @Size(max = 100, message = "Last name is too long")
   private String lastName;
 
   @NotBlank(message = "Email is required")
   @Email(message = "Invalid email format")
+  @Size(max = 255, message = "Email is too long")
   private String email;
 
   @io.swagger.v3.oas.annotations.media.Schema(

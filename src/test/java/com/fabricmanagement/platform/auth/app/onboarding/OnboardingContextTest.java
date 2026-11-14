@@ -34,6 +34,32 @@ class OnboardingContextTest {
   }
 
   @Test
+  void toCreateAdminUserRequest_sendsTheInvitationMailByDefault() {
+    OnboardingContext context = new OnboardingContext();
+    context.setAdminContact("jane@acme.com");
+
+    assertThat(context.toCreateAdminUserRequest().isInvitationEmailSuppressed()).isFalse();
+  }
+
+  @Test
+  void toCreateAdminUserRequest_suppressesTheInvitationMailForAVerifiedSelfServiceSignup() {
+    OnboardingContext context = new OnboardingContext();
+    context.setAdminContact("jane@acme.com");
+    context.setInvitationEmailSuppressed(true);
+
+    assertThat(context.toCreateAdminUserRequest().isInvitationEmailSuppressed()).isTrue();
+  }
+
+  @Test
+  void toCreateAdminUserRequest_suppressesTheInvitationMailForAnExistingIdentity() {
+    OnboardingContext context = new OnboardingContext();
+    context.setAdminContact("jane@acme.com");
+    context.setExistingIdentity(true);
+
+    assertThat(context.toCreateAdminUserRequest().isInvitationEmailSuppressed()).isTrue();
+  }
+
+  @Test
   void toResult_buildsResponseFromContext() {
     UUID organizationId = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();

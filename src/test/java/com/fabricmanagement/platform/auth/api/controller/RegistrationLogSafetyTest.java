@@ -2,6 +2,8 @@ package com.fabricmanagement.platform.auth.api.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,6 +13,7 @@ import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.web.exception.GlobalExceptionHandler;
 import com.fabricmanagement.platform.auth.app.PasswordResetService;
 import com.fabricmanagement.platform.auth.app.PasswordSetupService;
+import com.fabricmanagement.platform.auth.app.SignupRequestService;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
@@ -50,6 +53,7 @@ class RegistrationLogSafetyTest {
       """;
 
   @Mock private TenantOnboardingService onboarding;
+  @Mock private SignupRequestService signupRequests;
   @Mock private PasswordSetupService setup;
   @Mock private PasswordResetService reset;
   @Mock private AuthCookieSupport cookies;
@@ -60,7 +64,7 @@ class RegistrationLogSafetyTest {
   void setUp() {
     mvc =
         MockMvcBuilders.standaloneSetup(
-                new PublicSignupController(onboarding),
+                new PublicSignupController(signupRequests),
                 new TenantOnboardingController(onboarding),
                 new PasswordController(setup, reset, cookies))
             .setControllerAdvice(new GlobalExceptionHandler(meters))
@@ -77,7 +81,7 @@ class RegistrationLogSafetyTest {
             .setupUrl(URL)
             .registrationToken(TOKEN)
             .build();
-    when(onboarding.createSelfServiceTenant(any())).thenReturn(response);
+    doNothing().when(signupRequests).request(any());
     when(onboarding.createSalesLedTenant(any())).thenReturn(response);
     try (var logs = capture()) {
       String publicJson =
@@ -99,7 +103,9 @@ class RegistrationLogSafetyTest {
       assertSafe(logs);
       assertThat(logs.text())
           .contains(
-              response.getTenantId().toString(), "signup completed", "onboarded successfully");
+              response.getTenantId().toString(),
+              "Public signup requested",
+              "onboarded successfully");
     }
   }
 
@@ -138,7 +144,7 @@ class RegistrationLogSafetyTest {
       when(onboarding.createSalesLedTenant(any())).thenThrow(failure);
       body = ADMIN_BODY;
     } else {
-      when(onboarding.createSelfServiceTenant(any())).thenThrow(failure);
+      doThrow(failure).when(signupRequests).request(any());
       body = PUBLIC_BODY;
     }
     try (var logs = capture()) {

@@ -1,63 +1,43 @@
 package com.fabricmanagement.platform.auth.app;
 
-import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
-import com.fabricmanagement.common.util.PiiMaskingUtil;
-import com.fabricmanagement.platform.auth.domain.AuthUser;
-import com.fabricmanagement.platform.auth.domain.RefreshToken;
+import com.fabricmanagement.platform.auth.app.AccountSetupService.SetupTarget;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
-import com.fabricmanagement.platform.auth.domain.event.UserLoginEvent;
-import com.fabricmanagement.platform.auth.domain.event.UserRegisteredEvent;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
-import com.fabricmanagement.platform.auth.dto.OnboardingPrefillDto;
 import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
+import com.fabricmanagement.platform.auth.dto.SetupLinkStatus;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
-import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RegistrationTokenRepository;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
-import com.fabricmanagement.platform.communication.app.ContactService;
-import com.fabricmanagement.platform.communication.domain.Contact;
-import com.fabricmanagement.platform.organization.domain.Organization;
-import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
-import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
-import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
-import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import jakarta.persistence.EntityManager;
-import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Password Setup Service - Complete registration with secure token.
+ * Setup links: the page behind {@code /setup?token=...}.
  *
- * <h2>Two Flows:</h2>
- *
- * <ul>
- *   <li><b>Sales-led:</b> Token only (email verified by link click)
- *   <li><b>Self-service:</b> Token only (email verified by link click)
- * </ul>
- *
- * <p>Both flows result in:
+ * <h2>Two kinds of link</h2>
  *
  * <ul>
- *   <li>Password set
- *   <li>User verified
- *   <li>Auto-login (JWT tokens returned)
- *   <li>Onboarding status and prefill for onboarding form
+ *   <li><b>Self-service signup:</b> the token belongs to a pending signup. Using it proves the
+ *       e-mail address and builds the company ({@link SignupCompletionService}). Tried first.
+ *   <li><b>Sales-led and invited users:</b> the token is a {@link RegistrationToken} of a user that
+ *       already exists. Using it gives that user their login.
  * </ul>
+ *
+ * <p>Both end the same way ({@link AccountSetupService}): the login is created and the person is
+ * signed in, unless the address already had a login, in which case the company is added to it and
+ * the person signs in normally.
  */
 @Service
 @RequiredArgsConstructor
@@ -66,40 +46,32 @@ public class PasswordSetupService {
 
   private final RegistrationTokenRepository tokenRepository;
   private final AuthUserRepository authUserRepository;
-  private final RefreshTokenRepository refreshTokenRepository;
   private final UserFacade userFacade;
-  private final UserRepository userRepository;
-  private final UserContactAssignmentService userContactAssignmentService;
-  private final ContactService contactService;
-  private final PasswordEncoder passwordEncoder;
-  private final JwtService jwtService;
-  private final DomainEventPublisher eventPublisher;
-  private final EntityManager entityManager;
-  private final OrganizationRepository organizationRepository;
-  private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantQueryPort tenantQueryPort;
-  private final EmployeeProjectionPort employeeProjectionPort;
   private final TrialLifecyclePort trialLifecyclePort;
   private final TenantSessionBinder tenantSessionBinder;
   private final IdentityProvisioningService identityProvisioningService;
-
-  @Value("${application.jwt.refresh-expiration:604800000}")
-  private long refreshTokenExpiration;
-
-  @Value("${application.jwt.expiration:900000}")
-  private long accessTokenExpiration;
+  private final SignupCompletionService signupCompletion;
+  private final AccountSetupService accountSetup;
 
   /**
-   * Complete password setup using secure token.
-   *
-   * <p><b>Both flows:</b> Token only (email verified by link click). No verification code.
+   * Complete a setup link: the e-mail address is proved by the click, the password is the person's
+   * choice (not needed when the address already has a login).
    *
    * @param request Password setup request
-   * @return Login response with tokens, onboarding status and onboardingPrefill when needed
+   * @return Login response with tokens, onboarding status and onboardingPrefill when needed; or
+   *     {@code signInRequired} when the company was added to an existing login
    */
   @Transactional
   public LoginResponse setupPassword(PasswordSetupRequest request, String ipAddress) {
     log.info("Password setup initiated");
+
+    // A link from a self-service signup form: the company does not exist yet.
+    Optional<LoginResponse> completedSignup =
+        signupCompletion.complete(request.getToken(), request.getPassword(), ipAddress);
+    if (completedSignup.isPresent()) {
+      return completedSignup.get();
+    }
 
     // RLS: common_registration_token is tenant-scoped, but password setup is anonymous (no tenant
     // context yet), so the RLS-bound reads below can't see the token. Resolve the token's tenant
@@ -109,24 +81,21 @@ public class PasswordSetupService {
     UUID tokenTenantId =
         tenantQueryPort
             .findTenantIdByRegistrationToken(request.getToken())
-            .orElseThrow(PasswordSetupService::invalidToken);
+            .orElseThrow(SignupCompletionService::invalidToken);
     TenantContext.setCurrentTenantId(tokenTenantId);
     tenantSessionBinder.bindToCurrentSession(tokenTenantId);
 
     RegistrationToken token =
         tokenRepository
             .findByToken(request.getToken())
-            .orElseThrow(PasswordSetupService::invalidToken);
+            .orElseThrow(SignupCompletionService::invalidToken);
 
     if (!token.isValid()) {
       log.warn("Password setup rejected: tenantId={}, reason=AUTH_TOKEN_INVALID", tokenTenantId);
-      throw invalidToken();
+      throw SignupCompletionService.invalidToken();
     }
 
     log.debug("Password setup tenant resolved: tenantId={}", tokenTenantId);
-
-    // Email is verified when user completes password setup (link click + password set).
-    // ensureAuthenticationContact below verifies the contact for this flow.
 
     UserDto user =
         userFacade
@@ -152,191 +121,54 @@ public class PasswordSetupService {
       trialLifecyclePort.startSelfServiceTrialIfNeeded(user.getTenantId());
     }
 
-    // Reload User entity with contacts/departments for JWT generation
-    com.fabricmanagement.platform.user.domain.User userEntity =
-        userRepository
-            .findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
-            .orElseGet(
-                () ->
-                    userRepository
-                        .findByTenantIdAndId(user.getTenantId(), user.getId())
-                        .orElseThrow(() -> new IllegalArgumentException("User entity not found")));
-
-    // ✅ Verify contact when user completes password setup (link click = email ownership proof).
-    // Ensures user has at least one verified contact for multi-contact login support.
-    UUID userEntityTenantId = userEntity.getTenantId();
-    UUID userEntityId = userEntity.getId();
-
-    if (userEntity.getAnyVerifiedContact().isEmpty()) {
-      ensureAuthenticationContact(userEntityTenantId, userEntityId, token.getContactValue());
-      // Detach stale user entity and reload with fresh contact associations
-      entityManager.detach(userEntity);
-      userEntity =
-          userRepository
-              .findByTenantIdAndContactValue(userEntityTenantId, token.getContactValue())
-              .orElseGet(
-                  () ->
-                      userRepository
-                          .findByTenantIdAndId(userEntityTenantId, userEntityId)
-                          .orElseThrow(
-                              () -> new IllegalArgumentException("User entity not found")));
-    }
-
-    // ✅ Create single AuthUser for User (user-based authentication)
-    // Multi-contact login supported: Any verified contact of this User can be used for login
-    String passwordHash = passwordEncoder.encode(request.getPassword());
-
-    // ✅ Create AuthUser for User (one AuthUser per User)
-    AuthUser authUser = AuthUser.create(user.getId(), passwordHash);
-    authUser.setTenantId(user.getTenantId());
-    authUser.verify();
-
-    authUserRepository.save(authUser);
-    log.info("✅ Password setup: Created AuthUser for user: userId={}", user.getId());
-
-    identityProvisioningService.provisionCredential(
-        token.getContactValue(),
-        passwordHash,
-        Boolean.TRUE.equals(authUser.getIsMfaEnabled()),
-        authUser.getPrimaryMfaType(),
-        authUser.getMfaSecret(),
-        true,
-        user.getTenantId(),
-        user.getId());
-
     token.markAsUsed();
     tokenRepository.save(token);
 
-    // User entity already loaded with contacts/departments for JWT generation
-    // If contact was recovered, userEntity was reloaded above
-    com.fabricmanagement.platform.user.domain.User freshUserEntity = userEntity;
+    return accountSetup.finishSetup(
+        new SetupTarget(
+            user.getTenantId(),
+            user.getId(),
+            user.getOrganizationId(),
+            token.getContactValue(),
+            !Boolean.TRUE.equals(user.getHasCompletedOnboarding())),
+        request.getPassword(),
+        ipAddress);
+  }
 
-    String accessToken = jwtService.generateAccessToken(freshUserEntity);
-    String refreshToken = jwtService.generateRefreshToken(freshUserEntity);
-
-    // Persist refresh token for token refresh flow
-    RefreshToken refreshTokenEntity =
-        RefreshToken.create(
-            user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
-    refreshTokenEntity.setTenantId(user.getTenantId());
-    refreshTokenRepository.save(refreshTokenEntity);
-
-    // Get contact value for event
-    String contactValue =
-        freshUserEntity
-            .getAnyVerifiedContact()
-            .map(contact -> contact.getContactValue())
-            .orElse(token.getContactValue());
-
-    eventPublisher.publish(new UserRegisteredEvent(user.getTenantId(), user.getId(), contactValue));
-    // Auto-login event for audit trail (password setup is a successful login)
-    eventPublisher.publish(
-        new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
-
-    UserDto freshUser =
-        UserDto.from(
-            freshUserEntity,
-            employeeProjectionPort
-                .findByUserId(freshUserEntity.getTenantId(), freshUserEntity.getId())
-                .orElse(null));
-
-    boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
-    OnboardingPrefillDto onboardingPrefill = null;
-    if (needsOnboarding) {
-      var orgOpt =
-          organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
-      var prefillBuilder =
-          OnboardingPrefillDto.builder()
-              .primaryEmail(contactValue)
-              .organizationName(orgOpt.map(Organization::getName).orElse(null))
-              .legalName(
-                  orgOpt
-                      .map(
-                          o -> {
-                            String ln = o.getLegalName();
-                            return (ln != null && !ln.isBlank()) ? ln : o.getName();
-                          })
-                      .orElse(null))
-              .taxId(orgOpt.map(Organization::getTaxId).orElse(null))
-              .organizationType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null));
-
-      // Sales-led: prefill address from Organization primary address; self-signup: no address
-      organizationAddressRepository
-          .findPrimaryWithAddressByOrganizationId(user.getOrganizationId())
-          .map(oa -> oa.getAddress())
-          .ifPresent(
-              addr -> {
-                prefillBuilder
-                    .addressLine1(addr.getStreetAddress())
-                    .addressLine2(addr.getAddressLine2())
-                    .city(addr.getCity())
-                    .state(addr.getState())
-                    .district(addr.getDistrict())
-                    .postalCode(addr.getPostalCode())
-                    .country(addr.getCountry());
-              });
-
-      onboardingPrefill = prefillBuilder.build();
+  /**
+   * Tells the setup page whether a link can still be used and whether it must ask for a password,
+   * without using it. Every unusable link (unknown, expired, used) gets the same answer.
+   */
+  @Transactional(readOnly = true)
+  public SetupLinkStatus checkLink(String rawToken) {
+    Optional<SetupLinkStatus> signupLink = signupCompletion.checkLink(rawToken);
+    if (signupLink.isPresent()) {
+      return signupLink.get();
     }
 
-    log.info(
-        "Password setup completed: tenantId={}, userId={}, needsOnboarding={}",
-        user.getTenantId(),
-        user.getId(),
-        needsOnboarding);
+    Optional<UUID> tokenTenantId = tenantQueryPort.findTenantIdByRegistrationToken(rawToken);
+    if (tokenTenantId.isEmpty()) {
+      return SetupLinkStatus.invalid();
+    }
+    TenantContext.setCurrentTenantId(tokenTenantId.get());
+    tenantSessionBinder.bindToCurrentSession(tokenTenantId.get());
 
-    return LoginResponse.builder()
-        .accessToken(accessToken)
-        .refreshToken(refreshToken)
-        .expiresIn(accessTokenExpiration / 1000) // Convert ms to seconds
-        .user(freshUser)
-        .needsOnboarding(needsOnboarding)
-        .onboardingPrefill(onboardingPrefill)
-        .build();
+    return tokenRepository
+        .findByToken(rawToken)
+        .filter(RegistrationToken::isValid)
+        // Same answer as setupPassword, which refuses a link whose user already has a password.
+        .filter(token -> !userAlreadyHasPassword(token.getContactValue()))
+        .map(
+            token ->
+                new SetupLinkStatus(
+                    true, !identityProvisioningService.isEmailRegistered(token.getContactValue())))
+        .orElseGet(SetupLinkStatus::invalid);
   }
 
-  /**
-   * One answer for a token that is unknown, expired or already used, so the page can tell the
-   * person to ask for a new link. An unknown token used to surface as a bare illegal-argument error
-   * that the client showed as a generic failure.
-   */
-  private static PlatformDomainException invalidToken() {
-    return new PlatformDomainException(
-        "Registration token is invalid or expired", "AUTH_TOKEN_INVALID", 400);
-  }
-
-  /**
-   * Ensure user has a verified contact for authentication.
-   *
-   * <p>Creates and verifies contact if missing, then assigns to user. Must run within correct
-   * tenant context.
-   */
-  private UUID ensureAuthenticationContact(UUID tenantId, UUID userId, String contactValue) {
-    log.warn("No verified contact found for userId={}, attempting recovery", userId);
-
-    return TenantContext.executeInTenantContext(
-        tenantId,
-        () -> {
-          Contact contact =
-              contactService
-                  .findByValue(contactValue)
-                  .orElseGet(
-                      () -> {
-                        log.info("Creating contact for {}", PiiMaskingUtil.maskEmail(contactValue));
-                        return contactService.createContact(
-                            contactValue, null, "Primary", true, null);
-                      });
-
-          contactService.verifyContact(contact.getId());
-
-          if (!userContactAssignmentService.existsUserContact(userId, contact.getId())) {
-            userContactAssignmentService.assignContact(userId, contact.getId(), true);
-          } else {
-            userContactAssignmentService.setAsDefault(userId, contact.getId());
-          }
-
-          log.info("Recovered verified contact: userId={}, contactId={}", userId, contact.getId());
-          return contact.getId();
-        });
+  private boolean userAlreadyHasPassword(String contactValue) {
+    return userFacade
+        .findByContactValue(contactValue)
+        .map(user -> authUserRepository.existsByUserId(user.getId()))
+        .orElse(false);
   }
 }

@@ -356,6 +356,17 @@ public class EmailOutboxService {
   }
 
   /**
+   * How many mails were queued to this recipient for this tenant since the given time. Used to cap
+   * platform mails that anyone can trigger for somebody else's address. The caller must run in the
+   * tenant's context (the platform tenant, for signup mails), as the insert does.
+   */
+  @Transactional(readOnly = true)
+  public long countQueuedTo(UUID tenantId, String recipient, java.time.Instant since) {
+    return emailOutboxRepository.countByTenantIdAndRecipientAndCreatedAtAfter(
+        tenantId, recipient, since);
+  }
+
+  /**
    * Get pending email count (for monitoring).
    *
    * <p>Counted through {@code fabric_system}: these are called from metric gauges and a scheduled

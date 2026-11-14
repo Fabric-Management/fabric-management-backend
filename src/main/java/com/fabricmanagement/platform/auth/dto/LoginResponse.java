@@ -4,6 +4,7 @@ import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,6 +43,19 @@ public class LoginResponse {
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private String maskedContact;
+
+  /**
+   * True when a setup link added the company to a login that already existed. The link does not
+   * sign the person in (their password and MFA still apply): the client sends them to the normal
+   * login. Omitted from JSON otherwise.
+   */
+  @Schema(
+      description =
+          "True when a setup link added the company to an existing login; no auth cookies are"
+              + " set and the client sends the user to the login page. Omitted otherwise.",
+      requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Boolean signInRequired;
 
   /**
    * When true, frontend must show onboarding form. Always set explicitly; never null in API

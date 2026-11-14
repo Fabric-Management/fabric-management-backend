@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.platform.auth.domain.port.SignupEvidencePort.SignupCompany;
+import com.fabricmanagement.platform.auth.domain.port.SignupEvidencePort.UnverifiedSignup;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.lead.domain.*;
 import com.fabricmanagement.platform.lead.infra.repository.*;
@@ -99,6 +100,116 @@ class LeadServiceTest {
                 assertThat(error.getErrorCode()).isEqualTo("ONBOARDING_SIGNUP_LINK_UNRESOLVED"));
     verify(leads).findBySignupTenantIdAndSignupId(any(), any());
     verify(leads, never()).findByWorkEmail(any());
+  }
+
+  @Test
+  void aSignupFormWhoseLinkIsNotUsedYetBecomesAnUnverifiedLead() {
+    UUID signupId = UUID.randomUUID();
+    when(leads.findBySignupId(signupId)).thenReturn(Optional.empty());
+
+    service.recordUnverified(unverified(signupId, "Hawthorn Weaving Ltd"));
+
+    var capture = ArgumentCaptor.forClass(Lead.class);
+    verify(leads).save(capture.capture());
+    Lead lead = capture.getValue();
+    assertThat(lead.getSignupId()).isEqualTo(signupId);
+    assertThat(lead.isVerified()).isFalse();
+    assertThat(lead.getSignupTenantId()).isNull();
+    assertThat(lead.getSignupSnapshot()).isNull();
+    assertThat(lead.getWorkEmail()).isEqualTo("owner@example.com");
+    assertThat(lead.getCompanyName()).isEqualTo("Hawthorn Weaving Ltd");
+    verifyNoInteractions(snapshots);
+  }
+
+  @Test
+  void theFormSentAgainRefreshesTheSameUnverifiedLead() {
+    UUID signupId = UUID.randomUUID();
+    Lead existing = unverifiedLead(signupId, "First Name Ltd");
+    when(leads.findBySignupId(signupId)).thenReturn(Optional.of(existing));
+
+    service.recordUnverified(unverified(signupId, "Second Name Ltd"));
+
+    assertThat(existing.getCompanyName()).isEqualTo("Second Name Ltd");
+    verify(leads, never()).save(any());
+  }
+
+  @Test
+  void linkingTheSignupToItsTenantVerifiesTheLead() {
+    UUID signupId = UUID.randomUUID();
+    Lead lead = unverifiedLead(signupId, "Hawthorn Weaving Ltd");
+    var completed = signup();
+    UUID tenantId = completed.tenantId();
+
+    lead.linkSignup(signupId, tenantId, completed.ownerUserId(), completed.facts(), Instant.now());
+
+    assertThat(lead.isVerified()).isTrue();
+    assertThat(lead.getSignupTenantId()).isEqualTo(tenantId);
+    assertThat(lead.getSignupSnapshot()).isEqualTo(completed.facts());
+  }
+
+  @Test
+  void aLeadThatIsAlreadyVerifiedIsNotRewrittenByTheForm() {
+    UUID signupId = UUID.randomUUID();
+    Lead lead = unverifiedLead(signupId, "Hawthorn Weaving Ltd");
+    var completed = signup();
+    lead.linkSignup(
+        signupId, completed.tenantId(), completed.ownerUserId(), completed.facts(), Instant.now());
+    when(leads.findBySignupId(signupId)).thenReturn(Optional.of(lead));
+
+    assertThatThrownBy(() -> service.recordUnverified(unverified(signupId, "Changed Ltd")))
+        .isInstanceOf(PlatformDomainException.class);
+    assertThat(lead.getCompanyName()).isEqualTo("Hawthorn Weaving Ltd");
+  }
+
+  @Test
+  void completingTheSignupLinksAndVerifiesTheLeadRecordedAtFormTime() {
+    var signup = signup();
+    Lead lead = unverifiedLead(signup.signupId(), "Hawthorn Weaving Ltd");
+    UUID leadId = UUID.randomUUID();
+    ReflectionTestUtils.setField(lead, "id", leadId);
+    when(leads.findBySignupId(signup.signupId())).thenReturn(Optional.of(lead));
+    when(leads.saveAndFlush(lead)).thenReturn(lead);
+
+    service.capture(signup);
+
+    assertThat(lead.isVerified()).isTrue();
+    assertThat(lead.getSignupTenantId()).isEqualTo(signup.tenantId());
+    assertThat(lead.getSignupUserId()).isEqualTo(signup.ownerUserId());
+    assertThat(lead.getSignupSnapshot()).isEqualTo(signup.facts());
+    assertThat(lead.getTermsAcceptedAt()).isEqualTo(signup.termsAcceptedAt());
+    assertThat(lead.getTrialTenantId()).isEqualTo(signup.tenantId());
+    var history = ArgumentCaptor.forClass(LeadProfileSnapshot.class);
+    verify(snapshots).save(history.capture());
+    assertThat(history.getValue().getLeadId()).isEqualTo(leadId);
+    assertThat(history.getValue().getSource()).isEqualTo("SIGNUP");
+    assertThat(history.getValue().getRevision()).isZero();
+    verify(leads, never()).save(any());
+  }
+
+  private UnverifiedSignup unverified(UUID signupId, String company) {
+    return new UnverifiedSignup(
+        signupId,
+        company,
+        "GB123456789",
+        OrganizationType.WEAVER,
+        "Eleanor",
+        "Hughes",
+        "owner@example.com",
+        List.of("FabricOS"),
+        "PLAYGROUND");
+  }
+
+  private Lead unverifiedLead(UUID signupId, String company) {
+    return Lead.createUnverified(
+        signupId,
+        company,
+        "GB123456789",
+        OrganizationType.WEAVER,
+        "Eleanor",
+        "Hughes",
+        "owner@example.com",
+        List.of("FabricOS"),
+        "PLAYGROUND");
   }
 
   private SignupCompany signup() {

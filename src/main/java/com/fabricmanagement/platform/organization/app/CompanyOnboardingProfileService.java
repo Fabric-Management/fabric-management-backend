@@ -34,6 +34,7 @@ public class CompanyOnboardingProfileService {
   private final AddressService addressService;
   private final ContactService contactService;
   private final OnboardingRequestValidator validator;
+  private final OrganizationNamingService naming;
 
   /**
    * Opaque preflight result: all validation and locks precede any writes, including personal data.
@@ -122,7 +123,7 @@ public class CompanyOnboardingProfileService {
   public void save(PreparedProfile prepared) {
     Organization root = prepared.root;
     var request = prepared.request;
-    root.setName(patch(request.getOrganizationName(), root.getName()));
+    naming.rename(root, patch(request.getOrganizationName(), root.getName()));
     if (request.getOrganizationType() != null)
       root.setOrganizationType(request.getOrganizationType());
     root.setTaxId(patch(request.getTaxId(), root.getTaxId()));

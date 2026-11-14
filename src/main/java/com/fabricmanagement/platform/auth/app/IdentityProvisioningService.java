@@ -148,6 +148,50 @@ public class IdentityProvisioningService {
   }
 
   /**
+   * Gives the user of a setup link their login (SIGNUP-DEFER-1). The link has proved that the
+   * person controls the address, so unlike {@link #provisionCredential} an identity that already
+   * exists is never flagged for a password reset: the person is simply added to it as a member of
+   * the new company and keeps the password they have. A new identity is created with the given
+   * password hash.
+   *
+   * @param passwordHash required when no identity exists for the address; ignored otherwise
+   */
+  @Transactional
+  public LoginIdentity provisionFromVerifiedLink(
+      String email, String passwordHash, UUID tenantId, UUID userId) {
+    String normalizedEmail = normalizeEmailOrThrow(email);
+    if (loginIdentityRepository.existsByEmail(normalizedEmail)) {
+      return provisionMembershipForExistingIdentity(normalizedEmail, tenantId, userId);
+    }
+    if (passwordHash == null || passwordHash.isBlank()) {
+      throw new PlatformDomainException("Password is required", "AUTH_PASSWORD_REQUIRED", 400);
+    }
+
+    LoginIdentity identity =
+        loginIdentityRepository.save(
+            LoginIdentity.builder()
+                .email(normalizedEmail)
+                .passwordHash(passwordHash)
+                .isMfaEnabled(false)
+                .primaryMfaType(MfaType.NONE)
+                .isActive(true)
+                .emailVerified(true)
+                .failedLoginAttempts(0)
+                .requiresPasswordReset(false)
+                .build());
+    requirePlatformSeparation(identity, tenantId);
+    membershipRepository.save(
+        Membership.builder()
+            .loginIdentityId(identity.getId())
+            .tenantId(tenantId)
+            .userId(userId)
+            .status(MembershipStatus.ACTIVE)
+            .isDefault(true)
+            .build());
+    return identity;
+  }
+
+  /**
    * PLATFORM-BOUNDARY-1: a login identity is either platform staff (a member of the platform tenant
    * only) or a tenant person, never both. An e-mail shared between the two would otherwise join
    * platform staff to a customer or demo tenant, or a customer to the platform. Memberships of

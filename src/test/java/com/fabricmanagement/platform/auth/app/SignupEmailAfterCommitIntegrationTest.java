@@ -26,6 +26,9 @@ class SignupEmailAfterCommitIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   void rollbackPreventsSignupEmailListenerDelivery() {
+    // Sales-led: the only signup event that still sends a mail (self-service signups mail their
+    // link when the form is sent, SIGNUP-DEFER-1). A self-service event would make this test pass
+    // because the listener ignores it, not because of the rollback.
     SelfSignupCompletedEvent event =
         new SelfSignupCompletedEvent(
             UUID.randomUUID(),
@@ -36,7 +39,7 @@ class SignupEmailAfterCommitIntegrationTest extends AbstractIntegrationTest {
             "ROLL-123",
             "SPINNER",
             "https://app.example.com/setup?token=rollback",
-            false,
+            true,
             List.of("FabricOS"),
             "PLAYGROUND",
             UUID.randomUUID(),
