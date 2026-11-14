@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.admin.api.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -75,6 +76,32 @@ class PlatformAdminAccessRealRolesIT extends AbstractFabricAppIntegrationTest {
     mockMvc
         .perform(get("/api/v1/admin/tenants").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("a listed tenant UUID opens companies until that tenant is removed")
+  void listedTenantCompaniesBecomeNotFoundAfterRemoval() throws Exception {
+    customerTenant = insertTenant();
+    String token = tokenFor(TenantContext.SYSTEM_TENANT_ID, "PLATFORM_ADMIN");
+    String tenantPath = "/api/v1/admin/tenants/" + customerTenant;
+
+    mockMvc
+        .perform(get("/api/v1/admin/tenants").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == '%s')]", customerTenant).isNotEmpty());
+    mockMvc
+        .perform(get(tenantPath + "/companies").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray());
+
+    removeWhatTheTestWrote();
+
+    for (String suffix : new String[] {"", "/companies", "/statistics"}) {
+      mockMvc
+          .perform(get(tenantPath + suffix).header("Authorization", "Bearer " + token))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.code").value("TENANT_NOT_FOUND"));
+    }
   }
 
   @Test

@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantKind;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantSummary;
 import com.fabricmanagement.platform.admin.dto.TenantStatistics;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
@@ -128,9 +129,7 @@ public class PlatformAdminService {
   public TenantDto getTenant(UUID tenantId) {
     log.info("Platform admin: Accessing tenant: {}", tenantId);
 
-    return tenantSystemService
-        .findById(tenantId)
-        .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
+    return tenantSystemService.findById(tenantId).orElseThrow(PlatformAdminService::tenantNotFound);
   }
 
   /**
@@ -248,11 +247,7 @@ public class PlatformAdminService {
   public TenantStatistics getTenantStatistics(UUID tenantId) {
     log.info("Platform admin: Getting statistics for tenant: {}", tenantId);
 
-    // Get tenant info via system executor (BYPASSRLS — tenant table has self-row RLS)
-    TenantDto tenant =
-        tenantSystemService
-            .findById(tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
+    TenantDto tenant = getTenant(tenantId);
 
     return readInTenant(
         tenantId,
@@ -306,11 +301,15 @@ public class PlatformAdminService {
    * empty list (RLS filters everything out) rather than a clear 404.
    *
    * @param tenantId The tenant ID to validate
-   * @throws IllegalArgumentException if tenant does not exist
+   * @throws PlatformDomainException if tenant does not exist
    */
   private void validateTenantExists(UUID tenantId) {
     if (!tenantSystemService.exists(tenantId)) {
-      throw new IllegalArgumentException("Tenant not found: " + tenantId);
+      throw tenantNotFound();
     }
+  }
+
+  private static PlatformDomainException tenantNotFound() {
+    return new PlatformDomainException("Tenant not found", "TENANT_NOT_FOUND", 404);
   }
 }
