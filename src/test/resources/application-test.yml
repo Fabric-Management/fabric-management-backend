@@ -51,6 +51,9 @@ management:
 retention:
   quote:
     enabled: false
+  # PendingSignupRetentionIT calls the job directly.
+  signup:
+    enabled: false
 
 # Safe-edit cleanup runs only where a test calls it (SalesOrderEditRetentionIT).
 sales:

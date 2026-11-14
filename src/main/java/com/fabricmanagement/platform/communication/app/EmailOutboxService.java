@@ -148,6 +148,19 @@ public class EmailOutboxService {
       LIMIT 100
       """;
 
+  private static final String REDACT_LINKS_SQL =
+      """
+      UPDATE common_communication.communication_email_outbox
+      SET html_body = regexp_replace(html_body, ?, ?, 'g'),
+          version = version + 1,
+          updated_at = now()
+      WHERE tenant_id = ?
+        AND created_at > now() - (? * interval '1 minute')
+        AND ((status = 'SENT' AND sent_at < now() - (? * interval '1 minute'))
+          OR (status = 'FAILED' AND created_at < now() - (? * interval '1 minute')))
+        AND html_body ~ ?
+      """;
+
   private static final String RECLAIM_STUCK_SENDING_SQL =
       """
       UPDATE common_communication.communication_email_outbox
@@ -353,6 +366,40 @@ public class EmailOutboxService {
     EmailOutbox email = EmailOutbox.create(recipient, subject, htmlBody);
     email.setTenantId(tenantId);
     return emailOutboxRepository.save(email);
+  }
+
+  /**
+   * Removes one-time links from the stored copies of one tenant's mails once nobody can need them
+   * there: the mail was sent more than {@code minutesAfterSending} ago, or failed for good and was
+   * queued more than {@code minutesAfterFailing} ago. Mails still waiting to be sent keep their
+   * link, so the worker never sends a redacted copy. Only mails queued within the last {@code
+   * lookbackMinutes} are looked at, so a frequent run does not rescan the whole history. The
+   * recipient's mail is not touched, only the outbox copy: a database read no longer yields a
+   * usable link.
+   *
+   * <p>Runs through {@code fabric_system}: it is called by a scheduled job, which has no tenant
+   * context.
+   *
+   * @param linkPattern a PostgreSQL regular expression for the link; matches are replaced
+   * @param replacement the replacement, which may refer to groups of the pattern ({@code \1})
+   * @return the number of mails changed
+   */
+  public int redactLinks(
+      UUID tenantId,
+      String linkPattern,
+      String replacement,
+      int minutesAfterSending,
+      int minutesAfterFailing,
+      int lookbackMinutes) {
+    return systemTransactionExecutor.executeUpdate(
+        REDACT_LINKS_SQL,
+        linkPattern,
+        replacement,
+        tenantId,
+        lookbackMinutes,
+        minutesAfterSending,
+        minutesAfterFailing,
+        linkPattern);
   }
 
   /**

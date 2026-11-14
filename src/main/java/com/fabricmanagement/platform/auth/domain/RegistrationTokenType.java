@@ -7,7 +7,7 @@ package com.fabricmanagement.platform.auth.domain;
  *
  * <ul>
  *   <li><b>SALES_LED:</b> Created by sales team, email verified by token click only
- *   <li><b>SELF_SERVICE:</b> Created by user, requires token + verification code
+ *   <li><b>SELF_SERVICE:</b> legacy, no longer issued (see the constant)
  * </ul>
  */
 public enum RegistrationTokenType {
@@ -26,18 +26,10 @@ public enum RegistrationTokenType {
   SALES_LED,
 
   /**
-   * Self-service signup token.
-   *
-   * <p>Flow:
-   *
-   * <pre>
-   * User signs up → Email sent with token
-   * → User clicks link → Password setup (email verified by click)
-   * → Auto-login → Onboarding wizard
-   * </pre>
-   *
-   * <p><b>Note:</b> No verification code needed - email link click verifies ownership. Verification
-   * codes are only used for unverified contacts during login flows.
+   * Legacy self-service signup token. <b>No longer issued</b> (SIGNUP-DEFER-1): a self-service
+   * signup is a {@code pending_signup} with a hashed link, and the company is built when the link
+   * is used. Kept because the column's check constraint and existing rows name it; a remaining
+   * token of this type is used like a sales-led one.
    */
   SELF_SERVICE,
 
