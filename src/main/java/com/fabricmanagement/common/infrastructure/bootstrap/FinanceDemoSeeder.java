@@ -118,11 +118,19 @@ public class FinanceDemoSeeder {
   private void setReportingCurrencyUsd(UUID tenantId) {
     organizationRepository
         .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
-        .ifPresent(
+        .ifPresentOrElse(
             org -> {
               org.setReportingCurrency(REPORTING_CURRENCY);
               organizationRepository.save(org);
-            });
+            },
+            // TD-16: without a root organisation the reporting currency stays the platform
+            // default, and conversions to it can miss their rates.
+            () ->
+                log.warn(
+                    "Tenant {} has no root organisation yet; its reporting currency stays the"
+                        + " platform default instead of {}",
+                    tenantId,
+                    REPORTING_CURRENCY));
     // Evict any cached (possibly default) reporting currency captured before this write.
     var cache = cacheManager.getCache("tenantReportingCurrency");
     if (cache != null) {

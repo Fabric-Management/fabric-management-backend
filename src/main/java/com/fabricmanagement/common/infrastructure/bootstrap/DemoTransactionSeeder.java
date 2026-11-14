@@ -58,7 +58,7 @@ public class DemoTransactionSeeder {
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
 
-  private static final String DEMO_CUSTOMER_NAME = "Global Fashion Wear Corp.";
+  static final String DEMO_CUSTOMER_NAME = "Global Fashion Wear Corp.";
   private static final String DEMO_SO_REFERENCE = "PO-DEMO-2026-001";
   private static final String DEMO_WO_NOTES = "Expedite for new collection";
 

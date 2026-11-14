@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.infrastructure.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -81,11 +80,13 @@ class SpELPermissionEvaluatorPackageGateTest {
   }
 
   @Test
-  void platformStaffAreNotBoundByATenantsPackages() {
+  void platformStaffAreBoundByThePackagesOfTheirOwnTenant() {
+    // TD-10/TD-15: the platform tenant enables no package, so business resources stay closed to
+    // platform staff there; platform screens are guarded by the platform role instead.
     grant("PLATFORM_ADMIN", TenantContext.SYSTEM_TENANT_ID, new PermissionResult(Map.of(), true));
-    when(packages.isResourceOpen(any(), any())).thenReturn(false);
+    when(packages.isResourceOpen(TenantContext.SYSTEM_TENANT_ID, "sales")).thenReturn(false);
 
-    assertThat(evaluator().can(authentication, "yarn", "read")).isTrue();
+    assertThat(evaluator().can(authentication, "sales", "read")).isFalse();
   }
 
   @Test

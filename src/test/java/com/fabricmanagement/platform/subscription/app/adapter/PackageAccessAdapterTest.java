@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.subscription.app.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -98,6 +99,25 @@ class PackageAccessAdapterTest {
     when(subscriptions.findByTenantId(TENANT)).thenReturn(List.of(learning("FabricOS")));
 
     assertThat(adapter.isResourceOpen(TENANT, "organization")).isTrue();
+  }
+
+  @Test
+  void thePlatformTenantEnablesNoPackage() {
+    // TD-10/TD-15: Longward runs the platform, not a mill. It has no subscription rows, yet every
+    // resource a package owns is closed there; its own settings and unclaimed resources stay open.
+    offerCatalogue(
+        definition("FabricOS", "sales", "products", "settings"),
+        definition("YarnOS", "yarn"),
+        definition("AccountOS", "finance"));
+    UUID platform = TenantContext.SYSTEM_TENANT_ID;
+
+    assertThat(adapter.isResourceOpen(platform, "sales")).isFalse();
+    assertThat(adapter.isResourceOpen(platform, "finance")).isFalse();
+    assertThat(adapter.isResourceOpen(platform, "settings")).isTrue();
+    assertThat(adapter.isResourceOpen(platform, "members")).isTrue();
+    assertThat(adapter.closedResources(platform))
+        .containsExactly("finance", "products", "sales", "yarn");
+    verify(subscriptions, never()).findByTenantId(platform);
   }
 
   @Test
