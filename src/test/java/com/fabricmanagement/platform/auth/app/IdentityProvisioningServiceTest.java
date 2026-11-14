@@ -324,6 +324,121 @@ class IdentityProvisioningServiceTest {
     verify(membershipRepository, never()).save(any(Membership.class));
   }
 
+  @Test
+  void aVerifiedLinkCreatesTheIdentityWithTheChosenPasswordAndADefaultMembership() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.existsByEmail("owner@example.com")).thenReturn(false);
+    when(loginIdentityRepository.save(any(LoginIdentity.class)))
+        .thenAnswer(
+            invocation -> {
+              LoginIdentity identity = invocation.getArgument(0);
+              identity.setId(identityId);
+              return identity;
+            });
+
+    LoginIdentity result =
+        service.provisionFromVerifiedLink(" Owner@Example.COM ", "hash", tenantId, userId);
+
+    assertThat(result.getEmail()).isEqualTo("owner@example.com");
+    assertThat(result.getPasswordHash()).isEqualTo("hash");
+    assertThat(result.getEmailVerified()).isTrue();
+    assertThat(result.getRequiresPasswordReset()).isFalse();
+    assertThat(result.getIsMfaEnabled()).isFalse();
+    assertThat(result.getPrimaryMfaType()).isEqualTo(MfaType.NONE);
+
+    ArgumentCaptor<Membership> membershipCaptor = ArgumentCaptor.forClass(Membership.class);
+    verify(membershipRepository).save(membershipCaptor.capture());
+    assertThat(membershipCaptor.getValue().getLoginIdentityId()).isEqualTo(identityId);
+    assertThat(membershipCaptor.getValue().getTenantId()).isEqualTo(tenantId);
+    assertThat(membershipCaptor.getValue().getUserId()).isEqualTo(userId);
+    assertThat(membershipCaptor.getValue().getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+    assertThat(membershipCaptor.getValue().getIsDefault()).isTrue();
+  }
+
+  @Test
+  void aVerifiedLinkForAnExistingIdentityKeepsItsPasswordAndNeedsNoNewOne() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    LoginIdentity identity = identity(identityId, "owner@example.com", "old-hash");
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.existsByEmail("owner@example.com")).thenReturn(true);
+    when(loginIdentityRepository.findByEmail("owner@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByUserId(userId)).thenReturn(Optional.empty());
+    when(membershipRepository.findByLoginIdentityIdAndTenantId(identityId, tenantId))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.countByLoginIdentityId(identityId)).thenReturn(1L);
+
+    LoginIdentity result =
+        service.provisionFromVerifiedLink("owner@example.com", null, tenantId, userId);
+
+    assertThat(result).isSameAs(identity);
+    assertThat(identity.getPasswordHash()).isEqualTo("old-hash");
+    assertThat(identity.getRequiresPasswordReset()).isFalse();
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+
+    ArgumentCaptor<Membership> membershipCaptor = ArgumentCaptor.forClass(Membership.class);
+    verify(membershipRepository).save(membershipCaptor.capture());
+    assertThat(membershipCaptor.getValue().getTenantId()).isEqualTo(tenantId);
+    assertThat(membershipCaptor.getValue().getUserId()).isEqualTo(userId);
+    assertThat(membershipCaptor.getValue().getIsDefault()).isFalse();
+  }
+
+  @Test
+  void aVerifiedLinkForANewIdentityWithoutAPasswordIsRefusedAndCreatesNothing() {
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+    when(loginIdentityRepository.existsByEmail("owner@example.com")).thenReturn(false);
+
+    for (String missing : new String[] {null, "", "   "}) {
+      assertThatThrownBy(
+              () ->
+                  service.provisionFromVerifiedLink(
+                      "owner@example.com", missing, UUID.randomUUID(), UUID.randomUUID()))
+          .isInstanceOfSatisfying(
+              PlatformDomainException.class,
+              error -> assertThat(error.getErrorCode()).isEqualTo("AUTH_PASSWORD_REQUIRED"));
+    }
+
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  @Test
+  void aVerifiedLinkNeverJoinsAPlatformStaffIdentityToACompany() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+    LoginIdentity staff = identity(identityId, "staff@example.com", "hash");
+
+    when(loginIdentityRepository.existsByEmail("staff@example.com")).thenReturn(true);
+    when(loginIdentityRepository.findByEmail("staff@example.com")).thenReturn(Optional.of(staff));
+    when(membershipRepository.findByUserId(any())).thenReturn(Optional.empty());
+    when(membershipRepository.findByLoginIdentityIdAndTenantId(identityId, tenantId))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.findByLoginIdentityId(identityId))
+        .thenReturn(List.of(membership(identityId, TenantContext.SYSTEM_TENANT_ID)));
+
+    assertThatThrownBy(
+            () ->
+                service.provisionFromVerifiedLink(
+                    "staff@example.com", null, tenantId, UUID.randomUUID()))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            error ->
+                assertThat(error.getErrorCode()).isEqualTo("AUTH_IDENTITY_PLATFORM_SEPARATION"));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
   private static Membership membership(UUID identityId, UUID tenantId) {
     return Membership.builder()
         .loginIdentityId(identityId)

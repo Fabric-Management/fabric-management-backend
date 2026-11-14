@@ -6,11 +6,11 @@ import com.fabricmanagement.common.infrastructure.web.exception.SignupAlreadyPen
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
 import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchestrator;
-import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
+import com.fabricmanagement.platform.auth.domain.PendingSignup;
+import com.fabricmanagement.platform.auth.domain.PendingSignupRequest;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tenant Onboarding Service — entry point for sales-led and self-service tenant creation.
+ * Tenant Onboarding Service — entry point for sales-led and (verified) self-service tenant
+ * creation.
  *
  * <p>Delegates to {@link TenantOnboardingOrchestrator} and uses {@link OrganizationFacade}, {@link
  * IdentityProvisioningService} and {@link TenantQueryPort} for validation. All creation logic lives
@@ -83,40 +84,44 @@ public class TenantOnboardingService {
   }
 
   /**
-   * Create new tenant via self-service signup.
+   * Builds the company of a self-service signup whose e-mail address has been proved
+   * (SIGNUP-DEFER-1 / TD-18). Called only when the e-mailed link is used: until then a signup is a
+   * small {@link PendingSignup} row and nothing else.
    *
-   * @param request Self signup request
-   * @return Onboarding response with token and setup URL
+   * <p>The signup id of the evidence is the pending signup's id, so the lead recorded when the form
+   * was sent is the one that gets linked to this tenant. No registration token is created and no
+   * "added to a company" mail follows: the person's login is created by the same transaction.
+   *
+   * @return the created tenant, organisation and admin user
    */
   @Transactional
-  public TenantOnboardingResponse createSelfServiceTenant(SelfSignupRequest request) {
-    log.info("Creating self-service tenant: organization={}", request.getOrganizationName());
-    validateTenantCreation(request.getTaxId(), request.getEmail());
-    if (!Boolean.TRUE.equals(request.getAcceptedTerms())) {
-      throw new PlatformDomainException(
-          "Terms and conditions must be accepted", "AUTH_TERMS_NOT_ACCEPTED", 400);
-    }
+  public TenantOnboardingResponse createVerifiedSelfServiceTenant(PendingSignup signup) {
+    PendingSignupRequest form = signup.getRequest();
+    SignupIntent intent = SignupIntent.from(form.intent());
+    log.info("Creating self-service tenant: pendingSignupId={}, intent={}", signup.getId(), intent);
 
     OnboardingContext context = new OnboardingContext();
-    context.setOrganizationName(request.getOrganizationName());
-    context.setTaxId(request.getTaxId());
-    context.setOrganizationType(request.getOrganizationType());
-    context.setAdminFirstName(request.getFirstName());
-    context.setAdminLastName(request.getLastName());
-    context.setAdminContact(request.getEmail());
-    context.setSignupSelectedOS(request.getSelectedOS());
+    context.setSignupId(signup.getId());
+    context.setTermsAcceptedAt(signup.getTermsAcceptedAt());
+    context.setOrganizationName(form.organizationName());
+    context.setTaxId(signup.getTaxId());
+    context.setOrganizationType(form.organizationType());
+    context.setAdminFirstName(form.firstName());
+    context.setAdminLastName(form.lastName());
+    context.setAdminContact(signup.getEmail());
+    context.setSignupSelectedOS(form.selectedOS());
     // Use admin email as billing email for self-service (no separate organization email
     // provided)
-    context.setOrganizationEmail(request.getEmail());
+    context.setOrganizationEmail(signup.getEmail());
     context.setSelectedOS(
-        request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
-            ? request.getSelectedOS()
+        form.selectedOS() != null && !form.selectedOS().isEmpty()
+            ? form.selectedOS()
             : List.of("FabricOS"));
-    context.setSignupIntent(request.getIntent().name());
-    context.setTermsAcceptedAt(java.time.Instant.now());
+    context.setSignupIntent(intent.name());
     context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);
-    context.setDemoMode(request.getIntent() != SignupIntent.TRIAL);
+    context.setDemoMode(intent != SignupIntent.TRIAL);
+    context.setInvitationEmailSuppressed(true);
 
     return orchestrator.onboard(context);
   }

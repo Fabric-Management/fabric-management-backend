@@ -12,6 +12,10 @@ spring:
 # Testcontainers uses the same superuser for all roles — this prevents
 # the CR-4 fail-fast guard from rejecting empty credentials at startup.
 application:
+  # Every MockMvc request comes from the loopback address and IT classes share one context, so the
+  # @RateLimited windows would leak between unrelated tests. RateLimitAspectTest covers the limit.
+  rate-limit:
+    enabled: false
   jwt:
     secret: ${JWT_SECRET:test-only-jwt-secret-key-not-for-production-min-256-bits-long}
   system-datasource:

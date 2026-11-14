@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.security;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContextResolver;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
@@ -26,13 +27,24 @@ public class OnboardingAccessService {
   private final AuthenticatedUserContextResolver contextResolver;
 
   public User requireCurrentUser(UUID userId) {
-    var context =
-        contextResolver
-            .resolve(SecurityContextHolder.getContext().getAuthentication())
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "User not authenticated", "USER_NOT_AUTHENTICATED", 401));
+    return requireCurrentUser(userId, requireAuthentication());
+  }
+
+  public void requireCompanySetupForCurrentUser() {
+    var context = requireAuthentication();
+    requireCompanySetup(requireCurrentUser(context.userId(), context));
+  }
+
+  private AuthenticatedUserContext requireAuthentication() {
+    return contextResolver
+        .resolve(SecurityContextHolder.getContext().getAuthentication())
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "User not authenticated", "USER_NOT_AUTHENTICATED", 401));
+  }
+
+  private User requireCurrentUser(UUID userId, AuthenticatedUserContext context) {
     UUID tenantId = TenantContext.requireTenantId();
     if (userId == null
         || !userId.equals(context.userId())

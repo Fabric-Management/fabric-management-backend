@@ -164,6 +164,16 @@ public class Organization extends BaseEntity {
   }
 
   /**
+   * Matches the root criteria of OrganizationRepository.lockRootForOnboarding and
+   * OrganizationRepository.findRootOrganization.
+   */
+  public boolean isCompanyRoot() {
+    return !hasParent()
+        && Boolean.TRUE.equals(getIsActive())
+        && getOrganizationType() != OrganizationType.EXTERNAL_PARTNER;
+  }
+
+  /**
    * Update organization basic info.
    *
    * @param name New name

@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import com.fabricmanagement.testsupport.PostgresImage;
 import java.util.List;
 import java.util.Optional;
@@ -122,20 +123,23 @@ class TenantOnboardingIntegrationTest {
             anyString(), anyString(), anyString(), anyString()))
         .thenReturn("Setup password email body");
 
-    String taxId = "111222333" + System.currentTimeMillis() % 10000;
+    long timestamp = System.currentTimeMillis();
+    String taxId = "111222333" + timestamp % 10000;
+    String organizationName = "E2E Test Company " + timestamp;
+    String email = "e2e-test-" + timestamp + "@example.com";
     String body =
         """
                 {
-                  "organizationName": "E2E Test Company",
+                  "organizationName": "%s",
                   "taxId": "%s",
                   "organizationType": "SPINNER",
                   "firstName": "Test",
                   "lastName": "User",
-                  "email": "e2e-test-%s@example.com",
+                  "email": "%s",
                   "acceptedTerms": true
                 }
                 """
-            .formatted(taxId, System.currentTimeMillis());
+            .formatted(organizationName, taxId, email);
 
     mockMvc
         .perform(
@@ -147,6 +151,22 @@ class TenantOnboardingIntegrationTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data").isString())
         .andExpect(jsonPath("$.data").value(org.hamcrest.CoreMatchers.containsString("email")));
+
+    // SIGNUP-DEFER-1: the form builds no company. It leaves one pending signup, waiting for the
+    // e-mailed link.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_tenant.common_tenant WHERE name = ?",
+                Integer.class,
+                organizationName))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_auth.pending_signup"
+                    + " WHERE email = ? AND completed_at IS NULL",
+                Integer.class,
+                email))
+        .isEqualTo(1);
   }
 
   @Test
@@ -185,6 +205,9 @@ class TenantOnboardingIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());
+    // The company is built when the e-mailed link is used.
+    PendingSignupFixtures.completeSignup(
+        mockMvc, jdbc, "tenant-test-" + timestamp + "@example.com");
 
     // Verify Tenant was created in common_tenant table
     Optional<Tenant> tenant =
@@ -293,6 +316,8 @@ class TenantOnboardingIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());
+    // The company is built when the e-mailed link is used.
+    PendingSignupFixtures.completeSignup(mockMvc, jdbc, "org-test-" + timestamp + "@example.com");
 
     // Verify Organization was created in common_organization table
     Optional<Organization> org = organizationRepository.findByTaxId(taxId);
@@ -366,21 +391,38 @@ class TenantOnboardingIntegrationTest {
                 """
             .formatted(organizationName, "RB" + timestamp % 100000, timestamp);
 
+    // The form is accepted; the company is only built when the link is used, and that is where the
+    // injected failure happens.
+    String email = "catalogue-rollback-" + timestamp + "@example.com";
+    mockMvc
+        .perform(
+            post("/api/v1/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    String link = PendingSignupFixtures.knownLinkToken(jdbc, email);
+
     int templatesBefore =
         jdbc.queryForObject("SELECT count(*) FROM flowboard.task_template", Integer.class);
     FAIL_AFTER_CATALOGUE.set(true);
     try {
       mockMvc
-          .perform(
-              post("/api/v1/public/signup")
-                  .with(csrf())
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body))
+          .perform(PendingSignupFixtures.useLink(link, PendingSignupFixtures.PASSWORD))
           .andExpect(
               result -> assertThat(result.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
     } finally {
       FAIL_AFTER_CATALOGUE.set(false);
     }
+
+    // The signup is still open: the same link works once the failure is gone.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM common_auth.pending_signup"
+                    + " WHERE email = ? AND completed_at IS NULL",
+                Integer.class,
+                email))
+        .isEqualTo(1);
 
     // Non-vacuous whatever happens to the tenant row: not one template was left anywhere.
     assertThat(jdbc.queryForObject("SELECT count(*) FROM flowboard.task_template", Integer.class))

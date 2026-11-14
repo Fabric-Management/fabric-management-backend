@@ -2,9 +2,9 @@ package com.fabricmanagement.platform.auth.api.controller;
 
 import com.fabricmanagement.common.infrastructure.logging.SensitiveLogData;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
+import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
+import com.fabricmanagement.platform.auth.app.SignupRequestService;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
-import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,17 +27,17 @@ import org.springframework.web.bind.annotation.RestController;
  * <h2>Flow:</h2>
  *
  * <pre>
- * 1. POST /api/public/signup
- *    → Creates tenant + company + admin user
- *    → Sends email with setup link after the onboarding transaction commits
+ * 1. POST /api/v1/public/signup
+ *    → Stores a small pending signup and an unverified sales lead, mails a setup link.
+ *      No tenant, users or demo data exist yet. The answer is the same for every e-mail address.
  *
- * 2. User clicks email link
+ * 2. User clicks email link (valid 24 hours)
  *    → Redirects to /setup?token=xyz
  *    → Email verified by click (no verification code needed)
  *
  * 3. User sets password
- *    → POST /api/auth/setup-password (token + password only)
- *    → Auto-login → Dashboard (onboarding wizard if needed)
+ *    → POST /api/v1/auth/setup-password (token + password only)
+ *    → Builds the company in one transaction, then auto-login → Dashboard
  * </pre>
  *
  * <p><b>Note:</b> Verification codes are NOT used in self-service signup. Email link click = email
@@ -50,33 +50,27 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Public Signup",
     description =
-        "Self-service tenant registration. No authentication required. Creates tenant, company, admin user, FabricOS trial, and sends setup link by email. Email link click = email verified.")
+        "Self-service tenant registration. No authentication required. Stores a pending signup and sends a setup link by email; the tenant is built when the link is used. Email link click = email verified.")
 public class PublicSignupController {
 
-  private final TenantOnboardingService onboardingService;
+  private final SignupRequestService signupRequests;
 
   @Operation(
       summary = "Self-service signup",
       description =
-          "Creates a new tenant from the public website. Company, admin user, and FabricOS trial are created; user receives an email with a setup link to set password. Terms must be accepted.")
+          "Takes a signup from the public website. Nothing but a pending signup is stored until the emailed link is used; then the company, admin user and FabricOS trial are created. The answer is the same whatever the state of the e-mail address. Terms must be accepted.")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "200",
       description = "Registration initiated; user should check email for setup link",
       content = @Content(mediaType = "application/json"))
   @PostMapping("/signup")
+  @RateLimited(requests = 5, windowSeconds = 60)
   @SensitiveLogData
   public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
 
     log.info("Public signup requested");
 
-    // Orchestrator handles data setup and publishes the post-commit signup email event.
-    TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
-
-    log.info(
-        "Self-service signup completed: tenantId={}, organizationId={}, userId={}",
-        response.getTenantId(),
-        response.getOrganizationId(),
-        response.getAdminUserId());
+    signupRequests.request(request);
 
     return ResponseEntity.ok(
         ApiResponse.success(

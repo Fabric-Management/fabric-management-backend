@@ -32,6 +32,21 @@ public class LeadService implements SignupEvidencePort, OnboardingEvidencePort {
     var existing = leads.findBySignupId(signup.signupId());
     if (existing.isPresent()) {
       Lead lead = existing.get();
+      if (lead.getSignupTenantId() == null && lead.getSignupSnapshot() == null) {
+        // The lead recorded when the signup form was sent (unverified, SIGNUP-DEFER-1): the e-mail
+        // link has now been used and the tenant exists, so it is verified and linked here.
+        lead.linkSignup(
+            signup.signupId(),
+            signup.tenantId(),
+            signup.ownerUserId(),
+            signup.facts(),
+            signup.termsAcceptedAt());
+        lead = leads.saveAndFlush(lead);
+        snapshots.save(
+            LeadProfileSnapshot.capture(
+                lead.getId(), 0, "SIGNUP", null, null, signup.ownerUserId(), signup.facts(), null));
+        return;
+      }
       if (!Objects.equals(lead.getSignupTenantId(), signup.tenantId())
           || !Objects.equals(lead.getSignupUserId(), signup.ownerUserId())
           || !Objects.equals(lead.getSignupIntent(), signup.intent())
@@ -66,6 +81,36 @@ public class LeadService implements SignupEvidencePort, OnboardingEvidencePort {
     snapshots.save(
         LeadProfileSnapshot.capture(
             lead.getId(), 0, "SIGNUP", null, null, signup.ownerUserId(), facts, null));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void recordUnverified(UnverifiedSignup signup) {
+    var existing = leads.findBySignupId(signup.signupId());
+    if (existing.isPresent()) {
+      existing
+          .get()
+          .refreshUnverified(
+              signup.organizationName(),
+              signup.taxId(),
+              signup.organizationType(),
+              signup.firstName(),
+              signup.lastName(),
+              signup.selectedOS(),
+              signup.intent());
+      return;
+    }
+    leads.save(
+        Lead.createUnverified(
+            signup.signupId(),
+            signup.organizationName(),
+            signup.taxId(),
+            signup.organizationType(),
+            signup.firstName(),
+            signup.lastName(),
+            signup.workEmail(),
+            signup.selectedOS(),
+            signup.intent()));
   }
 
   @Override

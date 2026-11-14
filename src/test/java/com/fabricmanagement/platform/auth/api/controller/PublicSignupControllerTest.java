@@ -1,23 +1,18 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.platform.auth.app.JwtService;
-import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
+import com.fabricmanagement.platform.auth.app.SignupRequestService;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
-import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,7 +41,7 @@ class PublicSignupControllerTest {
   @MockitoBean
   private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
 
-  @MockitoBean private TenantOnboardingService onboardingService;
+  @MockitoBean private SignupRequestService signupRequestService;
 
   @MockitoBean
   private com.fabricmanagement.platform.communication.app.NotificationService notificationService;
@@ -59,26 +54,8 @@ class PublicSignupControllerTest {
   private com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider frontendUrlProvider;
 
   @Test
-  @DisplayName("POST /api/public/signup returns 200 and success message")
+  @DisplayName("POST /api/v1/public/signup returns 200 and success message")
   void signup_returnsOkAndSuccessMessage() throws Exception {
-    UUID organizationId = UUID.randomUUID();
-    UUID tenantId = UUID.randomUUID();
-    TenantOnboardingResponse response =
-        TenantOnboardingResponse.builder()
-            .organizationId(organizationId)
-            .tenantId(tenantId)
-            .organizationUid("SIGNUP-001")
-            .organizationName("Signup Co")
-            .adminUserId(UUID.randomUUID())
-            .adminContactValue("user@example.com")
-            .registrationToken("token-456")
-            .subscriptions(List.of("FabricOS"))
-            .trialEndsAt(Instant.now().plusSeconds(86400))
-            .setupUrl("https://app.example.com/setup?token=token-456")
-            .build();
-    when(onboardingService.createSelfServiceTenant(any(SelfSignupRequest.class)))
-        .thenReturn(response);
-
     String body =
         """
         {
@@ -104,24 +81,8 @@ class PublicSignupControllerTest {
   }
 
   @Test
-  @DisplayName("POST /api/public/signup defaults unknown intent to playground")
+  @DisplayName("POST /api/v1/public/signup defaults unknown intent to playground")
   void signup_defaultsUnknownIntentToPlayground() throws Exception {
-    TenantOnboardingResponse response =
-        TenantOnboardingResponse.builder()
-            .organizationId(UUID.randomUUID())
-            .tenantId(UUID.randomUUID())
-            .organizationUid("SIGNUP-002")
-            .organizationName("Signup Co")
-            .adminUserId(UUID.randomUUID())
-            .adminContactValue("user@example.com")
-            .registrationToken("token-789")
-            .subscriptions(List.of("FabricOS"))
-            .trialEndsAt(Instant.now().plusSeconds(86400))
-            .setupUrl("https://app.example.com/setup?token=token-789")
-            .build();
-    when(onboardingService.createSelfServiceTenant(any(SelfSignupRequest.class)))
-        .thenReturn(response);
-
     String body =
         """
         {
@@ -146,7 +107,36 @@ class PublicSignupControllerTest {
 
     ArgumentCaptor<SelfSignupRequest> requestCaptor =
         ArgumentCaptor.forClass(SelfSignupRequest.class);
-    verify(onboardingService).createSelfServiceTenant(requestCaptor.capture());
+    verify(signupRequestService).request(requestCaptor.capture());
     assertThat(requestCaptor.getValue().getIntent()).isEqualTo(SignupIntent.PLAYGROUND);
+  }
+
+  @Test
+  @DisplayName("POST /api/v1/public/signup refuses a value too long for the pending signup row")
+  void signup_refusesTooLongTaxId() throws Exception {
+    String body =
+        """
+        {
+          "organizationName": "Signup Co",
+          "taxId": "%s",
+          "organizationType": "WEAVER",
+          "firstName": "John",
+          "lastName": "Doe",
+          "email": "user@example.com",
+          "acceptedTerms": true
+        }
+        """
+            .formatted("9".repeat(51));
+
+    mockMvc
+        .perform(
+            post("/api/v1/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors.taxId").exists());
+
+    verifyNoInteractions(signupRequestService);
   }
 }

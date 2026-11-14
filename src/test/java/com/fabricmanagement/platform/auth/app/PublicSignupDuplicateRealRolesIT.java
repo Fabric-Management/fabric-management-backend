@@ -8,11 +8,11 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.web.exception.ContactAlreadyRegisteredException;
 import com.fabricmanagement.common.infrastructure.web.exception.SignupAlreadyPendingException;
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
-import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
-import com.fabricmanagement.platform.auth.dto.SignupIntent;
+import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +33,11 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * AbstractIntegrationTest} row-level security is bypassed and the defect cannot be seen. The
  * existing company and e-mail identity are written by the owner connection (as an earlier signup
  * would have left them); the service must then refuse the second signup.
+ *
+ * <p>SIGNUP-DEFER-1: a self-service signup is checked twice, when the form is sent ({@link
+ * SignupRequestRealRolesIT}) and when its link is used (here: a tax number registered in between).
+ * A sales-led tenant is still created directly and checked here for tax number, login identity and
+ * waiting setup link.
  */
 class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest {
 
@@ -40,6 +45,7 @@ class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest 
   @Autowired private OrganizationFacade organizations;
   @Autowired private IdentityProvisioningService identities;
   @Autowired private TenantQueryPort tenantQueryPort;
+  @Autowired private SignupCompletionService signupCompletion;
 
   private final List<UUID> createdTenants = new ArrayList<>();
   private final List<String> createdEmails = new ArrayList<>();
@@ -50,6 +56,12 @@ class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest 
     // The container is shared with other real-role ITs: leave nothing behind.
     JdbcTemplate owner = owner();
     for (String email : createdEmails) {
+      owner.update("DELETE FROM common_auth.pending_signup WHERE email = ?", email);
+      // The membership foreign key no longer cascades (V20261031130000): memberships first.
+      owner.update(
+          "DELETE FROM common_auth.membership WHERE login_identity_id IN"
+              + " (SELECT id FROM common_auth.login_identity WHERE email = ?)",
+          email);
       owner.update("DELETE FROM common_auth.login_identity WHERE email = ?", email);
     }
     for (UUID tenantId : createdTenants) {
@@ -88,31 +100,61 @@ class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest 
   }
 
   @Test
-  @DisplayName("the same company cannot sign up twice")
-  void secondSignupWithTheSameTaxIdIsRefused() {
+  @DisplayName("a sales-led tenant cannot reuse the tax number of another company")
+  void aSalesLedTenantWithATakenTaxIdIsRefused() {
     String taxId = "TAX-" + shortId();
     UUID tenant = insertTenant();
     insertOrganisation(tenant, taxId);
     TenantContext.clear();
 
-    assertThatThrownBy(
-            () -> onboarding.createSelfServiceTenant(request(taxId, freshEmail("owner"))))
+    assertThatThrownBy(() -> onboarding.createSalesLedTenant(salesLed(taxId, freshEmail("owner"))))
         .isInstanceOf(TaxIdAlreadyExistsException.class);
   }
 
   @Test
-  @DisplayName("the same e-mail cannot sign up twice, even with a different tax number")
-  void secondSignupWithTheSameEmailIsRefused() {
+  @DisplayName("a tax number registered after the form was sent stops the completion")
+  void aTaxIdRegisteredSinceTheFormWasSentStopsTheCompletion() {
+    String taxId = "TAX-" + shortId();
+    String email = freshEmail("late");
+    String link = PendingSignupFixtures.insert(owner(), email, taxId);
+    // Sales staff register the company while the e-mail link is waiting.
+    insertOrganisation(insertTenant(), taxId);
+    TenantContext.clear();
+
+    assertThatThrownBy(() -> signupCompletion.complete(link, "Hawthorn!Secret27", "127.0.0.1"))
+        .isInstanceOf(TaxIdAlreadyExistsException.class);
+
+    // Nothing was built, and the signup stays as it was.
+    assertThat(
+            owner()
+                .queryForObject(
+                    "SELECT count(*) FROM common_auth.pending_signup"
+                        + " WHERE email = ? AND completed_at IS NULL",
+                    Integer.class,
+                    email))
+        .isEqualTo(1);
+    assertThat(
+            owner()
+                .queryForObject(
+                    "SELECT count(*) FROM common_auth.login_identity WHERE email = ?",
+                    Integer.class,
+                    email))
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("a sales-led tenant cannot use an e-mail that already has a login")
+  void aSalesLedTenantForAnExistingLoginIsRefused() {
     String email = insertLoginIdentity();
     TenantContext.clear();
 
-    assertThatThrownBy(() -> onboarding.createSelfServiceTenant(request("TAX-" + shortId(), email)))
+    assertThatThrownBy(() -> onboarding.createSalesLedTenant(salesLed("TAX-" + shortId(), email)))
         .isInstanceOf(ContactAlreadyRegisteredException.class);
   }
 
   @Test
-  @DisplayName("an e-mail whose setup link is still waiting cannot sign up again")
-  void secondSignupWhileTheFirstIsStillPendingIsRefused() {
+  @DisplayName("a sales-led tenant cannot use an e-mail whose setup link is still waiting")
+  void aSalesLedTenantForAnAddressWithAWaitingLinkIsRefused() {
     // The admin's login identity exists only after the link is used; the token holds the address.
     String email = freshEmail("pending");
     insertRegistrationToken(insertTenant(), email, false, "now() + interval '1 day'");
@@ -121,7 +163,7 @@ class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest 
     assertThat(tenantQueryPort.hasPendingRegistrationFor(email)).isTrue();
     assertThat(tenantQueryPort.hasPendingRegistrationFor("  " + email.toUpperCase(Locale.ROOT)))
         .isTrue();
-    assertThatThrownBy(() -> onboarding.createSelfServiceTenant(request("TAX-" + shortId(), email)))
+    assertThatThrownBy(() -> onboarding.createSalesLedTenant(salesLed("TAX-" + shortId(), email)))
         .isInstanceOf(SignupAlreadyPendingException.class);
   }
 
@@ -142,16 +184,14 @@ class PublicSignupDuplicateRealRolesIT extends AbstractFabricAppIntegrationTest 
     assertThat(tenantQueryPort.hasPendingRegistrationFor(" ")).isFalse();
   }
 
-  private static SelfSignupRequest request(String taxId, String email) {
-    return SelfSignupRequest.builder()
+  private static TenantOnboardingRequest salesLed(String taxId, String email) {
+    return TenantOnboardingRequest.builder()
         .organizationName("Duplicate Probe " + taxId)
         .taxId(taxId)
         .organizationType(OrganizationType.VERTICAL_MILL)
-        .firstName("Harriet")
-        .lastName("Lowe")
-        .email(email)
-        .intent(SignupIntent.PLAYGROUND)
-        .acceptedTerms(true)
+        .adminFirstName("Harriet")
+        .adminLastName("Lowe")
+        .adminContact(email)
         .build();
   }
 

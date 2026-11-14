@@ -6,11 +6,11 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
-import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import com.fabricmanagement.testsupport.PostgresImage;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -283,17 +283,15 @@ class PartnerNetworkDemoSeedIT {
   private UUID signupPlayground() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     return onboardingService
-        .createSelfServiceTenant(
-            SelfSignupRequest.builder()
-                .organizationName("Partner Playground " + suffix)
-                .taxId("PPG" + suffix)
-                .organizationType(OrganizationType.SPINNER)
-                .firstName("Demo")
-                .lastName("Prospect")
-                .email("partner-playground-" + suffix + "@example.com")
-                .intent(SignupIntent.PLAYGROUND)
-                .acceptedTerms(true)
-                .build())
+        .createVerifiedSelfServiceTenant(
+            PendingSignupFixtures.pendingSignup(
+                "Partner Playground " + suffix,
+                "PPG" + suffix,
+                OrganizationType.SPINNER,
+                "Demo",
+                "Prospect",
+                "partner-playground-" + suffix + "@example.com",
+                SignupIntent.PLAYGROUND))
         .getTenantId();
   }
 }

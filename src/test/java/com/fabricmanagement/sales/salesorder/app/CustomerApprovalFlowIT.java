@@ -17,6 +17,7 @@ import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import com.fabricmanagement.platform.organization.app.OrganizationNamingService;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.EditOrganizationContactRequest;
@@ -60,6 +61,7 @@ import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RevokeApprovalAu
 import com.fabricmanagement.sales.salesorder.dto.PublicOrderApprovalDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Save;
 import com.fabricmanagement.sales.salesorder.infra.repository.DeliveryProposalRepository;
+import com.fabricmanagement.sales.salesorder.infra.repository.OrderVersionRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import com.fabricmanagement.testsupport.PostgresImage;
@@ -138,6 +140,8 @@ class CustomerApprovalFlowIT {
 
   @Autowired private TenantRepository tenants;
   @Autowired private OrganizationRepository organizations;
+  @Autowired private OrganizationNamingService naming;
+  @Autowired private OrderVersionRepository versions;
   @Autowired private RoleRepository roles;
   @Autowired private UserRepository users;
   @Autowired private TradingPartnerRegistryRepository registries;
@@ -164,6 +168,7 @@ class CustomerApprovalFlowIT {
 
   private UUID tenantId;
   private UUID sales;
+  private UUID rootOrganizationId;
   private UUID orderId;
   private UUID partnerId;
   private UUID customerOrganizationId;
@@ -194,6 +199,7 @@ class CustomerApprovalFlowIT {
         organizations.save(
             Organization.create(
                 "Bradford Mills " + suffix, "TAX-" + suffix, OrganizationType.WEAVER));
+    rootOrganizationId = organization.getId();
     Role role = roles.save(Role.create("Sales " + suffix, "WORKER", "Approval test"));
     User user = User.create("Sam", "Seller", organization.getId());
     user.setRole(role);
@@ -220,7 +226,7 @@ class CustomerApprovalFlowIT {
             .createAndAssignContact(
                 customerOrganization.getId(),
                 com.fabricmanagement.platform.communication.dto.CreateContactRequest.builder()
-                    .contactValue("jane@northern-garments.co.uk")
+                    .contactValue("jane@northern-garments.example")
                     .contactType(ContactType.EMAIL)
                     .label("Jane Smith")
                     .isPersonal(false)
@@ -238,7 +244,7 @@ class CustomerApprovalFlowIT {
             .orderDate(LocalDate.now())
             // The order's day-to-day contact is not the approver: the request goes to Jane.
             .contactName("Order desk")
-            .contactEmail("orders@northern-garments.co.uk")
+            .contactEmail("orders@northern-garments.example")
             .approverContactId(janesAddress)
             .build();
     order.applyDeliveryTerms(
@@ -270,7 +276,7 @@ class CustomerApprovalFlowIT {
     // The customer has no tenant context: the link alone finds the request.
     PublicOrderApprovalDtos.LinkView link = publicApprovals.view(token);
     assertThat(link.state()).isEqualTo(PublicOrderApprovalDtos.LinkState.OPEN);
-    assertThat(link.recipientEmailMasked()).isEqualTo("j***@northern-garments.co.uk");
+    assertThat(link.recipientEmailMasked()).isEqualTo("j***@northern-garments.example");
     PublicOrderApprovalDtos.Verified verified = publicApprovals.verify(token, code(token));
     OrderVersionContent content = verified.version().content();
     assertThat(content.lines())
@@ -315,7 +321,7 @@ class CustomerApprovalFlowIT {
                     + " WHERE sales_order_id = ?",
                 orderId))
         .containsEntry("status", "APPROVED")
-        .containsEntry("decided_by_email", "jane@northern-garments.co.uk")
+        .containsEntry("decided_by_email", "jane@northern-garments.example")
         .containsEntry("ip_address", "203.0.113.7");
     // Only hashes are stored: the link itself appears nowhere in the table.
     assertThat(
@@ -399,6 +405,30 @@ class CustomerApprovalFlowIT {
         .containsEntry("cancelled", false)
         .containsEntry("stale", false)
         .containsEntry("source_missing", false);
+  }
+
+  @Test
+  void versionsKeepTheSellerNameThatWasCurrentWhenTheyWereFrozen() {
+    String original = tenants.findById(tenantId).orElseThrow().getName();
+    asSales(() -> customerApprovals.sendInformation(orderId, sales));
+
+    asSales(
+        () ->
+            transactions.execute(
+                status -> {
+                  var root =
+                      organizations.lockByTenantIdAndId(tenantId, rootOrganizationId).orElseThrow();
+                  naming.rename(root, "Willow Cloth Ltd");
+                  return null;
+                }));
+    send();
+
+    assertThat(
+            asSales(
+                () ->
+                    versions.findByTenantIdAndSalesOrderIdOrderByVersionNoDesc(tenantId, orderId)))
+        .extracting(version -> version.getContent().sellerName())
+        .containsExactly("Willow Cloth Ltd", original);
   }
 
   @Test
@@ -605,11 +635,11 @@ class CustomerApprovalFlowIT {
                     + " WHERE sales_order_id = ?",
                 orderId))
         .containsEntry("status", "SENT")
-        .containsEntry("recipient_email", "jane@northern-garments.co.uk");
+        .containsEntry("recipient_email", "jane@northern-garments.example");
 
     // A new grant needs the address confirmed as it reads now; the earlier one is refused.
     assertRefused(
-        () -> grantJane("jane@northern-garments.co.uk"),
+        () -> grantJane("jane@northern-garments.example"),
         ApproverAuthorities.APPROVER_EMAIL_CHANGED);
     // An authorised user confirms the new address is Jane's: the authority is granted again there.
     UUID renewed = grantJane("jane.smith@elsewhere.example");
@@ -629,7 +659,7 @@ class CustomerApprovalFlowIT {
         .singleElement()
         .satisfies(
             view -> {
-              assertThat(view.authorisedEmail()).isEqualTo("jane@northern-garments.co.uk");
+              assertThat(view.authorisedEmail()).isEqualTo("jane@northern-garments.example");
               assertThat(view.contactAddressChanged()).isTrue();
               assertThat(view.revokedAt()).isNotNull();
               assertThat(view.revocationCause())
@@ -654,12 +684,13 @@ class CustomerApprovalFlowIT {
     publicApprovals.sendCode(token);
     ArgumentCaptor<String> codes = ArgumentCaptor.forClass(String.class);
     verify(mailer, times(2))
-        .sendCode(eq(tenantId), eq("jane@northern-garments.co.uk"), any(), any(), codes.capture());
+        .sendCode(
+            eq(tenantId), eq("jane@northern-garments.example"), any(), any(), codes.capture());
     String queuedCode = codes.getValue();
 
     // A → B → A
     editJanesAddress("jane.smith@elsewhere.example");
-    editJanesAddress("jane@northern-garments.co.uk");
+    editJanesAddress("jane@northern-garments.example");
 
     // The card reads Jane's authorised address again; her authority ended with the first change.
     assertThat(
@@ -787,7 +818,7 @@ class CustomerApprovalFlowIT {
         new CustomerApproval.Decider(
             CustomerApprovalChannel.EMAIL_LINK,
             "Jane Smith",
-            "jane@northern-garments.co.uk",
+            "jane@northern-garments.example",
             null,
             null,
             null);
@@ -856,7 +887,7 @@ class CustomerApprovalFlowIT {
 
   /** An authorised user grants Jane the authority at the address her contact point reads now. */
   private UUID grantJane() {
-    return grantJane("jane@northern-garments.co.uk");
+    return grantJane("jane@northern-garments.example");
   }
 
   /** An authorised user grants Jane the authority, confirming {@code address} as hers. */
@@ -1007,7 +1038,7 @@ class CustomerApprovalFlowIT {
           .singleElement()
           .satisfies(
               view -> {
-                assertThat(view.recipientEmail()).isEqualTo("jane@northern-garments.co.uk");
+                assertThat(view.recipientEmail()).isEqualTo("jane@northern-garments.example");
                 assertThat(view.linkExpiresAt()).isNotNull();
               });
     } finally {
@@ -1016,7 +1047,12 @@ class CustomerApprovalFlowIT {
     ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
     verify(mailer)
         .sendApprovalRequest(
-            eq(tenantId), eq("jane@northern-garments.co.uk"), any(), any(), token.capture(), any());
+            eq(tenantId),
+            eq("jane@northern-garments.example"),
+            any(),
+            any(),
+            token.capture(),
+            any());
     return token.getValue();
   }
 
@@ -1110,7 +1146,7 @@ class CustomerApprovalFlowIT {
     publicApprovals.sendCode(token);
     ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
     verify(mailer)
-        .sendCode(eq(tenantId), eq("jane@northern-garments.co.uk"), any(), any(), code.capture());
+        .sendCode(eq(tenantId), eq("jane@northern-garments.example"), any(), any(), code.capture());
     return code.getValue();
   }
 }

@@ -54,6 +54,9 @@ class RlsAllowlistArchTest {
           "login_identity",
           "membership",
 
+          // Pending self-service signup (SIGNUP-DEFER-1): written before any tenant exists
+          "pending_signup",
+
           // Permanent marketing lead; tenant-independent with nullable trial_tenant_id link
           "common_lead",
           "lead_profile_snapshot", // Lead-owned retained evidence; deliberately tenant-independent

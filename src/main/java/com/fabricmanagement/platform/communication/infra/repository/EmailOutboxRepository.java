@@ -51,4 +51,6 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, UUID> 
 
   /** Count emails by status (for monitoring). */
   long countByStatusAndIsActiveTrue(EmailOutboxStatus status);
+
+  long countByTenantIdAndRecipientAndCreatedAtAfter(UUID tenantId, String recipient, Instant since);
 }

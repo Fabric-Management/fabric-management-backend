@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
@@ -17,6 +18,7 @@ import com.fabricmanagement.platform.auth.app.onboarding.OnboardingStep;
 import com.fabricmanagement.platform.auth.app.onboarding.PublishSelfSignupCompletedStep;
 import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchestrator;
 import com.fabricmanagement.platform.auth.domain.event.SelfSignupCompletedEvent;
+import com.fabricmanagement.platform.communication.app.EmailOutboxService;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.testsupport.SensitiveLogCapture;
@@ -25,8 +27,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,15 +40,16 @@ class SignupEmailLogSafetyTest {
   @Mock private NotificationService notifications;
   @Mock private EmailTemplateRenderer renderer;
   @Mock private LocalizationService localisation;
+  @Mock private EmailOutboxService emailOutboxService;
   @Mock private ApplicationEventPublisher springEvents;
   @Mock private FrontendUrlProvider frontend;
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void realSetupLinkReachesTheMessageButNotSuccessLogs(boolean salesLed) {
-    var event = event(salesLed);
-    arrangeMessage(salesLed);
-    var listener = new SignupEmailListener(notifications, renderer, localisation);
+  @Test
+  void realSetupLinkReachesTheMessageButNotSuccessLogs() {
+    var event = event(true);
+    arrangeMessage(true);
+    var listener =
+        new SignupEmailListener(notifications, renderer, localisation, emailOutboxService);
     try (var logs = capture()) {
       listener.onSelfSignupCompleted(event);
       verify(notifications)
@@ -62,19 +63,19 @@ class SignupEmailLogSafetyTest {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void failureAndAsyncHandlerOmitProviderMessageCausesSuppressedPayloadAndArguments(
-      boolean salesLed) throws Exception {
-    var event = event(salesLed);
-    arrangeMessage(salesLed);
+  @Test
+  void failureAndAsyncHandlerOmitProviderMessageCausesSuppressedPayloadAndArguments()
+      throws Exception {
+    var event = event(true);
+    arrangeMessage(true);
     var failure =
         new IllegalStateException("SMTP echoed " + URL, new IllegalArgumentException(PASSWORD));
     failure.addSuppressed(new RuntimeException(TOKEN));
     doThrow(failure)
         .when(notifications)
         .sendNotificationSync(any(), anyString(), anyString(), anyString());
-    var listener = new SignupEmailListener(notifications, renderer, localisation);
+    var listener =
+        new SignupEmailListener(notifications, renderer, localisation, emailOutboxService);
     try (var logs = capture()) {
       assertThatThrownBy(() -> listener.onSelfSignupCompleted(event)).isSameAs(failure);
       new LoggingAsyncUncaughtExceptionHandler()
@@ -89,6 +90,16 @@ class SignupEmailLogSafetyTest {
               "Signup email submission failed", "failureType=", event.getEventId().toString());
       assertThat(logs.text()).doesNotContain("Signup email submitted:");
     }
+  }
+
+  @Test
+  void aSelfServiceSignupCompletedEventSendsNoMail() {
+    var listener =
+        new SignupEmailListener(notifications, renderer, localisation, emailOutboxService);
+
+    listener.onSelfSignupCompleted(event(false));
+
+    verifyNoInteractions(notifications, renderer);
   }
 
   @Test
@@ -128,6 +139,7 @@ class SignupEmailLogSafetyTest {
     context.setTenantId(UUID.randomUUID());
     context.setUserId(UUID.randomUUID());
     context.setAdminContact("eleanor.hughes@example.com");
+    context.setSalesLed(true);
     context.setRegistrationToken(TOKEN);
     when(frontend.buildUrl("/setup?token=" + TOKEN)).thenReturn(URL);
     try (var logs = capture()) {
@@ -169,9 +181,6 @@ class SignupEmailLogSafetyTest {
     when(localisation.getMessage(anyString(), any(), any())).thenReturn("Setup");
     if (salesLed)
       when(renderer.renderWelcome(anyString(), anyString(), anyString(), anyString()))
-          .thenReturn(URL);
-    else
-      when(renderer.renderSetupPassword(anyString(), anyString(), anyString(), anyString()))
           .thenReturn(URL);
   }
 

@@ -32,8 +32,23 @@ class CreateRegistrationTokenStepTest {
   }
 
   @Test
-  void createsTokenForRegularSignup() {
+  void skipsSelfServiceSignupBecauseItsLinkWasAlreadyUsed() {
     OnboardingContext context = new OnboardingContext();
+    context.setUserId(UUID.randomUUID());
+    context.setOrganizationId(UUID.randomUUID());
+    context.setAdminContact("owner@example.com");
+    context.setSalesLed(false);
+
+    step.execute(context);
+
+    verify(tokenRepository, never()).save(Mockito.any(RegistrationToken.class));
+    assertThat(context.getRegistrationToken()).isNull();
+  }
+
+  @Test
+  void createsTokenForSalesLedSignup() {
+    OnboardingContext context = new OnboardingContext();
+    context.setSalesLed(true);
     context.setUserId(UUID.randomUUID());
     context.setOrganizationId(UUID.randomUUID());
     context.setAdminContact("owner@example.com");
@@ -44,6 +59,8 @@ class CreateRegistrationTokenStepTest {
         ArgumentCaptor.forClass(RegistrationToken.class);
     verify(tokenRepository).save(tokenCaptor.capture());
     assertThat(tokenCaptor.getValue().getContactValue()).isEqualTo("owner@example.com");
+    assertThat(tokenCaptor.getValue().getTokenType())
+        .isEqualTo(com.fabricmanagement.platform.auth.domain.RegistrationTokenType.SALES_LED);
     assertThat(context.getRegistrationToken()).isNotBlank();
   }
 }

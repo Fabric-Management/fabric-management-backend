@@ -75,3 +75,53 @@ BEGIN
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE common_auth.membership TO fabric_system;
   END IF;
 END $$;
+
+-- SIGNUP-DEFER-1 (TD-18): a public signup first writes only this row; the tenant is built when the
+-- e-mailed link is used. RLS-ALL EXEMPTION: like login_identity this table is pre-auth and
+-- cross-tenant (no tenant exists yet), so it carries no tenant_id and no RLS; exclude it from future
+-- RLS-all sweeps. completed_tenant_id is a plain nullable FK, not an isolation column.
+CREATE TABLE IF NOT EXISTS common_auth.pending_signup (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL,
+    tax_id VARCHAR(50) NOT NULL,
+    request JSONB NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    terms_accepted_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    send_count INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ,
+    completed_tenant_id UUID,
+    CONSTRAINT fk_pending_signup_tenant FOREIGN KEY (completed_tenant_id)
+        REFERENCES common_tenant.common_tenant(id) ON DELETE SET NULL,
+    CONSTRAINT chk_pending_signup_email_lowercase CHECK (email = lower(btrim(email)) AND btrim(email) <> ''),
+    CONSTRAINT chk_pending_signup_completion CHECK (completed_tenant_id IS NULL OR completed_at IS NOT NULL)
+);
+
+-- One open pending signup per e-mail and per tax number, enforced here so that two simultaneous
+-- signups cannot both pass a read-before-insert check. Expired rows are deleted before an insert.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_pending_signup_open_email
+    ON common_auth.pending_signup (email) WHERE completed_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_pending_signup_open_tax
+    ON common_auth.pending_signup (lower(btrim(tax_id))) WHERE completed_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_pending_signup_token_hash
+    ON common_auth.pending_signup (token_hash);
+CREATE INDEX IF NOT EXISTS idx_pending_signup_expiry
+    ON common_auth.pending_signup (expires_at) WHERE completed_at IS NULL;
+
+COMMENT ON TABLE common_auth.pending_signup IS
+    'RLS-all exempt pending self-service signup. Holds the submitted form and the hash of the setup token until the e-mailed link builds the tenant. No tenant_id; exclude from future RLS-all sweeps.';
+
+ALTER TABLE common_auth.pending_signup DISABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_app') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE common_auth.pending_signup TO fabric_app;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE common_auth.pending_signup TO fabric_system;
+  END IF;
+END $$;

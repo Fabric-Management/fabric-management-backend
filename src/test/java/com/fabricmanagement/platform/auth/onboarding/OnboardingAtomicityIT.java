@@ -22,6 +22,7 @@ import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
+import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -86,23 +87,44 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
     stubEmailRendering();
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     String name = "Willow Cloth Ltd " + suffix;
-    String body = signupBody(name, suffix, "TRIAL");
+    // SIGNUP-DEFER-1: the form only records the signup; the company is built when its link is used.
+    mockMvc.perform(signup(signupBody(name, suffix, "TRIAL"))).andExpect(status().isOk());
+    assertThat(tenantCountByName(name)).isZero();
+    String link = PendingSignupFixtures.knownLinkToken(systemJdbc, email(suffix));
 
     doThrow(new PlatformDomainException("Injected late failure", "ONBOARDING_LATE_FAILURE", 503))
         .when(lastStep)
         .execute(ArgumentMatchers.<OnboardingContext>any());
-    mockMvc.perform(signup(body)).andExpect(status().isServiceUnavailable());
+    mockMvc
+        .perform(PendingSignupFixtures.useLink(link, PendingSignupFixtures.PASSWORD))
+        .andExpect(status().isServiceUnavailable());
 
-    // The signup got as far as its last step, so every clone and seed before it had run.
+    // The completion got as far as its last step, so every clone and seed before it had run.
     verify(lastStep).execute(ArgumentMatchers.<OnboardingContext>any());
     assertThat(tenantCountByName(name)).isZero();
     for (String table : TEMPLATE_COPY_TABLES) {
       assertThat(orphanRows(table)).as("rows of %s without a tenant", table).isZero();
     }
+    // Nothing of the login was left either, and the signup is still open for the same link.
+    assertThat(
+            systemJdbc.queryForObject(
+                "SELECT count(*) FROM common_auth.login_identity WHERE email = ?",
+                Long.class,
+                email(suffix)))
+        .isZero();
+    assertThat(
+            systemJdbc.queryForObject(
+                "SELECT count(*) FROM common_auth.pending_signup"
+                    + " WHERE email = ? AND completed_at IS NULL",
+                Long.class,
+                email(suffix)))
+        .isEqualTo(1L);
 
-    // The same company signs up again, and ends up once, under its own name and slug.
+    // The same link is used again, and the company ends up once, under its own name and slug.
     Mockito.reset(lastStep);
-    mockMvc.perform(signup(body)).andExpect(status().isOk());
+    mockMvc
+        .perform(PendingSignupFixtures.useLink(link, PendingSignupFixtures.PASSWORD))
+        .andExpect(status().isOk());
 
     assertThat(tenantCountByName(name)).isEqualTo(1L);
     String slug =
@@ -119,7 +141,7 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     String name = "Alder Mills Ltd " + suffix;
 
-    mockMvc.perform(signup(signupBody(name, suffix, "PLAYGROUND"))).andExpect(status().isOk());
+    completeSignup(name, suffix, "PLAYGROUND");
 
     UUID tenantId = tenantIdByName(name);
     // The copies were written on the signup's own connection: role, permission, ownership policy,
@@ -161,7 +183,7 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     String name = "Birch Spinners Ltd " + suffix;
 
-    mockMvc.perform(signup(signupBody(name, suffix, "PLAYGROUND"))).andExpect(status().isOk());
+    completeSignup(name, suffix, "PLAYGROUND");
 
     UUID tenantId = tenantIdByName(name);
 
@@ -205,13 +227,23 @@ class OnboardingAtomicityIT extends AbstractFabricAppIntegrationTest {
         .content(body);
   }
 
+  private static String email(String suffix) {
+    return "eleanor." + suffix + "@example.com";
+  }
+
   private static String signupBody(String name, String suffix, String intent) {
     return """
         {"organizationName":"%s","taxId":"GB%s","organizationType":"WEAVER",
-         "firstName":"Eleanor","lastName":"Hughes","email":"eleanor.%s@example.com",
+         "firstName":"Eleanor","lastName":"Hughes","email":"%s",
          "selectedOS":["FabricOS"],"intent":"%s","acceptedTerms":true}
         """
-        .formatted(name, suffix, suffix, intent);
+        .formatted(name, suffix, email(suffix), intent);
+  }
+
+  /** The two steps of a signup: the form, then the e-mailed link that builds the company. */
+  private void completeSignup(String name, String suffix, String intent) throws Exception {
+    mockMvc.perform(signup(signupBody(name, suffix, intent))).andExpect(status().isOk());
+    PendingSignupFixtures.completeSignup(mockMvc, systemJdbc, email(suffix));
   }
 
   private void stubEmailRendering() {

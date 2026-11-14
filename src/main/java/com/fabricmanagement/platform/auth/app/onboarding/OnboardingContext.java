@@ -65,6 +65,12 @@ public class OnboardingContext {
   private boolean demoMode;
   private boolean existingIdentity;
 
+  /**
+   * The admin's login is created in the same transaction (self-service signup completed by its
+   * e-mail link), so no "you were added to a company" invitation mail may follow.
+   */
+  private boolean invitationEmailSuppressed;
+
   // ========================================
   // OUTPUTS - Tenant (Step 1)
   // ========================================
@@ -108,7 +114,7 @@ public class OnboardingContext {
         .firstName(adminFirstName)
         .lastName(adminLastName)
         .contactValue(adminContact)
-        .invitationEmailSuppressed(existingIdentity)
+        .invitationEmailSuppressed(existingIdentity || invitationEmailSuppressed)
         .build();
   }
 

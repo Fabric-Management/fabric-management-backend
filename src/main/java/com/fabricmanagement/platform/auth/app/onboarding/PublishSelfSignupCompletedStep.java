@@ -27,21 +27,33 @@ public class PublishSelfSignupCompletedStep implements OnboardingStep {
       return;
     }
 
-    String token = context.getRegistrationToken();
     String email = context.getAdminContact();
-    if (token == null || email == null) {
+    if (email == null) {
       log.warn(
-          "PublishSelfSignupCompletedStep: missing token or recipient email, skipping signup email event. "
-              + "tenantId={}, userId={}, tokenPresent={}, emailPresent={}",
+          "PublishSelfSignupCompletedStep: missing recipient email, skipping signup event. "
+              + "tenantId={}, userId={}",
           context.getTenantId(),
-          context.getUserId(),
-          token != null,
-          email != null);
+          context.getUserId());
       return;
     }
 
-    String setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
-    context.setSetupUrl(setupUrl);
+    // Only sales-led onboarding mails a setup link. A self-service company is built after its
+    // e-mail link was used, so the event carries no link; it still tells the platform team that a
+    // company joined.
+    String setupUrl = null;
+    if (context.isSalesLed()) {
+      String token = context.getRegistrationToken();
+      if (token == null) {
+        log.warn(
+            "PublishSelfSignupCompletedStep: missing token, skipping signup email event. "
+                + "tenantId={}, userId={}",
+            context.getTenantId(),
+            context.getUserId());
+        return;
+      }
+      setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
+      context.setSetupUrl(setupUrl);
+    }
 
     SelfSignupCompletedEvent event =
         new SelfSignupCompletedEvent(

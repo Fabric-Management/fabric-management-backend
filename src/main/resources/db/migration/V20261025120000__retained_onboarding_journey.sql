@@ -7,7 +7,8 @@ ALTER TABLE common_company.common_lead
   ADD COLUMN terms_accepted_at timestamptz,
   ADD COLUMN signup_snapshot jsonb,
   ADD COLUMN accepted_snapshot jsonb,
-  ADD COLUMN accepted_revision bigint NOT NULL DEFAULT 0;
+  ADD COLUMN accepted_revision bigint NOT NULL DEFAULT 0,
+  ADD COLUMN verified_at timestamptz;
 ALTER TABLE common_company.common_lead ALTER COLUMN tax_id DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_lead_signup ON common_company.common_lead(signup_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_lead_registration_link ON common_company.common_lead(signup_tenant_id, signup_user_id)
@@ -229,17 +230,26 @@ REVOKE ALL ON FUNCTION common_company.backfill_onboarding_evidence() FROM PUBLIC
 
 CREATE FUNCTION common_company.guard_signup_evidence() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF current_user IN ('fabric_app','fabric_system') AND
-    (NEW.signup_id, NEW.signup_tenant_id, NEW.signup_user_id, NEW.signup_snapshot,
-     NEW.company_name, NEW.tax_id, NEW.organization_type, NEW.first_name, NEW.last_name,
-     NEW.work_email, NEW.selected_os, NEW.signup_intent, NEW.terms_accepted_at, NEW.signup_provenance,
-     NEW.uid, NEW.created_at, NEW.created_by)
-    IS DISTINCT FROM
-    (OLD.signup_id, OLD.signup_tenant_id, OLD.signup_user_id, OLD.signup_snapshot,
-     OLD.company_name, OLD.tax_id, OLD.organization_type, OLD.first_name, OLD.last_name,
-     OLD.work_email, OLD.selected_os, OLD.signup_intent, OLD.terms_accepted_at, OLD.signup_provenance,
-     OLD.uid, OLD.created_at, OLD.created_by)
-  THEN RAISE EXCEPTION 'Original signup evidence is immutable' USING ERRCODE = '42501'; END IF;
+  IF current_user IN ('fabric_app','fabric_system') THEN
+    -- Always pinned: the identity of the lead and the address it was recorded for.
+    IF (NEW.signup_id, NEW.work_email, NEW.signup_provenance, NEW.uid, NEW.created_at, NEW.created_by)
+       IS DISTINCT FROM
+       (OLD.signup_id, OLD.work_email, OLD.signup_provenance, OLD.uid, OLD.created_at, OLD.created_by)
+    THEN RAISE EXCEPTION 'Original signup evidence is immutable' USING ERRCODE = '42501'; END IF;
+    -- SIGNUP-DEFER-1: a lead for a signup form whose e-mail link has not been used is not evidence
+    -- yet (no tenant, no snapshot, not verified). Its details may be refreshed by a repeated form
+    -- and it is linked to its tenant once, when the signup completes. From then on the original
+    -- signup evidence is immutable.
+    IF (OLD.verified_at IS NOT NULL OR OLD.signup_tenant_id IS NOT NULL OR OLD.signup_snapshot IS NOT NULL)
+       AND (NEW.signup_tenant_id, NEW.signup_user_id, NEW.signup_snapshot, NEW.verified_at,
+            NEW.company_name, NEW.tax_id, NEW.organization_type, NEW.first_name, NEW.last_name,
+            NEW.selected_os, NEW.signup_intent, NEW.terms_accepted_at)
+          IS DISTINCT FROM
+          (OLD.signup_tenant_id, OLD.signup_user_id, OLD.signup_snapshot, OLD.verified_at,
+           OLD.company_name, OLD.tax_id, OLD.organization_type, OLD.first_name, OLD.last_name,
+           OLD.selected_os, OLD.signup_intent, OLD.terms_accepted_at)
+    THEN RAISE EXCEPTION 'Original signup evidence is immutable' USING ERRCODE = '42501'; END IF;
+  END IF;
   RETURN NEW;
 END $$;
 CREATE TRIGGER immutable_signup_evidence BEFORE UPDATE ON common_company.common_lead
@@ -264,3 +274,8 @@ DO $$ BEGIN
 END $$;
 REVOKE ALL ON common_company.onboarding_link_issue, common_company.lead_profile_snapshot,
   common_user.onboarding_journey, common_user.onboarding_operation FROM PUBLIC;
+
+-- SIGNUP-DEFER-1: a lead is written when the signup form is sent and stays unverified (verified_at
+-- IS NULL) until the e-mailed link is used. Every lead that already has a tenant is verified.
+UPDATE common_company.common_lead SET verified_at = created_at
+  WHERE verified_at IS NULL AND (signup_tenant_id IS NOT NULL OR trial_tenant_id IS NOT NULL);
