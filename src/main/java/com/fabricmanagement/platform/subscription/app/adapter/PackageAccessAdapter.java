@@ -31,6 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>A resource no package claims stays open, so a new resource is never locked by omission.
  *   <li>A tenant that is no longer writable (an expired real trial, for example) keeps read access
  *       to its data; the tenant write guard blocks changes. Packages gate live use, not retention.
+ *   <li>The platform tenant (Longward) runs the platform, not a mill: it is governed with no
+ *       package enabled, so every business resource a package owns is closed there, platform staff
+ *       included (TD-10/TD-15). Its own settings stay open (security, localisation, team,
+ *       notification preferences, the account's HR tabs). Platform screens are guarded by the
+ *       platform role, not packages.
  *   <li>A package definition keeps owning its resources after it is deactivated or soft-deleted.
  *       Ownership is read from the whole system catalogue; only a tenant's own subscription decides
  *       whether the package is enabled. Taking a package off the offer therefore never opens what
@@ -48,9 +53,13 @@ public class PackageAccessAdapter implements PackageAccessPort {
   private final SubscriptionRepository subscriptions;
   private final TenantAccessPort tenantAccess;
 
-  private record Access(boolean governed, Set<String> enabled, List<OSDefinition> catalogue) {
+  /** Resources the platform tenant keeps although no package is enabled there. */
+  static final Set<String> PLATFORM_TENANT_OPEN = Set.of("settings");
+
+  private record Access(
+      boolean governed, Set<String> enabled, List<OSDefinition> catalogue, Set<String> keptOpen) {
     boolean opens(String resource) {
-      if (!governed) return true;
+      if (!governed || keptOpen.contains(resource)) return true;
       List<OSDefinition> owners =
           catalogue.stream().filter(definition -> definition.includesModule(resource)).toList();
       return owners.isEmpty()
@@ -79,9 +88,16 @@ public class PackageAccessAdapter implements PackageAccessPort {
   }
 
   private Access access(UUID tenantId) {
+    if (TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      return new Access(
+          true,
+          Set.of(),
+          definitions.findByTenantId(TenantContext.SYSTEM_TENANT_ID),
+          PLATFORM_TENANT_OPEN);
+    }
     List<Subscription> rows = subscriptions.findByTenantId(tenantId);
     if (rows.isEmpty() || !tenantAccess.isWritable(tenantId)) {
-      return new Access(false, Set.of(), List.of());
+      return new Access(false, Set.of(), List.of(), Set.of());
     }
     Set<String> enabled =
         rows.stream()
@@ -92,6 +108,6 @@ public class PackageAccessAdapter implements PackageAccessPort {
     // a retired definition that dropped out of this list would leave its resources unclaimed, and
     // an unclaimed resource is open to everyone.
     List<OSDefinition> catalogue = definitions.findByTenantId(TenantContext.SYSTEM_TENANT_ID);
-    return new Access(true, enabled, catalogue);
+    return new Access(true, enabled, catalogue, Set.of());
   }
 }

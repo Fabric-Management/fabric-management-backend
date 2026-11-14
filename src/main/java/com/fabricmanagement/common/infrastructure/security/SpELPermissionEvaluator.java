@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Access needs two independent yeses: the user's role/department permission, and the tenant's
  * packages ({@link PackageAccessPort}). The package check is not a permission and is not bypassed
- * by an administrator role; only platform staff operating across tenants skip it.
+ * by any role, platform staff included: in the platform tenant no package is enabled, so business
+ * resources stay closed there (TD-10/TD-15).
  */
 @Component("auth")
 public class SpELPermissionEvaluator {
@@ -87,9 +88,6 @@ public class SpELPermissionEvaluator {
   }
 
   private boolean packageOpens(AuthenticatedUserContext ctx, String resource) {
-    if (PlatformAuthority.isPlatformAdmin(ctx)) {
-      return true;
-    }
     boolean open = packages.map(port -> port.isResourceOpen(ctx.tenantId(), resource)).orElse(true);
     if (!open) {
       PackageAccessDenial.record(resource);

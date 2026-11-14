@@ -33,7 +33,6 @@ public class TenantSeeder implements DataSeeder {
   private final TenantSystemService tenantService;
   private final TenantClonerService tenantClonerService;
   private final TransactionTemplate transactionTemplate;
-  private final DemoTransactionSeeder demoTransactionSeeder;
 
   @Override
   public boolean isSeeded() {
@@ -89,18 +88,13 @@ public class TenantSeeder implements DataSeeder {
                 log.info("Cloned {} notification templates into Nexus Fabrics", clonedTemplates);
               }
 
-              // Return tenant ID to seed transactions outside this transaction boundary
               return tenant.getId();
             });
 
-    // Seed demo transactions if enabled
-    if (tenantId != null) {
-      try {
-        demoTransactionSeeder.seedIfEnabledFor(tenantId);
-      } catch (Exception e) {
-        log.error("Startup demo seeding failed, but continuing tenant bootstrap.", e);
-      }
-    }
+    // The sample company's demo transactions are seeded later, once its organisation and users
+    // exist (SampleCompanyDemoSeeder): seeded here, the reporting currency could not be set on a
+    // root organisation that did not exist yet (TD-16).
+    log.info("Nexus Fabrics tenant created: {}", tenantId);
   }
 
   @Override

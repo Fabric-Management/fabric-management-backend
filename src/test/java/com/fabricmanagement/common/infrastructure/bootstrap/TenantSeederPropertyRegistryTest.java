@@ -24,15 +24,12 @@ class TenantSeederPropertyRegistryTest {
   @Mock private TenantSystemService tenantSystemService;
   @Mock private TenantClonerService tenantClonerService;
   @Mock private TransactionTemplate transactionTemplate;
-  @Mock private DemoTransactionSeeder demoTransactionSeeder;
 
   private TenantSeeder tenantSeeder;
 
   @BeforeEach
   void setUp() {
-    tenantSeeder =
-        new TenantSeeder(
-            tenantSystemService, tenantClonerService, transactionTemplate, demoTransactionSeeder);
+    tenantSeeder = new TenantSeeder(tenantSystemService, tenantClonerService, transactionTemplate);
   }
 
   @Test
@@ -58,6 +55,5 @@ class TenantSeederPropertyRegistryTest {
     // The tenant row lives on the seeder's own transaction, so the copies are written there too.
     verify(tenantClonerService).cloneRolesInCallerTransaction(templateTenantId, tenantId);
     verify(tenantClonerService).cloneReferenceDataInCallerTransaction(tenantId);
-    verify(demoTransactionSeeder).seedIfEnabledFor(tenantId);
   }
 }

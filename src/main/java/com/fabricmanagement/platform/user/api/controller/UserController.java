@@ -2,7 +2,6 @@ package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
-import com.fabricmanagement.common.infrastructure.security.PlatformAuthority;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
@@ -291,10 +290,9 @@ public class UserController {
     user.setSuperAdmin(permResult.isSuperAdmin());
 
     CurrentUserResponse response = CurrentUserResponse.from(user, tenantService.getMyTenant());
-    // Platform staff are not bound by a tenant's packages; everyone else is, administrators too.
-    if (!PlatformAuthority.isPlatformAdmin(user.getRoleCode(), tenantId)) {
-      response.setClosedResources(List.copyOf(packageAccess.closedResources(tenantId)));
-    }
+    // Everyone is bound by the tenant's packages, administrators and platform staff too: in the
+    // platform tenant no package is enabled, so the business screens are closed (TD-10/TD-15).
+    response.setClosedResources(List.copyOf(packageAccess.closedResources(tenantId)));
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
