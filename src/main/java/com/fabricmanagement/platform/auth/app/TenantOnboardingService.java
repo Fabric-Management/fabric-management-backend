@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.web.exception.ContactAlreadyRegisteredException;
+import com.fabricmanagement.common.infrastructure.web.exception.SignupAlreadyPendingException;
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
 import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchestrator;
@@ -10,7 +12,6 @@ import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
-import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Tenant Onboarding Service — entry point for sales-led and self-service tenant creation.
  *
- * <p>Delegates to {@link TenantOnboardingOrchestrator} and uses only {@link OrganizationFacade} and
- * {@link UserFacade} for validation. All creation logic lives in ordered {@link
- * com.fabricmanagement.platform.auth.app.onboarding.OnboardingStep} implementations.
+ * <p>Delegates to {@link TenantOnboardingOrchestrator} and uses {@link OrganizationFacade}, {@link
+ * IdentityProvisioningService} and {@link TenantQueryPort} for validation. All creation logic lives
+ * in ordered {@link com.fabricmanagement.platform.auth.app.onboarding.OnboardingStep}
+ * implementations.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,7 +39,8 @@ public class TenantOnboardingService {
 
   private final TenantOnboardingOrchestrator orchestrator;
   private final OrganizationFacade organizationFacade;
-  private final UserFacade userFacade;
+  private final IdentityProvisioningService identityProvisioningService;
+  private final TenantQueryPort tenantQueryPort;
 
   /**
    * Create new tenant via sales-led process.
@@ -122,8 +125,14 @@ public class TenantOnboardingService {
     if (organizationFacade.existsByTaxId(taxId)) {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
-    if (userFacade.contactExists(contactValue)) {
+    if (identityProvisioningService.isEmailRegistered(contactValue)) {
       throw new ContactAlreadyRegisteredException("Contact value already registered");
+    }
+    // The admin's login identity exists only once the setup link is used; until then the address
+    // is held by the registration token of the signup that sent it.
+    if (tenantQueryPort.hasPendingRegistrationFor(contactValue)) {
+      throw new SignupAlreadyPendingException(
+          "A registration for this contact is already waiting to be completed");
     }
   }
 }

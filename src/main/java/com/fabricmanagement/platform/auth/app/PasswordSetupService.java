@@ -109,19 +109,18 @@ public class PasswordSetupService {
     UUID tokenTenantId =
         tenantQueryPort
             .findTenantIdByRegistrationToken(request.getToken())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid registration token"));
+            .orElseThrow(PasswordSetupService::invalidToken);
     TenantContext.setCurrentTenantId(tokenTenantId);
     tenantSessionBinder.bindToCurrentSession(tokenTenantId);
 
     RegistrationToken token =
         tokenRepository
             .findByToken(request.getToken())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid registration token"));
+            .orElseThrow(PasswordSetupService::invalidToken);
 
     if (!token.isValid()) {
       log.warn("Password setup rejected: tenantId={}, reason=AUTH_TOKEN_INVALID", tokenTenantId);
-      throw new PlatformDomainException(
-          "Registration token is invalid or expired", "AUTH_TOKEN_INVALID", 400);
+      throw invalidToken();
     }
 
     log.debug("Password setup tenant resolved: tenantId={}", tokenTenantId);
@@ -294,6 +293,16 @@ public class PasswordSetupService {
         .needsOnboarding(needsOnboarding)
         .onboardingPrefill(onboardingPrefill)
         .build();
+  }
+
+  /**
+   * One answer for a token that is unknown, expired or already used, so the page can tell the
+   * person to ask for a new link. An unknown token used to surface as a bare illegal-argument error
+   * that the client showed as a generic failure.
+   */
+  private static PlatformDomainException invalidToken() {
+    return new PlatformDomainException(
+        "Registration token is invalid or expired", "AUTH_TOKEN_INVALID", 400);
   }
 
   /**

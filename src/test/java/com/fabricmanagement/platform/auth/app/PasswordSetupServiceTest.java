@@ -193,6 +193,24 @@ class PasswordSetupServiceTest {
     }
   }
 
+  @Test
+  void anUnknownTokenIsAnInvalidTokenNotABareIllegalArgument() {
+    // A link from a database that no longer exists, or a mistyped one: no tenant owns the token.
+    String unknown = "1c08bc0a-1177-4c67-85ad-eae26b5939bb";
+    when(tenantQueryPort.findTenantIdByRegistrationToken(unknown)).thenReturn(Optional.empty());
+    var request =
+        PasswordSetupRequest.builder().token(unknown).password("Hawthorn!Secret27").build();
+
+    assertThatThrownBy(() -> service.setupPassword(request, "127.0.0.1"))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            failure -> assertThat(failure.getErrorCode()).isEqualTo("AUTH_TOKEN_INVALID"));
+
+    verify(tenantSessionBinder, never()).bindToCurrentSession(any());
+    verify(passwordEncoder, never()).encode(any());
+    verify(tokenRepository, never()).save(any());
+  }
+
   private PasswordSetupFixture arrangePasswordSetup(RegistrationTokenType tokenType) {
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

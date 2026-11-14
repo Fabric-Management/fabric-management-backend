@@ -247,6 +247,16 @@ public class IdentityProvisioningService {
     return true;
   }
 
+  /**
+   * Whether this e-mail address already belongs to a login identity. Identities are global, one per
+   * address across every tenant, so unlike a user-contact query this is not hidden by row-level
+   * security (TD-17).
+   */
+  @Transactional(readOnly = true)
+  public boolean isEmailRegistered(String email) {
+    return loginIdentityRepository.existsByEmail(normalizeEmailOrThrow(email));
+  }
+
   private String normalizeEmailOrThrow(String email) {
     if (email == null || email.isBlank()) {
       throw new PlatformDomainException("Email is required", "AUTH_EMAIL_REQUIRED", 400);

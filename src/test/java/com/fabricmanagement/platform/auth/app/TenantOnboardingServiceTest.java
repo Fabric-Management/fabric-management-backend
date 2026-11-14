@@ -1,9 +1,12 @@
 package com.fabricmanagement.platform.auth.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.web.exception.SignupAlreadyPendingException;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
 import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchestrator;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
@@ -12,7 +15,6 @@ import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
-import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -22,9 +24,12 @@ class TenantOnboardingServiceTest {
   private final TenantOnboardingOrchestrator orchestrator =
       Mockito.mock(TenantOnboardingOrchestrator.class);
   private final OrganizationFacade organizationFacade = Mockito.mock(OrganizationFacade.class);
-  private final UserFacade userFacade = Mockito.mock(UserFacade.class);
+  private final IdentityProvisioningService identityProvisioningService =
+      Mockito.mock(IdentityProvisioningService.class);
+  private final TenantQueryPort tenantQueryPort = Mockito.mock(TenantQueryPort.class);
   private final TenantOnboardingService service =
-      new TenantOnboardingService(orchestrator, organizationFacade, userFacade);
+      new TenantOnboardingService(
+          orchestrator, organizationFacade, identityProvisioningService, tenantQueryPort);
 
   @Test
   void shouldMarkPlaygroundSelfServiceTenantAsDemoMode() {
@@ -40,6 +45,17 @@ class TenantOnboardingServiceTest {
     assertThat(contextCaptor.getValue().isSalesLed()).isFalse();
     assertThat(contextCaptor.getValue().isDemoMode()).isTrue();
     assertThat(contextCaptor.getValue().getSignupIntent()).isEqualTo("PLAYGROUND");
+  }
+
+  @Test
+  void shouldRefuseASignupWhoseEmailIsWaitingForActivation() {
+    when(tenantQueryPort.hasPendingRegistrationFor("owner@example.com")).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> service.createSelfServiceTenant(selfSignupRequest(SignupIntent.PLAYGROUND)))
+        .isInstanceOf(SignupAlreadyPendingException.class);
+
+    verify(orchestrator, Mockito.never()).onboard(Mockito.any(OnboardingContext.class));
   }
 
   @Test

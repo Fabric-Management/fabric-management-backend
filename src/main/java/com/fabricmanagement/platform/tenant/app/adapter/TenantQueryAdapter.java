@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,11 @@ public class TenantQueryAdapter implements TenantQueryPort {
 
   private static final String SELECT_TENANT_ID_BY_REG_TOKEN =
       "SELECT tenant_id FROM common_auth.common_registration_token WHERE token = ?";
+
+  private static final String SELECT_PENDING_REGISTRATION =
+      "SELECT EXISTS (SELECT 1 FROM common_auth.common_registration_token"
+          + " WHERE lower(btrim(contact_value)) = ? AND is_used = false AND expires_at > now()"
+          + " AND deleted_at IS NULL)";
 
   private static final String SELECT_TENANT_ID_BY_REFRESH_TOKEN =
       "SELECT tenant_id FROM common_auth.common_refresh_token WHERE token = ?";
@@ -127,6 +133,19 @@ public class TenantQueryAdapter implements TenantQueryPort {
     TenantReference result =
         systemExecutor.executeQueryForObject(SELECT_BY_ID, TenantQueryAdapter::reference, tenantId);
     return Optional.ofNullable(result);
+  }
+
+  @Override
+  public boolean hasPendingRegistrationFor(String contactValue) {
+    if (contactValue == null || contactValue.isBlank()) {
+      return false;
+    }
+    Boolean pending =
+        systemExecutor.executeQueryForObject(
+            SELECT_PENDING_REGISTRATION,
+            (rs, i) -> rs.getBoolean(1),
+            contactValue.trim().toLowerCase(Locale.ROOT));
+    return Boolean.TRUE.equals(pending);
   }
 
   @Override

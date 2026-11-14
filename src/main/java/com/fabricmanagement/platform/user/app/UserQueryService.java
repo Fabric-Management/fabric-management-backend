@@ -228,7 +228,11 @@ public class UserQueryService {
     return userRepository.existsByTenantIdAndContactValue(tenantId, contactValue);
   }
 
-  /** Global contact exists (any tenant) — use only where cross-tenant check is required. */
+  /**
+   * Whether a user of the current tenant has this contact. Row-level security hides other tenants'
+   * rows, so despite the name this is NOT a cross-tenant check; to ask whether an e-mail address is
+   * registered anywhere, use {@code IdentityProvisioningService.isEmailRegistered} (TD-17).
+   */
   @Transactional(readOnly = true)
   public boolean contactExists(String contactValue) {
     return userRepository.existsByContactValue(contactValue);
