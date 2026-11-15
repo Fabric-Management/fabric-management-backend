@@ -1,10 +1,13 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.RoleScope;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.MemberAdministrationAccess;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoleService {
 
   private final RoleRepository roleRepository;
+  private final PermissionCacheInvalidation permissionCache;
+  private final MemberAdministrationAccess access;
+  private final UserRepository users;
 
   /**
    * Returns all active roles for the current tenant that a tenant may see and assign. The platform
@@ -77,7 +83,8 @@ public class RoleService {
       return internalRoles.getFirst();
     }
     throw new PlatformDomainException(
-        "Platform roles not initialized for tenant. Ensure role cloning completed during onboarding.",
+        "Platform roles not initialized for tenant. Ensure role cloning completed during"
+            + " onboarding.",
         "PLATFORM_ROLES_NOT_INITIALIZED",
         500);
   }
@@ -85,6 +92,8 @@ public class RoleService {
   @Transactional
   public Role create(String roleName, String roleCode, String description) {
     UUID tenantId = TenantContext.requireTenantId();
+    var actor = access.requireManage();
+    access.requireRoleCreation(actor, roleCode);
     // The platform staff code is reserved: it already exists, as Longward's role.
     if (Role.isPlatformRoleCode(roleCode)
         || roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
@@ -95,7 +104,9 @@ public class RoleService {
           new Object[] {roleCode});
     }
     Role role = Role.create(roleName, roleCode, description);
-    return roleRepository.save(role);
+    Role saved = roleRepository.save(role);
+    permissionCache.evictRolesAfterCommit(tenantId);
+    return saved;
   }
 
   @Transactional
@@ -107,9 +118,12 @@ public class RoleService {
             .filter(found -> !found.isPlatformScope())
             .orElseThrow(
                 () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
+    access.requireManage();
     role.setRoleName(roleName);
     role.setDescription(description);
-    return roleRepository.save(role);
+    Role saved = roleRepository.save(role);
+    permissionCache.evictRolesAfterCommit(tenantId);
+    return saved;
   }
 
   @Transactional
@@ -121,7 +135,16 @@ public class RoleService {
             .filter(found -> !found.isPlatformScope())
             .orElseThrow(
                 () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
+    access.requireManage();
+    if ("ADMIN".equalsIgnoreCase(role.getRoleCode())) {
+      throw new PlatformDomainException(
+          "The administrator role cannot be deactivated", "ROLE_ADMIN_PROTECTED", 409);
+    }
     role.delete();
     roleRepository.save(role);
+    for (UUID userId : users.findIdsByTenantIdAndRoleId(tenantId, roleId)) {
+      permissionCache.evictMemberAfterCommit(tenantId, userId);
+    }
+    permissionCache.evictRolesAfterCommit(tenantId);
   }
 }

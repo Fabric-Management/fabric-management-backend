@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserDeactivatedEvent;
@@ -45,6 +46,7 @@ public class UserService implements UserFacade {
   private final UserDepartmentRepository userDepartmentRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final DomainEventPublisher eventPublisher;
+  private final PermissionCacheInvalidation permissionCache;
 
   @Transactional
   public UserDto createInternalUser(CreateInternalUserRequest request) {
@@ -165,6 +167,7 @@ public class UserService implements UserFacade {
 
     user.delete();
     userRepository.save(user);
+    permissionCache.evictMemberAfterCommit(tenantId, userId);
 
     eventPublisher.publish(new UserDeactivatedEvent(tenantId, userId, reason));
 

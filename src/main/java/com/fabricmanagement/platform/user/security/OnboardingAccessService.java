@@ -85,24 +85,11 @@ public class OnboardingAccessService {
     } else if (user.isDemoSeed() || user.getUserType() != UserType.INTERNAL) {
       reason = "ONBOARDING_COMPANY_REQUIRES_REAL_MEMBER";
     } else {
-      var role = user.getRole();
-      String roleCode =
-          role != null && Boolean.TRUE.equals(role.getIsActive()) && role.getDeletedAt() == null
-              ? role.getRoleCode()
-              : null;
-      var departments =
-          user.getUserDepartments().stream()
-              .filter(assignment -> Boolean.TRUE.equals(assignment.getIsActive()))
-              .map(com.fabricmanagement.platform.user.domain.UserDepartment::getDepartment)
-              .filter(Objects::nonNull)
-              .filter(d -> Boolean.TRUE.equals(d.getIsActive()) && d.getDeletedAt() == null)
-              .map(com.fabricmanagement.platform.organization.domain.Department::getDepartmentCode)
-              .filter(Objects::nonNull)
-              .distinct()
-              .toList();
+      var identity = PermissionIdentityReader.fromActiveUser(user);
       DataScope scope =
           permissions
-              .evaluateFresh(user.getTenantId(), roleCode, departments, user.getId())
+              .evaluateFresh(
+                  user.getTenantId(), identity.roleCode(), identity.departmentCodes(), user.getId())
               .scopeOf("organization", "configure");
       if (scope == null || scope.compareTo(DataScope.ORGANIZATION) < 0) {
         reason = "ONBOARDING_COMPANY_PERMISSION_REQUIRED";

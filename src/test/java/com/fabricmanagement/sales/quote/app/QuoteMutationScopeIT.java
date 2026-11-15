@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.quote.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -88,7 +89,7 @@ class QuoteMutationScopeIT extends AbstractIntegrationTest {
                   ? Optional.of(new PermissionIdentity("WORKER", List.of("SALES")))
                   : Optional.empty();
             });
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation ->
                 actions.isEmpty()

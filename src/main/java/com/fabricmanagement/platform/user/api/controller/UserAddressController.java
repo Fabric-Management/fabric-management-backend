@@ -1,10 +1,13 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.user.api.facade.UserAddressFacade;
 import com.fabricmanagement.platform.user.dto.UserAddressDto;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -88,6 +91,18 @@ public class UserAddressController {
 
     return ResponseEntity.ok(
         ApiResponse.success(userAddress, "Address created and assigned successfully"));
+  }
+
+  @PutMapping("/{addressId}")
+  @Operation(
+      operationId = "updateUserAddress",
+      summary = "Update a postal address on this owner's card")
+  public ResponseEntity<ApiResponse<AddressDto>> updateAddress(
+      @PathVariable UUID userId,
+      @PathVariable UUID addressId,
+      @Valid @RequestBody UpdateAddressRequest request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(userAddressFacade.updateAddress(userId, addressId, request)));
   }
 
   @PutMapping("/{addressId}/primary")

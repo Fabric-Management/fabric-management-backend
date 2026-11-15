@@ -87,7 +87,7 @@ class ProvisionExistingIdentityStepTest {
     assertThat(authUser.getPrimaryMfaType()).isEqualTo(MfaType.TOTP);
     assertThat(authUser.getMfaSecret()).isEqualTo("secret");
     verify(contactService).verifyContact(contactId);
-    verify(userContactAssignmentService).assignContact(userId, contactId, true);
+    verify(userContactAssignmentService).assignContactForProvisioning(userId, contactId, true);
   }
 
   @Test

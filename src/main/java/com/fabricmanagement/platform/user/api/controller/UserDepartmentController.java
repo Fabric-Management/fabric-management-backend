@@ -1,6 +1,5 @@
 package com.fabricmanagement.platform.user.api.controller;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.api.facade.UserDepartmentFacade;
 import com.fabricmanagement.platform.user.dto.AssignDepartmentRequest;
@@ -64,8 +63,7 @@ public class UserDepartmentController {
         userDepartmentFacade.assignDepartment(
             userId,
             request.getDepartmentId(),
-            request.getIsPrimary() != null && request.getIsPrimary(),
-            TenantContext.getCurrentUserId());
+            request.getIsPrimary() != null && request.getIsPrimary());
 
     return ResponseEntity.ok(ApiResponse.success(assignment, "Department assigned successfully"));
   }

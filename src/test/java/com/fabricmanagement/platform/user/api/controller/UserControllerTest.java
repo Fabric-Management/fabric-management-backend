@@ -189,7 +189,6 @@ class UserControllerTest {
     PermissionResult permissions =
         new PermissionResult(Map.of("members", Map.of("read", DataScope.GLOBAL)), false);
     when(userService.findByIdWithPermissionData(TENANT_ID, USER_ID)).thenReturn(Optional.of(user));
-    when(permissionEvaluator.evaluate(TENANT_ID, "ADMIN", List.of("ADMIN"), USER_ID))
-        .thenReturn(permissions);
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, USER_ID, false)).thenReturn(permissions);
   }
 }

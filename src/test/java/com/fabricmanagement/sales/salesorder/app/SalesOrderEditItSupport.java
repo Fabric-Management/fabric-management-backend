@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
@@ -352,8 +353,8 @@ public abstract class SalesOrderEditItSupport {
   }
 
   private void stubPermissions() {
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
-        .thenAnswer(invocation -> permissions(invocation.getArgument(3)));
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
+        .thenAnswer(invocation -> permissions(invocation.getArgument(1)));
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any()))
         .thenAnswer(invocation -> permissions(invocation.getArgument(3)));
   }

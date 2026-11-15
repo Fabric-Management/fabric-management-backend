@@ -1,7 +1,9 @@
 package com.fabricmanagement.sales.common.app;
 
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.PermissionKey;
+import com.fabricmanagement.common.infrastructure.security.PlatformAuthority;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
@@ -37,9 +39,16 @@ public class WorkScopeResolver {
     PermissionResult permissions =
         fresh
             ? permissionEvaluator.evaluateFresh(
-                tenantId, identity.roleCode(), identity.departmentCodes(), userId)
-            : permissionEvaluator.evaluate(
-                tenantId, identity.roleCode(), identity.departmentCodes(), userId);
+                tenantId,
+                PlatformAuthority.effectiveRoleCode(
+                    identity.roleCode(),
+                    tenantId,
+                    AuthenticatedUserContext.restrictsPlatformRole(tenantId, userId),
+                    false),
+                identity.departmentCodes(),
+                userId)
+            : permissionEvaluator.evaluateMembership(
+                tenantId, userId, AuthenticatedUserContext.restrictsPlatformRole(tenantId, userId));
     return new WorkActor(
         userId,
         identity.departmentCodes().stream()

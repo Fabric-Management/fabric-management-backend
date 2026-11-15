@@ -56,10 +56,10 @@ class PermissionEvaluatorDepartmentCodeTest {
                     ? List.of()
                     : defaultValue(method.getReturnType()));
     PermissionEvaluator evaluator =
-        new PermissionEvaluator(templateRepository, overrideRepository, departmentRepository);
+        new PermissionEvaluator(templateRepository, overrideRepository, departmentRepository, null);
 
     PermissionResult result =
-        evaluator.evaluate(TENANT_ID, "WORKER", List.of(department.code()), USER_ID);
+        evaluator.evaluateFresh(TENANT_ID, "WORKER", List.of(department.code()), USER_ID);
 
     assertThat(result.can(resource, action)).isTrue();
     assertThat(result.scopeOf(resource, action)).isEqualTo(DataScope.OWN);

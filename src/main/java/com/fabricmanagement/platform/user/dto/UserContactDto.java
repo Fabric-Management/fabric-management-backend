@@ -18,4 +18,6 @@ public class UserContactDto {
   private UUID contactId;
   private ContactDto contact;
   private Boolean isDefault;
+  private String label;
+  private Boolean isPersonal;
 }

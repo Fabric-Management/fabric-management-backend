@@ -26,6 +26,11 @@ public interface UserDepartmentRepository extends JpaRepository<UserDepartment, 
 
   Optional<UserDepartment> findByUserIdAndIsPrimaryTrue(UUID userId);
 
+  Optional<UserDepartment> findByTenantIdAndUserIdAndDepartmentId(
+      UUID tenantId, UUID userId, UUID departmentId);
+
+  Optional<UserDepartment> findByTenantIdAndUserIdAndIsPrimaryTrue(UUID tenantId, UUID userId);
+
   @Query(
       "SELECT ud FROM UserDepartment ud "
           + "JOIN ud.user u "

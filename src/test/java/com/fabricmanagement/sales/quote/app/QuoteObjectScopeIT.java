@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.quote.app;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -199,10 +200,10 @@ class QuoteObjectScopeIT extends AbstractIntegrationTest {
               }
               return Optional.of(new PermissionIdentity("WORKER", departments.get(userId)));
             });
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation -> {
-              UUID userId = invocation.getArgument(3);
+              UUID userId = invocation.getArgument(1);
               DataScope scope = readScopes.get(userId);
               return scope == null
                   ? new PermissionResult(Map.of(), false)

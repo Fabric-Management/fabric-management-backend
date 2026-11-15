@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 /**
  * Atomic edit request for an organization–contact pair.
  *
- * <p>Combines contact entity field updates (value, type, label) with assignment field updates
- * (isDefault, department) into a single transactional operation.
+ * <p>Combines contact point updates (value, type) with owner-link updates (label, isPersonal,
+ * isDefault, department) into a single transactional operation.
  *
  * <p>All fields use patch semantics: {@code null} means "don't change".
  */

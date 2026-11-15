@@ -127,7 +127,7 @@ public class PlatformOperatorDevSeeder implements DataSeeder {
     // Created without a role: the ordinary user path refuses platform-scope roles. The role is
     // given here, by trusted provisioning code, and nowhere else.
     UserDto created =
-        userCreationService.createInternalUser(
+        userCreationService.createInternalUserForProvisioning(
             CreateInternalUserRequest.builder()
                 .firstName(operator.firstName())
                 .lastName(operator.lastName())

@@ -99,6 +99,70 @@ class ConstitutionArchTest {
   }
 
   @Test
+  void membershipProvisioningMethodsHaveExplicitCallers() {
+    String userApp = "com.fabricmanagement.platform.user.app.";
+    String bootstrap = "com.fabricmanagement.common.infrastructure.bootstrap.";
+    String authApp = "com.fabricmanagement.platform.auth.app.";
+    String orgApp = "com.fabricmanagement.platform.organization.app.";
+    String partnerApp = "com.fabricmanagement.platform.tradingpartner.app.";
+    var contactProvisioners =
+        Set.of(
+            userApp + "UserCreationService",
+            authApp + "AccountSetupService",
+            authApp + "UserInvitationEventListener",
+            authApp + "onboarding.ProvisionExistingIdentityStep",
+            partnerApp + "PartnerUserInvitationEventListener");
+    var callers =
+        Map.of(
+            userApp + "UserDepartmentService.assignDepartmentForProvisioning",
+            Set.of(userApp + "UserCreationService"),
+            userApp + "UserWorkLocationService.assignLocationForProvisioning",
+            Set.of(userApp + "UserCreationService"),
+            userApp + "UserCreationService.createInternalUserForProvisioning",
+            Set.of(
+                bootstrap + "PlatformOperatorDevSeeder",
+                bootstrap + "SalesQuoteDemoSeeder",
+                bootstrap + "UserSeeder"),
+            userApp + "UserCreationService.createExternalUserForProvisioning",
+            Set.of(
+                userApp + "UserCreationService",
+                bootstrap + "PartnerUserSeeder",
+                partnerApp + "PartnerUserService"),
+            userApp + "UserContactAssignmentService.assignContactForProvisioning",
+            contactProvisioners,
+            userApp + "UserContactAssignmentService.makeProvisionedContactDefault",
+            contactProvisioners,
+            userApp + "UserContactAssignmentService.assignContactFromMemberCreation",
+            Set.of(userApp + "UserCreationService"),
+            userApp + "UserAddressAssignmentService.assignAddressForProvisioning",
+            Set.of(
+                userApp + "UserCreationService",
+                userApp + "UserAddressAutoService",
+                userApp + "UserProfileService"),
+            orgApp + "OrganizationContactAssignmentService.ensureOnboardingContact",
+            Set.of(
+                orgApp + "CompanyOnboardingProfileService",
+                authApp + "onboarding.AssignContactAndAddressStep"),
+            orgApp + "OrganizationAddressAssignmentService.assignAddressForProvisioning",
+            Set.of(
+                bootstrap + "PartnerNetworkDemoSeeder",
+                orgApp + "CompanyOnboardingProfileService",
+                authApp + "onboarding.AssignContactAndAddressStep"));
+    var violations = new TreeSet<String>();
+    for (JavaClass source : allClasses) {
+      for (var call : source.getMethodCallsFromSelf()) {
+        String target = call.getTargetOwner().getName() + "." + call.getTarget().getName();
+        if (callers.containsKey(target) && !callers.get(target).contains(source.getName())) {
+          violations.add(call.getDescription());
+        }
+      }
+    }
+    assertThat(violations)
+        .as("Only listed callers may provision membership without a route actor")
+        .isEmpty();
+  }
+
+  @Test
   void frontendRouteLiteralsAreCentralizedInAppRoutes() throws Exception {
     List<Path> roots =
         List.of(
@@ -256,7 +320,8 @@ class ConstitutionArchTest {
               .should()
               .resideInAPackage("..api.dto..")
               .as(
-                  "Rule 2.3: DTOs must be in the module's root dto/ package, api/dto/ is forbidden.");
+                  "Rule 2.3: DTOs must be in the module's root dto/ package, api/dto/ is"
+                      + " forbidden.");
 
       rule.check(allClasses);
     }
@@ -302,7 +367,8 @@ class ConstitutionArchTest {
               .dependOnClassesThat()
               .haveFullyQualifiedName("com.fabricmanagement.finance.invoice.domain.Invoice")
               .as(
-                  "Rule 3.3: finance.payment must use InvoicePaymentPort — direct Invoice entity import is forbidden");
+                  "Rule 3.3: finance.payment must use InvoicePaymentPort — direct Invoice entity"
+                      + " import is forbidden");
 
       rule.check(allClasses);
     }
@@ -525,7 +591,8 @@ class ConstitutionArchTest {
               .should()
               .haveSimpleNameNotContaining("ColorPartnerCode")
               .as(
-                  "Rule 6.4: ColorPartnerCode is an aggregate child and must not expose its own repository");
+                  "Rule 6.4: ColorPartnerCode is an aggregate child and must not expose its own"
+                      + " repository");
 
       rule.check(allClasses);
     }
@@ -560,8 +627,8 @@ class ConstitutionArchTest {
               .should()
               .resideInAPackage("..infrastructure..")
               .as(
-                  "Rule 6.3: 'infrastructure' package name is strictly reserved for common/infrastructure/."
-                      + " Other modules must use 'infra'.");
+                  "Rule 6.3: 'infrastructure' package name is strictly reserved for"
+                      + " common/infrastructure/. Other modules must use 'infra'.");
 
       rule.check(allClasses);
     }
@@ -614,7 +681,8 @@ class ConstitutionArchTest {
 
     @Test
     @DisplayName(
-        "Rule 15.1: Durable-set listener classes must use @ApplicationModuleListener instead of @TransactionalEventListener(AFTER_COMMIT)")
+        "Rule 15.1: Durable-set listener classes must use @ApplicationModuleListener instead of"
+            + " @TransactionalEventListener(AFTER_COMMIT)")
     void durableSetMustUseDurableAnnotation() {
       // PERMANENT: notification.hub is best-effort due to external side effects (emails/SMS).
       // Applying durable pattern here would risk duplicate notifications on retries.
@@ -649,13 +717,15 @@ class ConstitutionArchTest {
                                   method,
                                   "Method "
                                       + method.getFullName()
-                                      + " uses AFTER_COMMIT (default). Use @ApplicationModuleListener instead."));
+                                      + " uses AFTER_COMMIT (default). Use"
+                                      + " @ApplicationModuleListener instead."));
                         }
                       }
                     }
                   })
               .as(
-                  "Rule 15.1: Durable event pattern mandates @ApplicationModuleListener over @TransactionalEventListener(AFTER_COMMIT) for cross-module integration");
+                  "Rule 15.1: Durable event pattern mandates @ApplicationModuleListener over"
+                      + " @TransactionalEventListener(AFTER_COMMIT) for cross-module integration");
 
       rule.check(allClasses);
     }
@@ -796,8 +866,8 @@ class ConstitutionArchTest {
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.human..")
               .as(
-                  "Rule 11.3: platform/user uses ports/adapters for employee data;"
-                      + " human imports are limited to Employee*Event listeners and cache invalidation");
+                  "Rule 11.3: platform/user uses ports/adapters for employee data; human imports"
+                      + " are limited to Employee*Event listeners and cache invalidation");
 
       rule.check(allClasses);
     }
@@ -813,8 +883,8 @@ class ConstitutionArchTest {
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.production..infra..")
               .as(
-                  "Rule 11.4: platform/ai must not access production infrastructure directly (repositories, entities);"
-                      + " it must use facades or AIToolRegistry.");
+                  "Rule 11.4: platform/ai must not access production infrastructure directly"
+                      + " (repositories, entities); it must use facades or AIToolRegistry.");
 
       rule.check(allClasses);
     }
@@ -1112,7 +1182,8 @@ class ConstitutionArchTest {
                   "com.fabricmanagement.production..app..",
                   "com.fabricmanagement.production..infra..")
               .as(
-                  "Rule 12.1: sales must use ProductionOrderPort — direct WorkOrderService/repository import forbidden");
+                  "Rule 12.1: sales must use ProductionOrderPort — direct"
+                      + " WorkOrderService/repository import forbidden");
 
       rule.check(allClasses);
     }
@@ -1130,7 +1201,8 @@ class ConstitutionArchTest {
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.approval.app..")
               .as(
-                  "Rule 12.2: production must use ApprovalPort from common — direct ApprovalGuardService import forbidden (event listeners exempt)");
+                  "Rule 12.2: production must use ApprovalPort from common — direct"
+                      + " ApprovalGuardService import forbidden (event listeners exempt)");
 
       rule.check(allClasses);
     }
@@ -1146,7 +1218,8 @@ class ConstitutionArchTest {
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.platform.user.infra..")
               .as(
-                  "Rule 12.3: approval must use UserTrustLevelPort — direct UserRepository import forbidden");
+                  "Rule 12.3: approval must use UserTrustLevelPort — direct UserRepository import"
+                      + " forbidden");
 
       rule.check(allClasses);
     }
@@ -1196,6 +1269,9 @@ class ConstitutionArchTest {
       //   - NotificationQueueScanner     : Scheduled hub queue worker: due rows across tenants
       //   - OrganizationTaxIdLookup      : TD-17 signup duplicate check: does any tenant already
       // have this tax ID; read-only EXISTS on one column, returns only yes or no
+      //   - FiberRequestTenantLocator    : Platform fibre-request queue: which tenant each request
+      // belongs to and the queue order; reads only id and tenant_id, the request itself is read and
+      // decided in its own tenant
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -1262,6 +1338,12 @@ class ConstitutionArchTest {
               // company" can only be asked as the system role. One EXISTS on one column; it returns
               // yes or no and never a row.
               .doNotHaveSimpleName("OrganizationTaxIdLookup")
+              .and()
+              // The platform reviews every company's fibre requests from its own tenant. Only the
+              // id,
+              // the tenant and the queue order are read as the system role; each request is then
+              // read and decided in its own tenant under row-level security.
+              .doNotHaveSimpleName("FiberRequestTenantLocator")
               .and()
               // TASK-TEMPLATE-TENANCY-1: reads another tenant's keyed task templates (golden or the
               // playground source), read-only, filtered by tenant_id. Target writes stay on

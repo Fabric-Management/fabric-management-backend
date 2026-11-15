@@ -61,7 +61,7 @@ class PermissionCatalogueGrantResolutionTest {
     when(templates.findEffectiveTemplatesForDepartments(eq(TENANT), eq(role), any()))
         .thenReturn(applicable);
     when(overrides.findActiveOverrides(TENANT, USER)).thenReturn(List.of());
-    var result = evaluator.evaluate(TENANT, role, List.of(department), USER);
+    var result = evaluator.evaluateFresh(TENANT, role, List.of(department), USER);
     assertThat(result.isSuperAdmin()).isFalse();
     if ("DENIED".equals(expected)) {
       assertThat(result.can(resource, action)).isFalse();

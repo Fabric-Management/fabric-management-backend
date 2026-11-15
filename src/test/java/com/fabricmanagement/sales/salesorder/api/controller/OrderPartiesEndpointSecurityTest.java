@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.api.controller;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -125,7 +126,7 @@ class OrderPartiesEndpointSecurityTest {
                       DataScope.GLOBAL,
                       "approve",
                       DataScope.GLOBAL)))) {
-        when(evaluator.evaluate(any(), any(), any(), any()))
+        when(evaluator.evaluateMembership(any(), any(), anyBoolean()))
             .thenReturn(new PermissionResult(permissions, false));
         endpoints.forEach(
             endpoint ->
@@ -134,7 +135,7 @@ class OrderPartiesEndpointSecurityTest {
       }
       verifyNoInteractions(context.getBean(ApprovalAuthorityService.class));
 
-      when(evaluator.evaluate(any(), any(), any(), any()))
+      when(evaluator.evaluateMembership(any(), any(), anyBoolean()))
           .thenReturn(
               new PermissionResult(
                   Map.of("sales", Map.of("grant-approval-authority", DataScope.GLOBAL)), false));

@@ -1,10 +1,10 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.app.ProfileUpdateRequestService;
 import com.fabricmanagement.platform.user.app.UserService;
@@ -41,12 +41,10 @@ public class UserProfileController {
 
   private PermissionResult getPermissions(UUID requesterId) {
     UUID tenantId = TenantContext.requireTenantId();
-    UserDto requester =
-        userService
-            .findByIdWithPermissionData(tenantId, requesterId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
-    return permissionEvaluator.evaluate(
-        tenantId, requester.getRoleCode(), requester.getDepartmentCodes(), requesterId);
+    return permissionEvaluator.evaluateMembership(
+        tenantId,
+        requesterId,
+        AuthenticatedUserContext.restrictsPlatformRole(tenantId, requesterId));
   }
 
   /**

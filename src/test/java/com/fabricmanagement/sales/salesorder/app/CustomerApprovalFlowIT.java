@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -189,7 +190,7 @@ class CustomerApprovalFlowIT {
                     "verify-delivery",
                     DataScope.ORGANIZATION)),
             false);
-    when(permissionEvaluator.evaluate(any(), any(), any(), any())).thenReturn(salesTeam);
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean())).thenReturn(salesTeam);
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any())).thenReturn(salesTeam);
 
     String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -222,18 +223,21 @@ class CustomerApprovalFlowIT {
     customer.setOrganizationId(customerOrganizationId);
     partnerId = partners.saveAndFlush(customer).getId();
     janesAddress =
-        organizationContacts
-            .createAndAssignContact(
-                customerOrganization.getId(),
-                com.fabricmanagement.platform.communication.dto.CreateContactRequest.builder()
-                    .contactValue("jane@northern-garments.example")
-                    .contactType(ContactType.EMAIL)
-                    .label("Jane Smith")
-                    .isPersonal(false)
-                    .build(),
-                true,
-                "Buying")
-            .getContactId();
+        asSales(
+            () ->
+                organizationContacts
+                    .createAndAssignContact(
+                        customerOrganization.getId(),
+                        com.fabricmanagement.platform.communication.dto.CreateContactRequest
+                            .builder()
+                            .contactValue("jane@northern-garments.example")
+                            .contactType(ContactType.EMAIL)
+                            .label("Jane Smith")
+                            .isPersonal(false)
+                            .build(),
+                        true,
+                        "Buying")
+                    .getContactId());
     // Jane may approve orders for the customer (ADR-0014 D4).
     authorityId = grantJane();
     SalesOrder order =
@@ -886,6 +890,58 @@ class CustomerApprovalFlowIT {
   }
 
   /** An authorised user grants Jane the authority at the address her contact point reads now. */
+  @Test
+  void changingASharedContactEndsOnlyTheEditedCompanysApprovalAuthority() {
+    UUID otherPartnerId =
+        asSales(
+            () -> {
+              var otherOrg =
+                  organizations.save(
+                      Organization.create(
+                          "Aire Cloth Ltd", null, OrganizationType.EXTERNAL_PARTNER));
+              var registry = TradingPartnerRegistry.create(null, "Aire Cloth Ltd", "GBR");
+              registry.setUid("REG-" + UUID.randomUUID());
+              var otherCustomer =
+                  TradingPartner.create(
+                      registries.save(registry), PartnerType.CUSTOMER, "Aire Cloth Ltd");
+              otherCustomer.setOrganizationId(otherOrg.getId());
+              UUID savedPartnerId = partners.saveAndFlush(otherCustomer).getId();
+              organizationContacts.assignContact(
+                  otherOrg.getId(),
+                  com.fabricmanagement.platform.communication.dto.AssignContactRequest.builder()
+                      .contactId(janesAddress)
+                      .isDefault(true)
+                      .build());
+              return savedPartnerId;
+            });
+    UUID otherAuthority =
+        asSales(
+                () ->
+                    authorityService.grant(
+                        otherPartnerId,
+                        new GrantApprovalAuthorityRequest(
+                            "Jane Smith",
+                            janesAddress,
+                            "jane@northern-garments.example",
+                            ApprovalAuthorityBasis.WRITTEN_MANDATE,
+                            "Mandate letter from the managing director",
+                            LocalDate.now().minusDays(1),
+                            null),
+                        sales))
+            .id();
+
+    editJanesAddress("jane.smith@elsewhere.example");
+
+    assertThat(asSales(() -> authorityService.list(partnerId)))
+        .filteredOn(view -> view.id().equals(authorityId))
+        .singleElement()
+        .satisfies(view -> assertThat(view.revokedAt()).isNotNull());
+    assertThat(asSales(() -> authorityService.list(otherPartnerId)))
+        .filteredOn(view -> view.id().equals(otherAuthority))
+        .singleElement()
+        .satisfies(view -> assertThat(view.revokedAt()).isNull());
+  }
+
   private UUID grantJane() {
     return grantJane("jane@northern-garments.example");
   }

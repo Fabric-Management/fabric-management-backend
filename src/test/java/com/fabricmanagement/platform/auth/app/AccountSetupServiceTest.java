@@ -255,7 +255,7 @@ class AccountSetupServiceTest {
         .thenReturn(Optional.of(stale))
         .thenReturn(Optional.of(reloaded));
     when(contactService.findByValue(CONTACT)).thenReturn(Optional.empty());
-    when(contactService.createContact(any(), any(), any(), any(), any())).thenReturn(contact);
+    when(contactService.createContact(any(), any(), any())).thenReturn(contact);
     when(identityProvisioningService.isEmailRegistered(CONTACT)).thenReturn(false);
     when(passwordEncoder.encode(PASSWORD)).thenReturn("hash");
     when(identityProvisioningService.provisionFromVerifiedLink(CONTACT, "hash", tenantId, userId))
@@ -265,7 +265,7 @@ class AccountSetupServiceTest {
     LoginResponse response = service.finishSetup(target(false), PASSWORD, "127.0.0.1");
 
     verify(contactService).verifyContact(contactId);
-    verify(userContactAssignmentService).assignContact(userId, contactId, true);
+    verify(userContactAssignmentService).assignContactForProvisioning(userId, contactId, true);
     verify(entityManager).detach(stale);
     // The tokens are made for the reloaded user, the one that has the verified contact.
     verify(jwtService).generateAccessToken(reloaded);

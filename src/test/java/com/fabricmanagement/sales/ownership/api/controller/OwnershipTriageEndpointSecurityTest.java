@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.ownership.api.controller;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -127,7 +128,7 @@ class OwnershipTriageEndpointSecurityTest {
   }
 
   private void grant(PermissionEvaluator evaluator, String action) {
-    when(evaluator.evaluate(any(), any(), any(), any()))
+    when(evaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenReturn(
             new PermissionResult(Map.of("sales", Map.of(action, DataScope.ORGANIZATION)), false));
   }

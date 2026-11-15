@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tenant.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -10,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 public class TenantTransactionalPurgeService {
 
   private static final String TENANT_DEMOMODE_CACHE = "tenant-demomode";
+  private static final int MAX_PURGE_ATTEMPTS = 3;
   private static final String TENANT_EMAIL_SANDBOX_CACHE = "tenant-emailsandbox";
   private static final String QUALITY_DECISION_PURGE_SETTING = "app.quality_decision_purge_tenant";
   private static final String COMMERCIAL_ASSIGNMENT_PURGE_SETTING =
@@ -315,7 +318,8 @@ public class TenantTransactionalPurgeService {
     Instant trialEndsAt = now.plus(baseDays, ChronoUnit.DAYS);
 
     Map<String, Integer> deletedRows =
-        systemExecutor.executeInTransaction(
+        executePurgeWithDeadlockRetry(
+            tenantId,
             jdbc -> {
               ensureTenantIsDemoMode(jdbc, tenantId);
               Map<String, Integer> rows = purgeDemoData(jdbc, tenantId);
@@ -323,6 +327,7 @@ public class TenantTransactionalPurgeService {
               return rows;
             });
 
+    evictPermissions();
     evictDemoModeCache(tenantId);
     log.info(
         "Tenant go-real purge completed: tenantId={}, trialEndsAt={}, deletedRows={}",
@@ -338,15 +343,41 @@ public class TenantTransactionalPurgeService {
     }
 
     Map<String, Integer> deletedRows =
-        systemExecutor.executeInTransaction(
+        executePurgeWithDeadlockRetry(
+            tenantId,
             jdbc -> {
               ensureTenantIsDemoMode(jdbc, tenantId);
               return purgeDemoData(jdbc, tenantId);
             });
 
+    evictPermissions();
     log.info(
         "Tenant demo data purge completed: tenantId={}, deletedRows={}", tenantId, deletedRows);
     return new PurgeDemoDataResult(tenantId, deletedRows);
+  }
+
+  private Map<String, Integer> executePurgeWithDeadlockRetry(
+      UUID tenantId, Function<JdbcTemplate, Map<String, Integer>> purge) {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return systemExecutor.executeInTransaction(purge);
+      } catch (RuntimeException failure) {
+        if (attempt == MAX_PURGE_ATTEMPTS || !isDeadlock(failure)) {
+          throw failure;
+        }
+        log.warn(
+            "Demo purge deadlocked: tenantId={}, failedAttempt={}. Retrying.", tenantId, attempt);
+      }
+    }
+  }
+
+  private static boolean isDeadlock(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SQLException sql && "40P01".equals(sql.getSQLState())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private Map<String, Integer> purgeDemoData(JdbcTemplate jdbc, UUID tenantId) {
@@ -840,6 +871,11 @@ public class TenantTransactionalPurgeService {
     int deleted = jdbc.update(sql, args);
     rows.put(label, deleted);
     log.debug("Tenant go-real purge table deleted: table={}, rows={}", label, deleted);
+  }
+
+  private void evictPermissions() {
+    var cache = cacheManager.getCache("permissions");
+    if (cache != null) cache.clear();
   }
 
   private void evictDemoModeCache(UUID tenantId) {

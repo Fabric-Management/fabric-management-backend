@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.PermissionIdentityReader;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class UserQueryService {
   private final EmployeeProjectionPort employeeProjectionPort;
   private final UserWorkLocationService userWorkLocationService;
   private final PermissionEvaluator permissionEvaluator;
+  private final PermissionIdentityReader permissionIdentities;
 
   @Transactional(readOnly = true)
   public Optional<UserDto> findById(UUID tenantId, UUID userId) {
@@ -149,9 +151,7 @@ public class UserQueryService {
 
   @Transactional(readOnly = true)
   public Optional<PermissionIdentity> findPermissionIdentity(UUID tenantId, UUID userId) {
-    return userRepository
-        .findByIdWithPermissionData(tenantId, userId)
-        .map(this::permissionIdentity);
+    return permissionIdentities.find(tenantId, userId);
   }
 
   /** Returns active tenant users whose freshly evaluated permissions contain the requested key. */
@@ -161,9 +161,10 @@ public class UserQueryService {
       return Set.of();
     }
     return userRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        .filter(user -> user.getDeletedAt() == null)
         .filter(
             user -> {
-              PermissionIdentity identity = permissionIdentity(user);
+              PermissionIdentity identity = PermissionIdentityReader.fromActiveUser(user);
               return permissionEvaluator
                   .evaluateFresh(
                       tenantId, identity.roleCode(), identity.departmentCodes(), user.getId())
@@ -185,20 +186,6 @@ public class UserQueryService {
     public PermissionIdentity {
       departmentCodes = List.copyOf(departmentCodes);
     }
-  }
-
-  private PermissionIdentity permissionIdentity(User user) {
-    return new PermissionIdentity(
-        user.getRole() != null ? user.getRole().getRoleCode() : null,
-        user.getUserDepartments().stream()
-            .filter(assignment -> Boolean.TRUE.equals(assignment.getIsActive()))
-            .map(com.fabricmanagement.platform.user.domain.UserDepartment::getDepartment)
-            .filter(java.util.Objects::nonNull)
-            .filter(department -> Boolean.TRUE.equals(department.getIsActive()))
-            .map(department -> department.getDepartmentCode())
-            .filter(code -> code != null && !code.isBlank())
-            .distinct()
-            .toList());
   }
 
   /**

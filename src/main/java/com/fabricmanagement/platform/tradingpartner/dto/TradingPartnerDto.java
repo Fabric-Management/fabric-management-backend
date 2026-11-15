@@ -5,6 +5,7 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import com.fabricmanagement.platform.tradingpartner.security.PartnerContactDetailsAccess.Capability;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
@@ -62,6 +63,12 @@ public class TradingPartnerDto {
   private UUID organizationId;
   private String preferredCurrency;
   private boolean pendingAccountingReview;
+
+  @Schema(
+      description =
+          "The current actor's authority to edit partner addresses and contacts on the detail"
+              + " screen")
+  private Capability contactDetailsEdit;
 
   @Schema(nullable = true)
   private UUID acquiredById;

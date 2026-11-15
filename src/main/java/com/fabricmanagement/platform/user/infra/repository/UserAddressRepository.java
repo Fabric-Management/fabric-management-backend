@@ -14,6 +14,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserAddressRepository extends JpaRepository<UserAddress, UserAddressId> {
 
+  List<UserAddress> findByTenantIdAndAddressIdAndIsActiveTrue(UUID tenantId, UUID addressId);
+
   @Query(
       "SELECT ua FROM UserAddress ua "
           + "LEFT JOIN FETCH ua.address "

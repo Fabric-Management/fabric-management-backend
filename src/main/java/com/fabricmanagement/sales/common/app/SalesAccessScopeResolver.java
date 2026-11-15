@@ -1,6 +1,8 @@
 package com.fabricmanagement.sales.common.app;
 
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.PlatformAuthority;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity;
@@ -38,9 +40,16 @@ public class SalesAccessScopeResolver {
     PermissionResult permissions =
         freshness == PermissionFreshness.FRESH
             ? permissionEvaluator.evaluateFresh(
-                tenantId, targetUser.roleCode(), targetUser.departmentCodes(), userId)
-            : permissionEvaluator.evaluate(
-                tenantId, targetUser.roleCode(), targetUser.departmentCodes(), userId);
+                tenantId,
+                PlatformAuthority.effectiveRoleCode(
+                    targetUser.roleCode(),
+                    tenantId,
+                    AuthenticatedUserContext.restrictsPlatformRole(tenantId, userId),
+                    false),
+                targetUser.departmentCodes(),
+                userId)
+            : permissionEvaluator.evaluateMembership(
+                tenantId, userId, AuthenticatedUserContext.restrictsPlatformRole(tenantId, userId));
     DataScope scope = permissions.scopeOf(RESOURCE, action);
     if (scope == null) {
       return AccessScope.denied();

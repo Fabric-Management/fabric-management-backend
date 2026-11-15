@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.human.core.employee.domain.event.EmployeeTerminatedEvent;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import org.slf4j.Logger;
@@ -14,11 +15,15 @@ public class EmployeeTerminationEventListener {
   private static final Logger log = LoggerFactory.getLogger(EmployeeTerminationEventListener.class);
   private final UserRepository userRepository;
   private final IdempotentEventHandler idempotentHandler;
+  private final PermissionCacheInvalidation permissionCache;
 
   public EmployeeTerminationEventListener(
-      UserRepository userRepository, IdempotentEventHandler idempotentHandler) {
+      UserRepository userRepository,
+      IdempotentEventHandler idempotentHandler,
+      PermissionCacheInvalidation permissionCache) {
     this.userRepository = userRepository;
     this.idempotentHandler = idempotentHandler;
+    this.permissionCache = permissionCache;
   }
 
   @ApplicationModuleListener
@@ -38,6 +43,7 @@ public class EmployeeTerminationEventListener {
                         "Deactivating user account {} due to employee termination.", user.getUid());
                     user.delete(); // Soft delete sets isActive to false
                     userRepository.save(user);
+                    permissionCache.evictMemberAfterCommit(user.getTenantId(), user.getId());
                   });
         });
   }

@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -86,7 +87,7 @@ class OrderPlanningClaimConcurrencyIT extends AbstractIntegrationTest {
                     "write", DataScope.OWN,
                     "claim", DataScope.DEPARTMENT)),
             false);
-    when(permissionEvaluator.evaluate(any(), any(), any(), any())).thenReturn(planner);
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean())).thenReturn(planner);
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any())).thenReturn(planner);
 
     String suffix = UUID.randomUUID().toString().substring(0, 8);

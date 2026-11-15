@@ -115,7 +115,9 @@ class UserQueryServiceTest {
                 .build());
     when(userRepository.findByIdWithPermissionData(tenantId, userId)).thenReturn(Optional.of(user));
 
-    assertThat(service.findPermissionIdentity(tenantId, userId))
+    assertThat(
+            new com.fabricmanagement.platform.user.security.PermissionIdentityReader(userRepository)
+                .find(tenantId, userId))
         .hasValueSatisfying(
             identity -> assertThat(identity.departmentCodes()).containsExactly("QUALITY-mixed"));
   }

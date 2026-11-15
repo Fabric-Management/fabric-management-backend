@@ -327,7 +327,8 @@ class PermissionTemplateBackfillIT {
         RETIREMENT_TENANT,
         () ->
             permissionEvaluator
-                .evaluate(RETIREMENT_TENANT, RETIREMENT_ROLE, List.of(RETIREMENT_DEPARTMENT), user)
+                .evaluateFresh(
+                    RETIREMENT_TENANT, RETIREMENT_ROLE, List.of(RETIREMENT_DEPARTMENT), user)
                 .can(resource, action));
   }
 

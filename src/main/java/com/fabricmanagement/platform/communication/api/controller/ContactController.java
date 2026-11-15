@@ -5,11 +5,9 @@ import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.api.facade.ContactFacade;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.communication.dto.ContactDto;
-import com.fabricmanagement.platform.communication.dto.CreateContactRequest;
 import com.fabricmanagement.platform.communication.dto.WhatsAppCapabilityDto;
 import com.fabricmanagement.platform.communication.infra.client.WhatsAppClient;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.UUID;
@@ -27,14 +25,6 @@ public class ContactController {
 
   private final ContactFacade facade;
   private final WhatsAppClient whatsAppClient;
-
-  @PostMapping
-  public ResponseEntity<ApiResponse<ContactDto>> createContact(
-      @Valid @RequestBody CreateContactRequest request) {
-    log.info("Creating contact: type={}", request.getContactType());
-    return ResponseEntity.ok(
-        ApiResponse.success(facade.createContact(request), "Contact created successfully"));
-  }
 
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<ContactDto>> getContact(@PathVariable UUID id) {
@@ -60,20 +50,6 @@ public class ContactController {
     log.debug("Getting contacts by type: type={}", type);
     ContactType contactType = ContactType.valueOf(type.toUpperCase());
     return ResponseEntity.ok(ApiResponse.success(facade.getContactsByType(contactType)));
-  }
-
-  @PutMapping("/{id}/verify")
-  public ResponseEntity<ApiResponse<ContactDto>> verifyContact(@PathVariable UUID id) {
-    log.info("Verifying contact: id={}", id);
-    return ResponseEntity.ok(
-        ApiResponse.success(facade.verifyContact(id), "Contact verified successfully"));
-  }
-
-  @DeleteMapping("/{id}")
-  public ResponseEntity<ApiResponse<Void>> deleteContact(@PathVariable UUID id) {
-    log.info("Deleting contact: id={}", id);
-    facade.deleteContact(id);
-    return ResponseEntity.ok(ApiResponse.success(null, "Contact deleted successfully"));
   }
 
   @GetMapping("/check-whatsapp")

@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -146,8 +147,8 @@ public abstract class SalesOrderLiveItSupport extends SalesOrderEditItSupport {
     defaults = Settings.of(liveProperties);
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any()))
         .thenAnswer(invocation -> permissionsOf(invocation.getArgument(3)));
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
-        .thenAnswer(invocation -> cachedPermissionsOf(invocation.getArgument(3)));
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
+        .thenAnswer(invocation -> cachedPermissionsOf(invocation.getArgument(1)));
   }
 
   @AfterEach

@@ -49,6 +49,13 @@ public class UserContact extends BaseJunctionEntity implements Assignable {
   @Builder.Default
   private Boolean isDefault = false;
 
+  @Column(name = "label", length = 100)
+  private String label;
+
+  @Column(name = "is_personal", nullable = false)
+  @Builder.Default
+  private Boolean isPersonal = true;
+
   @Override
   public UUID getParentId() {
     return userId;

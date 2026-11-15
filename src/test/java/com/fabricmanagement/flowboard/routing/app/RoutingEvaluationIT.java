@@ -83,18 +83,14 @@ class RoutingEvaluationIT extends RoutingIntegrationSupport {
     var task = task(user("Creator").getId());
     configure(member.getId());
     assertThat(
-            evaluator
-                .evaluate(tenant, member.getRole().getRoleCode(), List.of(), member.getId())
-                .scopeOf("sales", "write"))
+            evaluator.evaluateMembership(tenant, member.getId(), false).scopeOf("sales", "write"))
         .isEqualTo(DataScope.GLOBAL);
     jdbc.update(
         "UPDATE common_user.permission_template SET data_scope = 'OWN' WHERE tenant_id = ? AND role_code = ? AND resource = 'sales' AND action = 'write'",
         tenant,
         member.getRole().getRoleCode());
     assertThat(
-            evaluator
-                .evaluate(tenant, member.getRole().getRoleCode(), List.of(), member.getId())
-                .scopeOf("sales", "write"))
+            evaluator.evaluateMembership(tenant, member.getId(), false).scopeOf("sales", "write"))
         .isEqualTo(DataScope.GLOBAL);
     evaluate(task);
     assertThat(assignees(task)).isEmpty();

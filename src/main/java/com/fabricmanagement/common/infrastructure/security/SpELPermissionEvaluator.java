@@ -50,8 +50,8 @@ public class SpELPermissionEvaluator {
     }
 
     PermissionResult result =
-        permissionEvaluator.evaluate(
-            ctx.tenantId(), ctx.roleCode(), ctx.departmentCodes(), ctx.userId());
+        permissionEvaluator.evaluateMembership(
+            ctx.tenantId(), ctx.userId(), ctx.restrictsPlatformRole());
 
     return result.can(resource, action) && packageOpens(ctx, resource);
   }
@@ -72,8 +72,8 @@ public class SpELPermissionEvaluator {
     }
 
     PermissionResult result =
-        permissionEvaluator.evaluate(
-            ctx.tenantId(), ctx.roleCode(), ctx.departmentCodes(), ctx.userId());
+        permissionEvaluator.evaluateMembership(
+            ctx.tenantId(), ctx.userId(), ctx.restrictsPlatformRole());
 
     com.fabricmanagement.platform.user.domain.DataScope userScope =
         result.scopeOf(resource, action);

@@ -323,6 +323,33 @@ public class AddressService {
     return address;
   }
 
+  /** Copies an owner's postal content before applying edits to a shared address. */
+  @Transactional
+  public Address copyForUpdate(Address source, UpdateAddressRequest request) {
+    Address copy =
+        Address.builder()
+            .streetAddress(source.getStreetAddress())
+            .addressLine2(source.getAddressLine2())
+            .city(source.getCity())
+            .state(source.getState())
+            .district(source.getDistrict())
+            .postalCode(source.getPostalCode())
+            .country(source.getCountry())
+            .countryCode(source.getCountryCode())
+            .addressType(source.getAddressType())
+            .label(source.getLabel())
+            .contactPerson(source.getContactPerson())
+            .contactPhone(source.getContactPhone())
+            .contactEmail(source.getContactEmail())
+            .latitude(source.getLatitude())
+            .longitude(source.getLongitude())
+            .placeId(source.getPlaceId())
+            .formattedAddress(source.getFormattedAddress())
+            .build();
+    addressRepository.save(copy);
+    return updateAddress(copy.getId(), request);
+  }
+
   private void attachLookup(Address address, String placeId) {
     if (placeId == null || placeId.isBlank()) return;
     AddressValidationResponse found = googleMapsClient.validateByPlaceId(placeId.trim(), null);

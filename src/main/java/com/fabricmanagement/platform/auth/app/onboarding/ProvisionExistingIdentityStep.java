@@ -56,7 +56,8 @@ public class ProvisionExistingIdentityStep implements OnboardingStep {
         });
 
     log.info(
-        "ProvisionExistingIdentityStep: linked existing identity for tenantId={}, userId={}, email={}",
+        "ProvisionExistingIdentityStep: linked existing identity for tenantId={}, userId={},"
+            + " email={}",
         tenantId,
         userId,
         PiiMaskingUtil.maskEmail(email));
@@ -80,14 +81,14 @@ public class ProvisionExistingIdentityStep implements OnboardingStep {
     Contact contact =
         contactService
             .findByValue(email)
-            .orElseGet(() -> contactService.createContact(email, null, "Primary", true, null));
+            .orElseGet(() -> contactService.createContact(email, null, null));
 
     contactService.verifyContact(contact.getId());
 
     if (!userContactAssignmentService.existsUserContact(userId, contact.getId())) {
-      userContactAssignmentService.assignContact(userId, contact.getId(), true);
+      userContactAssignmentService.assignContactForProvisioning(userId, contact.getId(), true);
     } else {
-      userContactAssignmentService.setAsDefault(userId, contact.getId());
+      userContactAssignmentService.makeProvisionedContactDefault(userId, contact.getId());
     }
   }
 }

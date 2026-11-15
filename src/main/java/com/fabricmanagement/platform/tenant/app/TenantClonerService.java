@@ -891,37 +891,43 @@ public class TenantClonerService {
               // 3.6 Contact
               Map<UUID, UUID> contactMap = new HashMap<>();
               jdbc.query(
-                  "SELECT id, contact_value, contact_type, is_verified, label, is_personal FROM common_communication.common_contact WHERE tenant_id = ?",
+                  "SELECT id, contact_value, contact_type, is_verified FROM"
+                      + " common_communication.common_contact WHERE tenant_id = ?",
                   rs -> {
                     UUID oldId = (UUID) rs.getObject("id");
                     UUID newId = UUID.randomUUID();
                     jdbc.update(
-                        "INSERT INTO common_communication.common_contact (id, tenant_id, uid, contact_value, contact_type, is_verified, label, is_personal, created_at, updated_at, version) "
-                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, now(), now(), 0)",
+                        "INSERT INTO common_communication.common_contact (id, tenant_id, uid,"
+                            + " contact_value, contact_type, is_verified, created_at, updated_at,"
+                            + " version) VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, now(),"
+                            + " now(), 0)",
                         newId,
                         newTenantId,
                         rs.getString("contact_value"),
                         rs.getString("contact_type"),
-                        rs.getBoolean("is_verified"),
-                        rs.getString("label"),
-                        rs.getBoolean("is_personal"));
+                        rs.getBoolean("is_verified"));
                     contactMap.put(oldId, newId);
                   },
                   templateTenantId);
 
               // 3.7 User Contact
               jdbc.query(
-                  "SELECT user_id, contact_id, is_default FROM common_user.common_user_contact WHERE tenant_id = ?",
+                  "SELECT user_id, contact_id, is_default, label, is_personal FROM"
+                      + " common_user.common_user_contact WHERE tenant_id = ?",
                   rs -> {
                     UUID oldUserId = (UUID) rs.getObject("user_id");
                     UUID oldContactId = (UUID) rs.getObject("contact_id");
                     jdbc.update(
-                        "INSERT INTO common_user.common_user_contact (tenant_id, user_id, contact_id, uid, is_default, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, gen_random_uuid()::varchar, ?, now(), now())",
+                        "INSERT INTO common_user.common_user_contact (tenant_id, user_id,"
+                            + " contact_id, uid, is_default, label, is_personal, created_at,"
+                            + " updated_at) VALUES (?, ?, ?, gen_random_uuid()::varchar, ?, ?, ?,"
+                            + " now(), now())",
                         newTenantId,
                         userMap.get(oldUserId),
                         contactMap.get(oldContactId),
-                        rs.getBoolean("is_default"));
+                        rs.getBoolean("is_default"),
+                        rs.getString("label"),
+                        rs.getBoolean("is_personal"));
                   },
                   templateTenantId);
 

@@ -8,6 +8,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantGroup;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantKind;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantSummary;
+import com.fabricmanagement.platform.auth.app.LoginEmailQueryService;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
@@ -33,6 +34,7 @@ class PlatformAdminServiceTenantKindTest {
           mock(UserRepository.class),
           mock(SubscriptionRepository.class),
           mock(EmployeeProjectionPort.class),
+          mock(LoginEmailQueryService.class),
           mock(PlatformTransactionManager.class));
 
   @Test

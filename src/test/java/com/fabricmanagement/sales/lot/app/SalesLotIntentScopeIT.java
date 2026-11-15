@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.lot.app;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -80,10 +81,10 @@ class SalesLotIntentScopeIT extends AbstractIntegrationTest {
                   ? Optional.of(new PermissionIdentity("WORKER", List.of("SALES")))
                   : Optional.empty();
             });
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation -> {
-              DataScope scope = readScopes.get((UUID) invocation.getArgument(3));
+              DataScope scope = readScopes.get((UUID) invocation.getArgument(1));
               return scope == null
                   ? new PermissionResult(Map.of(), false)
                   : new PermissionResult(Map.of("sales", Map.of("read", scope)), false);

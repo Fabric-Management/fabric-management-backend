@@ -104,7 +104,8 @@ class UserCreationServiceTest {
                       COMPANY_ID,
                       null,
                       null,
-                      null))
+                      null,
+                      true))
           .isInstanceOf(
               com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("already registered");
@@ -126,7 +127,8 @@ class UserCreationServiceTest {
                       COMPANY_ID,
                       null,
                       null,
-                      null))
+                      null,
+                      true))
           .isInstanceOf(
               com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("Organization not found");
@@ -146,8 +148,7 @@ class UserCreationServiceTest {
       contact.setId(CONTACT_ID);
       contact.setContactValue(CONTACT_VALUE);
       contact.setContactType(ContactType.EMAIL);
-      when(contactService.createContact(
-              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+      when(contactService.createContact(eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq(null)))
           .thenReturn(contact);
 
       User result =
@@ -159,11 +160,13 @@ class UserCreationServiceTest {
               COMPANY_ID,
               null,
               null,
-              null);
+              null,
+              true);
 
       verify(userRepository).save(any(User.class));
-      verify(contactService).createContact(CONTACT_VALUE, ContactType.EMAIL, "Primary", true, null);
-      verify(userContactAssignmentService).assignContact(eq(USER_ID), eq(CONTACT_ID), eq(true));
+      verify(contactService).createContact(CONTACT_VALUE, ContactType.EMAIL, null);
+      verify(userContactAssignmentService)
+          .assignContactForProvisioning(USER_ID, CONTACT_ID, true, "Primary", true);
       verify(userAddressAutoService)
           .copyOrganizationPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
       assertThat(result.getId()).isEqualTo(USER_ID);
@@ -197,12 +200,11 @@ class UserCreationServiceTest {
       contact.setId(CONTACT_ID);
       contact.setContactValue(CONTACT_VALUE);
       contact.setContactType(ContactType.EMAIL);
-      when(contactService.createContact(
-              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+      when(contactService.createContact(eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq(null)))
           .thenReturn(contact);
       when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
-      service.createInternalUser(request);
+      service.createInternalUserForProvisioning(request);
 
       ArgumentCaptor<UserCreatedEvent> eventCaptor =
           ArgumentCaptor.forClass(UserCreatedEvent.class);
@@ -231,12 +233,11 @@ class UserCreationServiceTest {
       contact.setId(CONTACT_ID);
       contact.setContactValue(CONTACT_VALUE);
       contact.setContactType(ContactType.EMAIL);
-      when(contactService.createContact(
-              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+      when(contactService.createContact(eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq(null)))
           .thenReturn(contact);
       when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
-      service.createInternalUser(request);
+      service.createInternalUserForProvisioning(request);
 
       ArgumentCaptor<UserCreatedEvent> eventCaptor =
           ArgumentCaptor.forClass(UserCreatedEvent.class);
@@ -273,8 +274,7 @@ class UserCreationServiceTest {
       contact.setId(CONTACT_ID);
       contact.setContactValue(CONTACT_VALUE);
       contact.setContactType(ContactType.EMAIL);
-      when(contactService.createContact(
-              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+      when(contactService.createContact(eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq(null)))
           .thenReturn(contact);
       when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentName(
               eq(TENANT_ID), eq(COMPANY_ID), eq("Administration Office")))
@@ -316,11 +316,10 @@ class UserCreationServiceTest {
       contact.setId(CONTACT_ID);
       contact.setContactValue(CONTACT_VALUE);
       contact.setContactType(ContactType.EMAIL);
-      when(contactService.createContact(
-              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+      when(contactService.createContact(eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq(null)))
           .thenReturn(contact);
 
-      UserDto result = service.createExternalUser(request);
+      UserDto result = service.createExternalUserForProvisioning(request);
 
       verify(userRepository).save(any(User.class));
       verify(userAddressAutoService)

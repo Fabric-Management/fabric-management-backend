@@ -73,7 +73,8 @@ public class UserAddressAutoService {
               "Work Address",
               sourceAddr.getAddressLine2());
 
-      userAddressAssignmentService.assignAddress(userId, userWorkAddress.getId(), true, true);
+      userAddressAssignmentService.assignAddressForProvisioning(
+          userId, userWorkAddress.getId(), true, true);
 
       log.info(
           "User work address copied from organization: userId={}, organizationId={}",

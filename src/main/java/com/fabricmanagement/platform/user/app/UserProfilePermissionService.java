@@ -1,16 +1,12 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
-import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.user.domain.DataScope;
-import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.value.ProfileCategory;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,24 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserProfilePermissionService {
 
   private final PermissionEvaluator permissionEvaluator;
-  private final UserRepository userRepository;
 
   private PermissionResult getPermissions(UUID requesterId) {
     UUID tenantId = TenantContext.requireTenantId();
-    User user =
-        userRepository
-            .findByTenantIdAndId(tenantId, requesterId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + requesterId));
-
-    String roleCode = user.getRole() != null ? user.getRole().getRoleCode() : null;
-    List<String> departmentCodes =
-        user.getUserDepartments().stream()
-            .filter(ud -> Boolean.TRUE.equals(ud.getIsActive()))
-            .map(ud -> ud.getDepartment() != null ? ud.getDepartment().getDepartmentCode() : null)
-            .filter(c -> c != null)
-            .collect(Collectors.toList());
-
-    return permissionEvaluator.evaluate(tenantId, roleCode, departmentCodes, requesterId);
+    return permissionEvaluator.evaluateMembership(
+        tenantId,
+        requesterId,
+        AuthenticatedUserContext.restrictsPlatformRole(tenantId, requesterId));
   }
 
   @Transactional(readOnly = true)

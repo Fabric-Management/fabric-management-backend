@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -121,7 +122,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
               tokenClaims.primaryDepartment(),
               tokenClaims.tenantId(),
               tokenClaims.isPlayground(),
-              tokenClaims.guestId());
+              tokenClaims.guestId(),
+              tokenClaims.demoImpersonation());
 
       UsernamePasswordAuthenticationToken authentication =
           new UsernamePasswordAuthenticationToken(userContext, null, authorities);
@@ -169,12 +171,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 new SimpleGrantedAuthority("PARTNER_USER"))
             : Stream.empty();
 
+    String code = roleCode == null ? null : roleCode.toUpperCase(Locale.ROOT);
     Stream<SimpleGrantedAuthority> roleAuthorities =
-        roleCode == null
+        code == null || code.startsWith("ROLE_")
             ? Stream.empty()
             : Stream.of(
-                new SimpleGrantedAuthority("ROLE_" + roleCode.toUpperCase()),
-                new SimpleGrantedAuthority(roleCode.toUpperCase()));
+                new SimpleGrantedAuthority("ROLE_" + code), new SimpleGrantedAuthority(code));
 
     return Stream.concat(partnerAuthorities, roleAuthorities).toList();
   }

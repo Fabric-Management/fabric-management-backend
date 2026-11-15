@@ -119,7 +119,7 @@ class SpELPermissionEvaluatorPackageGateTest {
         new AuthenticatedUserContext(
             UUID.randomUUID(), role, List.of(), null, tenantId, false, null);
     when(resolver.resolve(authentication)).thenReturn(Optional.of(context));
-    when(permissions.evaluate(tenantId, role, List.of(), context.userId())).thenReturn(result);
+    when(permissions.evaluateMembership(tenantId, context.userId(), false)).thenReturn(result);
   }
 
   private static MockHttpServletRequest bindRequest() {

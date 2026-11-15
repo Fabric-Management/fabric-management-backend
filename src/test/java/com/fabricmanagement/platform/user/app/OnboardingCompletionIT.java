@@ -189,10 +189,9 @@ class OnboardingCompletionIT extends AbstractIntegrationTest {
                 .addressType(AddressType.HEADQUARTERS)
                 .label("Mill office")
                 .build());
-    addressAssignments.assignAddress(root, existing.getId(), true, true);
-    Contact email =
-        contacts.createContact("OFFICE@HAWTHORN.EXAMPLE", ContactType.EMAIL, "Office", false, null);
-    contactAssignments.assignContact(root, email.getId(), true, null);
+    addressAssignments.assignAddressForProvisioning(root, existing.getId(), true, true);
+    Contact email = contacts.createContact("OFFICE@HAWTHORN.EXAMPLE", ContactType.EMAIL, null);
+    contactAssignments.ensureOnboardingContact(root, email.getId(), true);
     onboarding.completeOnboarding(actor, full());
     assertCompleteRows(1);
     assertThat(headquarters()).isEqualTo(existing.getId());
@@ -396,13 +395,13 @@ class OnboardingCompletionIT extends AbstractIntegrationTest {
                 .addressType(AddressType.HEADQUARTERS)
                 .label("Shared office")
                 .build());
-    addressAssignments.assignAddress(root, shared.getId(), true, true);
+    addressAssignments.assignAddressForProvisioning(root, shared.getId(), true, true);
     if (owner.equals("organisation")) {
       Organization branch =
           Organization.create("Hawthorn York Mill", "GB987654321", OrganizationType.WEAVER);
       branch.setParentOrganizationId(root);
       branch = organizations.saveAndFlush(branch);
-      addressAssignments.assignAddress(branch.getId(), shared.getId(), true, true);
+      addressAssignments.assignAddressForProvisioning(branch.getId(), shared.getId(), true, true);
     } else {
       personalAddresses.saveAndFlush(
           UserAddress.builder().userId(actor).addressId(shared.getId()).build());
@@ -470,10 +469,7 @@ class OnboardingCompletionIT extends AbstractIntegrationTest {
     UUID otherContact;
     try {
       otherContact =
-          contacts
-              .createContact(
-                  "office@hawthorn.example", ContactType.EMAIL, "Willow office", false, null)
-              .getId();
+          contacts.createContact("office@hawthorn.example", ContactType.EMAIL, null).getId();
     } finally {
       authenticate(tenant, actor);
     }

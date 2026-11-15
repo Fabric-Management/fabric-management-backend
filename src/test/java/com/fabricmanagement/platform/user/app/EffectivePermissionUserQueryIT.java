@@ -25,7 +25,6 @@ import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -75,8 +74,7 @@ class EffectivePermissionUserQueryIT extends AbstractIntegrationTest {
     User revokingOverride = user(tenantA, globalRole, "RevokeOverride", null);
     assertThat(
             permissionEvaluator
-                .evaluate(
-                    tenantA.id(), globalRole.getRoleCode(), List.of(), revokingOverride.getId())
+                .evaluateMembership(tenantA.id(), revokingOverride.getId(), false)
                 .can("sales", "write"))
         .isTrue();
     override(tenantA, revokingOverride, null);

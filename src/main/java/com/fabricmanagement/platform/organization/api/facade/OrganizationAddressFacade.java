@@ -2,13 +2,16 @@ package com.fabricmanagement.platform.organization.api.facade;
 
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.domain.Address;
+import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.organization.app.OrganizationAddressAssignmentService;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.platform.organization.dto.OrganizationAddressDto;
 import com.fabricmanagement.platform.organization.mapper.OrganizationAddressMapper;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,6 +25,7 @@ public class OrganizationAddressFacade {
 
   private final OrganizationAddressAssignmentService assignmentService;
   private final AddressService addressService;
+  private final OrganizationWriteAccess writeAccess;
   private final OrganizationAddressMapper mapper;
 
   @Transactional(readOnly = true)
@@ -66,6 +70,7 @@ public class OrganizationAddressFacade {
       CreateAddressRequest request,
       Boolean isPrimary,
       Boolean isHeadquarters) {
+    writeAccess.requireContactDetails(organizationId);
     Address address = addressService.createAddress(request);
     OrganizationAddress orgAddress =
         assignmentService.assignAddress(organizationId, address.getId(), isPrimary, isHeadquarters);
@@ -90,5 +95,11 @@ public class OrganizationAddressFacade {
   @Transactional
   public void safeRemoveAddress(UUID organizationId, UUID addressId) {
     assignmentService.safeRemoveAddress(organizationId, addressId);
+  }
+
+  @Transactional
+  public AddressDto updateAddress(
+      UUID organizationId, UUID addressId, UpdateAddressRequest request) {
+    return AddressDto.from(assignmentService.updateAddress(organizationId, addressId, request));
   }
 }

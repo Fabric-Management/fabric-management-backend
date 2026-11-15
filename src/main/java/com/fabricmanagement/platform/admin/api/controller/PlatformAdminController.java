@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.admin.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.admin.app.PlatformAdminService;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantSummary;
+import com.fabricmanagement.platform.admin.dto.PlatformTenantUser;
 import com.fabricmanagement.platform.admin.dto.TenantStatistics;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
@@ -83,14 +84,15 @@ public class PlatformAdminController {
    * <p><b>Tenant Context:</b> Automatically switches to target tenant context
    *
    * @param tenantId The tenant ID to query
-   * @return List of users in that tenant
+   * @return The tenant's active users, each with the e-mail they sign in with
    */
   @GetMapping("/tenants/{tenantId}/users")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<List<UserDto>>> getTenantUsers(@PathVariable UUID tenantId) {
+  public ResponseEntity<ApiResponse<List<PlatformTenantUser>>> getTenantUsers(
+      @PathVariable UUID tenantId) {
     log.info("Platform admin: Getting users for tenant: {}", tenantId);
 
-    List<UserDto> users = platformAdminService.getTenantUsers(tenantId);
+    List<PlatformTenantUser> users = platformAdminService.getTenantUsers(tenantId);
 
     return ResponseEntity.ok(
         ApiResponse.success(users, String.format("Found %d users in tenant", users.size())));

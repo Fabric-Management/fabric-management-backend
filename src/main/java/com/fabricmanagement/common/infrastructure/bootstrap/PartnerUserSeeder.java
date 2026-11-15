@@ -196,7 +196,7 @@ public class PartnerUserSeeder implements DataSeeder {
             .invitationEmailSuppressed(true)
             .build();
 
-    UserDto user = userCreationService.createExternalUser(req);
+    UserDto user = userCreationService.createExternalUserForProvisioning(req);
 
     // Override role (createExternalUser assigns EXTERNAL_USER by default)
     User entity =

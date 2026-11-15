@@ -114,9 +114,7 @@ class OnboardingAuthorisationIT extends AbstractIntegrationTest {
             .build();
     grant = overrides.saveAndFlush(grant);
     assertThat(
-            permissions
-                .evaluate(tenant, "WORKER", List.of(), actor)
-                .can("organization", "configure"))
+            permissions.evaluateMembership(tenant, actor, false).can("organization", "configure"))
         .isTrue();
 
     onboarding.completeOnboarding(

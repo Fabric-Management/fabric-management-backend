@@ -17,18 +17,25 @@ import com.fabricmanagement.product.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.product.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.product.fiber.dto.CreateFiberRequestRequest;
 import com.fabricmanagement.product.fiber.dto.FiberRequestDto;
+import com.fabricmanagement.product.fiber.infra.FiberRequestTenantLocator;
+import com.fabricmanagement.product.fiber.infra.FiberRequestTenantLocator.LocatedPage;
+import com.fabricmanagement.product.fiber.infra.FiberRequestTenantLocator.LocatedRequest;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.product.fiber.infra.repository.FiberRequestRepository;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +74,7 @@ public class FiberRequestService {
   private final DomainEventPublisher eventPublisher;
   private final TenantQueryPort tenantQueryPort;
   private final TenantSessionBinder tenantSessionBinder;
+  private final FiberRequestTenantLocator tenantLocator;
 
   /**
    * Submit a fiber request (tenant → platform). The open-request key is {@code (tenantId, isoCode,
@@ -135,24 +143,23 @@ public class FiberRequestService {
    */
   @Transactional
   public FiberRequestDto approve(UUID requestId, UUID reviewedBy) {
-    FiberRequest request =
-        fiberRequestRepository
-            .findByIdForUpdate(requestId)
-            .orElseThrow(
-                () ->
-                    new FiberDomainException(
-                        "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
+    return inTenant(
+        requestTenant(requestId),
+        reviewedBy,
+        () -> {
+          FiberRequest request = lockForDecision(requestId);
 
-    if (request.getStatus() != FiberRequestStatus.PENDING) {
-      throw new FiberDomainException(
-          "Only PENDING requests can be approved.",
-          "FIBER_REQUEST_INVALID_STATUS",
-          409,
-          new Object[] {request.getStatus()});
-    }
+          if (request.getStatus() != FiberRequestStatus.PENDING) {
+            throw new FiberDomainException(
+                "Only PENDING requests can be approved.",
+                "FIBER_REQUEST_INVALID_STATUS",
+                409,
+                new Object[] {request.getStatus()});
+          }
 
-    FiberSourceVariantService.SharedPureReference reference = resolvePublishedCode(request);
-    return approveInRequestTenant(request, reference, reviewedBy);
+          FiberSourceVariantService.SharedPureReference reference = resolvePublishedCode(request);
+          return applyApproval(request, reference, reviewedBy);
+        });
   }
 
   /**
@@ -165,13 +172,15 @@ public class FiberRequestService {
    */
   @Transactional
   public FiberRequestDto reject(UUID requestId, String reviewNote, UUID reviewedBy) {
-    FiberRequest request =
-        fiberRequestRepository
-            .findByIdForUpdate(requestId)
-            .orElseThrow(
-                () ->
-                    new FiberDomainException(
-                        "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
+    return inTenant(
+        requestTenant(requestId),
+        reviewedBy,
+        () -> rejectInRequestTenant(requestId, reviewNote, reviewedBy));
+  }
+
+  private FiberRequestDto rejectInRequestTenant(
+      UUID requestId, String reviewNote, UUID reviewedBy) {
+    FiberRequest request = lockForDecision(requestId);
 
     if (request.getStatus() != FiberRequestStatus.PENDING) {
       throw new FiberDomainException(
@@ -223,25 +232,46 @@ public class FiberRequestService {
   @Transactional(readOnly = true)
   public Page<FiberRequestDto> listForPlatform(
       Optional<FiberRequestStatus> statusFilter, Pageable pageable) {
-    Page<FiberRequest> page =
-        statusFilter
-            .map(s -> fiberRequestRepository.findByStatusOrderByCreatedAtDesc(s, pageable))
-            .orElseGet(() -> fiberRequestRepository.findAll(pageable));
-
-    if (page.isEmpty()) {
-      return page.map(e -> FiberRequestDto.from(e, null));
+    // Every company's requests: the queue order comes from the system role, each request is then
+    // read in its own tenant under row-level security.
+    LocatedPage located =
+        tenantLocator.page(statusFilter.orElse(null), pageable.getOffset(), pageable.getPageSize());
+    if (located.requests().isEmpty()) {
+      return new PageImpl<>(List.of(), pageable, located.total());
     }
 
-    Set<UUID> tenantIds =
-        page.getContent().stream().map(FiberRequest::getTenantId).collect(Collectors.toSet());
-    Map<UUID, String> tenantNames =
-        tenantQueryPort.findAllByIds(tenantIds).stream()
-            .collect(Collectors.toMap(TenantReference::id, TenantReference::name));
+    Map<UUID, List<UUID>> idsByTenant =
+        located.requests().stream()
+            .collect(
+                Collectors.groupingBy(
+                    LocatedRequest::tenantId,
+                    LinkedHashMap::new,
+                    Collectors.mapping(LocatedRequest::requestId, Collectors.toList())));
+    Map<UUID, TenantReference> tenants =
+        tenantQueryPort.findAllByIds(idsByTenant.keySet()).stream()
+            .collect(Collectors.toMap(TenantReference::id, tenant -> tenant));
 
-    return page.map(
-        e ->
-            FiberRequestDto.from(
-                e, tenantNames.getOrDefault(e.getTenantId(), e.getTenantId().toString())));
+    UUID actorId = TenantContext.capture().userId();
+    Map<UUID, FiberRequest> requests = new HashMap<>();
+    idsByTenant.forEach(
+        (tenantId, ids) -> {
+          TenantReference tenant = tenants.get(tenantId);
+          if (tenant == null) {
+            log.warn("Fiber requests {} belong to a missing tenant {}", ids, tenantId);
+            return;
+          }
+          inTenant(tenant, actorId, () -> fiberRequestRepository.findAllById(ids))
+              .forEach(request -> requests.put(request.getId(), request));
+        });
+
+    List<FiberRequestDto> content =
+        located.requests().stream()
+            .map(row -> requests.get(row.requestId()))
+            .filter(Objects::nonNull)
+            .map(
+                request -> FiberRequestDto.from(request, tenants.get(request.getTenantId()).name()))
+            .toList();
+    return new PageImpl<>(content, pageable, located.total());
   }
 
   /** Get fiber request by ID (tenant-scoped). */
@@ -253,66 +283,57 @@ public class FiberRequestService {
   /** Get fiber request by ID (platform — any tenant, includes tenantName). */
   @Transactional(readOnly = true)
   public Optional<FiberRequestDto> getById(UUID id) {
-    return fiberRequestRepository
-        .findById(id)
-        .map(
-            e -> {
-              String tenantName =
-                  tenantQueryPort
-                      .findById(e.getTenantId())
-                      .map(TenantReference::name)
-                      .orElse(e.getTenantId().toString());
-              return FiberRequestDto.from(e, tenantName);
-            });
+    UUID actorId = TenantContext.capture().userId();
+    return tenantLocator
+        .tenantOf(id)
+        .flatMap(tenantQueryPort::findById)
+        .flatMap(
+            tenant ->
+                inTenant(tenant, actorId, () -> fiberRequestRepository.findById(id))
+                    .map(request -> FiberRequestDto.from(request, tenant.name())));
   }
 
-  /** Runs all approval writes with Java and PostgreSQL bound to the requesting tenant. */
-  private FiberRequestDto approveInRequestTenant(
-      FiberRequest request,
-      FiberSourceVariantService.SharedPureReference reference,
-      UUID reviewedBy) {
-    TenantReference tenant =
-        tenantQueryPort
-            .findById(request.getTenantId())
+  /** The tenant a request belongs to; a request that does not exist is 404. */
+  private TenantReference requestTenant(UUID requestId) {
+    UUID tenantId =
+        tenantLocator
+            .tenantOf(requestId)
             .orElseThrow(
                 () ->
                     new FiberDomainException(
-                        "Request tenant not found: " + request.getTenantId(),
-                        "FIBER_REQUEST_TENANT_NOT_FOUND",
-                        404));
+                        "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
+    return tenantQueryPort
+        .findById(tenantId)
+        .orElseThrow(
+            () ->
+                new FiberDomainException(
+                    "Request tenant not found: " + tenantId,
+                    "FIBER_REQUEST_TENANT_NOT_FOUND",
+                    404));
+  }
+
+  /** Locks the request row, so one request has exactly one outcome. */
+  private FiberRequest lockForDecision(UUID requestId) {
+    return fiberRequestRepository
+        .findByIdForUpdate(requestId)
+        .orElseThrow(
+            () ->
+                new FiberDomainException(
+                    "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
+  }
+
+  /**
+   * Runs work with Java and PostgreSQL bound to the given tenant, inside the caller's transaction,
+   * then binds the caller's tenant back.
+   */
+  private <T> T inTenant(TenantReference tenant, UUID actorId, Supplier<T> work) {
     TenantContext.TenantSnapshot previous = TenantContext.capture();
     boolean completed = false;
-
     try {
       TenantContext.restore(
-          new TenantContext.TenantSnapshot(request.getTenantId(), tenant.uid(), reviewedBy, null));
-      tenantSessionBinder.bindToCurrentSession(request.getTenantId());
-
-      if (request.getMaterialSource() != null) {
-        sourceVariantService.createPrivateVariant(
-            request.getTenantId(), reference, request.getFiberName(), request.getMaterialSource());
-      } else {
-        log.info(
-            "Fiber request {} fulfilled by the shared canonical fibre for {}; no private row",
-            request.getId(),
-            reference.isoCode().getIsoCode());
-      }
-
-      request.setStatus(FiberRequestStatus.APPROVED);
-      request.setReviewedBy(reviewedBy);
-      request.setReviewNote(null);
-      FiberRequest saved = fiberRequestRepository.saveAndFlush(request);
-
-      eventPublisher.publish(
-          new FiberRequestApprovedEvent(
-              saved.getTenantId(),
-              saved.getId(),
-              saved.getRequestedBy(),
-              saved.getIsoCode(),
-              saved.getFiberName()));
-
-      log.info("Fiber request approved: id={}, isoCode={}", saved.getId(), saved.getIsoCode());
-      FiberRequestDto result = FiberRequestDto.from(saved);
+          new TenantContext.TenantSnapshot(tenant.id(), tenant.uid(), actorId, null));
+      tenantSessionBinder.bindToCurrentSession(tenant.id());
+      T result = work.get();
       completed = true;
       return result;
     } finally {
@@ -323,6 +344,38 @@ public class FiberRequestService {
         tenantSessionBinder.bindToCurrentSession(previous.tenantId());
       }
     }
+  }
+
+  /** The approval writes; runs bound to the requesting tenant (see {@link #approve}). */
+  private FiberRequestDto applyApproval(
+      FiberRequest request,
+      FiberSourceVariantService.SharedPureReference reference,
+      UUID reviewedBy) {
+    if (request.getMaterialSource() != null) {
+      sourceVariantService.createPrivateVariant(
+          request.getTenantId(), reference, request.getFiberName(), request.getMaterialSource());
+    } else {
+      log.info(
+          "Fiber request {} fulfilled by the shared canonical fibre for {}; no private row",
+          request.getId(),
+          reference.isoCode().getIsoCode());
+    }
+
+    request.setStatus(FiberRequestStatus.APPROVED);
+    request.setReviewedBy(reviewedBy);
+    request.setReviewNote(null);
+    FiberRequest saved = fiberRequestRepository.saveAndFlush(request);
+
+    eventPublisher.publish(
+        new FiberRequestApprovedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getRequestedBy(),
+            saved.getIsoCode(),
+            saved.getFiberName()));
+
+    log.info("Fiber request approved: id={}, isoCode={}", saved.getId(), saved.getIsoCode());
+    return FiberRequestDto.from(saved);
   }
 
   /**

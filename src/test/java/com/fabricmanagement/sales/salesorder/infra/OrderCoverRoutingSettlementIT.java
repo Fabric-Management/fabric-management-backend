@@ -11,7 +11,6 @@ import com.fabricmanagement.flowboard.routing.domain.RoutingPoolKey;
 import com.fabricmanagement.sales.salesorder.app.OrderCoverService;
 import com.fabricmanagement.sales.salesorder.dto.ConfirmProductionCoverPayload;
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ class OrderCoverRoutingSettlementIT extends OrderCoverIntegrationSupport {
         request(cover, refresh(cover), cover.lineIds(), UUID.randomUUID(), "Produce to order");
     assertThat(
             permissionEvaluator
-                .evaluate(tenant, actor.getRole().getRoleCode(), List.of(), actor.getId())
+                .evaluateMembership(tenant, actor.getId(), false)
                 .can(resource, "write"))
         .isTrue();
     jdbc.update(
@@ -47,7 +46,7 @@ class OrderCoverRoutingSettlementIT extends OrderCoverIntegrationSupport {
         resource);
     assertThat(
             permissionEvaluator
-                .evaluate(tenant, actor.getRole().getRoleCode(), List.of(), actor.getId())
+                .evaluateMembership(tenant, actor.getId(), false)
                 .can(resource, "write"))
         .isTrue();
     postTransition(cover, command)
@@ -81,14 +80,14 @@ class OrderCoverRoutingSettlementIT extends OrderCoverIntegrationSupport {
   }
 
   @Test
-  void deactivatedDirectAssigneeCannotSettle() throws Exception {
+  void deactivatedDirectAssigneeGetsNotFoundBeforeSettlement() throws Exception {
     var cover = governed(1);
     var command =
         request(cover, refresh(cover), cover.lineIds(), UUID.randomUUID(), "Produce to order");
     jdbc.update("update common_user.common_user set is_active=false where id=?", actor.getId());
     postTransition(cover, command)
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.reason.code").value("PERMISSION_DENIED"));
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     assertNoSettlement();
     assertThat(attempts(command.idempotencyKey())).isZero();
   }

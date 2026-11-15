@@ -197,11 +197,7 @@ public class PermissionManagementService {
             .orElseThrow(() -> new PlatformDomainException("User not found", "NOT_FOUND", 404));
 
     PermissionResult result =
-        permissionEvaluator.evaluate(
-            tenantId,
-            targetUser.getRoleCode(),
-            targetUser.getDepartmentCodes(),
-            targetUser.getId());
+        permissionEvaluator.evaluateMembership(tenantId, targetUser.getId(), false);
 
     return result.permissions().entrySet().stream()
         .collect(

@@ -28,10 +28,9 @@ public class UserDepartmentFacade {
   }
 
   @Transactional
-  public UserDepartmentDto assignDepartment(
-      UUID userId, UUID departmentId, Boolean isPrimary, UUID assignedBy) {
+  public UserDepartmentDto assignDepartment(UUID userId, UUID departmentId, Boolean isPrimary) {
     return userDepartmentMapper.toDto(
-        userDepartmentService.assignDepartment(userId, departmentId, isPrimary, assignedBy));
+        userDepartmentService.assignDepartment(userId, departmentId, isPrimary));
   }
 
   @Transactional

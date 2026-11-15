@@ -259,16 +259,16 @@ public class AccountSetupService {
                   .orElseGet(
                       () -> {
                         log.info("Creating contact for {}", PiiMaskingUtil.maskEmail(contactValue));
-                        return contactService.createContact(
-                            contactValue, null, "Primary", true, null);
+                        return contactService.createContact(contactValue, null, null);
                       });
 
           contactService.verifyContact(contact.getId());
 
           if (!userContactAssignmentService.existsUserContact(userId, contact.getId())) {
-            userContactAssignmentService.assignContact(userId, contact.getId(), true);
+            userContactAssignmentService.assignContactForProvisioning(
+                userId, contact.getId(), true);
           } else {
-            userContactAssignmentService.setAsDefault(userId, contact.getId());
+            userContactAssignmentService.makeProvisionedContactDefault(userId, contact.getId());
           }
 
           log.info("Recovered verified contact: userId={}, contactId={}", userId, contact.getId());

@@ -115,7 +115,7 @@ class PermissionEvaluatorFreshnessIT extends AbstractIntegrationTest {
   }
 
   private PermissionResult evaluateCached(User user) {
-    return evaluator.evaluate(tenantId, workerRole.getRoleCode(), List.of(), user.getId());
+    return evaluator.evaluateMembership(tenantId, user.getId(), false);
   }
 
   private PermissionResult evaluateFresh(User user) {
@@ -135,7 +135,8 @@ class PermissionEvaluatorFreshnessIT extends AbstractIntegrationTest {
 
   private void narrowDirectlyInDatabase(PermissionTemplate template) {
     jdbc.update(
-        "UPDATE common_user.permission_template SET data_scope = 'OWN' WHERE tenant_id = ? AND id = ?",
+        "UPDATE common_user.permission_template SET data_scope = 'OWN' WHERE tenant_id = ? AND id ="
+            + " ?",
         tenantId,
         template.getId());
   }

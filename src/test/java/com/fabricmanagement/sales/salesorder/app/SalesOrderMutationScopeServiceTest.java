@@ -87,7 +87,7 @@ class SalesOrderMutationScopeServiceTest {
     TenantContext.setCurrentUserId(SystemUser.ID);
     when(userQueryService.findPermissionIdentity(tenantId, targetUserId))
         .thenReturn(Optional.of(new PermissionIdentity("WORKER", List.of())));
-    when(permissionEvaluator.evaluate(tenantId, "WORKER", List.of(), targetUserId))
+    when(permissionEvaluator.evaluateMembership(tenantId, targetUserId, false))
         .thenReturn(new PermissionResult(Map.of("sales", Map.of("write", DataScope.OWN)), false));
 
     assertDeniedWithoutChangingOrder(mutation, targetUserId);

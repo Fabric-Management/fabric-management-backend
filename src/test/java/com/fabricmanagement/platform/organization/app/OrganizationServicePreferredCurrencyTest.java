@@ -13,6 +13,7 @@ import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import com.fabricmanagement.platform.user.security.OnboardingAccessService;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,7 @@ class OrganizationServicePreferredCurrencyTest {
 
   @Mock private OrganizationNamingService naming;
   @Mock private OnboardingAccessService onboardingAccess;
+  @Mock private OrganizationWriteAccess writeAccess;
 
   @InjectMocks private OrganizationService organizationService;
 

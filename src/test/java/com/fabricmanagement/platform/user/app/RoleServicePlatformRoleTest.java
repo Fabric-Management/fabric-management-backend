@@ -9,10 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.RoleScope;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.MemberAdministrationAccess;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,7 +32,12 @@ class RoleServicePlatformRoleTest {
   private static final UUID TENANT = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
   private final RoleRepository roleRepository = mock(RoleRepository.class);
-  private final RoleService service = new RoleService(roleRepository);
+  private final RoleService service =
+      new RoleService(
+          roleRepository,
+          mock(PermissionCacheInvalidation.class),
+          mock(MemberAdministrationAccess.class),
+          mock(UserRepository.class));
 
   @BeforeEach
   void bindTenant() {

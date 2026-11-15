@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.communication.dto.CreateContactRequest;
 import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.platform.user.dto.UserContactDto;
 import com.fabricmanagement.platform.user.mapper.UserContactMapper;
+import com.fabricmanagement.platform.user.security.UserContactDetailsAccess;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,20 +20,24 @@ public class UserContactFacade {
 
   private final UserContactAssignmentService userContactAssignmentService;
   private final ContactService contactService;
+  private final UserContactDetailsAccess access;
   private final UserContactMapper userContactMapper;
 
   @Transactional(readOnly = true)
   public List<UserContactDto> getUserContacts(UUID userId) {
+    access.requireRead(userId);
     return userContactMapper.toDtoList(userContactAssignmentService.getUserContacts(userId));
   }
 
   @Transactional(readOnly = true)
   public Optional<UserContactDto> getDefaultContact(UUID userId) {
+    access.requireRead(userId);
     return userContactAssignmentService.getDefaultContact(userId).map(userContactMapper::toDto);
   }
 
   @Transactional(readOnly = true)
   public Optional<UserContactDto> getAuthenticationContact(UUID userId) {
+    access.requireRead(userId);
     return userContactAssignmentService
         .getAuthenticationContact(userId)
         .map(userContactMapper::toDto);
@@ -47,14 +52,13 @@ public class UserContactFacade {
   @Transactional
   public UserContactDto createAndAssignContact(
       UUID userId, CreateContactRequest request, Boolean isDefault) {
+    access.requireWrite(userId);
     Contact contact =
         contactService.createContact(
-            request.getContactValue(),
-            request.getContactType(),
-            request.getLabel(),
-            request.getIsPersonal(),
-            request.getParentContactId());
-    return assignContact(userId, contact.getId(), isDefault);
+            request.getContactValue(), request.getContactType(), request.getParentContactId());
+    return userContactMapper.toDto(
+        userContactAssignmentService.assignContact(
+            userId, contact.getId(), isDefault, request.getLabel(), request.getIsPersonal()));
   }
 
   @Transactional

@@ -6,12 +6,14 @@ import com.fabricmanagement.platform.user.domain.PermissionOverride;
 import com.fabricmanagement.platform.user.domain.PermissionTemplate;
 import com.fabricmanagement.platform.user.infra.repository.PermissionOverrideRepository;
 import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRepository;
+import com.fabricmanagement.platform.user.security.PermissionIdentityReader;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,17 +26,30 @@ public class PermissionEvaluator {
   private final com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository
       departmentRepository;
 
-  /**
-   * Calculates the effective permissions for a user via logic precedence. 1. ADMIN/PLATFORM_ADMIN
-   * bypass 2. Per-Dept hierarchical retrieval with tenant overriding system default 3. Cross-Dept
-   * merging (escalating scope) 4. User-Specific overrides applied last
-   */
-  @org.springframework.cache.annotation.Cacheable(
+  private final PermissionIdentityReader permissionIdentities;
+
+  /** The cache contains only decisions made from persisted membership. */
+  @Cacheable(
       value = "permissions",
-      key = "#tenantId + '_' + #userId")
-  public PermissionResult evaluate(
-      UUID tenantId, String roleCode, List<String> departmentCodes, UUID userId) {
-    return evaluateFresh(tenantId, roleCode, departmentCodes, userId);
+      key = "#tenantId + '_' + #userId",
+      condition = "!#restrictPlatformRole",
+      sync = true)
+  public PermissionResult evaluateMembership(
+      UUID tenantId, UUID userId, boolean restrictPlatformRole) {
+    if (tenantId == null || userId == null) {
+      return new PermissionResult(Map.of(), false);
+    }
+    return permissionIdentities
+        .find(tenantId, userId)
+        .map(
+            identity ->
+                evaluateFresh(
+                    tenantId,
+                    PlatformAuthority.effectiveRoleCode(
+                        identity.roleCode(), tenantId, restrictPlatformRole, false),
+                    identity.departmentCodes(),
+                    userId))
+        .orElseGet(() -> new PermissionResult(Map.of(), false));
   }
 
   /** Calculates effective permissions directly from persistence, bypassing the permission cache. */
