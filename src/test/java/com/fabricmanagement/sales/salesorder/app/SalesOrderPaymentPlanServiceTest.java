@@ -9,6 +9,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint;
 import com.fabricmanagement.common.infrastructure.tenant.TenantBusinessCalendarPort;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.app.port.PaymentPlanChequeTermsPort;
 import com.fabricmanagement.sales.salesorder.domain.CustomerApproval;
 import com.fabricmanagement.sales.salesorder.domain.CustomerApprovalChannel;
 import com.fabricmanagement.sales.salesorder.domain.OrderFlowEvent;
@@ -65,6 +66,7 @@ class SalesOrderPaymentPlanServiceTest {
   @Mock OrderFlowEventRepository flowEvents;
   @Mock PaymentPlanSettlementGuard settlement;
   @Mock OrderPaymentPlanSettlementAckRepository acknowledgements;
+  @Mock PaymentPlanChequeTermsPort chequeTerms;
   final UUID tenant = UUID.randomUUID(), actor = UUID.randomUUID(), orderId = UUID.randomUUID();
   SalesOrderPaymentPlanService service;
   SalesOrder order;
@@ -90,7 +92,8 @@ class SalesOrderPaymentPlanServiceTest {
             validation.getValidator(),
             flowEvents,
             settlement,
-            acknowledgements);
+            acknowledgements,
+            chequeTerms);
     order =
         SalesOrder.builder().orderDate(LocalDate.of(2026, 10, 20)).orderNumber("SO-001").build();
     order.setId(orderId);

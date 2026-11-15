@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS sales_ord.order_payment_plan_currency (
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
   revision_id uuid NOT NULL, currency varchar(3) NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
   base_amount numeric(19,4) CHECK (base_amount >= 0), rules jsonb,
+  -- PAYMENT-PLAN-7 R3: agreed own share of the total paid by cheque; null = not agreed (never 100).
+  own_cheque_percent smallint
+    CONSTRAINT ck_payment_plan_own_cheque_percent CHECK (own_cheque_percent BETWEEN 0 AND 100),
   UNIQUE (tenant_id, id), UNIQUE (tenant_id, revision_id, currency),
   FOREIGN KEY (tenant_id, revision_id) REFERENCES sales_ord.order_payment_plan_revision(tenant_id, id)
 );

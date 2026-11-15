@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint;
 import com.fabricmanagement.common.infrastructure.tenant.TenantBusinessCalendarPort;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.app.port.PaymentPlanChequeTermsPort;
 import com.fabricmanagement.sales.salesorder.domain.CustomerApproval;
 import com.fabricmanagement.sales.salesorder.domain.CustomerApprovalStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderFlowStage;
@@ -69,6 +70,7 @@ public class SalesOrderPaymentPlanService {
   private final OrderFlowEventRepository flowEvents;
   private final PaymentPlanSettlementGuard settlement;
   private final OrderPaymentPlanSettlementAckRepository acknowledgements;
+  private final PaymentPlanChequeTermsPort chequeTerms;
 
   @Transactional(readOnly = true)
   public View read(UUID orderId, UUID actor) {
@@ -133,7 +135,10 @@ public class SalesOrderPaymentPlanService {
                 submitReason == null,
                 submitReason,
                 "CUSTOMER_APPROVAL",
-                true)));
+                true)),
+        chequeTerms.chequeSplitTracked(TenantContext.requireTenantId()),
+        chequeTerms.defaultOwnChequePercent(
+            TenantContext.requireTenantId(), order.getTradingPartnerId()));
   }
 
   @Transactional(readOnly = true)
@@ -183,7 +188,10 @@ public class SalesOrderPaymentPlanService {
         store.dto(draft),
         null,
         store.stale(order, draft),
-        List.of());
+        List.of(),
+        chequeTerms.chequeSplitTracked(TenantContext.requireTenantId()),
+        chequeTerms.defaultOwnChequePercent(
+            TenantContext.requireTenantId(), order.getTradingPartnerId()));
   }
 
   public Revision save(UUID orderId, Save request, UUID actor) {

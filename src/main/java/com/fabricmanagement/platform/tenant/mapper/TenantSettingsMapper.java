@@ -14,5 +14,6 @@ public interface TenantSettingsMapper {
 
   /** The stock-proposal group has its own endpoint; the service keeps the stored one. */
   @Mapping(target = "stockProposal", ignore = true)
+  @Mapping(target = "chequeSplitTracking", ignore = true)
   TenantSettings toEntity(UpdateTenantSettingsRequest request);
 }

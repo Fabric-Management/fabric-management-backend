@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.app.port.PaymentPlanChequeTermsPort;
 import com.fabricmanagement.sales.salesorder.domain.OrderCurrencyTotals;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -41,6 +42,7 @@ public class PaymentPlanStore {
   private final OrderPaymentPlanCurrencyRepository currencies;
   private final OrderPaymentPlanLineRepository lines;
   private final SalesOrderLineRepository orderLines;
+  private final PaymentPlanChequeTermsPort chequeTerms;
 
   public Optional<OrderPaymentPlan> plan(UUID orderId) {
     return plans.findByTenantIdAndSalesOrderId(TenantContext.requireTenantId(), orderId);
@@ -122,7 +124,8 @@ public class PaymentPlanStore {
                                                       row.chequePaymentDate(),
                                                       row.manual());
                                                 })
-                                            .toList()))
+                                            .toList(),
+                                        group.getOwnChequePercent()))
                             .toList(),
                         revision.getValidationIssues())));
   }
@@ -171,7 +174,11 @@ public class PaymentPlanStore {
     Map<String, java.math.BigDecimal> bases = new TreeMap<>();
     totals.totals().forEach(value -> bases.put(value.currency(), value.grandTotal()));
     return PaymentPlanGenerator.generate(
-        input, bases, totals.unpricedLineCount() > 0, order.getOrderDate());
+        input,
+        bases,
+        totals.unpricedLineCount() > 0,
+        order.getOrderDate(),
+        chequeTerms.chequeSplitTracked(TenantContext.requireTenantId()));
   }
 
   public String fingerprint(SalesOrder order) {

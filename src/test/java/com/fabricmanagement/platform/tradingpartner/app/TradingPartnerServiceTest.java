@@ -464,6 +464,35 @@ class TradingPartnerServiceTest {
 
       assertThat(result.getAcquiredById()).isNull();
     }
+
+    /** PAYMENT-PLAN-7 R2: the default is set when sent and left alone when omitted. */
+    @Test
+    void setsTheDefaultOwnChequeShareOnlyWhenSent() {
+      TradingPartner partner =
+          TradingPartner.builder()
+              .registry(TradingPartnerRegistry.builder().id(REGISTRY_ID).build())
+              .partnerType(PartnerType.CUSTOMER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      partner.setId(PARTNER_ID);
+      partner.setTenantId(TENANT_ID);
+      when(partnerRepository.findByTenantIdAndId(TENANT_ID, PARTNER_ID))
+          .thenReturn(Optional.of(partner));
+      when(partnerRepository.save(partner)).thenReturn(partner);
+
+      TradingPartnerDto set =
+          service.updatePartner(
+              PARTNER_ID,
+              UpdateTradingPartnerRequest.builder().defaultOwnChequePercent(40).build());
+      TradingPartnerDto untouched =
+          service.updatePartner(
+              PARTNER_ID, UpdateTradingPartnerRequest.builder().customName("Alias").build());
+
+      assertThat(set.getDefaultOwnChequePercent()).isEqualTo(40);
+      assertThat(untouched.getDefaultOwnChequePercent()).isEqualTo(40);
+      assertThatThrownBy(() -> partner.changeDefaultOwnChequePercent(101))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
   }
 
   @Nested

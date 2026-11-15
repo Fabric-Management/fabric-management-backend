@@ -70,7 +70,17 @@ public final class SalesOrderPaymentPlanDtos {
       @Schema(nullable = true) Revision draft,
       @Schema(nullable = true) Revision agreed,
       boolean stale,
-      List<Capability> capabilities) {}
+      List<Capability> capabilities,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "The tenant agrees the own / endorsed cheque share on plans")
+          boolean chequeSplitTracked,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              minimum = "0",
+              maximum = "100",
+              description = "The order customer's default own cheque share, 100 when never set")
+          int defaultOwnChequePercent) {}
 
   @Schema(name = "SalesOrderPaymentPlanConflict")
   public record Conflict(
@@ -81,7 +91,18 @@ public final class SalesOrderPaymentPlanDtos {
       List<String> validationIssues) {}
 
   @Schema(name = "SalesPaymentPlanPreviewDto")
-  public record PreviewResult(PaymentPlanContent content) {}
+  public record PreviewResult(
+      PaymentPlanContent content,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "The tenant agrees the own / endorsed cheque share on plans")
+          boolean chequeSplitTracked,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              minimum = "0",
+              maximum = "100",
+              description = "The selected customer's default own cheque share, 100 when never set")
+          int defaultOwnChequePercent) {}
 
   @Schema(name = "SalesPaymentPlanPreviewRequest")
   public record Preview(

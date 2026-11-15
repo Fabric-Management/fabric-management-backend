@@ -97,6 +97,7 @@ classified_relations AS (
                WHEN 'common_user.onboarding_journey' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'common_user.onboarding_operation' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_payment_plan' THEN 'MUTABLE_SYSTEM_PURGE'
+               WHEN 'common_company.trading_partner_cheque_drawer' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_payment_plan_revision' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_payment_plan_currency' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_payment_plan_line' THEN 'APPEND_ONLY_LEDGER'

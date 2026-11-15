@@ -7,6 +7,7 @@ import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Method;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.OrderTermUnit;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -31,13 +32,31 @@ public record PaymentPlanInput(
     currencyGroups = currencyGroups == null ? null : List.copyOf(currencyGroups);
   }
 
+  /**
+   * {@code ownChequePercent} is the agreed own share of the total paid by cheque in this currency
+   * (PAYMENT-PLAN-7). It is omitted from JSON when null so requests made without it keep their
+   * stored hash.
+   */
   @Schema(name = "SalesOrderPaymentPlanCurrencyInput")
   public record CurrencyInput(
       @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
       @Valid @Schema(nullable = true) Rules rules,
-      @Size(max = 121) List<@NotNull @Valid Row> rows) {
+      @Size(max = 121) List<@NotNull @Valid Row> rows,
+      @Min(0)
+          @Max(100)
+          @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Schema(
+              nullable = true,
+              minimum = "0",
+              maximum = "100",
+              description = "Own share of the total paid by cheque in this currency")
+          Integer ownChequePercent) {
     public CurrencyInput {
       rows = rows == null ? null : List.copyOf(rows);
+    }
+
+    public CurrencyInput(String currency, Rules rules, List<Row> rows) {
+      this(currency, rules, rows, null);
     }
   }
 

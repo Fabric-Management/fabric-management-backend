@@ -28,7 +28,11 @@ class FinanceLockOrderArchTest {
         .importPackages(packages);
   }
 
-  /** Finance code sales may know: the two collection ports and the vocabulary they speak. */
+  /**
+   * Finance code sales may know: the collection ports and the vocabulary they speak. None of them
+   * takes the finance lock on the caller's behalf; the cheque-drawer port (PAYMENT-PLAN-7) writes
+   * only the partner module's drawer list.
+   */
   private static DescribedPredicate<JavaClass> financeBeyondTheCollectionPorts() {
     return DescribedPredicate.describe(
         "finance types other than the collection ports and their vocabulary",

@@ -2,6 +2,8 @@ package com.fabricmanagement.platform.tradingpartner.dto;
 
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -48,4 +50,13 @@ public class UpdateTradingPartnerRequest {
    */
   @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> relationshipMeta;
+
+  /**
+   * Default own-cheque share for this customer's payment plans, 0–100. Null leaves it unchanged; an
+   * unset default is read as 100.
+   */
+  @Min(0)
+  @Max(100)
+  @Schema(nullable = true, minimum = "0", maximum = "100")
+  private Integer defaultOwnChequePercent;
 }

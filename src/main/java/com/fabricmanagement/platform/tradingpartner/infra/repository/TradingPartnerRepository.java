@@ -3,10 +3,12 @@ package com.fabricmanagement.platform.tradingpartner.infra.repository;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +18,15 @@ import org.springframework.data.repository.query.Param;
  * <p>All queries are tenant-scoped for data isolation.
  */
 public interface TradingPartnerRepository extends JpaRepository<TradingPartner, UUID> {
+
+  /**
+   * The partner row locked for update. Serialises changes to a partner's own lists (cheque drawers,
+   * PAYMENT-PLAN-7 R13) so a check-then-insert cannot race.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT p FROM TradingPartner p WHERE p.tenantId = :tenantId AND p.id = :id")
+  Optional<TradingPartner> lockByTenantIdAndId(
+      @Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   /** Find by tenant and ID. */
   Optional<TradingPartner> findByTenantIdAndId(

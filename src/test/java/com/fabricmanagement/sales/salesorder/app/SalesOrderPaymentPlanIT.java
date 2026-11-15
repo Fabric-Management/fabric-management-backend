@@ -356,4 +356,200 @@ class SalesOrderPaymentPlanIT extends AbstractIntegrationTest {
                     }))
         .isInstanceOf(org.springframework.dao.DataAccessException.class);
   }
+
+  // PAYMENT-PLAN-7 S1: the agreed own / endorsed cheque share.
+
+  void chequeSplitTracking(boolean on) {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "update common_tenant.common_tenant set settings ="
+                    + " coalesce(settings, '{}'::jsonb) || jsonb_build_object('chequeSplitTracking',"
+                    + " ?::boolean) where id = ?",
+                on,
+                tenant));
+  }
+
+  PaymentPlanInput cheques(Integer own, LocalDate first) {
+    var rules =
+        new PaymentPlanInput.Rules(
+            Frequency.MONTH,
+            2,
+            first,
+            null,
+            Method.CHEQUE,
+            null,
+            null,
+            null,
+            null,
+            com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.ChequeDateMode
+                .COMMON_DATE,
+            LocalDate.of(2027, 1, 31));
+    return new PaymentPlanInput(
+        List.of(new PaymentPlanInput.CurrencyInput("GBP", rules, null, own)));
+  }
+
+  Save next(PaymentPlanInput input, String reason) {
+    var view = in(tenant, () -> plans.read(orderId, actor));
+    return new Save(UUID.randomUUID(), view.orderVersion(), view.planVersion(), input, reason);
+  }
+
+  @Test
+  void anAgreedSplitIsStoredReadBackAndCarriedIntoLaterRevisions() {
+    chequeSplitTracking(true);
+    var first =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId,
+                    new Save(
+                        UUID.randomUUID(),
+                        0L,
+                        0L,
+                        cheques(60, LocalDate.of(2026, 10, 30)),
+                        "Initial schedule"),
+                    actor));
+    assertThat(first.content().validationIssues()).doesNotContain("GBP:CHEQUE_SPLIT_REQUIRED");
+    var view = in(tenant, () -> plans.read(orderId, actor));
+    assertThat(view.chequeSplitTracked()).isTrue();
+    assertThat(view.defaultOwnChequePercent()).isEqualTo(100);
+    assertThat(view.draft().content().currencyGroups().getFirst().ownChequePercent()).isEqualTo(60);
+
+    var dateOnly =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId,
+                    next(cheques(60, LocalDate.of(2026, 11, 2)), "Customer moved the first date"),
+                    actor));
+    assertThat(dateOnly.content().currencyGroups().getFirst().ownChequePercent()).isEqualTo(60);
+
+    var changed =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId, next(cheques(40, LocalDate.of(2026, 11, 2)), "New split"), actor));
+    assertThat(changed.revisionNo()).isGreaterThan(dateOnly.revisionNo());
+    assertThat(changed.content().currencyGroups().getFirst().ownChequePercent()).isEqualTo(40);
+    assertThat(
+            in(
+                tenant,
+                () ->
+                    jdbc.queryForList(
+                        "select c.own_cheque_percent from sales_ord.order_payment_plan_currency c"
+                            + " where c.tenant_id = ? order by c.created_at",
+                        Integer.class,
+                        tenant)))
+        .containsExactly(60, 60, 40);
+  }
+
+  @Test
+  void aTrackedChequePlanWithoutASplitIsIncompleteAndAnUntrackedOneIsNot() {
+    chequeSplitTracking(true);
+    var tracked =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId,
+                    new Save(
+                        UUID.randomUUID(),
+                        0L,
+                        0L,
+                        cheques(null, LocalDate.of(2026, 10, 30)),
+                        "Initial schedule"),
+                    actor));
+    assertThat(tracked.content().validationIssues()).contains("GBP:CHEQUE_SPLIT_REQUIRED");
+
+    chequeSplitTracking(false);
+    var untracked =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId,
+                    next(cheques(null, LocalDate.of(2026, 10, 30)), "Tracking off"),
+                    actor));
+    assertThat(untracked.content().validationIssues()).doesNotContain("GBP:CHEQUE_SPLIT_REQUIRED");
+    assertThat(untracked.content().currencyGroups().getFirst().ownChequePercent()).isNull();
+    assertThat(in(tenant, () -> plans.read(orderId, actor)).chequeSplitTracked()).isFalse();
+  }
+
+  @Test
+  void theViewResolvesTheOrderCustomersDefault() {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "update common_company.common_trading_partner set default_own_cheque_percent = 50"
+                    + " where id = ?",
+                partner));
+    in(tenant, () -> plans.save(orderId, first(UUID.randomUUID()), actor));
+    assertThat(in(tenant, () -> plans.read(orderId, actor)).defaultOwnChequePercent())
+        .isEqualTo(50);
+  }
+
+  @Test
+  void aSaveWithASplitReplaysAsTheSameRevision() {
+    chequeSplitTracking(true);
+    UUID operation = UUID.randomUUID();
+    var request = new Save(operation, 0L, 0L, cheques(60, LocalDate.of(2026, 10, 30)), "Initial");
+    var saved = in(tenant, () -> plans.save(orderId, request, actor));
+    var replay = in(tenant, () -> plans.save(orderId, request, actor));
+    assertThat(replay.id()).isEqualTo(saved.id());
+    var differentSplit =
+        new Save(operation, 0L, 0L, cheques(40, LocalDate.of(2026, 10, 30)), "Initial");
+    assertThatThrownBy(() -> in(tenant, () -> plans.save(orderId, differentSplit, actor)))
+        .hasMessageContaining("different content");
+  }
+
+  @Test
+  void manualChequeRowsWithoutRulesStoreAndShowTheSplit() {
+    var manual =
+        new PaymentPlanInput(
+            List.of(
+                new PaymentPlanInput.CurrencyInput(
+                    "GBP",
+                    null,
+                    List.of(
+                        new PaymentPlanInput.Row(
+                            null,
+                            Kind.INSTALMENT,
+                            new BigDecimal("100.00"),
+                            Method.CHEQUE,
+                            DateTrigger.EXPLICIT_DATE,
+                            LocalDate.of(2026, 11, 30),
+                            LocalDate.of(2026, 12, 31))),
+                    70)));
+    in(
+        tenant,
+        () -> plans.save(orderId, new Save(UUID.randomUUID(), 0L, 0L, manual, "Manual"), actor));
+    var group = in(tenant, () -> plans.read(orderId, actor)).draft().content().currencyGroups();
+    assertThat(group.getFirst().rules()).isNull();
+    assertThat(group.getFirst().ownChequePercent()).isEqualTo(70);
+  }
+
+  @Test
+  void aShareOutsideTheRangeIsRefusedBeforeAnythingIsStored() {
+    for (int own : new int[] {101, -1}) {
+      var request =
+          new Save(UUID.randomUUID(), 0L, 0L, cheques(own, LocalDate.of(2026, 10, 30)), "Bad");
+      assertThatThrownBy(() -> in(tenant, () -> plans.save(orderId, request, actor)))
+          .isInstanceOfSatisfying(
+              com.fabricmanagement.sales.common.exception.OrderDomainException.class,
+              failure -> assertThat(failure.getErrorCode()).isEqualTo("PAYMENT_PLAN_INVALID"));
+    }
+    assertThat(
+            in(
+                tenant,
+                () ->
+                    jdbc.queryForObject(
+                        "select count(*) from sales_ord.order_payment_plan_revision where"
+                            + " tenant_id=?",
+                        Integer.class,
+                        tenant)))
+        .isZero();
+  }
 }

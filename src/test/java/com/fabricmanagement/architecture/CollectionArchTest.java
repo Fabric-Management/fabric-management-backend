@@ -3,6 +3,7 @@ package com.fabricmanagement.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.*;
 
+import com.fabricmanagement.finance.collection.api.controller.CollectionChequeDrawerController;
 import com.fabricmanagement.finance.collection.api.controller.CollectionController;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderPaymentPlanAgreedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderPaymentPlanCancelledEvent;
@@ -96,5 +97,44 @@ class CollectionArchTest {
                       : reversals.contains(method.getName()) ? "reverse" : "write")
                   + "')");
     }
+  }
+
+  /** PAYMENT-PLAN-7 R15: whoever receives a cheque can complete its drawer. */
+  @Test
+  void chequeDrawerEndpointsUseThePermissionThatReceivesACheque() {
+    for (var method : CollectionChequeDrawerController.class.getDeclaredMethods()) {
+      if (!Modifier.isPublic(method.getModifiers())) continue;
+      assertThat(method.getAnnotation(PreAuthorize.class)).isNotNull();
+      assertThat(method.getAnnotation(PreAuthorize.class).value())
+          .isEqualTo("@auth.can(authentication, 'finance', 'write')");
+    }
+  }
+
+  /**
+   * PAYMENT-PLAN-7 R15: finance reaches the drawer list only through its own port's adapter, and
+   * never a trading-partner entity or repository. (Display-name resolution elsewhere is older and
+   * goes through the partner module's query services.)
+   */
+  @Test
+  void onlyTheDrawerAdapterReachesTheDrawerList() {
+    noClasses()
+        .that()
+        .resideInAPackage("..finance.collection..")
+        .and()
+        .resideOutsideOfPackage("..finance.collection.app.adapter..")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName(
+            "com.fabricmanagement.platform.tradingpartner.app.TradingPartnerChequeDrawerService")
+        .orShould()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "..platform.tradingpartner.domain..",
+            "..platform.tradingpartner.infra..",
+            "..platform.tradingpartner.dto..")
+        .check(
+            new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages(COLLECTION));
   }
 }

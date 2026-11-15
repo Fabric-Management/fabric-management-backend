@@ -10,7 +10,9 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "order_payment_plan_currency", schema = "sales_ord")
@@ -30,6 +32,11 @@ public class OrderPaymentPlanCurrency extends BaseEntity {
   @Column(columnDefinition = "jsonb", updatable = false)
   private PaymentPlanInput.Rules rules;
 
+  /** PAYMENT-PLAN-7 R4: frozen with the revision like every other commercial fact. */
+  @Column(updatable = false)
+  @JdbcTypeCode(SqlTypes.SMALLINT)
+  private Integer ownChequePercent;
+
   public static OrderPaymentPlanCurrency create(
       UUID revision, PaymentPlanContent.CurrencyGroup group) {
     var value = new OrderPaymentPlanCurrency();
@@ -37,6 +44,7 @@ public class OrderPaymentPlanCurrency extends BaseEntity {
     value.currency = group.currency();
     value.baseAmount = group.baseAmount();
     value.rules = group.rules();
+    value.ownChequePercent = group.ownChequePercent();
     return value;
   }
 

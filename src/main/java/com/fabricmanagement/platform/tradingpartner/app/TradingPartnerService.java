@@ -316,6 +316,10 @@ public class TradingPartnerService {
       partner.setRelationshipMeta(request.getRelationshipMeta());
     }
 
+    if (request.getDefaultOwnChequePercent() != null) {
+      partner.changeDefaultOwnChequePercent(request.getDefaultOwnChequePercent());
+    }
+
     if (!wasCustomer) {
       stampAcquirerIfCustomer(partner, acquiredById);
     }

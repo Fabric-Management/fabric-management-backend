@@ -10,7 +10,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Tenant-specific trading partner relationship.
@@ -182,6 +184,24 @@ public class TradingPartner extends BaseEntity {
   @Embedded @Builder.Default private Verification verification = Verification.predating();
 
   @Embedded private OfflineMetadata offlineMetadata;
+
+  /**
+   * Default own-cheque share (0–100) proposed for this customer's payment plans (PAYMENT-PLAN-7
+   * R2). Null means never set and is resolved as 100 by the reader; a plan's agreed term is never
+   * changed by a later edit of this default.
+   */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "default_own_cheque_percent")
+  @JdbcTypeCode(SqlTypes.SMALLINT)
+  private Integer defaultOwnChequePercent;
+
+  /** Sets the default own-cheque share; the database check enforces the same range. */
+  public void changeDefaultOwnChequePercent(int percent) {
+    if (percent < 0 || percent > 100) {
+      throw new IllegalArgumentException("Own cheque share must be between 0 and 100");
+    }
+    defaultOwnChequePercent = percent;
+  }
 
   @Override
   protected String getModuleCode() {

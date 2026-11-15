@@ -32,4 +32,9 @@ public record UpdateTenantSettingsRequest(
     @Size(max = 7) String primaryColor,
     boolean mfaRequired,
     @Min(15) @Max(10080) int sessionTimeoutMinutes,
-    String[] allowedIpRanges) {}
+    String[] allowedIpRanges,
+    @Schema(
+            description =
+                "Agree the own / endorsed cheque share on orders. Null keeps the stored value.",
+            nullable = true)
+        Boolean chequeSplitTracking) {}

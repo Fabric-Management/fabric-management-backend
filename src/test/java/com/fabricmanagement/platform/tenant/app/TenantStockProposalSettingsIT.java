@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.tenant.domain.StockProposalSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,5 +86,30 @@ class TenantStockProposalSettingsIT extends AbstractIntegrationTest {
     assertThat(afterBoth.getLocale()).isEqualTo("de-DE");
     assertThat(afterBoth.getStockProposal()).isEqualTo(group);
     assertThat(afterBoth.getStockProposal().fabricRollMinHealthyPieces()).isEqualTo(9);
+  }
+
+  /** PAYMENT-PLAN-7 R1: an omitted switch is kept by the update itself, a sent one is written. */
+  @Test
+  void theChequeSplitSwitchIsKeptWhenOmittedAndWrittenWhenSent() {
+    var results =
+        TenantContext.executeInTenantContext(
+            tenantId,
+            () -> {
+              TenantSettings on = TenantSettings.defaults();
+              on.setChequeSplitTracking(true);
+              tenantService.updateMySettings(on, false);
+              TenantSettings omitted = TenantSettings.defaults();
+              omitted.setTimezone("Europe/Dublin");
+              TenantSettings kept = tenantService.updateMySettings(omitted, true);
+              TenantSettings afterKeep = tenantService.getMySettings();
+              TenantSettings off = TenantSettings.defaults();
+              tenantService.updateMySettings(off, false);
+              return List.of(kept, afterKeep, tenantService.getMySettings());
+            });
+
+    assertThat(results.get(0).isChequeSplitTracking()).isTrue();
+    assertThat(results.get(1).isChequeSplitTracking()).isTrue();
+    assertThat(results.get(1).getTimezone()).isEqualTo("Europe/Dublin");
+    assertThat(results.get(2).isChequeSplitTracking()).isFalse();
   }
 }
