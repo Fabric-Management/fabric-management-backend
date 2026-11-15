@@ -24,11 +24,17 @@ import java.util.UUID;
 public final class PaymentPlanGenerator {
   private PaymentPlanGenerator() {}
 
+  /**
+   * @param chequeSplitTracked the tenant agrees the own / endorsed cheque share (PAYMENT-PLAN-7
+   *     R6). When on, a currency with a cheque row must carry it; the generator never fills a
+   *     default in.
+   */
   public static PaymentPlanContent generate(
       PaymentPlanInput input,
       Map<String, BigDecimal> bases,
       boolean unpriced,
-      LocalDate orderDate) {
+      LocalDate orderDate,
+      boolean chequeSplitTracked) {
     var issues = new ArrayList<String>();
     var groups = new ArrayList<CurrencyGroup>();
     var currencies = new HashSet<String>();
@@ -90,7 +96,15 @@ public final class PaymentPlanGenerator {
       }
       if (base != null && planned.compareTo(base) != 0)
         issues.add(group.currency() + ":TOTAL_MISMATCH");
-      groups.add(new CurrencyGroup(group.currency(), base, group.rules(), rows));
+      Integer own = group.ownChequePercent();
+      if (own != null && (own < 0 || own > 100))
+        throw invalid("Own cheque share must be between 0 and 100");
+      var result = new CurrencyGroup(group.currency(), base, group.rules(), rows, own);
+      if (own == null && chequeSplitTracked && result.hasChequeRow())
+        issues.add(group.currency() + ":CHEQUE_SPLIT_REQUIRED");
+      if (own != null && !result.hasChequeRow())
+        issues.add(group.currency() + ":CHEQUE_SPLIT_WITHOUT_CHEQUE");
+      groups.add(result);
     }
     for (String currency : bases.keySet())
       if (!currencies.contains(currency)) issues.add(currency + ":PLAN_REQUIRED");

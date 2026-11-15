@@ -76,6 +76,10 @@ public class TradingPartnerDto {
   @Schema(nullable = true)
   private Instant customerRelationshipEstablishedAt;
 
+  /** Default own-cheque share for payment plans, 0–100; null = never set (read as 100). */
+  @Schema(nullable = true, minimum = "0", maximum = "100")
+  private Integer defaultOwnChequePercent;
+
   // Audit
   private Instant createdAt;
   private Boolean isActive;
@@ -114,6 +118,7 @@ public class TradingPartnerDto {
         .pendingAccountingReview(tp.isPendingAccountingReview())
         .acquiredById(tp.getAcquiredById())
         .customerRelationshipEstablishedAt(tp.getCustomerRelationshipEstablishedAt())
+        .defaultOwnChequePercent(tp.getDefaultOwnChequePercent())
         .createdAt(tp.getCreatedAt())
         .isActive(tp.getIsActive())
         .legacyCompanyId(tp.getLegacyCompanyId())

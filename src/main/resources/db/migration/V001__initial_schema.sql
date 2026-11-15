@@ -1866,6 +1866,8 @@ CREATE TABLE IF NOT EXISTS common_company.common_trading_partner (
     verification_status VARCHAR(20) NOT NULL DEFAULT 'VERIFIED',
     verified_by UUID,
     verified_at TIMESTAMPTZ,
+    -- PAYMENT-PLAN-7 R2: default own-cheque share for this customer's plans; null = never set (100).
+    default_own_cheque_percent SMALLINT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1873,6 +1875,7 @@ CREATE TABLE IF NOT EXISTS common_company.common_trading_partner (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT ck_tp_default_own_cheque_percent CHECK (default_own_cheque_percent BETWEEN 0 AND 100),
     CONSTRAINT chk_tp_verification CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED')),
     CONSTRAINT fk_tp_tenant FOREIGN KEY (tenant_id) REFERENCES common_tenant.common_tenant(id) ON DELETE RESTRICT,
     CONSTRAINT fk_tp_registry FOREIGN KEY (registry_id) REFERENCES common_company.trading_partner_registry(id) ON DELETE RESTRICT,

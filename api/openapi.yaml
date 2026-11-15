@@ -97841,6 +97841,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SalesOrderPaymentPlanLine"
+        ownChequePercent:
+          type:
+          - integer
+          - "null"
+          format: int32
+          maximum: 100
+          minimum: 0
         rules:
           anyOf:
           - $ref: "#/components/schemas/SalesOrderPaymentPlanRules"
@@ -97852,6 +97859,14 @@ components:
           type: string
           minLength: 1
           pattern: "[A-Z]{3}"
+        ownChequePercent:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Own share of the total paid by cheque in this currency
+          maximum: 100
+          minimum: 0
         rows:
           type: array
           items:
@@ -97877,6 +97892,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SalesOrderPaymentPlanCapability"
+        chequeSplitTracked:
+          type: boolean
+          description: The tenant agrees the own / endorsed cheque share on plans
+        defaultOwnChequePercent:
+          type: integer
+          format: int32
+          description: "The order customer's default own cheque share, 100 when never\
+            \ set"
+          maximum: 100
+          minimum: 0
         draft:
           anyOf:
           - $ref: "#/components/schemas/SalesOrderPaymentPlanRevisionDto"
@@ -97897,6 +97922,9 @@ components:
           format: int64
         stale:
           type: boolean
+      required:
+      - chequeSplitTracked
+      - defaultOwnChequePercent
     SalesOrderPaymentPlanInput:
       type: object
       properties:
@@ -98153,8 +98181,21 @@ components:
     SalesPaymentPlanPreviewDto:
       type: object
       properties:
+        chequeSplitTracked:
+          type: boolean
+          description: The tenant agrees the own / endorsed cheque share on plans
         content:
           $ref: "#/components/schemas/SalesOrderPaymentPlanContent"
+        defaultOwnChequePercent:
+          type: integer
+          format: int32
+          description: "The selected customer's default own cheque share, 100 when\
+            \ never set"
+          maximum: 100
+          minimum: 0
+      required:
+      - chequeSplitTracked
+      - defaultOwnChequePercent
     SalesPaymentPlanPreviewRequest:
       type: object
       properties:
@@ -101024,6 +101065,8 @@ components:
             type: string
         betaFeaturesEnabled:
           type: boolean
+        chequeSplitTracking:
+          type: boolean
         costVarianceThreshold:
           type: number
         country:
@@ -101057,6 +101100,8 @@ components:
           items:
             type: string
         betaFeaturesEnabled:
+          type: boolean
+        chequeSplitTracking:
           type: boolean
         costVarianceThreshold:
           type: number
@@ -101230,6 +101275,13 @@ components:
           - string
           - "null"
           format: date-time
+        defaultOwnChequePercent:
+          type:
+          - integer
+          - "null"
+          format: int32
+          maximum: 100
+          minimum: 0
         displayName:
           type: string
         id:
@@ -102491,6 +102543,12 @@ components:
           type: boolean
           description: Enable beta features
           example: false
+        chequeSplitTracking:
+          type:
+          - boolean
+          - "null"
+          description: Agree the own / endorsed cheque share on orders. Null keeps
+            the stored value.
         costVarianceThreshold:
           type:
           - number
@@ -102566,6 +102624,13 @@ components:
           type: string
           maxLength: 255
           minLength: 0
+        defaultOwnChequePercent:
+          type:
+          - integer
+          - "null"
+          format: int32
+          maximum: 100
+          minimum: 0
         partnerType:
           type: string
           enum:

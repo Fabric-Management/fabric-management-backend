@@ -35,5 +35,17 @@ public class TradingPartnerQueryService {
                     Boolean.TRUE.equals(partner.getIsActive())));
   }
 
+  /**
+   * The customer's stored default own-cheque share (PAYMENT-PLAN-7 R2). Empty when it was never set
+   * or the partner is not this tenant's; the reader resolves both as 100.
+   */
+  public Optional<Integer> findDefaultOwnChequePercent(UUID tenantId, UUID partnerId) {
+    return tradingPartnerRepository
+        .findByTenantIdAndId(tenantId, partnerId)
+        .map(
+            com.fabricmanagement.platform.tradingpartner.domain.TradingPartner
+                ::getDefaultOwnChequePercent);
+  }
+
   public record PartnerClassification(PartnerType type, PartnerStatus status, boolean active) {}
 }

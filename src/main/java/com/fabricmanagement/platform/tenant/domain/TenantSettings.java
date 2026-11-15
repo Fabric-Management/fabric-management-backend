@@ -104,6 +104,17 @@ public class TenantSettings implements Serializable {
   private StockProposalSettings stockProposal;
 
   // ========================================
+  // PAYMENT TERMS
+  // ========================================
+
+  /**
+   * Agree the own / endorsed cheque share on payment plans that have a cheque row (PAYMENT-PLAN-7
+   * R1). Off by default; absent reads as off. Turning it off never hides, erases or blocks an
+   * existing agreed term.
+   */
+  @Builder.Default private boolean chequeSplitTracking = false;
+
+  // ========================================
   // SECURITY
   // ========================================
 

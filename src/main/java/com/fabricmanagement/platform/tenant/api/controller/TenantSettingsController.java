@@ -67,7 +67,10 @@ public class TenantSettingsController {
     log.info("Updating settings for current tenant");
 
     TenantSettings settings = tenantSettingsMapper.toEntity(request);
-    TenantSettings updated = tenantService.updateMySettings(settings);
+    // An older client that does not send the switch must not turn it off (PAYMENT-PLAN-7 R1).
+    boolean keepStoredSwitch = request.chequeSplitTracking() == null;
+    if (!keepStoredSwitch) settings.setChequeSplitTracking(request.chequeSplitTracking());
+    TenantSettings updated = tenantService.updateMySettings(settings, keepStoredSwitch);
     TenantSettingsDto dto = tenantSettingsMapper.toDto(updated);
 
     return ResponseEntity.ok(ApiResponse.success(dto, "Settings updated successfully"));

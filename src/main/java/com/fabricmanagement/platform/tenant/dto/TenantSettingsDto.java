@@ -9,6 +9,7 @@ public record TenantSettingsDto(
     String currency,
     String country,
     BigDecimal costVarianceThreshold,
+    boolean chequeSplitTracking,
     boolean betaFeaturesEnabled,
     boolean aiEnabled,
     boolean emailNotificationsEnabled,

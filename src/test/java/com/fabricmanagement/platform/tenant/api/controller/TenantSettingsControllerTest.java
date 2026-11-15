@@ -3,6 +3,9 @@ package com.fabricmanagement.platform.tenant.api.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
 import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.tenant.domain.StockProposalSettings;
+import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.dto.UpdateStockProposalSettingsRequest;
 import com.fabricmanagement.platform.tenant.dto.UpdateTenantSettingsRequest;
 import com.fabricmanagement.platform.tenant.mapper.TenantSettingsMapper;
@@ -35,7 +39,30 @@ class TenantSettingsControllerTest {
 
     assertThatThrownBy(() -> controller.updateSettings(generalRequest(), user))
         .isInstanceOf(AccessDeniedException.class);
-    verify(service, never()).updateMySettings(any());
+    verify(service, never()).updateMySettings(any(), anyBoolean());
+  }
+
+  /** PAYMENT-PLAN-7 R1: an older client that omits the switch must not turn it off. */
+  @Test
+  void anOmittedChequeSplitSwitch_asksTheServiceToKeepTheStoredValue() {
+    when(auth.can(user, "members", "manage")).thenReturn(true);
+    when(mapper.toEntity(any())).thenAnswer(call -> TenantSettings.defaults());
+    when(service.updateMySettings(any(), anyBoolean())).thenAnswer(call -> call.getArgument(0));
+
+    controller.updateSettings(generalRequest(null), user);
+
+    verify(service).updateMySettings(any(), eq(true));
+  }
+
+  @Test
+  void aSentChequeSplitSwitch_isApplied() {
+    when(auth.can(user, "members", "manage")).thenReturn(true);
+    when(mapper.toEntity(any())).thenAnswer(call -> TenantSettings.defaults());
+    when(service.updateMySettings(any(), anyBoolean())).thenAnswer(call -> call.getArgument(0));
+
+    controller.updateSettings(generalRequest(true), user);
+
+    verify(service).updateMySettings(argThat(TenantSettings::isChequeSplitTracking), eq(false));
   }
 
   @Test
@@ -69,6 +96,10 @@ class TenantSettingsControllerTest {
   }
 
   private static UpdateTenantSettingsRequest generalRequest() {
+    return generalRequest(null);
+  }
+
+  private static UpdateTenantSettingsRequest generalRequest(Boolean chequeSplitTracking) {
     return new UpdateTenantSettingsRequest(
         "Europe/London",
         "en-GB",
@@ -82,7 +113,8 @@ class TenantSettingsControllerTest {
         null,
         false,
         480,
-        null);
+        null,
+        chequeSplitTracking);
   }
 
   private static UpdateStockProposalSettingsRequest stockRequest() {

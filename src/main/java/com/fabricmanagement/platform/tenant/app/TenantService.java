@@ -90,6 +90,17 @@ public class TenantService {
    * @return Updated TenantSettings
    */
   public TenantSettings updateMySettings(TenantSettings settings) {
+    return updateMySettings(settings, false);
+  }
+
+  /**
+   * As {@link #updateMySettings(TenantSettings)}; with {@code keepStoredChequeSplitTracking} the
+   * stored cheque-split switch is kept in the same statement, so a client that does not send it
+   * never turns it off and a concurrent change is not lost (PAYMENT-PLAN-7 R1). The returned
+   * settings carry the value actually stored.
+   */
+  public TenantSettings updateMySettings(
+      TenantSettings settings, boolean keepStoredChequeSplitTracking) {
     UUID tenantId = TenantContext.requireTenantId();
     String settingsJson;
     try {
@@ -98,20 +109,30 @@ public class TenantService {
       throw new IllegalArgumentException("Failed to serialize tenant settings", e);
     }
 
-    int updated =
+    String keep =
+        keepStoredChequeSplitTracking
+            ? " || jsonb_build_object('chequeSplitTracking',"
+                + " COALESCE(settings -> 'chequeSplitTracking', 'false'::jsonb))"
+            : "";
+    List<Boolean> stored =
         systemExecutor.executeInTransaction(
             jdbc ->
-                jdbc.update(
+                jdbc.queryForList(
                     "UPDATE common_tenant.common_tenant"
                         + " SET settings = ?::jsonb"
-                        + " || jsonb_build_object('stockProposal', settings -> 'stockProposal'),"
-                        + " updated_at = now(), version = version + 1 WHERE id = ?",
+                        + " || jsonb_build_object('stockProposal', settings -> 'stockProposal')"
+                        + keep
+                        + ", updated_at = now(), version = version + 1 WHERE id = ?"
+                        + " RETURNING COALESCE((settings ->> 'chequeSplitTracking')::boolean,"
+                        + " false)",
+                    Boolean.class,
                     settingsJson,
                     tenantId));
 
-    if (updated == 0) {
+    if (stored.isEmpty()) {
       throw new IllegalStateException("Current tenant not found: " + tenantId);
     }
+    settings.setChequeSplitTracking(stored.getFirst());
 
     eventPublisher.publish(
         new TenantSettingsUpdatedEvent(

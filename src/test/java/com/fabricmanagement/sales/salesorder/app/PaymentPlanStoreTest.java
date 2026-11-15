@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.salesorder.app.port.PaymentPlanChequeTermsPort;
 import com.fabricmanagement.sales.salesorder.domain.*;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.*;
 import com.fabricmanagement.sales.salesorder.infra.repository.*;
@@ -24,6 +25,7 @@ class PaymentPlanStoreTest {
   @Mock OrderPaymentPlanCurrencyRepository currencies;
   @Mock OrderPaymentPlanLineRepository lines;
   @Mock SalesOrderLineRepository orderLines;
+  @Mock PaymentPlanChequeTermsPort chequeTerms;
   @InjectMocks PaymentPlanStore store;
   UUID tenant = UUID.randomUUID(), orderId = UUID.randomUUID();
 
@@ -97,7 +99,8 @@ class PaymentPlanStoreTest {
     var gb =
         OrderPaymentPlanCurrency.create(
             b.getId(),
-            new PaymentPlanContent.CurrencyGroup("GBP", new BigDecimal("4284"), null, List.of()));
+            new PaymentPlanContent.CurrencyGroup(
+                "GBP", new BigDecimal("4284"), null, List.of(), 60));
     gb.setId(UUID.randomUUID());
     when(currencies.findByTenantIdAndRevisionIdInOrderByCurrencyAsc(
             tenant, List.of(a.getId(), b.getId())))
@@ -105,7 +108,12 @@ class PaymentPlanStoreTest {
     when(lines.findByTenantIdAndCurrencyGroupIdInOrderByOrdinalAsc(
             tenant, List.of(ga.getId(), gb.getId())))
         .thenReturn(List.of());
-    assertThat(store.contents(List.of(a, b))).hasSize(2);
+    var contents = store.contents(List.of(a, b));
+    assertThat(contents).hasSize(2);
+    // PAYMENT-PLAN-7 R4: the stored split is read back; an older group without one stays null.
+    assertThat(contents.get(a.getId()).currencyGroups().getFirst().ownChequePercent()).isNull();
+    assertThat(contents.get(b.getId()).currencyGroups().getFirst().ownChequePercent())
+        .isEqualTo(60);
     verify(currencies, times(1)).findByTenantIdAndRevisionIdInOrderByCurrencyAsc(any(), any());
     verify(lines, times(1)).findByTenantIdAndCurrencyGroupIdInOrderByOrdinalAsc(any(), any());
     verifyNoMoreInteractions(currencies, lines);
