@@ -14,7 +14,6 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
-import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.platform.auth.app.AccountSetupService.SetupTarget;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
@@ -52,7 +51,6 @@ class PasswordSetupServiceTest {
   @Mock private AuthUserRepository authUserRepository;
   @Mock private UserFacade userFacade;
   @Mock private TenantQueryPort tenantQueryPort;
-  @Mock private TrialLifecyclePort trialLifecyclePort;
   @Mock private TenantSessionBinder tenantSessionBinder;
   @Mock private IdentityProvisioningService identityProvisioningService;
   @Mock private SignupCompletionService signupCompletion;
@@ -68,7 +66,6 @@ class PasswordSetupServiceTest {
             authUserRepository,
             userFacade,
             tenantQueryPort,
-            trialLifecyclePort,
             tenantSessionBinder,
             identityProvisioningService,
             signupCompletion,
@@ -85,23 +82,27 @@ class PasswordSetupServiceTest {
   }
 
   @Test
-  @DisplayName("a legacy self-service token still activates the tenant trial")
-  void shouldActivateSelfServiceTrialOnPasswordSetup() {
-    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SELF_SERVICE);
+  @DisplayName("a link whose company is gone or inactive is refused before anything is used")
+  void shouldRefuseALinkWhoseTenantIsNotActive() {
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    RegistrationToken token =
+        RegistrationToken.create("admin@example.com", RegistrationTokenType.SALES_LED);
+    when(tenantQueryPort.findTenantIdByRegistrationToken(token.getToken()))
+        .thenReturn(Optional.of(tenantId));
+    when(tokenRepository.findByToken(token.getToken())).thenReturn(Optional.of(token));
+    when(userFacade.findByContactValue("admin@example.com"))
+        .thenReturn(Optional.of(UserDto.builder().id(userId).tenantId(tenantId).build()));
+    when(authUserRepository.existsByUserId(userId)).thenReturn(false);
+    when(tenantQueryPort.findById(tenantId)).thenReturn(Optional.empty());
+    var request =
+        PasswordSetupRequest.builder().token(token.getToken()).password("Str0ngPassword!").build();
 
-    service.setupPassword(fixture.request(), "127.0.0.1");
+    assertThatThrownBy(() -> service.setupPassword(request, "127.0.0.1"))
+        .isInstanceOf(IllegalStateException.class);
 
-    verify(trialLifecyclePort).startSelfServiceTrialIfNeeded(fixture.tenantId());
-  }
-
-  @Test
-  @DisplayName("sales-led password setup leaves trial activation unchanged")
-  void shouldNotActivateSalesLedTrialOnPasswordSetup() {
-    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SALES_LED);
-
-    service.setupPassword(fixture.request(), "127.0.0.1");
-
-    verify(trialLifecyclePort, never()).startSelfServiceTrialIfNeeded(any());
+    verify(tokenRepository, never()).save(any());
+    verify(accountSetup, never()).finishSetup(any(), any(), any());
   }
 
   @Test
@@ -165,7 +166,7 @@ class PasswordSetupServiceTest {
   @Test
   @DisplayName("success logs only safe identifiers")
   void successfulSetupLogsOnlySafeIdentifiers() {
-    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SELF_SERVICE);
+    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SALES_LED);
     try (var logs = new SensitiveLogCapture(PasswordSetupService.class)) {
       service.setupPassword(fixture.request(), "127.0.0.1");
       assertThat(logs.text()).contains(fixture.tenantId().toString());
@@ -182,7 +183,7 @@ class PasswordSetupServiceTest {
   void invalidTokensStayRejectedWithoutLoggingOrSubstringFailures(String state) {
     UUID tenantId = UUID.randomUUID();
     RegistrationToken token =
-        RegistrationToken.create("eleanor.hughes@example.com", RegistrationTokenType.SELF_SERVICE);
+        RegistrationToken.create("eleanor.hughes@example.com", RegistrationTokenType.SALES_LED);
     token.setToken(state.equals("short") ? "tiny" : "b24788a1-62fe-40ad-899f-80ea7543a1cc");
     if (state.equals("used")) token.markAsUsed();
     else token.setExpiresAt(Instant.now().minusSeconds(60));

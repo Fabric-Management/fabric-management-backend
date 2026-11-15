@@ -67,6 +67,26 @@ public interface PendingSignupRepository extends JpaRepository<PendingSignup, UU
       @Param("now") Instant now, @Param("email") String email, @Param("taxKey") String taxKey);
 
   /**
+   * Retention: removes signups whose link expired before {@code before} and was never used. Their
+   * sales lead stays; the form and the address of someone who never confirmed it do not.
+   *
+   * @return the number of rows removed
+   */
+  @Modifying
+  @Query("delete from PendingSignup p where p.completedAt is null and p.expiresAt < :before")
+  int deleteExpiredBefore(@Param("before") Instant before);
+
+  /**
+   * Retention: removes completed signups older than {@code before}. The company, its users and the
+   * linked lead (the signup evidence) carry everything that is still needed.
+   *
+   * @return the number of rows removed
+   */
+  @Modifying
+  @Query("delete from PendingSignup p where p.completedAt is not null and p.completedAt < :before")
+  int deleteCompletedBefore(@Param("before") Instant before);
+
+  /**
    * Gives an open signup its latest form and a new link, unless it has already had {@code maxLinks}
    * links. One atomic statement, so two simultaneous repeats cannot both read the same count and
    * the limit cannot be passed.

@@ -3,11 +3,8 @@ package com.fabricmanagement.platform.auth.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
-import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
-import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.platform.auth.app.AccountSetupService.SetupTarget;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
-import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.platform.auth.dto.SetupLinkStatus;
@@ -48,7 +45,6 @@ public class PasswordSetupService {
   private final AuthUserRepository authUserRepository;
   private final UserFacade userFacade;
   private final TenantQueryPort tenantQueryPort;
-  private final TrialLifecyclePort trialLifecyclePort;
   private final TenantSessionBinder tenantSessionBinder;
   private final IdentityProvisioningService identityProvisioningService;
   private final SignupCompletionService signupCompletion;
@@ -110,16 +106,14 @@ public class PasswordSetupService {
 
     // Tenant status guard: ensure tenant is active before allowing registration
     // Uses TenantQueryPort (BYPASSRLS) — password setup happens before tenant context is set
-    TenantReference tenantRef =
-        tenantQueryPort
-            .findById(user.getTenantId())
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Tenant not found or not active. Password setup is not allowed."));
-    if (tenantRef != null && token.getTokenType() == RegistrationTokenType.SELF_SERVICE) {
-      trialLifecyclePort.startSelfServiceTrialIfNeeded(user.getTenantId());
-    }
+    // (Self-service trials start when the signup link builds the company; no registration token
+    // of type SELF_SERVICE is issued since SIGNUP-DEFER-1.)
+    tenantQueryPort
+        .findById(user.getTenantId())
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Tenant not found or not active. Password setup is not allowed."));
 
     token.markAsUsed();
     tokenRepository.save(token);
