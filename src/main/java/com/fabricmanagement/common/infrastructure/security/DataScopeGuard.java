@@ -6,6 +6,7 @@ import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.PermissionIdentityReader;
 import jakarta.persistence.criteria.Predicate;
 import java.util.Collection;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ public class DataScopeGuard {
   private final PermissionEvaluator permissionEvaluator;
   private final AuthenticatedUserContextResolver contextResolver;
   private final UserRepository userRepository;
+  private final PermissionIdentityReader permissionIdentities;
 
   public DataScope currentScope(String resource, String action) {
     Optional<AuthenticatedUserContext> context = currentContext();
@@ -43,11 +45,10 @@ public class DataScopeGuard {
     AuthenticatedUserContext authenticated =
         context.orElseThrow(() -> forbidden(resource, "UNKNOWN"));
     PermissionResult result =
-        permissionEvaluator.evaluate(
+        permissionEvaluator.evaluateMembership(
             authenticated.tenantId(),
-            authenticated.roleCode(),
-            authenticated.departmentCodes(),
-            authenticated.userId());
+            authenticated.userId(),
+            authenticated.restrictsPlatformRole());
     return result.scopeOf(resource, action);
   }
 
@@ -126,11 +127,10 @@ public class DataScopeGuard {
     return context.map(
         authenticated -> {
           PermissionResult result =
-              permissionEvaluator.evaluate(
+              permissionEvaluator.evaluateMembership(
                   authenticated.tenantId(),
-                  authenticated.roleCode(),
-                  authenticated.departmentCodes(),
-                  authenticated.userId());
+                  authenticated.userId(),
+                  authenticated.restrictsPlatformRole());
           return result.scopeOf(resource, action);
         });
   }
@@ -159,9 +159,12 @@ public class DataScopeGuard {
     UUID tenantId = context != null ? context.tenantId() : TenantContext.getCurrentTenantIdOrNull();
     UUID userId = currentUserId();
     List<String> departmentCodes =
-        context != null && context.departmentCodes() != null
-            ? context.departmentCodes()
-            : List.of();
+        context == null
+            ? List.of()
+            : permissionIdentities
+                .find(tenantId, userId)
+                .map(identity -> identity.departmentCodes())
+                .orElseGet(List::of);
 
     Set<String> normalizedCodes = normalizeDepartmentCodes(departmentCodes);
     if (tenantId == null || normalizedCodes.isEmpty()) {

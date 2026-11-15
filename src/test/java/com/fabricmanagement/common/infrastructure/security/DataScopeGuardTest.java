@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,9 +46,11 @@ class DataScopeGuardTest {
 
   private final PermissionEvaluator permissionEvaluator = mock(PermissionEvaluator.class);
   private final UserRepository userRepository = mock(UserRepository.class);
+  private final com.fabricmanagement.platform.user.security.PermissionIdentityReader identities =
+      mock(com.fabricmanagement.platform.user.security.PermissionIdentityReader.class);
   private final DataScopeGuard guard =
       new DataScopeGuard(
-          permissionEvaluator, new AuthenticatedUserContextResolver(), userRepository);
+          permissionEvaluator, new AuthenticatedUserContextResolver(), userRepository, identities);
 
   @AfterEach
   void clearContext() {
@@ -59,7 +62,7 @@ class DataScopeGuardTest {
   @Test
   void ownScopeAllowsOnlyOwnRecords() {
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(permissionResult(DataScope.OWN));
 
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID)))
@@ -74,7 +77,7 @@ class DataScopeGuardTest {
   @Test
   void ownScopeFilterUsesCurrentUserCreatedByPredicate() {
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(permissionResult(DataScope.OWN));
     CriteriaMocks criteria = criteriaMocks();
     when(criteria.criteriaBuilder.equal(criteria.createdByPath, CURRENT_USER_ID))
@@ -94,8 +97,13 @@ class DataScopeGuardTest {
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(permissionResult(DataScope.DEPARTMENT));
+    when(identities.find(TENANT_ID, CURRENT_USER_ID))
+        .thenReturn(
+            java.util.Optional.of(
+                new com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity(
+                    "WORKER", List.of("PROCUREMENT"))));
     when(userRepository.findActiveUserIdsByDepartmentCodes(TENANT_ID, Set.of("PROCUREMENT")))
         .thenReturn(Set.of(DEPARTMENT_MEMBER_ID));
 
@@ -114,7 +122,7 @@ class DataScopeGuardTest {
   @Test
   void organizationAndGlobalScopesUseNoOpListPredicate() {
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(permissionResult(DataScope.ORGANIZATION), permissionResult(DataScope.GLOBAL));
     CriteriaMocks organizationCriteria = criteriaMocks();
     CriteriaMocks globalCriteria = criteriaMocks();
@@ -150,8 +158,13 @@ class DataScopeGuardTest {
                 "procurement",
                 Map.of("read", DataScope.ORGANIZATION, "write", DataScope.DEPARTMENT)),
             false);
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(managerPermissions);
+    when(identities.find(TENANT_ID, CURRENT_USER_ID))
+        .thenReturn(
+            java.util.Optional.of(
+                new com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity(
+                    "WORKER", List.of("PROCUREMENT"))));
     when(userRepository.findActiveUserIdsByDepartmentCodes(TENANT_ID, Set.of("PROCUREMENT")))
         .thenReturn(Set.of(DEPARTMENT_MEMBER_ID));
     CriteriaMocks criteria = criteriaMocks();
@@ -170,7 +183,7 @@ class DataScopeGuardTest {
   @Test
   void missingPermissionDeniesEntityAccessAndReturnsImpossibleListPredicate() {
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(new PermissionResult(Map.of(), false));
     CriteriaMocks criteria = criteriaMocks();
     when(criteria.criteriaBuilder.disjunction()).thenReturn(criteria.expectedPredicate);
@@ -200,7 +213,7 @@ class DataScopeGuardTest {
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(OTHER_USER_ID)))
         .doesNotThrowAnyException();
     assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isTrue();
-    verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
+    verify(permissionEvaluator, never()).evaluateMembership(any(), any(), anyBoolean());
   }
 
   @Test
@@ -209,7 +222,7 @@ class DataScopeGuardTest {
         .setAuthentication(new UsernamePasswordAuthenticationToken("anonymous", "n/a", List.of()));
 
     assertThat(guard.canAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID))).isFalse();
-    verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
+    verify(permissionEvaluator, never()).evaluateMembership(any(), any(), anyBoolean());
   }
 
   @Test
@@ -219,14 +232,19 @@ class DataScopeGuardTest {
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(OTHER_USER_ID)))
         .doesNotThrowAnyException();
     assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isTrue();
-    verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
+    verify(permissionEvaluator, never()).evaluateMembership(any(), any(), anyBoolean());
   }
 
   @Test
   void departmentScopeIncludesCurrentUserEvenWhenRepositoryDoesNotReturnThem() {
     authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, CURRENT_USER_ID, false))
         .thenReturn(permissionResult(DataScope.DEPARTMENT));
+    when(identities.find(TENANT_ID, CURRENT_USER_ID))
+        .thenReturn(
+            java.util.Optional.of(
+                new com.fabricmanagement.platform.user.app.UserQueryService.PermissionIdentity(
+                    "WORKER", List.of("PROCUREMENT"))));
     when(userRepository.findActiveUserIdsByDepartmentCodes(TENANT_ID, Set.of("PROCUREMENT")))
         .thenReturn(Set.of());
 

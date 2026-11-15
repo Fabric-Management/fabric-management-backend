@@ -7,10 +7,10 @@ import com.fabricmanagement.common.infrastructure.bootstrap.PartnerNetworkDemoDa
 import com.fabricmanagement.common.infrastructure.bootstrap.PartnerNetworkDemoData.LinkedSpec;
 import com.fabricmanagement.common.infrastructure.bootstrap.PartnerNetworkDemoData.Place;
 import com.fabricmanagement.common.infrastructure.bootstrap.PartnerNetworkDemoData.SupplierSpec;
+import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
-import com.fabricmanagement.platform.organization.api.facade.OrganizationAddressFacade;
-import com.fabricmanagement.platform.organization.dto.OrganizationAddressDto;
+import com.fabricmanagement.platform.organization.app.OrganizationAddressAssignmentService;
 import com.fabricmanagement.platform.tradingpartner.app.PartnerContactService;
 import com.fabricmanagement.platform.tradingpartner.app.PartnerLinkService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
@@ -37,10 +37,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * address cards a delivery can use, and the garment makers, dyehouses and forwarders that receive
  * goods for a customer, each with its own contacts and cards.
  *
- * <p>Writes through the services the screens use, so the data obeys the same rules. Every address
- * is on a reserved {@code .example} domain; the sandbox redirects each message to the address the
- * prospect registered with (EMAIL-SANDBOX-1). Verification is set explicitly, not left to the
- * seeding thread's permissions: a few records stay unverified so the order form shows both states.
+ * <p>Uses the address provisioning path for demo cards. Every e-mail address is on a reserved
+ * {@code .example} domain; the sandbox redirects each message to the address the prospect
+ * registered with (EMAIL-SANDBOX-1). Verification is set explicitly, not left to the seeding
+ * thread's permissions: a few records stay unverified so the order form shows both states.
  *
  * <p>Idempotent per owner: a customer, supplier, linked company or organization that already has
  * contacts or cards is left alone. A customer or supplier the other demos did not create is
@@ -55,7 +55,8 @@ public class PartnerNetworkDemoSeeder {
   private final TradingPartnerRepository partnerRepository;
   private final PartnerContactService contactService;
   private final PartnerLinkService linkService;
-  private final OrganizationAddressFacade addressFacade;
+  private final OrganizationAddressAssignmentService addressAssignments;
+  private final AddressService addressService;
   private final AddressRepository addressRepository;
   private final TransactionTemplate transactionTemplate;
 
@@ -152,7 +153,7 @@ public class PartnerNetworkDemoSeeder {
       log.warn("Partner network demo: a partner has no organization, its cards are skipped");
       return;
     }
-    if (!addressFacade.getOrganizationAddresses(organizationId).isEmpty()) {
+    if (!addressAssignments.getOrganizationAddresses(organizationId).isEmpty()) {
       return;
     }
     for (CardSpec spec : cards) {
@@ -168,10 +169,10 @@ public class PartnerNetworkDemoSeeder {
               .country(place.name())
               .countryCode(place.alpha2())
               .build();
-      OrganizationAddressDto card =
-          addressFacade.createAndAssignAddress(
-              organizationId, request, spec.primary(), spec.headquarters());
-      setCardVerified(card.getAddressId(), spec.verified());
+      var address = addressService.createAddress(request);
+      addressAssignments.assignAddressForProvisioning(
+          organizationId, address.getId(), spec.primary(), spec.headquarters());
+      setCardVerified(address.getId(), spec.verified());
     }
   }
 

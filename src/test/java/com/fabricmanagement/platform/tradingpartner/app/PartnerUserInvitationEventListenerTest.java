@@ -121,7 +121,8 @@ class PartnerUserInvitationEventListenerTest {
     assertThat(authUserCaptor.getValue().getIsVerified()).isTrue();
 
     verify(contactService).verifyContact(contact.getId());
-    verify(userContactAssignmentService).assignContact(userId, contact.getId(), true);
+    verify(userContactAssignmentService)
+        .assignContactForProvisioning(userId, contact.getId(), true);
     verify(registrationTokenRepository, never()).save(any(RegistrationToken.class));
     verify(emailTemplateRenderer, never())
         .renderPartnerInvitation(anyString(), anyString(), anyString(), anyString());
@@ -203,8 +204,6 @@ class PartnerUserInvitationEventListenerTest {
         Contact.builder()
             .contactValue(value)
             .contactType(ContactType.EMAIL)
-            .label("Primary")
-            .isPersonal(true)
             .isVerified(false)
             .build();
     contact.setId(contactId);

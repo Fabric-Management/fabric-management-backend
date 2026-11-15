@@ -38,7 +38,7 @@ class CollectionAccessServiceTest {
       when(users.isActive(tenant, actor)).thenReturn(false);
       assertThatThrownBy(() -> service.reach(actor, "read"))
           .isInstanceOf(AccessDeniedException.class);
-      verify(evaluator, never()).evaluate(any(), any(), any(), any());
+      verify(evaluator, never()).evaluateMembership(any(), any(), anyBoolean());
     } finally {
       TenantContext.clear();
     }

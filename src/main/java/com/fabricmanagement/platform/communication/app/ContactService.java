@@ -63,7 +63,7 @@ public class ContactService {
               .findFirst();
       if (existing.isPresent()) return existing.get();
     }
-    return createContact(prepared.value(), prepared.type(), "Organisation", false, null);
+    return createContact(prepared.value(), prepared.type(), null);
   }
 
   /** Validate without writes; telephone type comes from numbering metadata, not E.164 alone. */
@@ -100,12 +100,7 @@ public class ContactService {
   }
 
   @Transactional
-  public Contact createContact(
-      String contactValue,
-      ContactType contactType,
-      String label,
-      Boolean isPersonal,
-      UUID parentContactId) {
+  public Contact createContact(String contactValue, ContactType contactType, UUID parentContactId) {
     UUID tenantId = TenantContext.requireTenantId();
     ContactType resolvedType = contactType != null ? contactType : inferContactType(contactValue);
     String normalizedValue = normalizeContactValue(contactValue, resolvedType);
@@ -136,12 +131,14 @@ public class ContactService {
       }
     }
 
-    Optional<Contact> existing =
-        contactRepository.findByTenantIdAndContactValueAndContactType(
-            tenantId, normalizedValue, resolvedType);
+    Optional<Contact> existing = findPoint(tenantId, normalizedValue, resolvedType);
     if (existing.isPresent()) {
       Contact existingContact = existing.get();
-      applyWhatsAppRules(existingContact);
+      if (!Boolean.TRUE.equals(existingContact.getIsActive())) {
+        existingContact.activate();
+        existingContact.setIsVerified(false);
+        applyWhatsAppRules(existingContact);
+      }
       return existingContact;
     }
 
@@ -149,8 +146,6 @@ public class ContactService {
         Contact.builder()
             .contactValue(normalizedValue)
             .contactType(resolvedType)
-            .label(label)
-            .isPersonal(isPersonal != null ? isPersonal : true)
             .parentContactId(parentContactId)
             .isVerified(false)
             .build();
@@ -176,6 +171,23 @@ public class ContactService {
     return contactRepository.findByTenantIdAndContactType(tenantId, contactType);
   }
 
+  private Optional<Contact> findPoint(UUID tenant, String value, ContactType type) {
+    if (type == ContactType.EMAIL) {
+      var matching =
+          contactRepository
+              .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+                  tenant, type, value);
+      var active =
+          matching.stream().filter(contact -> Boolean.TRUE.equals(contact.getIsActive())).toList();
+      if (active.size() > 1) {
+        throw new PlatformDomainException(
+            "Multiple contacts use this email address", "CONTACT_EMAIL_AMBIGUOUS", 409);
+      }
+      return active.isEmpty() ? matching.stream().findFirst() : Optional.of(active.getFirst());
+    }
+    return contactRepository.findByTenantIdAndContactValueAndContactType(tenant, value, type);
+  }
+
   @Transactional(readOnly = true)
   public Optional<Contact> findByValueAndType(String contactValue, ContactType contactType) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -186,8 +198,7 @@ public class ContactService {
         contactType,
         maskContactValue(normalizedValue));
 
-    return contactRepository.findByTenantIdAndContactValueAndContactType(
-        tenantId, normalizedValue, contactType);
+    return findPoint(tenantId, normalizedValue, contactType);
   }
 
   @Transactional(readOnly = true)
@@ -306,57 +317,41 @@ public class ContactService {
         new ContactPointChangedEvent(tenantId, contactId, ContactPointChangedEvent.DELETED));
   }
 
-  /**
-   * Update individual fields of an existing contact with validation.
-   *
-   * <p>Only non-null fields are updated; null values are ignored (patch semantics).
-   */
-  @Transactional
-  public Contact updateContactFields(
-      UUID contactId,
-      String contactValue,
-      ContactType contactType,
-      String label,
-      Boolean isPersonal) {
-    UUID tenantId = TenantContext.requireTenantId();
-    log.info("Updating contact fields: tenantId={}, contactId={}", tenantId, contactId);
+  public record ContactPoint(String value, ContactType type) {}
 
-    Contact contact =
-        contactRepository
-            .findById(contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
-
-    if (!contact.getTenantId().equals(tenantId)) {
-      throw new CommonDomainException("Contact does not belong to current tenant");
+  /** Validate the complete value/type pair before changing either field. */
+  public ContactPoint prepareChange(Contact contact, String value, ContactType type) {
+    ContactType nextType = type != null ? type : contact.getContactType();
+    String nextValue =
+        normalizeContactValue(value != null ? value : contact.getContactValue(), nextType);
+    validateContactValue(nextValue, nextType);
+    if (nextType != contact.getContactType()
+        && (nextType == ContactType.PHONE_EXTENSION
+            || contact.getContactType() == ContactType.PHONE_EXTENSION)) {
+      throw new PlatformDomainException(
+          "Create a new contact to change the extension type",
+          "CONTACT_EXTENSION_TYPE_CHANGE",
+          409);
     }
+    return new ContactPoint(nextValue, nextType);
+  }
 
-    boolean changed = false;
+  public boolean samePoint(Contact contact, ContactPoint point) {
+    return contact.getContactType() == point.type()
+        && (point.type() == ContactType.EMAIL
+            ? contact.getContactValue().equalsIgnoreCase(point.value())
+            : contact.getContactValue().equals(point.value()));
+  }
+
+  @Transactional
+  public Contact replacePoint(Contact contact, ContactPoint point) {
+    if (samePoint(contact, point)) return contact;
     String valueBefore = contact.getContactValue();
     ContactType typeBefore = contact.getContactType();
-    ContactType resolvedType = contactType != null ? contactType : contact.getContactType();
-
-    if (contactValue != null) {
-      String normalizedValue = normalizeContactValue(contactValue, resolvedType);
-      validateContactValue(normalizedValue, resolvedType);
-      contact.setContactValue(normalizedValue);
-      changed = true;
-    }
-    if (contactType != null && contactType != contact.getContactType()) {
-      contact.setContactType(contactType);
-      changed = true;
-    }
-    if (label != null) {
-      contact.setLabel(label);
-      changed = true;
-    }
-    if (isPersonal != null) {
-      contact.setIsPersonal(isPersonal);
-      changed = true;
-    }
-
-    if (!changed) {
-      return contact;
-    }
+    contact.setContactValue(point.value());
+    contact.setContactType(point.type());
+    contact.setIsVerified(false);
+    applyWhatsAppRules(contact);
     Contact saved = contactRepository.save(contact);
     publishIfAddressChanged(saved, valueBefore, typeBefore);
     return saved;
@@ -455,7 +450,7 @@ public class ContactService {
     if (contactType == ContactType.WEBSITE) {
       return trimmed.toLowerCase();
     }
-    return trimmed;
+    return contactType == ContactType.EMAIL ? trimmed.toLowerCase(Locale.ROOT) : trimmed;
   }
 
   private ContactType inferContactType(String contactValue) {

@@ -296,7 +296,7 @@ class SalesQuoteDemoSeederTest {
 
     ArgumentCaptor<CreateInternalUserRequest> userCaptor =
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
-    verify(userCreationService, times(1)).createInternalUser(userCaptor.capture());
+    verify(userCreationService, times(1)).createInternalUserForProvisioning(userCaptor.capture());
     assertThat(userCaptor.getValue().isInvitationEmailSuppressed()).isTrue();
 
     // Intents ride through the named demo-seed entry: per line, the selected-lot quantity must
@@ -507,7 +507,8 @@ class SalesQuoteDemoSeederTest {
     when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentCode(
             eq(TENANT_ID), any(UUID.class), eq("SALES")))
         .thenReturn(Optional.empty());
-    when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
+    when(userCreationService.createInternalUserForProvisioning(
+            any(CreateInternalUserRequest.class)))
         .thenReturn(UserDto.builder().id(EMMA_ID).build());
     when(userRepository.findByTenantIdAndId(TENANT_ID, EMMA_ID))
         .thenReturn(Optional.of(user(EMMA_ID, "Emma", "Whitfield")));

@@ -62,6 +62,20 @@ public interface UserWorkLocationRepository
   long countByOrgAddressId(@Param("orgAddressId") UUID orgAddressId);
 
   @Modifying
+  @Query(
+      value =
+          """
+          UPDATE common_user.common_user_work_location
+          SET org_address_id = :replacementId, updated_at = now(), version = version + 1
+          WHERE tenant_id = :tenantId AND org_address_id = :previousId
+          """,
+      nativeQuery = true)
+  void moveAddress(
+      @Param("tenantId") UUID tenantId,
+      @Param("previousId") UUID previousId,
+      @Param("replacementId") UUID replacementId);
+
+  @Modifying
   @Query("DELETE FROM UserWorkLocation wl WHERE wl.orgAddressId = :orgAddressId")
   void deleteAllByOrgAddressId(@Param("orgAddressId") UUID orgAddressId);
 }

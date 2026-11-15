@@ -29,6 +29,7 @@ import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.MemberAdministrationAccess;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -73,9 +74,38 @@ public class UserCreationService {
   private final EmployeeProjectionPort employeeProjectionPort;
   private final EmployeeCompliancePort employeeCompliancePort;
   private final JobTitlePresetRepository jobTitlePresetRepository;
+  private final MemberAdministrationAccess access;
 
   @Transactional
   public UserDto createInternalUser(CreateInternalUserRequest request) {
+    var actor = access.requireManage();
+    Role role = resolveRole(request.getRoleId());
+    if (role != null) {
+      access.requireRoleGrant(actor, role);
+    }
+    return createInternalUser(request, role, actor.userId(), false);
+  }
+
+  @Transactional
+  public UserDto createInternalUserForProvisioning(CreateInternalUserRequest request) {
+    return createInternalUser(
+        request, resolveRole(request.getRoleId()), TenantContext.getCurrentUserId(), true);
+  }
+
+  private Role resolveRole(UUID roleId) {
+    if (roleId == null) {
+      return null;
+    }
+    return roleService
+        .findById(roleId)
+        .filter(role -> Boolean.TRUE.equals(role.getIsActive()) && role.getDeletedAt() == null)
+        .orElseThrow(
+            () ->
+                new PlatformDomainException("Role not found", "USER_CREATION_ROLE_NOT_FOUND", 404));
+  }
+
+  private UserDto createInternalUser(
+      CreateInternalUserRequest request, Role role, UUID assignedBy, boolean provisioning) {
     log.info(
         "Creating internal employee: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
@@ -89,19 +119,10 @@ public class UserCreationService {
             request.getOrganizationId(),
             com.fabricmanagement.platform.user.domain.UserType.INTERNAL,
             request.getAdditionalContacts(),
-            request.getAddresses());
+            request.getAddresses(),
+            provisioning);
 
-    UUID assignedBy = TenantContext.getCurrentUserId();
-
-    // Step 2: Assign role
-    if (request.getRoleId() != null) {
-      Role role =
-          roleService
-              .findById(request.getRoleId())
-              .orElseThrow(
-                  () ->
-                      new PlatformDomainException(
-                          "Role not found", "USER_CREATION_ROLE_NOT_FOUND", 404));
+    if (role != null) {
       userEntity.setRole(role);
     }
 
@@ -109,13 +130,13 @@ public class UserCreationService {
 
     // Step 3: Assign department (uses separate junction service)
     if (request.getDepartmentId() != null) {
-      userDepartmentService.assignDepartment(
+      userDepartmentService.assignDepartmentForProvisioning(
           saved.getId(), request.getDepartmentId(), true, assignedBy);
     }
 
     // Step 4: Assign work location (org address the user works at)
     if (request.getWorkLocationOrgAddressId() != null) {
-      userWorkLocationService.assignLocation(
+      userWorkLocationService.assignLocationForProvisioning(
           saved.getId(), request.getWorkLocationOrgAddressId(), true, null);
     }
 
@@ -145,6 +166,16 @@ public class UserCreationService {
 
   @Transactional
   public UserDto createExternalUser(CreateExternalUserRequest request) {
+    access.requireManage();
+    return createExternalUser(request, false);
+  }
+
+  @Transactional
+  public UserDto createExternalUserForProvisioning(CreateExternalUserRequest request) {
+    return createExternalUser(request, true);
+  }
+
+  private UserDto createExternalUser(CreateExternalUserRequest request, boolean provisioning) {
     log.info(
         "Creating external user: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
@@ -158,7 +189,8 @@ public class UserCreationService {
             request.getOrganizationId(),
             com.fabricmanagement.platform.user.domain.UserType.EXTERNAL,
             request.getAdditionalContacts(),
-            request.getAddresses());
+            request.getAddresses(),
+            provisioning);
 
     // Assign default external role if available (EXTERNAL_USER or VIEWER)
     roleService
@@ -241,10 +273,9 @@ public class UserCreationService {
               contactService.createContact(
                   normalizedContact,
                   com.fabricmanagement.platform.communication.domain.ContactType.EMAIL,
-                  "Primary",
-                  true,
                   null);
-          userContactAssignmentService.assignContact(saved.getId(), contact.getId(), true);
+          userContactAssignmentService.assignContactForProvisioning(
+              saved.getId(), contact.getId(), true);
 
           assignAdminDefaultDepartment(saved, request);
 
@@ -298,7 +329,8 @@ public class UserCreationService {
       UUID organizationId,
       com.fabricmanagement.platform.user.domain.UserType userType,
       List<ContactData> additionalContacts,
-      List<AddressData> addresses) {
+      List<AddressData> addresses,
+      boolean provisioning) {
 
     String trimmedFirstName = firstName.trim();
     String trimmedLastName = lastName.trim();
@@ -343,9 +375,9 @@ public class UserCreationService {
       User saved = userRepository.save(user);
 
       Contact primaryContact =
-          contactService.createContact(
-              normalizedContact, mapContactType(contactType), "Primary", true, null);
-      userContactAssignmentService.assignContact(saved.getId(), primaryContact.getId(), true);
+          contactService.createContact(normalizedContact, mapContactType(contactType), null);
+      attachCreatedUserContact(
+          saved.getId(), primaryContact.getId(), true, "Primary", true, provisioning);
 
       if (additionalContacts != null && !additionalContacts.isEmpty()) {
         for (ContactData contactData : additionalContacts) {
@@ -362,14 +394,14 @@ public class UserCreationService {
               contactData.getContactValue().trim().toLowerCase(Locale.ROOT);
 
           Contact additionalContact =
-              contactService.createContact(
-                  normalizedContactValue,
-                  mappedType,
-                  label,
-                  contactData.getIsPersonal() != null ? contactData.getIsPersonal() : true,
-                  null);
-          userContactAssignmentService.assignContact(
-              saved.getId(), additionalContact.getId(), false);
+              contactService.createContact(normalizedContactValue, mappedType, null);
+          attachCreatedUserContact(
+              saved.getId(),
+              additionalContact.getId(),
+              false,
+              label,
+              contactData.getIsPersonal(),
+              provisioning);
         }
       }
 
@@ -380,6 +412,22 @@ public class UserCreationService {
       log.warn("Concurrent duplicate contact detected: {}", normalizedContact);
       throw new PlatformDomainException(
           "Contact value already registered", "USER_CONTACT_ALREADY_REGISTERED", 409);
+    }
+  }
+
+  private void attachCreatedUserContact(
+      UUID userId,
+      UUID contactId,
+      boolean primary,
+      String label,
+      Boolean personal,
+      boolean provisioning) {
+    if (provisioning) {
+      userContactAssignmentService.assignContactForProvisioning(
+          userId, contactId, primary, label, personal);
+    } else {
+      userContactAssignmentService.assignContactFromMemberCreation(
+          userId, contactId, primary, label, personal);
     }
   }
 
@@ -429,7 +477,7 @@ public class UserCreationService {
         }
 
         boolean isWorkAddress = addressType == AddressType.OFFICE;
-        userAddressAssignmentService.assignAddress(
+        userAddressAssignmentService.assignAddressForProvisioning(
             user.getId(), address.getId(), isPrimary, isWorkAddress);
       }
     } else {
@@ -523,7 +571,7 @@ public class UserCreationService {
     } else if (contactType == com.fabricmanagement.platform.user.domain.ContactType.PHONE) {
       if (!PHONE_PATTERN.matcher(contactValue).matches()) {
         throw new PlatformDomainException(
-            "Invalid phone format. Must be E.164 format (e.g., +905551234567)",
+            "Invalid phone format. Must be E.164 format (e.g., +447700900123)",
             "USER_CONTACT_INVALID_PHONE",
             400);
       }
@@ -567,7 +615,7 @@ public class UserCreationService {
               request.getTenantId(), request.getOrganizationId(), ADMIN_DEFAULT_DEPARTMENT);
 
       if (adminDept.isPresent()) {
-        userDepartmentService.assignDepartment(
+        userDepartmentService.assignDepartmentForProvisioning(
             savedUser.getId(), adminDept.get().getId(), true, null);
         log.debug(
             "Admin default department assigned: userId={}, department={}",

@@ -54,37 +54,33 @@ class ContactServiceTest {
 
     @Test
     void throwsWhenContactValueEmpty() {
-      assertThatThrownBy(() -> service.createContact("  ", ContactType.EMAIL, "Label", false, null))
+      assertThatThrownBy(() -> service.createContact("  ", ContactType.EMAIL, null))
           .isInstanceOf(DomainException.class)
           .hasMessageContaining("cannot be empty");
     }
 
     @Test
     void throwsWhenInvalidEmailFormat() {
-      assertThatThrownBy(
-              () -> service.createContact("not-an-email", ContactType.EMAIL, "Label", false, null))
+      assertThatThrownBy(() -> service.createContact("not-an-email", ContactType.EMAIL, null))
           .isInstanceOf(DomainException.class)
           .hasMessageContaining("Invalid email");
     }
 
     @Test
     void createsAndSavesContactWhenValidEmail() {
-      when(contactRepository.findByTenantIdAndContactValueAndContactType(
-              TENANT_ID, "user@example.com", ContactType.EMAIL))
-          .thenReturn(Optional.empty());
+      when(contactRepository
+              .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+                  TENANT_ID, ContactType.EMAIL, "user@example.com"))
+          .thenReturn(java.util.List.of());
       when(contactRepository.save(any(Contact.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      Contact result =
-          service.createContact(
-              "  user@example.com  ", ContactType.EMAIL, "Work Email", false, null);
+      Contact result = service.createContact("  user@example.com  ", ContactType.EMAIL, null);
 
       ArgumentCaptor<Contact> captor = ArgumentCaptor.forClass(Contact.class);
       verify(contactRepository).save(captor.capture());
       Contact saved = captor.getValue();
       assertThat(saved.getContactValue()).isEqualTo("user@example.com");
       assertThat(saved.getContactType()).isEqualTo(ContactType.EMAIL);
-      assertThat(saved.getLabel()).isEqualTo("Work Email");
-      assertThat(saved.getIsPersonal()).isFalse();
       assertThat(result).isSameAs(saved);
     }
 
@@ -94,17 +90,17 @@ class ContactServiceTest {
           Contact.builder().contactValue("user@example.com").contactType(ContactType.EMAIL).build();
       existing.setId(UUID.randomUUID());
       existing.setTenantId(TENANT_ID);
-      when(contactRepository.findByTenantIdAndContactValueAndContactType(
-              TENANT_ID, "user@example.com", ContactType.EMAIL))
-          .thenReturn(Optional.of(existing));
+      when(contactRepository
+              .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+                  TENANT_ID, ContactType.EMAIL, "user@example.com"))
+          .thenReturn(java.util.List.of(existing));
 
-      Contact result =
-          service.createContact("user@example.com", ContactType.EMAIL, "Label", false, null);
+      Contact result = service.createContact("user@example.com", ContactType.EMAIL, null);
 
       assertThat(result).isSameAs(existing);
       verify(contactRepository)
-          .findByTenantIdAndContactValueAndContactType(
-              TENANT_ID, "user@example.com", ContactType.EMAIL);
+          .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+              TENANT_ID, ContactType.EMAIL, "user@example.com");
     }
   }
 
@@ -149,9 +145,10 @@ class ContactServiceTest {
           Contact.builder().contactValue("user@example.com").contactType(ContactType.EMAIL).build();
       contact.setId(UUID.randomUUID());
       contact.setTenantId(TENANT_ID);
-      when(contactRepository.findByTenantIdAndContactValueAndContactType(
-              TENANT_ID, "user@example.com", ContactType.EMAIL))
-          .thenReturn(Optional.of(contact));
+      when(contactRepository
+              .findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
+                  TENANT_ID, ContactType.EMAIL, "user@example.com"))
+          .thenReturn(java.util.List.of(contact));
 
       Optional<Contact> result = service.findByValueAndType("user@example.com", ContactType.EMAIL);
 
@@ -234,8 +231,8 @@ class ContactServiceTest {
   }
 
   @Nested
-  @DisplayName("updateContactFields")
-  class UpdateContactFields {
+  @DisplayName("replacePoint")
+  class ReplacePoint {
 
     private Contact jane(UUID contactId) {
       Contact contact =
@@ -246,17 +243,20 @@ class ContactServiceTest {
               .build();
       contact.setId(contactId);
       contact.setTenantId(TENANT_ID);
-      when(contactRepository.findById(contactId)).thenReturn(Optional.of(contact));
-      when(contactRepository.save(any(Contact.class))).thenAnswer(inv -> inv.getArgument(0));
       return contact;
     }
 
     @Test
     void anotherAddressIsReportedInTheSameTransaction() {
       UUID contactId = UUID.randomUUID();
-      jane(contactId);
+      Contact contact = jane(contactId);
+      contact.verify();
+      when(contactRepository.save(contact)).thenReturn(contact);
 
-      service.updateContactFields(contactId, "jane.smith@elsewhere.example", null, null, null);
+      service.replacePoint(
+          contact, service.prepareChange(contact, "jane.smith@elsewhere.example", null));
+
+      assertThat(contact.getIsVerified()).isFalse();
 
       ArgumentCaptor<ContactPointChangedEvent> event =
           ArgumentCaptor.forClass(ContactPointChangedEvent.class);
@@ -267,11 +267,14 @@ class ContactServiceTest {
     }
 
     @Test
-    void theSameMailboxInOtherLetterCaseOrALabelChangeIsNotReported() {
+    void theSameMailboxInOtherLetterCaseIsNotReported() {
       UUID contactId = UUID.randomUUID();
-      jane(contactId);
+      Contact contact = jane(contactId);
+      contact.verify();
 
-      service.updateContactFields(contactId, "Jane@Example.com", null, "Buying", null);
+      service.replacePoint(contact, service.prepareChange(contact, "Jane@Example.com", null));
+
+      assertThat(contact.getIsVerified()).isTrue();
 
       verify(eventPublisher, never()).publish(any());
     }

@@ -101,7 +101,7 @@ class SalesOrderAccessPolicyTest {
 
   @Test
   void missingPermissionPairDeniesReadAndWrite() {
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, TARGET_USER_ID, false))
         .thenReturn(new PermissionResult(Map.of(), false));
     SalesOrder order = order(TENANT_ID, TARGET_USER_ID);
 
@@ -141,7 +141,7 @@ class SalesOrderAccessPolicyTest {
 
   @Test
   void freshWriteSelectsFreshEvaluatorWithoutChangingScopeRules() {
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, TARGET_USER_ID, false))
         .thenReturn(
             new PermissionResult(Map.of("sales", Map.of("write", DataScope.GLOBAL)), false));
     when(permissionEvaluator.evaluateFresh(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
@@ -162,7 +162,7 @@ class SalesOrderAccessPolicyTest {
     PermissionResult permissions =
         new PermissionResult(
             Map.of("sales", Map.of("read", readScope, "write", writeScope)), false);
-    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("SALES"), TARGET_USER_ID))
+    when(permissionEvaluator.evaluateMembership(TENANT_ID, TARGET_USER_ID, false))
         .thenReturn(permissions);
   }
 

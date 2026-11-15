@@ -2,10 +2,12 @@ package com.fabricmanagement.platform.communication.infra.repository;
 
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -13,6 +15,11 @@ import org.springframework.stereotype.Repository;
 /** Repository for Contact entity. */
 @Repository
 public interface ContactRepository extends JpaRepository<Contact, UUID> {
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "SELECT item FROM Contact item WHERE item.tenantId = :tenantId AND item.id = :id AND"
+          + " item.isActive = true")
+  Optional<Contact> lockActiveByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   List<Contact> findByTenantIdAndContactTypeAndContactValueIgnoreCaseOrderByCreatedAtAsc(
       UUID tenantId, ContactType contactType, String contactValue);

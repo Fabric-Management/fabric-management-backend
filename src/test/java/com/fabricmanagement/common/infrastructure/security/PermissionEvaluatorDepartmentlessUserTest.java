@@ -31,7 +31,7 @@ class PermissionEvaluatorDepartmentlessUserTest {
 
     PermissionResult result =
         evaluator(List.of(template), List.of())
-            .evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.can("sales-orders", "read")).isTrue();
     assertThat(result.scopeOf("sales-orders", "read")).isEqualTo(DataScope.ORGANIZATION);
@@ -45,7 +45,7 @@ class PermissionEvaluatorDepartmentlessUserTest {
 
     PermissionResult result =
         evaluator(List.of(template), List.of())
-            .evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.can("finance", "read")).isFalse();
     assertThat(result.scopeOf("finance", "read")).isNull();
@@ -67,7 +67,7 @@ class PermissionEvaluatorDepartmentlessUserTest {
 
     PermissionResult result =
         evaluator(List.of(), List.of(), departmentRepository)
-            .evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.can("finance", "read")).isFalse();
     assertThat(result.scopeOf("finance", "read")).isNull();
@@ -82,7 +82,7 @@ class PermissionEvaluatorDepartmentlessUserTest {
 
     PermissionResult result =
         evaluator(List.of(template), List.of(override))
-            .evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.can("finance", "read")).isFalse();
     assertThat(result.scopeOf("finance", "read")).isNull();
@@ -98,7 +98,7 @@ class PermissionEvaluatorDepartmentlessUserTest {
 
     PermissionResult result =
         evaluator(List.of(template), List.of(grant, replacement))
-            .evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.can("reports", "export")).isTrue();
     assertThat(result.scopeOf("reports", "export")).isEqualTo(DataScope.DEPARTMENT);
@@ -111,7 +111,8 @@ class PermissionEvaluatorDepartmentlessUserTest {
   @MethodSource("departmentlessDepartmentCodes")
   void returnsEmptyResultWithoutTemplatesOrOverrides(List<String> departmentCodes) {
     PermissionResult result =
-        evaluator(List.of(), List.of()).evaluate(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
+        evaluator(List.of(), List.of())
+            .evaluateFresh(TENANT_ID, ROLE_CODE, departmentCodes, USER_ID);
 
     assertThat(result.permissions()).isEmpty();
     assertThat(result.can("finance", "read")).isFalse();
@@ -124,14 +125,16 @@ class PermissionEvaluatorDepartmentlessUserTest {
   void preservesNullAndSuperAdminRoleFastPaths(List<String> departmentCodes) {
     PermissionEvaluator evaluator = evaluator(List.of(), List.of());
 
-    PermissionResult nullRoleResult = evaluator.evaluate(TENANT_ID, null, departmentCodes, USER_ID);
-    PermissionResult adminResult = evaluator.evaluate(TENANT_ID, "ADMIN", departmentCodes, USER_ID);
+    PermissionResult nullRoleResult =
+        evaluator.evaluateFresh(TENANT_ID, null, departmentCodes, USER_ID);
+    PermissionResult adminResult =
+        evaluator.evaluateFresh(TENANT_ID, "ADMIN", departmentCodes, USER_ID);
     PermissionResult platformAdminResult =
-        evaluator.evaluate(
+        evaluator.evaluateFresh(
             TenantContext.SYSTEM_TENANT_ID, "PLATFORM_ADMIN", departmentCodes, USER_ID);
     // PLATFORM-BOUNDARY-1: the platform role outside the platform tenant grants nothing.
     PermissionResult strayPlatformRole =
-        evaluator.evaluate(TENANT_ID, "PLATFORM_ADMIN", departmentCodes, USER_ID);
+        evaluator.evaluateFresh(TENANT_ID, "PLATFORM_ADMIN", departmentCodes, USER_ID);
 
     assertThat(nullRoleResult.permissions()).isEmpty();
     assertThat(nullRoleResult.can("finance", "read")).isFalse();
@@ -182,7 +185,8 @@ class PermissionEvaluatorDepartmentlessUserTest {
                 "findActiveOverrides".equals(method.getName())
                     ? overrides
                     : defaultValue(method.getReturnType()));
-    return new PermissionEvaluator(templateRepository, overrideRepository, departmentRepository);
+    return new PermissionEvaluator(
+        templateRepository, overrideRepository, departmentRepository, null);
   }
 
   private PermissionTemplate template(

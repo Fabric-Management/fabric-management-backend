@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -108,7 +109,7 @@ class SalesOrderMutationScopeIT extends AbstractIntegrationTest {
   @BeforeEach
   void setUp() {
     actions.clear();
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation -> new PermissionResult(Map.of("sales", Map.copyOf(actions)), false));
     String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -334,7 +335,8 @@ class SalesOrderMutationScopeIT extends AbstractIntegrationTest {
             order.getTenantId(),
             order.getId()),
         jdbc.queryForList(
-            "SELECT * FROM sales_ord.sales_order_line WHERE tenant_id = ? AND sales_order_id = ? ORDER BY id",
+            "SELECT * FROM sales_ord.sales_order_line WHERE tenant_id = ? AND sales_order_id = ?"
+                + " ORDER BY id",
             order.getTenantId(),
             order.getId()));
   }

@@ -2,6 +2,7 @@ package com.fabricmanagement.flowboard.routing.app;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -91,7 +92,7 @@ class RoutingEndpointSecurityTest {
           List.of(
               Map.<String, Map<String, DataScope>>of(),
               Map.of("flowboard", Map.of("write", DataScope.GLOBAL)))) {
-        when(evaluator.evaluate(any(), any(), any(), any()))
+        when(evaluator.evaluateMembership(any(), any(), anyBoolean()))
             .thenReturn(new PermissionResult(permissions, false));
         endpoints.forEach(
             endpoint ->
@@ -102,7 +103,7 @@ class RoutingEndpointSecurityTest {
           context.getBean(RoutingQueryService.class),
           context.getBean(RoutingPoolConfigurationService.class),
           context.getBean(RoutingRepairService.class));
-      when(evaluator.evaluate(any(), any(), any(), any()))
+      when(evaluator.evaluateMembership(any(), any(), anyBoolean()))
           .thenReturn(
               new PermissionResult(
                   Map.of("flowboard", Map.of("manage-routing", DataScope.GLOBAL)), false));

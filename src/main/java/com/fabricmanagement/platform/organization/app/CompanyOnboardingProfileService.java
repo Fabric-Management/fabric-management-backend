@@ -137,10 +137,11 @@ public class CompanyOnboardingProfileService {
     if (prepared.address != null) {
       if (prepared.headquarters == null) {
         Address created = addressService.createAddress(prepared.address);
-        addresses.assignAddress(root.getId(), created.getId(), true, true);
+        addresses.assignAddressForProvisioning(root.getId(), created.getId(), true, true);
       } else {
         if (!Boolean.TRUE.equals(prepared.headquarters.getIsHeadquarters())) {
-          addresses.setAsHeadquarters(root.getId(), prepared.headquarters.getAddressId());
+          addresses.setHeadquartersForOnboarding(
+              root.getId(), prepared.headquarters.getAddressId());
         }
         addressService.replaceOnboardingHeadquarters(
             prepared.headquarters.getAddressId(), root.getId(), prepared.address);

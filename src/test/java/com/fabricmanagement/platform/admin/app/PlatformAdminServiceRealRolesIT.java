@@ -3,8 +3,8 @@ package com.fabricmanagement.platform.admin.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.admin.dto.PlatformTenantUser;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
-import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +27,7 @@ class PlatformAdminServiceRealRolesIT extends AbstractFabricAppIntegrationTest {
   @Autowired private PlatformAdminService service;
 
   private final List<UUID> createdTenants = new ArrayList<>();
+  private final List<UUID> createdLoginIdentities = new ArrayList<>();
 
   @AfterEach
   void cleanUp() {
@@ -34,12 +35,17 @@ class PlatformAdminServiceRealRolesIT extends AbstractFabricAppIntegrationTest {
     // The container is shared with other real-role ITs: leave nothing behind.
     JdbcTemplate owner = owner();
     for (UUID tenantId : createdTenants) {
+      owner.update("DELETE FROM common_auth.membership WHERE tenant_id = ?", tenantId);
       owner.update("DELETE FROM common_user.common_user WHERE tenant_id = ?", tenantId);
       owner.update("DELETE FROM common_user.common_role WHERE tenant_id = ?", tenantId);
       owner.update("DELETE FROM common_company.common_organization WHERE tenant_id = ?", tenantId);
       owner.update("DELETE FROM common_tenant.common_tenant WHERE id = ?", tenantId);
     }
     createdTenants.clear();
+    for (UUID identityId : createdLoginIdentities) {
+      owner.update("DELETE FROM common_auth.login_identity WHERE id = ?", identityId);
+    }
+    createdLoginIdentities.clear();
   }
 
   @Test
@@ -49,20 +55,34 @@ class PlatformAdminServiceRealRolesIT extends AbstractFabricAppIntegrationTest {
     UUID target = insertTenant("Target");
     UUID organisation = insertOrganisation(target, "Ashdown Mills");
     UUID user = insertUser(target, organisation);
+    UUID withoutLogin = insertUser(target, organisation);
+    String email = "harriet." + shortId().toLowerCase(Locale.ROOT) + "@example.com";
+    insertLogin(target, user, email);
     insertUser(caller, insertOrganisation(caller, "Caller Org"));
 
     // The request runs as the platform staff member's own tenant.
     TenantContext.setCurrentTenantId(caller);
 
-    List<UserDto> users = service.getTenantUsers(target);
+    List<PlatformTenantUser> users = service.getTenantUsers(target);
     List<OrganizationDto> organisations = service.getTenantOrganizations(target);
 
-    assertThat(users).extracting(UserDto::getId).containsExactly(user);
+    assertThat(users)
+        .extracting(PlatformTenantUser::id)
+        .containsExactlyInAnyOrder(user, withoutLogin);
+    // Each user carries the e-mail they sign in with; a user without a login has none.
+    assertThat(users)
+        .filteredOn(listed -> listed.id().equals(user))
+        .extracting(PlatformTenantUser::email)
+        .containsExactly(email);
+    assertThat(users)
+        .filteredOn(listed -> listed.id().equals(withoutLogin))
+        .extracting(PlatformTenantUser::email)
+        .containsOnlyNulls();
     assertThat(organisations).extracting(OrganizationDto::getName).containsExactly("Ashdown Mills");
     assertThat(service.getTenantUser(target, user).getId()).isEqualTo(user);
     assertThat(service.getTenantOrganization(target, organisation).getName())
         .isEqualTo("Ashdown Mills");
-    assertThat(service.getTenantStatistics(target).getUserCount()).isEqualTo(1L);
+    assertThat(service.getTenantStatistics(target).getUserCount()).isEqualTo(2L);
     // The caller's tenant is restored afterwards.
     assertThat(TenantContext.getCurrentTenantIdOrNull()).isEqualTo(caller);
   }
@@ -128,6 +148,24 @@ class PlatformAdminServiceRealRolesIT extends AbstractFabricAppIntegrationTest {
             organisationId,
             roleId);
     return userId;
+  }
+
+  private void insertLogin(UUID tenantId, UUID userId, String email) {
+    UUID identityId = UUID.randomUUID();
+    owner()
+        .update(
+            "INSERT INTO common_auth.login_identity (id, email, password_hash) VALUES (?, ?,"
+                + " 'not-a-real-hash')",
+            identityId,
+            email);
+    createdLoginIdentities.add(identityId);
+    owner()
+        .update(
+            "INSERT INTO common_auth.membership (login_identity_id, tenant_id, user_id) VALUES (?,"
+                + " ?, ?)",
+            identityId,
+            tenantId,
+            userId);
   }
 
   private static String shortId() {

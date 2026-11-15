@@ -11,7 +11,7 @@ import org.mapstruct.Mapping;
 @Mapper(config = MapStructConfig.class)
 public interface OrganizationContactMapper {
 
-  @Mapping(source = "organization.id", target = "organizationId")
+  @Mapping(source = "organizationId", target = "organizationId")
   @Mapping(source = "contact", target = "contact")
   OrganizationContactDto toDto(OrganizationContact entity);
 

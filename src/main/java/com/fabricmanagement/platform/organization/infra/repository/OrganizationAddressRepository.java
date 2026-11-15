@@ -20,6 +20,8 @@ public interface OrganizationAddressRepository
       UUID organizationId, UUID addressId);
 
   /** Finds only active assignments. Used by business-logic operations. */
+  boolean existsByTenantIdAndAddressIdAndIsActiveTrue(UUID tenantId, UUID addressId);
+
   @Query(
       "SELECT oa FROM OrganizationAddress oa "
           + "WHERE oa.organizationId = :orgId AND oa.addressId = :addressId "

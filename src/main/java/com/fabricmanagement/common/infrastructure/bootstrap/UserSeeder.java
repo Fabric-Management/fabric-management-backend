@@ -513,7 +513,7 @@ public class UserSeeder implements DataSeeder {
             .invitationEmailSuppressed(true)
             .build();
 
-    UserDto user = userCreationService.createInternalUser(req);
+    UserDto user = userCreationService.createInternalUserForProvisioning(req);
     stampDemoSeed(user.getId(), tenantId);
 
     // 3. Mark all auto-assigned contacts as verified to allow login

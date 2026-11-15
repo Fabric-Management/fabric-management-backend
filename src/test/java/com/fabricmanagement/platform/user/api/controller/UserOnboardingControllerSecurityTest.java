@@ -17,6 +17,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContextResolver;
 import com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.RestAuthenticationEntryPoint;
 import com.fabricmanagement.common.infrastructure.security.SecurityConfig;
@@ -48,6 +49,7 @@ import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRep
 import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.platform.user.security.OnboardingAccessService;
+import com.fabricmanagement.platform.user.security.PermissionIdentityReader;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -79,7 +81,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
   SecurityConfig.class, RestAuthenticationEntryPoint.class, JwtAuthenticationFilter.class,
   LocalizationFilter.class, UserService.class, UserOnboardingService.class,
   OnboardingAccessService.class, PermissionEvaluator.class, AuthenticatedUserContextResolver.class,
-  OnboardingRequestValidator.class
+  OnboardingRequestValidator.class, PermissionIdentityReader.class
 })
 class UserOnboardingControllerSecurityTest {
   private static final UUID TENANT = UUID.randomUUID();
@@ -94,6 +96,7 @@ class UserOnboardingControllerSecurityTest {
   @MockitoBean private UserRepository users;
   @MockitoBean private PermissionTemplateRepository templates;
   @MockitoBean private PermissionOverrideRepository overrides;
+  @MockitoBean private PermissionCacheInvalidation permissionCache;
   @MockitoBean private DepartmentRepository departments;
   @MockitoBean private UserCreationService creation;
   @MockitoBean private UserQueryService queries;

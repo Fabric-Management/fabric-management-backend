@@ -54,6 +54,13 @@ public class OrganizationContact extends BaseJunctionEntity implements Assignabl
   @Column(name = "department", length = 255)
   private String department;
 
+  @Column(name = "label", length = 100)
+  private String label;
+
+  @Column(name = "is_personal", nullable = false)
+  @Builder.Default
+  private Boolean isPersonal = false;
+
   @Override
   public UUID getParentId() {
     return organizationId;

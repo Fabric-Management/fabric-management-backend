@@ -39,8 +39,6 @@ import lombok.*;
  *     .contactValue("john.doe@gmail.com")
  *     .contactType(ContactType.EMAIL)
  *     .isVerified(true)
- *     .label("Personal Email")
- *     .isPersonal(true)
  *     .build();
  *
  * // Company phone extension
@@ -48,8 +46,6 @@ import lombok.*;
  *     .contactValue("101")
  *     .contactType(ContactType.PHONE_EXTENSION)
  *     .parentContactId(companyPhoneContactId)
- *     .label("Extension 101")
- *     .isPersonal(false)
  *     .build();
  * }</pre>
  */
@@ -103,14 +99,6 @@ public class Contact extends BaseEntity {
   private Boolean isVerified = false;
 
   /**
-   * Label for categorization
-   *
-   * <p>Examples: "Home", "Work", "Mobile", "Extension 101", "Main Office"
-   */
-  @Column(name = "label", length = 100)
-  private String label;
-
-  /**
    * Parent contact ID (for PHONE_EXTENSION)
    *
    * <p>For PHONE_EXTENSION type, this references the parent PHONE contact
@@ -119,17 +107,6 @@ public class Contact extends BaseEntity {
    */
   @Column(name = "parent_contact_id")
   private UUID parentContactId;
-
-  /**
-   * Personal vs. company-provided flag
-   *
-   * <p>true = User's personal contact (owned by user)
-   *
-   * <p>false = Company-provided contact (e.g., work email, company phone extension)
-   */
-  @Column(name = "is_personal", nullable = false)
-  @Builder.Default
-  private Boolean isPersonal = true;
 
   /** Mark contact as verified */
   public void verify() {

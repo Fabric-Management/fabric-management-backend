@@ -1,11 +1,14 @@
 package com.fabricmanagement.platform.organization.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationAddressFacade;
 import com.fabricmanagement.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.platform.organization.dto.OrganizationAddressDto;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -73,6 +76,18 @@ public class OrganizationAddressController {
         ApiResponse.success(
             facade.createAndAssignAddress(organizationId, createRequest, isPrimary, isHeadquarters),
             "Address created and assigned successfully"));
+  }
+
+  @PutMapping("/{addressId}")
+  @Operation(
+      operationId = "updateOrganizationAddress",
+      summary = "Update a postal address on this owner's card")
+  public ResponseEntity<ApiResponse<AddressDto>> updateAddress(
+      @PathVariable UUID organizationId,
+      @PathVariable UUID addressId,
+      @Valid @RequestBody UpdateAddressRequest request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(facade.updateAddress(organizationId, addressId, request)));
   }
 
   @PutMapping("/{addressId}/primary")

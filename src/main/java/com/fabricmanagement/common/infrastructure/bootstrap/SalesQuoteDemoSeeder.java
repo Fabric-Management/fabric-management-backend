@@ -832,7 +832,7 @@ public class SalesQuoteDemoSeeder {
             .orElse(null);
 
     UserDto created =
-        userCreationService.createInternalUser(
+        userCreationService.createInternalUserForProvisioning(
             CreateInternalUserRequest.builder()
                 .firstName(MARKETER_FIRST_NAME)
                 .lastName(MARKETER_LAST_NAME)

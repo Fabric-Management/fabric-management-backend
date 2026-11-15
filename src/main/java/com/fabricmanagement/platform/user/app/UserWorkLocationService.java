@@ -3,11 +3,12 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
-import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
+import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.user.domain.UserWorkLocation;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
+import com.fabricmanagement.platform.user.security.MemberAdministrationAccess;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,14 +25,20 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
   private final UserRepository userRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
+  private final MemberAdministrationAccess access;
+  private final AddressRepository addresses;
 
   public UserWorkLocationService(
       UserRepository userRepository,
       OrganizationAddressRepository organizationAddressRepository,
-      UserWorkLocationRepository userWorkLocationRepository) {
+      UserWorkLocationRepository userWorkLocationRepository,
+      MemberAdministrationAccess access,
+      AddressRepository addresses) {
     this.userRepository = userRepository;
     this.organizationAddressRepository = organizationAddressRepository;
     this.userWorkLocationRepository = userWorkLocationRepository;
+    this.access = access;
+    this.addresses = addresses;
   }
 
   @Override
@@ -50,30 +57,27 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
   @Override
   protected void validateChildExists(UUID childId) {
     UUID tenantId = TenantContext.requireTenantId();
-    OrganizationAddress oa =
-        organizationAddressRepository
-            .findByAddressId(childId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Organization address not found", "USER_LOCATION_NOT_FOUND", 404));
-
-    if (!oa.getTenantId().equals(tenantId)) {
+    // Address edits and removals take this same lock before moving or deleting work locations.
+    if (addresses.lockActiveByTenantAndId(tenantId, childId).isEmpty()
+        || !organizationAddressRepository.existsByTenantIdAndAddressIdAndIsActiveTrue(
+            tenantId, childId)) {
       throw new PlatformDomainException(
-          "Organization address does not belong to current tenant",
-          "USER_LOCATION_TENANT_MISMATCH",
-          403);
+          "Organisation address not found", "USER_LOCATION_NOT_FOUND", 404);
     }
   }
 
   @Override
   protected Optional<UserWorkLocation> findExisting(UUID parentId, UUID childId) {
-    return userWorkLocationRepository.findByUserIdAndOrgAddressId(parentId, childId);
+    return userWorkLocationRepository
+        .findByUserIdAndOrgAddressId(parentId, childId)
+        .filter(location -> TenantContext.requireTenantId().equals(location.getTenantId()));
   }
 
   @Override
   protected Optional<UserWorkLocation> findPrimaryByParent(UUID parentId) {
-    return userWorkLocationRepository.findPrimaryByUserId(parentId);
+    return userWorkLocationRepository
+        .findPrimaryByUserId(parentId)
+        .filter(location -> TenantContext.requireTenantId().equals(location.getTenantId()));
   }
 
   @Override
@@ -94,22 +98,34 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
   @Transactional
   public UserWorkLocation assignLocation(
       UUID userId, UUID orgAddressId, Boolean isPrimary, String notes) {
+    validateParentExists(userId);
+    validateChildExists(orgAddressId);
+    access.requireManage();
+    return createLocation(userId, orgAddressId, isPrimary, notes);
+  }
+
+  @Transactional
+  UserWorkLocation assignLocationForProvisioning(
+      UUID userId, UUID orgAddressId, Boolean isPrimary, String notes) {
+    validateParentExists(userId);
+    validateChildExists(orgAddressId);
+    return createLocation(userId, orgAddressId, isPrimary, notes);
+  }
+
+  private UserWorkLocation createLocation(
+      UUID userId, UUID orgAddressId, Boolean isPrimary, String notes) {
     log.info(
         "Assigning work location: userId={}, orgAddressId={}, isPrimary={}",
         userId,
         orgAddressId,
         isPrimary);
-    validateParentExists(userId);
-    validateChildExists(orgAddressId);
-
-    if (userWorkLocationRepository.findByUserIdAndOrgAddressId(userId, orgAddressId).isPresent()) {
+    if (findExisting(userId, orgAddressId).isPresent()) {
       throw new PlatformDomainException(
           "Work location is already assigned to this user", "USER_LOCATION_ALREADY_ASSIGNED", 409);
     }
 
     if (Boolean.TRUE.equals(isPrimary)) {
-      userWorkLocationRepository
-          .findPrimaryByUserId(userId)
+      findPrimaryByParent(userId)
           .ifPresent(
               existing -> {
                 existing.setIsPrimary(false);
@@ -131,6 +147,38 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
   @Transactional
   public void removeLocation(UUID userId, UUID orgAddressId) {
     unassign(userId, orgAddressId);
+  }
+
+  @Override
+  @Transactional
+  public UserWorkLocation assign(UUID userId, UUID orgAddressId, Boolean isPrimary) {
+    return assignLocation(userId, orgAddressId, isPrimary, null);
+  }
+
+  @Override
+  @Transactional
+  public UserWorkLocation setPrimary(UUID userId, UUID orgAddressId) {
+    validateChildExists(orgAddressId);
+    requireAssignment(userId, orgAddressId);
+    access.requireManage();
+    return super.setPrimary(userId, orgAddressId);
+  }
+
+  @Override
+  @Transactional
+  public void unassign(UUID userId, UUID orgAddressId) {
+    validateChildExists(orgAddressId);
+    UserWorkLocation location = requireAssignment(userId, orgAddressId);
+    access.requireManage();
+    userWorkLocationRepository.delete(location);
+  }
+
+  private UserWorkLocation requireAssignment(UUID userId, UUID orgAddressId) {
+    return findExisting(userId, orgAddressId)
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Work location assignment not found", "USER_LOCATION_NOT_FOUND", 404));
   }
 
   @Transactional(readOnly = true)

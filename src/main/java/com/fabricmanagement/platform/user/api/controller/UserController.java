@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
@@ -57,12 +58,10 @@ public class UserController {
 
   private PermissionResult getPermissions(UUID requesterId) {
     UUID tenantId = TenantContext.requireTenantId();
-    UserDto requester =
-        userService
-            .findByIdWithPermissionData(tenantId, requesterId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
-    return permissionEvaluator.evaluate(
-        tenantId, requester.getRoleCode(), requester.getDepartmentCodes(), requesterId);
+    return permissionEvaluator.evaluateMembership(
+        tenantId,
+        requesterId,
+        AuthenticatedUserContext.restrictsPlatformRole(tenantId, requesterId));
   }
 
   /**
@@ -78,11 +77,6 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> createInternalUser(
       @Valid @RequestBody CreateInternalUserRequest request) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!getPermissions(requesterId).can("members", "manage")) {
-      throw new AccessDeniedException(
-          "Only Administration Office and Human Resources can create members.");
-    }
-
     log.info(
         "Creating internal employee: contactValue={}, requesterId={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()),
@@ -107,11 +101,6 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> createExternalUser(
       @Valid @RequestBody CreateExternalUserRequest request) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!getPermissions(requesterId).can("members", "manage")) {
-      throw new AccessDeniedException(
-          "Only Administration Office and Human Resources can create members.");
-    }
-
     log.info(
         "Creating external user: contactValue={}, requesterId={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()),
@@ -283,8 +272,8 @@ public class UserController {
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
     PermissionResult permResult =
-        permissionEvaluator.evaluate(
-            tenantId, user.getRoleCode(), user.getDepartmentCodes(), user.getId());
+        permissionEvaluator.evaluateMembership(
+            tenantId, userId, AuthenticatedUserContext.restrictsPlatformRole(tenantId, userId));
 
     user.setPermissions(permResult.permissions());
     user.setSuperAdmin(permResult.isSuperAdmin());

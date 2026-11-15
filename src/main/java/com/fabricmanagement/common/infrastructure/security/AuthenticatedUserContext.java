@@ -9,9 +9,8 @@ import java.util.stream.Collectors;
 /**
  * Immutable snapshot of the authenticated user's identity, role and department memberships.
  *
- * <p>Populated by {@link JwtAuthenticationFilter} from JWT claims and stored as {@code
- * Authentication.details}. Consumed by security services (e.g. {@code PermissionEvaluator}) via
- * SpEL {@code @PreAuthorize} expressions without any additional DB round-trips.
+ * <p>Populated by {@link JwtAuthenticationFilter} from JWT claims. The permission evaluator reads
+ * current roles and departments from persistence.
  *
  * <p><b>JWT claim sources:</b>
  *
@@ -30,10 +29,45 @@ public record AuthenticatedUserContext(
     String primaryDepartmentCode,
     UUID tenantId,
     boolean isPlayground,
-    String guestId) {
+    String guestId,
+    boolean demoImpersonation) {
 
   public AuthenticatedUserContext {
     departmentCodes = departmentCodes != null ? List.copyOf(departmentCodes) : List.of();
+  }
+
+  public AuthenticatedUserContext(
+      UUID userId,
+      String roleCode,
+      List<String> departmentCodes,
+      String primaryDepartmentCode,
+      UUID tenantId,
+      boolean isPlayground,
+      String guestId) {
+    this(
+        userId,
+        roleCode,
+        departmentCodes,
+        primaryDepartmentCode,
+        tenantId,
+        isPlayground,
+        guestId,
+        false);
+  }
+
+  public static boolean restrictsPlatformRole(UUID tenantId, UUID userId) {
+    var authentication =
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .getAuthentication();
+    return authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUserContext context
+        && java.util.Objects.equals(tenantId, context.tenantId())
+        && java.util.Objects.equals(userId, context.userId())
+        && context.restrictsPlatformRole();
+  }
+
+  public boolean restrictsPlatformRole() {
+    return PlatformAuthority.isPlatformTenant(tenantId) && (isPlayground || demoImpersonation);
   }
 
   /** Constructor for backward compatibility */

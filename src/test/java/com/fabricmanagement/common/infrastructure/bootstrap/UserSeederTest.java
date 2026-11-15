@@ -91,7 +91,8 @@ class UserSeederTest {
     when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentCode(
             Mockito.eq(tenantId), Mockito.eq(organizationId), anyString()))
         .thenAnswer(invocation -> Optional.of(department(organizationId)));
-    when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
+    when(userCreationService.createInternalUserForProvisioning(
+            any(CreateInternalUserRequest.class)))
         .thenAnswer(invocation -> UserDto.builder().id(UUID.randomUUID()).build());
     when(userRepository.findByTenantIdAndId(Mockito.eq(tenantId), ArgumentMatchers.any(UUID.class)))
         .thenAnswer(
@@ -111,7 +112,8 @@ class UserSeederTest {
 
     ArgumentCaptor<CreateInternalUserRequest> requestCaptor =
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
-    verify(userCreationService, Mockito.times(14)).createInternalUser(requestCaptor.capture());
+    verify(userCreationService, Mockito.times(14))
+        .createInternalUserForProvisioning(requestCaptor.capture());
     verify(authUserRepository, Mockito.times(14)).save(any());
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
     verify(userRepository, Mockito.times(14)).save(userCaptor.capture());
@@ -149,7 +151,7 @@ class UserSeederTest {
     int seeded = userSeeder.seedFor(tenantId, "owner@example.com", PersonaSubset.REPRESENTATIVE);
 
     assertThat(seeded).isZero();
-    verify(userCreationService, never()).createInternalUser(any());
+    verify(userCreationService, never()).createInternalUserForProvisioning(any());
     verify(authUserRepository, never()).save(any());
   }
 
@@ -215,7 +217,8 @@ class UserSeederTest {
     when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentCode(
             Mockito.eq(tenantId), Mockito.eq(organizationId), anyString()))
         .thenAnswer(invocation -> Optional.of(department(organizationId)));
-    when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
+    when(userCreationService.createInternalUserForProvisioning(
+            any(CreateInternalUserRequest.class)))
         .thenAnswer(invocation -> UserDto.builder().id(UUID.randomUUID()).build());
     when(userRepository.findByTenantIdAndId(Mockito.eq(tenantId), ArgumentMatchers.any(UUID.class)))
         .thenAnswer(
@@ -233,7 +236,8 @@ class UserSeederTest {
 
     ArgumentCaptor<CreateInternalUserRequest> requests =
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
-    verify(userCreationService, Mockito.times(8)).createInternalUser(requests.capture());
+    verify(userCreationService, Mockito.times(8))
+        .createInternalUserForProvisioning(requests.capture());
     assertThat(seeded).isEqualTo(8);
     assertThat(requests.getAllValues())
         .extracting(CreateInternalUserRequest::getContactValue)

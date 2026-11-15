@@ -33,7 +33,7 @@ class OwnershipAssignmentPermissionEvaluatorTest {
   @BeforeEach
   void setUp() {
     evaluator =
-        new PermissionEvaluator(templateRepository, overrideRepository, departmentRepository);
+        new PermissionEvaluator(templateRepository, overrideRepository, departmentRepository, null);
     when(departmentRepository.findAncestorCodes(TENANT_ID, "SALES")).thenReturn(List.of("SALES"));
   }
 
@@ -42,7 +42,8 @@ class OwnershipAssignmentPermissionEvaluatorTest {
     stubTemplates("MANAGER", List.of());
     when(overrideRepository.findActiveOverrides(TENANT_ID, USER_ID)).thenReturn(List.of());
 
-    PermissionResult result = evaluator.evaluate(TENANT_ID, "MANAGER", List.of("SALES"), USER_ID);
+    PermissionResult result =
+        evaluator.evaluateFresh(TENANT_ID, "MANAGER", List.of("SALES"), USER_ID);
 
     assertThat(result.can("sales", "assign-owner")).isFalse();
   }
@@ -61,7 +62,7 @@ class OwnershipAssignmentPermissionEvaluatorTest {
     when(overrideRepository.findActiveOverrides(TENANT_ID, USER_ID)).thenReturn(List.of(override));
 
     PermissionResult result =
-        evaluator.evaluate(TENANT_ID, "SALES_COORDINATOR", List.of("SALES"), USER_ID);
+        evaluator.evaluateFresh(TENANT_ID, "SALES_COORDINATOR", List.of("SALES"), USER_ID);
 
     assertThat(result.can("sales", "assign-owner")).isTrue();
     assertThat(result.scopeOf("sales", "assign-owner")).isEqualTo(DataScope.ORGANIZATION);
@@ -80,7 +81,8 @@ class OwnershipAssignmentPermissionEvaluatorTest {
     stubTemplates("WORKER", List.of(salesWrite));
     when(overrideRepository.findActiveOverrides(TENANT_ID, USER_ID)).thenReturn(List.of());
 
-    PermissionResult result = evaluator.evaluate(TENANT_ID, "WORKER", List.of("SALES"), USER_ID);
+    PermissionResult result =
+        evaluator.evaluateFresh(TENANT_ID, "WORKER", List.of("SALES"), USER_ID);
 
     assertThat(result.can("sales", "write")).isTrue();
     assertThat(result.can("sales", "assign-owner")).isFalse();

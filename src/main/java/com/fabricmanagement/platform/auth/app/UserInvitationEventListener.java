@@ -158,16 +158,17 @@ public class UserInvitationEventListener {
                   log.info(
                       "Creating contact for existing identity invite: {}",
                       PiiMaskingUtil.maskEmail(event.getContactValue()));
-                  return contactService.createContact(
-                      event.getContactValue(), null, "Primary", true, null);
+                  return contactService.createContact(event.getContactValue(), null, null);
                 });
 
     contactService.verifyContact(contact.getId());
 
     if (!userContactAssignmentService.existsUserContact(event.getUserId(), contact.getId())) {
-      userContactAssignmentService.assignContact(event.getUserId(), contact.getId(), true);
+      userContactAssignmentService.assignContactForProvisioning(
+          event.getUserId(), contact.getId(), true);
     } else {
-      userContactAssignmentService.setAsDefault(event.getUserId(), contact.getId());
+      userContactAssignmentService.makeProvisionedContactDefault(
+          event.getUserId(), contact.getId());
     }
   }
 

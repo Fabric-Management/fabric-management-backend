@@ -229,8 +229,7 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
   }
 
   @Test
-  void nonRootWritesRemainAccessibleWithoutCompanySetupAuthorityUntilTd22() throws Exception {
-    // TD-22 owns authorisation for child and external organisations.
+  void childAndPartnerUpdatesRespectTheOrganisationBoundary() throws Exception {
     var child = Organization.create("Hawthorn Warehouse", null, OrganizationType.WEAVER);
     child.setParent(root);
     UUID childId = organizations.saveAndFlush(child).getId();
@@ -244,16 +243,22 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
             put("/api/v1/common/organizations/{id}", childId)
                 .with(authentication(SecurityContextHolder.getContext().getAuthentication()))
                 .param("name", "Hawthorn Leeds Warehouse"))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
     perform(
             put("/api/v1/common/organizations/{id}", externalId)
                 .with(authentication(SecurityContextHolder.getContext().getAuthentication()))
                 .param("name", "York Cloth Works Ltd"))
+        .andExpect(status().isForbidden());
+    authenticate(admin, "ADMIN");
+    perform(
+            put("/api/v1/common/organizations/{id}", childId)
+                .with(authentication(SecurityContextHolder.getContext().getAuthentication()))
+                .param("name", "Hawthorn Leeds Warehouse"))
         .andExpect(status().isOk());
     assertThat(organizations.findByTenantIdAndId(tenant, childId).orElseThrow().getName())
         .isEqualTo("Hawthorn Leeds Warehouse");
     assertThat(organizations.findByTenantIdAndId(tenant, externalId).orElseThrow().getName())
-        .isEqualTo("York Cloth Works Ltd");
+        .isEqualTo("York Cloth Ltd");
     assertNames(ORIGINAL);
   }
 
@@ -272,7 +277,8 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
     for (String role : List.of("fabric_app", "fabric_system")) {
       assertThat(
               systemJdbc.queryForObject(
-                  "SELECT has_function_privilege(?, 'common_company.backfill_tenant_company_names()', 'EXECUTE')",
+                  "SELECT has_function_privilege(?,"
+                      + " 'common_company.backfill_tenant_company_names()', 'EXECUTE')",
                   Boolean.class,
                   role))
           .isFalse();
@@ -294,7 +300,8 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
   private UUID createTenant() {
     UUID id = UUID.randomUUID();
     systemJdbc.update(
-        "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type) VALUES (?, ?, ?, ?, 'REGULAR')",
+        "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type) VALUES (?, ?, ?, ?,"
+            + " 'REGULAR')",
         id,
         "HW-" + id,
         "hawthorn-" + id,

@@ -4,7 +4,6 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.InternalEndpoint;
 import com.fabricmanagement.platform.communication.api.facade.AddressValidationFacade;
 import com.fabricmanagement.platform.communication.app.AddressValidationService;
-import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.AutocompleteResponse;
 import com.fabricmanagement.platform.communication.dto.ValidateAddressRequest;
@@ -13,7 +12,6 @@ import com.fabricmanagement.platform.communication.util.PostcodeValidator;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -109,41 +107,6 @@ public class AddressValidationController {
   }
 
   /**
-   * Validate and create endpoint - Validate address and persist to database.
-   *
-   * <p>Validates address first, then creates Address entity with normalized data.
-   *
-   * <p>Only VERIFIED or PARTIAL addresses are persisted.
-   */
-  @PostMapping("/validate-and-create")
-  public ResponseEntity<ApiResponse<AddressDto>> validateAndCreate(
-      @Valid @RequestBody ValidateAddressRequest request) {
-    log.info(
-        "Validate and create request: placeId={}, addressType={}",
-        request.getPlaceId(),
-        request.getAddressType());
-
-    AddressDto address = addressValidationFacade.validateAndCreateAddress(request);
-
-    return ResponseEntity.ok(
-        ApiResponse.success(address, "Address validated and created successfully"));
-  }
-
-  /**
-   * Revalidate existing address endpoint.
-   *
-   * <p>Revalidates an existing address by its placeId and updates with latest data.
-   */
-  @PostMapping("/{addressId}/revalidate")
-  public ResponseEntity<ApiResponse<AddressDto>> revalidateAddress(@PathVariable UUID addressId) {
-    log.info("Revalidate request: addressId={}", addressId);
-
-    AddressDto address = addressValidationFacade.revalidateAddress(addressId);
-
-    return ResponseEntity.ok(ApiResponse.success(address, "Address revalidated successfully"));
-  }
-
-  /**
    * Search addresses by postcode endpoint (Global).
    *
    * <p><b>NOTE:</b> This endpoint uses deprecated Geocoding API method. Main flow uses
@@ -205,7 +168,8 @@ public class AddressValidationController {
               ApiResponse.error(
                   "POSTCODE_TOO_SHORT",
                   String.format(
-                      "Postcode must be at least %d characters for %s. Please enter more characters.",
+                      "Postcode must be at least %d characters for %s. Please enter more"
+                          + " characters.",
                       minLength, countryName)));
     }
 

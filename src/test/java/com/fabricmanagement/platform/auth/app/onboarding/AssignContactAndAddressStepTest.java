@@ -120,7 +120,7 @@ class AssignContactAndAddressStepTest {
     assertThat(request.getValue().getAddressType()).isEqualTo(AddressType.HEADQUARTERS);
     assertThat(request.getValue().getLabel()).isNotBlank();
     verify(addressAssignments)
-        .assignAddress(context.getOrganizationId(), address.getId(), true, true);
+        .assignAddressForProvisioning(context.getOrganizationId(), address.getId(), true, true);
   }
 
   @Test
@@ -132,14 +132,14 @@ class AssignContactAndAddressStepTest {
     Contact contact = mock(Contact.class);
     UUID contactId = UUID.randomUUID();
     when(contact.getId()).thenReturn(contactId);
-    when(contacts.createContact(
-            "office@hawthorn.example", ContactType.EMAIL, "Organization", false, null))
+    when(contacts.createContact("office@hawthorn.example", ContactType.EMAIL, null))
         .thenReturn(contact);
 
     step.execute(context);
 
     verifyNoInteractions(addresses, addressAssignments);
-    verify(contactAssignments).assignContact(context.getOrganizationId(), contactId, true, null);
+    verify(contactAssignments)
+        .ensureOnboardingContact(context.getOrganizationId(), contactId, true);
   }
 
   private OnboardingContext context() {

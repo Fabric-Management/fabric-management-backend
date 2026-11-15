@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.OrganizationTaxIdLookup;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import com.fabricmanagement.platform.user.security.OnboardingAccessService;
 import java.util.Currency;
 import java.util.List;
@@ -38,6 +39,7 @@ public class OrganizationService {
   private final OrganizationTaxIdLookup taxIdLookup;
   private final OrganizationNamingService naming;
   private final OnboardingAccessService onboardingAccess;
+  private final OrganizationWriteAccess writeAccess;
 
   // ========================================
   // CREATE OPERATIONS
@@ -59,13 +61,6 @@ public class OrganizationService {
           400);
     }
 
-    // Validate tax ID uniqueness within tenant
-    if (request.getTaxId() != null
-        && organizationRepository.existsByTenantIdAndTaxId(tenantId, request.getTaxId())) {
-      throw new TaxIdAlreadyExistsException(
-          "Organization with this tax ID already exists in your tenant");
-    }
-
     // Validate parent if provided
     if (request.getParentOrganizationId() != null) {
       if (!organizationRepository.existsByTenantIdAndId(
@@ -73,6 +68,16 @@ public class OrganizationService {
         throw new PlatformDomainException(
             "Parent organization not found", "ORG_PARENT_NOT_FOUND", 404);
       }
+    }
+
+    writeAccess.requireConfigure();
+    writeAccess.requireInternalType(request.getOrganizationType());
+
+    // Validate tax ID uniqueness within tenant
+    if (request.getTaxId() != null
+        && organizationRepository.existsByTenantIdAndTaxId(tenantId, request.getTaxId())) {
+      throw new TaxIdAlreadyExistsException(
+          "Organization with this tax ID already exists in your tenant");
     }
 
     Organization organization =
@@ -267,8 +272,11 @@ public class OrganizationService {
                     new PlatformDomainException(
                         "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
 
+    writeAccess.requireInternalType(organization.getOrganizationType());
     if (organization.isCompanyRoot()) {
       onboardingAccess.requireCompanySetupForCurrentUser();
+    } else {
+      writeAccess.requireConfigure();
     }
 
     // Validate tax ID uniqueness if changed
@@ -310,6 +318,12 @@ public class OrganizationService {
                     new PlatformDomainException(
                         "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
 
+    writeAccess.requireInternalType(organization.getOrganizationType());
+    writeAccess.requireConfigure();
+    if (organization.isCompanyRoot()) {
+      throw new PlatformDomainException(
+          "The root organisation cannot be deactivated", "ORG_ROOT_CANNOT_BE_DEACTIVATED", 409);
+    }
     organization.delete();
     organizationRepository.save(organization);
 

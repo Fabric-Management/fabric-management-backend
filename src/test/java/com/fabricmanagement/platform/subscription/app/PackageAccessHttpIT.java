@@ -1,8 +1,6 @@
 package com.fabricmanagement.platform.subscription.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -66,9 +64,9 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
     evaluations.initialisePlayground(tenantId);
     TenantContext.clear();
 
-    when(permissionEvaluator.evaluate(any(), eq("ADMIN"), any(), any()))
+    when(permissionEvaluator.evaluateMembership(tenantId, owner, false))
         .thenReturn(new PermissionResult(Map.of(), true));
-    when(permissionEvaluator.evaluate(any(), eq("MANAGER"), any(), any()))
+    when(permissionEvaluator.evaluateMembership(tenantId, persona, false))
         .thenReturn(new PermissionResult(Map.of("yarn", Map.of("read", DataScope.GLOBAL)), false));
   }
 
@@ -129,10 +127,11 @@ class PackageAccessHttpIT extends AbstractIntegrationTest {
 
   @Test
   void aRoleWithoutPermissionIsStillRefusedByTheRoleWhenThePackageIsSelected() throws Exception {
-    when(permissionEvaluator.evaluate(any(), eq("VIEWER"), any(), any()))
+    UUID viewer = UUID.randomUUID();
+    when(permissionEvaluator.evaluateMembership(tenantId, viewer, false))
         .thenReturn(new PermissionResult(Map.of(), false));
 
-    performAs(UUID.randomUUID(), "VIEWER")
+    performAs(viewer, "VIEWER")
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
   }

@@ -93,7 +93,14 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
       AuthenticatedUserContext userContext =
           new AuthenticatedUserContext(
-              userId, roleCode, departmentCodes, primaryDepartment, tenantId);
+              userId,
+              roleCode,
+              departmentCodes,
+              primaryDepartment,
+              tenantId,
+              claims.isPlayground(),
+              claims.guestId(),
+              claims.demoImpersonation());
 
       List<SimpleGrantedAuthority> authorities =
           roleCode == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + roleCode));

@@ -21,9 +21,7 @@ public class ContactDto {
   private String contactValue;
   private ContactType contactType;
   private Boolean isVerified;
-  private String label;
   private UUID parentContactId;
-  private Boolean isPersonal;
   private Boolean isActive;
   private Instant createdAt;
   private Instant updatedAt;
@@ -36,9 +34,7 @@ public class ContactDto {
         .contactValue(contact.getContactValue())
         .contactType(contact.getContactType())
         .isVerified(contact.getIsVerified())
-        .label(contact.getLabel())
         .parentContactId(contact.getParentContactId())
-        .isPersonal(contact.getIsPersonal())
         .isActive(contact.getIsActive())
         .createdAt(contact.getCreatedAt())
         .updatedAt(contact.getUpdatedAt())

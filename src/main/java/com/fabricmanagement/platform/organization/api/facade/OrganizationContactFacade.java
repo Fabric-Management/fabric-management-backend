@@ -10,6 +10,7 @@ import com.fabricmanagement.platform.organization.dto.EditOrganizationContactReq
 import com.fabricmanagement.platform.organization.dto.OrganizationContactDto;
 import com.fabricmanagement.platform.organization.dto.UpdateContactAssignmentRequest;
 import com.fabricmanagement.platform.organization.mapper.OrganizationContactMapper;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class OrganizationContactFacade {
 
   private final OrganizationContactAssignmentService assignmentService;
   private final ContactService contactService;
+  private final OrganizationWriteAccess writeAccess;
   private final OrganizationContactMapper mapper;
 
   @Transactional(readOnly = true)
@@ -55,15 +57,18 @@ public class OrganizationContactFacade {
   @Transactional
   public OrganizationContactDto createAndAssignContact(
       UUID organizationId, CreateContactRequest request, Boolean isDefault, String department) {
+    writeAccess.requireContactDetails(organizationId);
     Contact contact =
         contactService.createContact(
-            request.getContactValue(),
-            request.getContactType(),
-            request.getLabel(),
-            request.getIsPersonal(),
-            request.getParentContactId());
+            request.getContactValue(), request.getContactType(), request.getParentContactId());
     OrganizationContact orgContact =
-        assignmentService.assignContact(organizationId, contact.getId(), isDefault, department);
+        assignmentService.assignContact(
+            organizationId,
+            contact.getId(),
+            isDefault,
+            department,
+            request.getLabel(),
+            request.getIsPersonal());
     return mapper.toDto(orgContact);
   }
 

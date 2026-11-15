@@ -21,6 +21,8 @@ public class OrganizationContactDto {
   private UUID contactId;
   private Boolean isDefault;
   private String department;
+  private String label;
+  private Boolean isPersonal;
 
   /** Nested contact details — populated when the contact relation is loaded. */
   private ContactData contact;
@@ -34,9 +36,7 @@ public class OrganizationContactDto {
     private UUID id;
     private String contactValue;
     private ContactType contactType;
-    private String label;
     private Boolean isVerified;
-    private Boolean isPersonal;
     private UUID parentContactId;
   }
 
@@ -46,7 +46,9 @@ public class OrganizationContactDto {
             .organizationId(entity.getOrganizationId())
             .contactId(entity.getContactId())
             .isDefault(entity.getIsDefault())
-            .department(entity.getDepartment());
+            .department(entity.getDepartment())
+            .label(entity.getLabel())
+            .isPersonal(entity.getIsPersonal());
 
     Contact contact = entity.getContact();
     if (contact != null) {
@@ -55,9 +57,7 @@ public class OrganizationContactDto {
               .id(contact.getId())
               .contactValue(contact.getContactValue())
               .contactType(contact.getContactType())
-              .label(contact.getLabel())
               .isVerified(contact.getIsVerified())
-              .isPersonal(contact.getIsPersonal())
               .parentContactId(contact.getParentContactId())
               .build());
     }

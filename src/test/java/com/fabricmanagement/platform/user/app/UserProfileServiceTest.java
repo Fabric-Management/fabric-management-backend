@@ -154,7 +154,7 @@ class UserProfileServiceTest {
     @Test
     void throwsWhenNoPermissionForPersonalCategory() {
       UpdateUserProfileRequest request =
-          UpdateUserProfileRequest.builder().personalPhone("+905551234567").build();
+          UpdateUserProfileRequest.builder().personalPhone("+447700900123").build();
       when(permissionService.canUpdatePersonalProfile(REQUESTER_ID, USER_ID)).thenReturn(false);
 
       assertThatThrownBy(() -> service.updateProfile(USER_ID, request, REQUESTER_ID))
@@ -184,8 +184,6 @@ class UserProfileServiceTest {
       when(contactService.createContact(
               eq("work@example.com"),
               eq(com.fabricmanagement.platform.communication.domain.ContactType.EMAIL),
-              eq("Work email"),
-              eq(false),
               eq(null)))
           .thenReturn(contact);
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
@@ -198,11 +196,9 @@ class UserProfileServiceTest {
           .createContact(
               eq("work@example.com"),
               eq(com.fabricmanagement.platform.communication.domain.ContactType.EMAIL),
-              eq("Work email"),
-              eq(false),
               eq(null));
       verify(userContactAssignmentService)
-          .assignContact(eq(USER_ID), eq(contact.getId()), eq(false));
+          .assignContact(USER_ID, contact.getId(), false, "Work email", false);
       assertThat(result.getId()).isEqualTo(USER_ID);
     }
   }
@@ -214,39 +210,39 @@ class UserProfileServiceTest {
     @Test
     void createsAndAssignsPersonalMobileWhenMissing() {
       Contact contact =
-          Contact.builder().contactValue("+905551234567").contactType(ContactType.MOBILE).build();
+          Contact.builder().contactValue("+447700900123").contactType(ContactType.MOBILE).build();
       contact.setId(UUID.randomUUID());
       contact.setTenantId(TENANT_ID);
-      when(contactService.findByValueAndType("+905551234567", ContactType.MOBILE))
+      when(contactService.findByValueAndType("+447700900123", ContactType.MOBILE))
           .thenReturn(Optional.empty());
-      when(contactService.createContact(
-              "+905551234567", ContactType.MOBILE, "Personal mobile", true, null))
+      when(contactService.createContact("+447700900123", ContactType.MOBILE, null))
           .thenReturn(contact);
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
           .thenReturn(false);
 
-      service.updatePersonalContact(USER_ID, "+905551234567", ContactType.MOBILE);
+      service.updatePersonalContact(USER_ID, "+447700900123", ContactType.MOBILE);
 
-      verify(contactService)
-          .createContact("+905551234567", ContactType.MOBILE, "Personal mobile", true, null);
-      verify(userContactAssignmentService).assignContact(USER_ID, contact.getId(), false);
+      verify(contactService).createContact("+447700900123", ContactType.MOBILE, null);
+      verify(userContactAssignmentService)
+          .assignContact(USER_ID, contact.getId(), false, "Personal mobile", true);
     }
 
     @Test
     void doesNotDuplicateExistingPersonalMobileAssignment() {
       Contact contact =
-          Contact.builder().contactValue("+905551234567").contactType(ContactType.MOBILE).build();
+          Contact.builder().contactValue("+447700900123").contactType(ContactType.MOBILE).build();
       contact.setId(UUID.randomUUID());
       contact.setTenantId(TENANT_ID);
-      when(contactService.findByValueAndType("+905551234567", ContactType.MOBILE))
+      when(contactService.findByValueAndType("+447700900123", ContactType.MOBILE))
           .thenReturn(Optional.of(contact));
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
           .thenReturn(true);
 
-      service.updatePersonalContact(USER_ID, "+905551234567", ContactType.MOBILE);
+      service.updatePersonalContact(USER_ID, "+447700900123", ContactType.MOBILE);
 
-      verify(contactService, never()).createContact(any(), any(), any(), any(), any());
-      verify(userContactAssignmentService, never()).assignContact(any(), any(), any());
+      verify(contactService, never()).createContact(any(), any(), any());
+      verify(userContactAssignmentService, never())
+          .assignContact(any(), any(), any(), any(), any());
     }
   }
 }

@@ -9,11 +9,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -181,7 +184,27 @@ class TenantTransactionalPurgeServiceTest {
         .update(contains("DELETE FROM finance.finance_payment WHERE tenant_id = ?"), eq(TENANT_ID));
 
     assertThatThrownBy(() -> service.goReal(TENANT_ID)).isSameAs(failure);
+    verify(systemExecutor).executeInTransaction(any());
     verify(cacheManager, never()).getCache("tenant-demomode");
+  }
+
+  @Test
+  void retriesTheWholePurgeAfterAPostgresDeadlock() {
+    stubSystemTransaction();
+    when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(TENANT_ID))).thenReturn(true);
+    when(jdbc.update(
+            "DELETE FROM production.production_execution_batch WHERE tenant_id = ?", TENANT_ID))
+        .thenThrow(
+            new PessimisticLockingFailureException(
+                "Purge deadlock", new SQLException("Deadlock", "40P01")))
+        .thenReturn(1);
+
+    var result = service.purgeDemoData(TENANT_ID);
+
+    assertThat(result.deletedRows()).containsEntry("production.production_execution_batch", 1);
+    verify(systemExecutor, times(2)).executeInTransaction(any());
+    verify(jdbc, times(2))
+        .update("DELETE FROM production.stock_unit WHERE tenant_id = ?", TENANT_ID);
   }
 
   @Test

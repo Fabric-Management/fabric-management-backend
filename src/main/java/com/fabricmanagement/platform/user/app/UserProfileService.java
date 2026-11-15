@@ -3,6 +3,8 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Address;
@@ -21,6 +23,8 @@ import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.MemberAdministrationAccess;
+import com.fabricmanagement.platform.user.security.UserContactDetailsAccess;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +55,9 @@ public class UserProfileService {
   private final EmployeeProjectionPort employeeProjectionPort;
   private final EmployeeMutationPort employeeMutationPort;
   private final DomainEventPublisher eventPublisher;
+  private final PermissionCacheInvalidation permissionCache;
+  private final MemberAdministrationAccess memberAccess;
+  private final UserContactDetailsAccess contactDetailsAccess;
 
   @Transactional
   public UserDto updateProfile(UUID userId, UpdateUserProfileRequest request, UUID requesterId) {
@@ -85,6 +92,30 @@ public class UserProfileService {
             .findByTenantIdAndId(TenantContext.requireTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+    if (request.getRoleId() != null) {
+      Role role =
+          roleRepository
+              .findByTenantIdAndId(TenantContext.requireTenantId(), request.getRoleId())
+              // PLATFORM-BOUNDARY-1: the platform staff role is never assigned here.
+              .filter(
+                  found ->
+                      !found.isPlatformScope()
+                          && Boolean.TRUE.equals(found.getIsActive())
+                          && found.getDeletedAt() == null)
+              .orElseThrow(
+                  () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
+      var actor = memberAccess.requireManage();
+      if (user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getRoleCode())) {
+        memberAccess.requireRoleGrant(actor, user.getRole());
+      }
+      memberAccess.requireRoleGrant(actor, role);
+      user.setRole(role);
+      permissionCache.evictMemberAfterCommit(user.getTenantId(), userId);
+    }
+    if (request.getDepartmentId() != null) {
+      boolean hasPrimaryDept = userDepartmentService.getPrimaryDepartment(userId).isPresent();
+      userDepartmentService.assignDepartment(userId, request.getDepartmentId(), !hasPrimaryDept);
+    }
     if (request.getFirstName() != null || request.getLastName() != null) {
       String firstName =
           request.getFirstName() != null ? request.getFirstName() : user.getFirstName();
@@ -99,23 +130,11 @@ public class UserProfileService {
       updateWorkContact(userId, request.getWorkPhone(), ContactType.MOBILE);
     }
     if (request.getWorkAddress() != null) {
+      contactDetailsAccess.requireWrite(userId);
       updateWorkAddress(userId, request.getWorkAddress());
     }
-    if (request.getRoleId() != null) {
-      Role role =
-          roleRepository
-              .findByTenantIdAndId(TenantContext.requireTenantId(), request.getRoleId())
-              // PLATFORM-BOUNDARY-1: the platform staff role is never assigned here.
-              .filter(found -> !found.isPlatformScope())
-              .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-      user.setRole(role);
-    }
-    if (request.getDepartmentId() != null) {
-      boolean hasPrimaryDept = userDepartmentService.getPrimaryDepartment(userId).isPresent();
-      userDepartmentService.assignDepartment(
-          userId, request.getDepartmentId(), !hasPrimaryDept, requesterId);
-    }
     if (request.getHomeAddress() != null) {
+      contactDetailsAccess.requireWrite(userId);
       updateHomeAddress(userId, request.getHomeAddress());
     }
     if (request.getPersonalPhone() != null) {
@@ -175,18 +194,16 @@ public class UserProfileService {
     Contact contact =
         contactService
             .findByValueAndType(contactValue, contactType)
-            .orElseGet(
-                () ->
-                    contactService.createContact(
-                        contactValue,
-                        contactType,
-                        "Work " + contactType.name().toLowerCase(),
-                        false,
-                        null));
+            .orElseGet(() -> contactService.createContact(contactValue, contactType, null));
     if (userContactAssignmentService.existsUserContact(userId, contact.getId())) {
       return;
     }
-    userContactAssignmentService.assignContact(userId, contact.getId(), false);
+    userContactAssignmentService.assignContact(
+        userId,
+        contact.getId(),
+        false,
+        "Work " + contactType.name().toLowerCase(java.util.Locale.ROOT),
+        false);
   }
 
   @Transactional
@@ -194,18 +211,16 @@ public class UserProfileService {
     Contact contact =
         contactService
             .findByValueAndType(contactValue, contactType)
-            .orElseGet(
-                () ->
-                    contactService.createContact(
-                        contactValue,
-                        contactType,
-                        "Personal " + contactType.name().toLowerCase(),
-                        true,
-                        null));
+            .orElseGet(() -> contactService.createContact(contactValue, contactType, null));
     if (userContactAssignmentService.existsUserContact(userId, contact.getId())) {
       return;
     }
-    userContactAssignmentService.assignContact(userId, contact.getId(), false);
+    userContactAssignmentService.assignContact(
+        userId,
+        contact.getId(),
+        false,
+        "Personal " + contactType.name().toLowerCase(java.util.Locale.ROOT),
+        true);
   }
 
   private void updateWorkAddress(UUID userId, UpdateUserProfileRequest.AddressData addressData) {
@@ -222,7 +237,7 @@ public class UserProfileService {
         .anyMatch(ua -> ua.getAddressId().equals(address.getId()))) {
       return;
     }
-    userAddressAssignmentService.assignAddress(userId, address.getId(), false, true);
+    userAddressAssignmentService.assignAddressForProvisioning(userId, address.getId(), false, true);
   }
 
   private void updateHomeAddress(UUID userId, UpdateUserProfileRequest.AddressData addressData) {
@@ -240,6 +255,7 @@ public class UserProfileService {
       return;
     }
     boolean isPrimary = userAddressAssignmentService.getPrimaryAddress(userId).isEmpty();
-    userAddressAssignmentService.assignAddress(userId, address.getId(), isPrimary, false);
+    userAddressAssignmentService.assignAddressForProvisioning(
+        userId, address.getId(), isPrimary, false);
   }
 }

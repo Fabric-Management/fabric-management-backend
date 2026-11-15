@@ -124,7 +124,7 @@ class PartnerUserSeederTest {
     UserDto mockUserDto = mock(UserDto.class);
     UUID createdUserId = UUID.randomUUID();
     when(mockUserDto.getId()).thenReturn(createdUserId);
-    when(userCreationService.createExternalUser(any())).thenReturn(mockUserDto);
+    when(userCreationService.createExternalUserForProvisioning(any())).thenReturn(mockUserDto);
 
     when(authUserRepository.existsByUserId(createdUserId)).thenReturn(false);
     when(passwordEncoder.encode(any())).thenReturn("encodedPass");
@@ -140,7 +140,7 @@ class PartnerUserSeederTest {
     partnerUserSeeder.seed();
 
     // Assert
-    verify(userCreationService).createExternalUser(requestCaptor.capture());
+    verify(userCreationService).createExternalUserForProvisioning(requestCaptor.capture());
     CreateExternalUserRequest capturedReq = requestCaptor.getValue();
     assertThat(capturedReq.getContactValue()).isEqualTo("oscar@ozcotton.com");
     assertThat(capturedReq.getOrganizationId()).isEqualTo(partnerOrgId);
@@ -162,6 +162,6 @@ class PartnerUserSeederTest {
     partnerUserSeeder.seed();
 
     // Assert
-    verify(userCreationService, never()).createExternalUser(any());
+    verify(userCreationService, never()).createExternalUserForProvisioning(any());
   }
 }

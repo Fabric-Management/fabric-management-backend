@@ -4,13 +4,17 @@ import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentServi
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import com.fabricmanagement.platform.communication.app.AddressService;
+import com.fabricmanagement.platform.communication.app.ContactDetailsOwnership;
 import com.fabricmanagement.platform.communication.domain.Address;
+import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.platform.organization.domain.event.OrganizationAddressAssignedEvent;
 import com.fabricmanagement.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import com.fabricmanagement.platform.user.domain.UserWorkLocation;
 import com.fabricmanagement.platform.user.infra.repository.UserWorkLocationRepository;
 import java.util.List;
@@ -35,18 +39,27 @@ public class OrganizationAddressAssignmentService
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
   private final DomainEventPublisher eventPublisher;
+  private final OrganizationWriteAccess writeAccess;
+  private final ContactDetailsOwnership ownership;
+  private final AddressService addresses;
 
   public OrganizationAddressAssignmentService(
       OrganizationRepository organizationRepository,
       AddressRepository addressRepository,
       OrganizationAddressRepository organizationAddressRepository,
       UserWorkLocationRepository userWorkLocationRepository,
-      DomainEventPublisher eventPublisher) {
+      DomainEventPublisher eventPublisher,
+      OrganizationWriteAccess writeAccess,
+      ContactDetailsOwnership ownership,
+      AddressService addresses) {
     this.organizationRepository = organizationRepository;
     this.addressRepository = addressRepository;
     this.organizationAddressRepository = organizationAddressRepository;
     this.userWorkLocationRepository = userWorkLocationRepository;
     this.eventPublisher = eventPublisher;
+    this.writeAccess = writeAccess;
+    this.ownership = ownership;
+    this.addresses = addresses;
   }
 
   @Override
@@ -75,16 +88,14 @@ public class OrganizationAddressAssignmentService
   @Override
   protected void validateChildExists(UUID childId) {
     UUID tenantId = TenantContext.requireTenantId();
-    Address address =
-        addressRepository
-            .findById(childId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
-    if (!address.getTenantId().equals(tenantId)) {
-      throw new PlatformDomainException(
-          "Address does not belong to current tenant", "ORG_ADDRESS_TENANT_MISMATCH", 403);
-    }
+    lockAddress(childId);
+  }
+
+  private Address lockAddress(UUID id) {
+    return addressRepository
+        .lockActiveByTenantAndId(TenantContext.requireTenantId(), id)
+        .orElseThrow(
+            () -> new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
   }
 
   @Override
@@ -118,6 +129,23 @@ public class OrganizationAddressAssignmentService
   @Transactional
   public OrganizationAddress assignAddress(
       UUID organizationId, UUID addressId, Boolean isPrimary, Boolean isHeadquarters) {
+    validateParentExists(organizationId);
+    validateChildExists(addressId);
+    writeAccess.requireContactDetails(organizationId);
+    ownership.requireAddressReuse(addressId, false);
+    return attachAddress(organizationId, addressId, isPrimary, isHeadquarters);
+  }
+
+  @Transactional
+  public OrganizationAddress assignAddressForProvisioning(
+      UUID organizationId, UUID addressId, Boolean isPrimary, Boolean isHeadquarters) {
+    validateParentExists(organizationId);
+    validateChildExists(addressId);
+    return attachAddress(organizationId, addressId, isPrimary, isHeadquarters);
+  }
+
+  private OrganizationAddress attachAddress(
+      UUID organizationId, UUID addressId, Boolean isPrimary, Boolean isHeadquarters) {
     log.info(
         "Assigning address to organization: organizationId={}, addressId={}, isPrimary={}, isHQ={}",
         organizationId,
@@ -125,8 +153,6 @@ public class OrganizationAddressAssignmentService
         isPrimary,
         isHeadquarters);
 
-    validateParentExists(organizationId);
-    validateChildExists(addressId);
     validateAssignment(organizationId, addressId);
 
     if (organizationAddressRepository
@@ -169,7 +195,7 @@ public class OrganizationAddressAssignmentService
 
   @Transactional
   public void removeAddress(UUID organizationId, UUID addressId) {
-    unassign(organizationId, addressId);
+    safeRemoveAddress(organizationId, addressId);
   }
 
   @Transactional
@@ -185,6 +211,13 @@ public class OrganizationAddressAssignmentService
 
   @Transactional
   public OrganizationAddress setAsHeadquarters(UUID organizationId, UUID addressId) {
+    requireLink(organizationId, addressId);
+    writeAccess.requireContactDetails(organizationId);
+    return setHeadquartersForOnboarding(organizationId, addressId);
+  }
+
+  @Transactional
+  OrganizationAddress setHeadquartersForOnboarding(UUID organizationId, UUID addressId) {
     log.info("Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
     OrganizationAddress junction =
         organizationAddressRepository
@@ -206,6 +239,61 @@ public class OrganizationAddressAssignmentService
     organizationAddressRepository.save(junction);
     return organizationAddressRepository
         .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Address assignment not found", "ORG_ADDRESS_ASSIGNMENT_NOT_FOUND", 404));
+  }
+
+  @Transactional
+  public Address updateAddress(UUID organizationId, UUID addressId, UpdateAddressRequest request) {
+    Address original = lockAddress(addressId);
+    OrganizationAddress link = requireLink(organizationId, addressId);
+    writeAccess.requireContactDetails(organizationId);
+    UUID tenant = TenantContext.requireTenantId();
+    if (addressRepository.countSharedOnboardingAddress(tenant, addressId, organizationId) == 0) {
+      return addresses.updateAddress(addressId, request);
+    }
+    Address replacement = addresses.copyForUpdate(original, request);
+    OrganizationAddress replacementLink =
+        OrganizationAddress.builder()
+            .organizationId(organizationId)
+            .addressId(replacement.getId())
+            .isPrimary(link.getIsPrimary())
+            .isHeadquarters(link.getIsHeadquarters())
+            .build();
+    link.delete();
+    organizationAddressRepository.saveAndFlush(link);
+    organizationAddressRepository.saveAndFlush(replacementLink);
+    userWorkLocationRepository.moveAddress(tenant, addressId, replacement.getId());
+    onAfterAssign(replacementLink);
+    return replacement;
+  }
+
+  @Override
+  @Transactional
+  public OrganizationAddress assign(UUID organizationId, UUID addressId, Boolean isPrimary) {
+    return assignAddress(organizationId, addressId, isPrimary, false);
+  }
+
+  @Override
+  @Transactional
+  public OrganizationAddress setPrimary(UUID organizationId, UUID addressId) {
+    requireLink(organizationId, addressId);
+    writeAccess.requireContactDetails(organizationId);
+    return super.setPrimary(organizationId, addressId);
+  }
+
+  @Override
+  @Transactional
+  public void unassign(UUID organizationId, UUID addressId) {
+    safeRemoveAddress(organizationId, addressId);
+  }
+
+  private OrganizationAddress requireLink(UUID organizationId, UUID addressId) {
+    return organizationAddressRepository
+        .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
+        .filter(link -> TenantContext.requireTenantId().equals(link.getTenantId()))
         .orElseThrow(
             () ->
                 new PlatformDomainException(
@@ -240,13 +328,7 @@ public class OrganizationAddressAssignmentService
         organizationId,
         addressId);
 
-    OrganizationAddress orgAddress =
-        organizationAddressRepository
-            .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Organization address not found", "ORG_ADDRESS_NOT_FOUND", 404));
+    OrganizationAddress orgAddress = requireLink(organizationId, addressId);
 
     Address address =
         addressRepository
@@ -255,6 +337,7 @@ public class OrganizationAddressAssignmentService
                 () ->
                     new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
 
+    writeAccess.requireContactDetails(organizationId);
     List<UserWorkLocation> affectedLocations =
         userWorkLocationRepository.findByOrgAddressId(orgAddress.getAddressId());
 
@@ -298,26 +381,10 @@ public class OrganizationAddressAssignmentService
         organizationId,
         addressId);
 
-    OrganizationAddress orgAddress =
-        organizationAddressRepository
-            .findByOrganizationIdAndAddressId(organizationId, addressId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Organization address not found", "ORG_ADDRESS_NOT_FOUND", 404));
+    Address address = lockAddress(addressId);
+    OrganizationAddress orgAddress = requireLink(organizationId, addressId);
 
-    Address address =
-        addressRepository
-            .findById(addressId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
-
-    if (!address.getTenantId().equals(tenantId)) {
-      throw new PlatformDomainException(
-          "Address does not belong to current tenant", "ORG_ADDRESS_TENANT_MISMATCH", 403);
-    }
-
+    writeAccess.requireContactDetails(organizationId);
     long affectedCount = userWorkLocationRepository.countByOrgAddressId(orgAddress.getAddressId());
     log.info(
         "Cascading deletion: {} user work-location assignments will be removed", affectedCount);
@@ -327,8 +394,10 @@ public class OrganizationAddressAssignmentService
     orgAddress.delete();
     organizationAddressRepository.save(orgAddress);
 
-    address.delete();
-    addressRepository.save(address);
+    if (addressRepository.countSharedOnboardingAddress(tenantId, addressId, organizationId) == 0) {
+      address.delete();
+      addressRepository.save(address);
+    }
 
     log.info(
         "Safe-remove completed: addressId={}, cascaded {} user locations",

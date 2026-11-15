@@ -74,7 +74,7 @@ class SalesAccessScopeResolverTest {
             resolver.resolve(TENANT, UUID.randomUUID(), "read", PermissionFreshness.CACHED).scope())
         .isNull();
 
-    when(permissions.evaluate(TENANT, "WORKER", List.of("sales"), USER))
+    when(permissions.evaluateMembership(TENANT, USER, false))
         .thenReturn(new PermissionResult(Map.of(), false));
     assertThat(resolver.resolve(TENANT, USER, "read", PermissionFreshness.CACHED).scope()).isNull();
   }
@@ -96,7 +96,7 @@ class SalesAccessScopeResolverTest {
   void departmentScopeWithNoDepartmentsStillIncludesTheTargetOnly() {
     when(users.findPermissionIdentity(TENANT, USER))
         .thenReturn(Optional.of(new PermissionIdentity("WORKER", List.of())));
-    when(permissions.evaluate(TENANT, "WORKER", List.of(), USER))
+    when(permissions.evaluateMembership(TENANT, USER, false))
         .thenReturn(
             new PermissionResult(Map.of("sales", Map.of("read", DataScope.DEPARTMENT)), false));
 
@@ -110,7 +110,7 @@ class SalesAccessScopeResolverTest {
   void departmentCodesAreNormalizedTogether() {
     when(users.findPermissionIdentity(TENANT, USER))
         .thenReturn(Optional.of(new PermissionIdentity("WORKER", List.of("sales", "finance"))));
-    when(permissions.evaluate(TENANT, "WORKER", List.of("sales", "finance"), USER))
+    when(permissions.evaluateMembership(TENANT, USER, false))
         .thenReturn(
             new PermissionResult(Map.of("sales", Map.of("read", DataScope.DEPARTMENT)), false));
     when(users.findActiveUserIdsByDepartmentCodes(TENANT, Set.of("SALES", "FINANCE")))
@@ -122,7 +122,7 @@ class SalesAccessScopeResolverTest {
   }
 
   private void cachedScope(DataScope scope) {
-    when(permissions.evaluate(TENANT, "WORKER", List.of("sales"), USER))
+    when(permissions.evaluateMembership(TENANT, USER, false))
         .thenReturn(
             new PermissionResult(Map.of("sales", Map.of("read", scope, "write", scope)), false));
   }

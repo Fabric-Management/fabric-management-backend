@@ -39,12 +39,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p><b>CRITICAL:</b> Tenant isolation enforced via Contact's tenant_id.
    */
   @Query(
-      "SELECT DISTINCT u FROM User u "
-          + "LEFT JOIN FETCH u.role "
-          + "JOIN com.fabricmanagement.platform.user.domain.UserContact uc ON u.id = uc.userId "
-          + "JOIN com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE LOWER(c.contactValue) = LOWER(:contactValue) "
-          + "AND u.tenantId = c.tenantId")
+      "SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.role JOIN"
+          + " com.fabricmanagement.platform.user.domain.UserContact uc ON u.id = uc.userId JOIN"
+          + " com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id"
+          + " WHERE LOWER(c.contactValue) = LOWER(:contactValue) AND u.tenantId = c.tenantId")
   Optional<User> findByContactValue(@Param("contactValue") String contactValue);
 
   /**
@@ -71,6 +69,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.id = :id")
   Optional<User> findByIdWithPermissionData(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
+  @Query("SELECT u.id FROM User u WHERE u.tenantId = :tenantId AND u.role.id = :roleId")
+  List<UUID> findIdsByTenantIdAndRoleId(
+      @Param("tenantId") UUID tenantId, @Param("roleId") UUID roleId);
+
   /**
    * Find user by tenant and contact value via Contact entity (new system).
    *
@@ -79,13 +81,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p>Eagerly fetches Role and UserContacts to avoid lazy loading issues.
    */
   @Query(
-      "SELECT DISTINCT u FROM User u "
-          + "LEFT JOIN FETCH u.role "
-          + "LEFT JOIN FETCH u.userContacts uc "
-          + "LEFT JOIN FETCH uc.contact "
-          + "JOIN UserContact ucFilter ON u.id = ucFilter.userId "
-          + "JOIN com.fabricmanagement.platform.communication.domain.Contact c ON ucFilter.contactId = c.id "
-          + "WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
+      "SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.role LEFT JOIN FETCH u.userContacts uc LEFT"
+          + " JOIN FETCH uc.contact JOIN UserContact ucFilter ON u.id = ucFilter.userId JOIN"
+          + " com.fabricmanagement.platform.communication.domain.Contact c ON ucFilter.contactId ="
+          + " c.id WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
   Optional<User> findByTenantIdAndContactValue(
       @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
@@ -133,11 +132,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Get all active users for an organization with role and department eagerly loaded. */
   @Query(
-      "SELECT DISTINCT u FROM User u "
-          + "LEFT JOIN FETCH u.role "
-          + "LEFT JOIN FETCH u.userDepartments ud "
-          + "LEFT JOIN FETCH ud.department "
-          + "WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId AND u.isActive = true")
+      "SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.role LEFT JOIN FETCH u.userDepartments ud"
+          + " LEFT JOIN FETCH ud.department WHERE u.tenantId = :tenantId AND u.organizationId ="
+          + " :organizationId AND u.isActive = true")
   List<User> findByTenantIdAndOrganizationIdAndIsActiveTrue(
       @Param("tenantId") UUID tenantId, @Param("organizationId") UUID organizationId);
 
@@ -149,11 +146,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p><b>CRITICAL:</b> Tenant isolation enforced via Contact's tenant_id.
    */
   @Query(
-      "SELECT COUNT(u) > 0 FROM User u "
-          + "JOIN com.fabricmanagement.platform.user.domain.UserContact uc ON u.id = uc.userId "
-          + "JOIN com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE LOWER(c.contactValue) = LOWER(:contactValue) "
-          + "AND u.tenantId = c.tenantId")
+      "SELECT COUNT(u) > 0 FROM User u JOIN com.fabricmanagement.platform.user.domain.UserContact"
+          + " uc ON u.id = uc.userId JOIN"
+          + " com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id"
+          + " WHERE LOWER(c.contactValue) = LOWER(:contactValue) AND u.tenantId = c.tenantId")
   boolean existsByContactValue(@Param("contactValue") String contactValue);
 
   /** Check if user exists in tenant. */
@@ -167,10 +163,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * @return true if any user in tenant has this contact value
    */
   @Query(
-      "SELECT COUNT(u) > 0 FROM User u "
-          + "JOIN com.fabricmanagement.platform.user.domain.UserContact uc ON u.id = uc.userId "
-          + "JOIN com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
+      "SELECT COUNT(u) > 0 FROM User u JOIN com.fabricmanagement.platform.user.domain.UserContact"
+          + " uc ON u.id = uc.userId JOIN"
+          + " com.fabricmanagement.platform.communication.domain.Contact c ON uc.contactId = c.id"
+          + " WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
   boolean existsByTenantIdAndContactValue(
       @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
@@ -223,6 +219,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
         AND u.isActive = true
         AND ud.tenantId = :tenantId
         AND ud.isActive = true
+        AND d.tenantId = :tenantId
+        AND d.isActive = true
+        AND d.deletedAt IS NULL
+        AND u.deletedAt IS NULL
         AND UPPER(d.departmentCode) IN :departmentCodes
       """)
   Set<UUID> findActiveUserIdsByDepartmentCodes(

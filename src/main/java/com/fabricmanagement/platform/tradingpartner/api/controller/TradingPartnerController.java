@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tradingpartner.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.platform.organization.security.OrganizationWriteAccess;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
@@ -49,6 +50,7 @@ import org.springframework.web.bind.annotation.*;
 public class TradingPartnerController {
 
   private final TradingPartnerService tradingPartnerService;
+  private final OrganizationWriteAccess writeAccess;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATE
@@ -155,6 +157,9 @@ public class TradingPartnerController {
             .findById(tenantId, id)
             .orElseThrow(() -> new IllegalArgumentException("Trading partner not found: " + id));
 
+    partner.setContactDetailsEdit(
+        writeAccess.partnerContactCapability(
+            Boolean.TRUE.equals(partner.getIsActive()) ? partner.getOrganizationId() : null));
     return ResponseEntity.ok(ApiResponse.success(partner));
   }
 

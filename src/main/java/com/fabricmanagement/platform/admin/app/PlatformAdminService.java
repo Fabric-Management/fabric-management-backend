@@ -3,7 +3,9 @@ package com.fabricmanagement.platform.admin.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantKind;
 import com.fabricmanagement.platform.admin.dto.PlatformTenantSummary;
+import com.fabricmanagement.platform.admin.dto.PlatformTenantUser;
 import com.fabricmanagement.platform.admin.dto.TenantStatistics;
+import com.fabricmanagement.platform.auth.app.LoginEmailQueryService;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -12,7 +14,6 @@ import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionR
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
-import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -70,6 +71,7 @@ public class PlatformAdminService {
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
   private final EmployeeProjectionPort employeeProjectionPort;
+  private final LoginEmailQueryService loginEmailQueryService;
   private final PlatformTransactionManager transactionManager;
 
   /**
@@ -140,7 +142,7 @@ public class PlatformAdminService {
    * @param tenantId The tenant ID to query
    * @return List of users in that tenant
    */
-  public List<UserDto> getTenantUsers(UUID tenantId) {
+  public List<PlatformTenantUser> getTenantUsers(UUID tenantId) {
     log.info("Platform admin: Getting users for tenant: {}", tenantId);
     validateTenantExists(tenantId);
 
@@ -155,12 +157,11 @@ public class PlatformAdminService {
           log.debug("Found {} users in tenant {}", users.size(), tenantId);
 
           List<UUID> userIds = users.stream().map(User::getId).toList();
-          Map<UUID, EmployeeSnapshot> employeeMap =
-              employeeProjectionPort.findByUserIds(tenantId, userIds);
+          Map<UUID, String> loginEmails = loginEmailQueryService.findByUserIds(userIds);
 
           return users.stream()
-              .map(user -> UserDto.from(user, employeeMap.get(user.getId())))
-              .collect(Collectors.toList());
+              .map(user -> PlatformTenantUser.of(UserDto.from(user), loginEmails.get(user.getId())))
+              .toList();
         });
   }
 

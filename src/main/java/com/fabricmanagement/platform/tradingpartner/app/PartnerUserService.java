@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionCacheInvalidation;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
@@ -28,11 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for managing partner portal users.
  *
  * <p>Delegates user creation to the existing {@link
- * com.fabricmanagement.platform.user.app.UserCreationService} via {@link
- * com.fabricmanagement.platform.user.app.UserService} but operates in the context of a specific
- * {@link TradingPartner} relationship. All mutating operations enforce partner isolation: the
- * requested {@code partnerId} must resolve to a {@link TradingPartner} owned by the current tenant,
- * and the target user must belong to that partner's organization.
+ * com.fabricmanagement.platform.user.app.UserCreationService} and operates in the context of a
+ * specific {@link TradingPartner} relationship. All mutating operations enforce partner isolation:
+ * the requested {@code partnerId} must resolve to a {@link TradingPartner} owned by the current
+ * tenant, and the target user must belong to that partner's organization.
  *
  * <p>Status derivation:
  *
@@ -52,10 +52,11 @@ public class PartnerUserService {
 
   private final TradingPartnerRepository tradingPartnerRepository;
   private final UserRepository userRepository;
+  private final PermissionCacheInvalidation permissionCache;
   private final AuthUserRepository authUserRepository;
   private final RoleService roleService;
   private final DomainEventPublisher eventPublisher;
-  private final com.fabricmanagement.platform.user.app.UserService userService;
+  private final com.fabricmanagement.platform.user.app.UserCreationService userCreationService;
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ public class PartnerUserService {
 
     // Delegate to existing external user creation (handles uniqueness check, contact assignment)
     com.fabricmanagement.platform.user.dto.UserDto userDto =
-        userService.createExternalUser(createRequest);
+        userCreationService.createExternalUserForProvisioning(createRequest);
 
     // Assign the partner role
     Role role =
@@ -119,6 +120,7 @@ public class PartnerUserService {
             .orElseThrow(() -> new IllegalStateException("User not found after creation"));
     user.setRole(role);
     userRepository.save(user);
+    permissionCache.evictMemberAfterCommit(tenantId, user.getId());
 
     // Publish partner-specific event — bypasses generic UserInvitationEventListener
     eventPublisher.publish(
@@ -239,6 +241,7 @@ public class PartnerUserService {
 
     user.setRole(role);
     userRepository.save(user);
+    permissionCache.evictMemberAfterCommit(tenantId, userId);
 
     log.info(
         "Partner user role updated: userId={}, partnerId={}, newRole={}",
@@ -263,6 +266,7 @@ public class PartnerUserService {
 
     user.delete(); // soft-delete via BaseEntity
     userRepository.save(user);
+    permissionCache.evictMemberAfterCommit(tenantId, userId);
 
     log.info("Partner user suspended: userId={}, partnerId={}", userId, partnerId);
   }
@@ -288,6 +292,7 @@ public class PartnerUserService {
 
     user.activate();
     userRepository.save(user);
+    permissionCache.evictMemberAfterCommit(tenantId, userId);
 
     log.info("Partner user reactivated: userId={}, partnerId={}", userId, partnerId);
     return toDto(user, partnerId, deriveStatus(user));
@@ -313,6 +318,7 @@ public class PartnerUserService {
     validatePartnerRoleOnUser(user);
 
     userRepository.delete(user);
+    permissionCache.evictMemberAfterCommit(tenantId, userId);
     log.info("Partner user removed: userId={}, partnerId={}", userId, partnerId);
   }
 

@@ -4,12 +4,16 @@ import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentServi
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import com.fabricmanagement.platform.communication.app.ContactDetailsOwnership;
+import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
+import com.fabricmanagement.platform.organization.infra.repository.OrganizationContactRepository;
 import com.fabricmanagement.platform.user.domain.UserContact;
 import com.fabricmanagement.platform.user.domain.event.ContactAssignedEvent;
 import com.fabricmanagement.platform.user.infra.repository.UserContactRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.security.UserContactDetailsAccess;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,16 +35,28 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
   private final ContactRepository contactRepository;
   private final UserContactRepository userContactRepository;
   private final DomainEventPublisher eventPublisher;
+  private final ContactDetailsOwnership ownership;
+  private final UserContactDetailsAccess access;
+  private final ContactService contacts;
+  private final OrganizationContactRepository organisationContacts;
 
   public UserContactAssignmentService(
       UserRepository userRepository,
       ContactRepository contactRepository,
       UserContactRepository userContactRepository,
-      DomainEventPublisher eventPublisher) {
+      DomainEventPublisher eventPublisher,
+      ContactDetailsOwnership ownership,
+      UserContactDetailsAccess access,
+      ContactService contacts,
+      OrganizationContactRepository organisationContacts) {
     this.userRepository = userRepository;
     this.contactRepository = contactRepository;
     this.userContactRepository = userContactRepository;
     this.eventPublisher = eventPublisher;
+    this.ownership = ownership;
+    this.access = access;
+    this.contacts = contacts;
+    this.organisationContacts = organisationContacts;
   }
 
   @Override
@@ -66,17 +82,14 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
   @Override
   protected void validateChildExists(UUID childId) {
     UUID tenantId = TenantContext.requireTenantId();
-    Contact contact =
-        contactRepository
-            .findById(childId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Contact not found", "USER_CONTACT_NOT_FOUND", 404));
-    if (!contact.getTenantId().equals(tenantId)) {
-      throw new PlatformDomainException(
-          "Contact does not belong to current tenant", "USER_CONTACT_TENANT_MISMATCH", 403);
-    }
+    lockContact(childId);
+  }
+
+  private Contact lockContact(UUID id) {
+    return contactRepository
+        .lockActiveByTenantAndId(TenantContext.requireTenantId(), id)
+        .orElseThrow(
+            () -> new PlatformDomainException("Contact not found", "USER_CONTACT_NOT_FOUND", 404));
   }
 
   @Override
@@ -106,27 +119,65 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Transactional
   public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault) {
-    return assign(userId, contactId, isDefault);
+    validateParentExists(userId);
+    validateChildExists(contactId);
+    access.requireWrite(userId);
+    ownership.requireContactReuse(contactId, true);
+    ownership.requireExtensionParent(lockContact(contactId).getParentContactId(), userId, true);
+    return attachWithMetadata(userId, contactId, isDefault, null, null);
+  }
+
+  @Transactional
+  public UserContact assignContact(
+      UUID userId, UUID contactId, Boolean isDefault, String label, Boolean isPersonal) {
+    validateParentExists(userId);
+    validateChildExists(contactId);
+    access.requireWrite(userId);
+    ownership.requireContactReuse(contactId, true);
+    ownership.requireExtensionParent(lockContact(contactId).getParentContactId(), userId, true);
+    return attachWithMetadata(userId, contactId, isDefault, label, isPersonal);
+  }
+
+  @Transactional
+  public UserContact assignContactForProvisioning(UUID userId, UUID contactId, Boolean isDefault) {
+    return attachWithMetadata(userId, contactId, isDefault, "Primary", true);
+  }
+
+  @Transactional
+  UserContact assignContactForProvisioning(
+      UUID userId, UUID contactId, Boolean isDefault, String label, Boolean isPersonal) {
+    return attachWithMetadata(userId, contactId, isDefault, label, isPersonal);
+  }
+
+  @Transactional
+  UserContact assignContactFromMemberCreation(
+      UUID userId, UUID contactId, Boolean isDefault, String label, Boolean isPersonal) {
+    var contact = lockContact(contactId);
+    ownership.requireContactReuse(contactId, true);
+    ownership.requireExtensionParent(contact.getParentContactId(), userId, true);
+    return attachWithMetadata(userId, contactId, isDefault, label, isPersonal);
+  }
+
+  private UserContact attachWithMetadata(
+      UUID userId, UUID contactId, Boolean isDefault, String label, Boolean isPersonal) {
+    UserContact link = super.assign(userId, contactId, isDefault);
+    link.setLabel(label);
+    link.setIsPersonal(isPersonal == null || isPersonal);
+    link.setContact(contactRepository.findById(contactId).orElseThrow());
+    return link;
+  }
+
+  @Transactional
+  public void makeProvisionedContactDefault(UUID userId, UUID contactId) {
+    super.setPrimary(userId, contactId);
   }
 
   @Transactional
   public void removeContact(UUID userId, UUID contactId) {
+    Contact contact = lockContact(contactId);
+    UserContact userContact = requireLink(userId, contactId);
+    access.requireWrite(userId);
     UUID tenantId = TenantContext.requireTenantId();
-    UserContact userContact =
-        userContactRepository
-            .findByUserIdAndContactId(userId, contactId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Contact assignment not found", "USER_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
-
-    Contact contact =
-        contactRepository
-            .findById(contactId)
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Contact not found", "USER_CONTACT_NOT_FOUND", 404));
 
     if (Boolean.TRUE.equals(contact.getIsVerified())) {
       long verifiedCount =
@@ -149,11 +200,50 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
     }
 
     userContactRepository.delete(userContact);
+    if (organisationContacts
+            .findByTenantIdAndContactIdAndIsActiveTrue(tenantId, contactId)
+            .isEmpty()
+        && userContactRepository.findByTenantIdAndContactId(tenantId, contactId).stream()
+            .noneMatch(
+                link -> !userId.equals(link.getUserId()) && Boolean.TRUE.equals(link.getIsActive()))
+        && contactRepository.findExtensionsByParentContactId(tenantId, contactId).isEmpty()) {
+      contacts.deleteContact(contactId);
+    }
   }
 
   @Transactional
   public UserContact setAsDefault(UUID userId, UUID contactId) {
     return setPrimary(userId, contactId);
+  }
+
+  private UserContact requireLink(UUID userId, UUID contactId) {
+    return findExisting(userId, contactId)
+        .filter(link -> TenantContext.requireTenantId().equals(link.getTenantId()))
+        .filter(link -> Boolean.TRUE.equals(link.getIsActive()))
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Contact assignment not found", "USER_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
+  }
+
+  @Override
+  @Transactional
+  public UserContact assign(UUID userId, UUID contactId, Boolean primary) {
+    return assignContact(userId, contactId, primary);
+  }
+
+  @Override
+  @Transactional
+  public UserContact setPrimary(UUID userId, UUID contactId) {
+    requireLink(userId, contactId);
+    access.requireWrite(userId);
+    return super.setPrimary(userId, contactId);
+  }
+
+  @Override
+  @Transactional
+  public void unassign(UUID userId, UUID contactId) {
+    removeContact(userId, contactId);
   }
 
   @Transactional(readOnly = true)

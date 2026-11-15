@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -118,8 +119,8 @@ class SalesOrderEditAccessIT extends SalesOrderEditItSupport {
     writeWithdrawn.clear();
     writeWithdrawnFreshOnly.clear();
     beforeFreshCheck = user -> {};
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
-        .thenAnswer(invocation -> permissionsOf(invocation.getArgument(3), false));
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
+        .thenAnswer(invocation -> permissionsOf(invocation.getArgument(1), false));
     when(permissionEvaluator.evaluateFresh(any(), any(), any(), any()))
         .thenAnswer(
             invocation -> {

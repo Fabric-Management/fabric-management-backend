@@ -4,11 +4,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.communication.api.facade.AddressFacade;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.AddressDto;
-import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
-import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,18 +23,6 @@ public class AddressController {
 
   private final AddressFacade facade;
 
-  @Operation(
-      summary = "Create a postal address",
-      description =
-          "Manual entry works without Google. Delivery verification follows the current actor policy.")
-  @PostMapping
-  public ResponseEntity<ApiResponse<AddressDto>> createAddress(
-      @Valid @RequestBody CreateAddressRequest request) {
-    log.info("Creating address: type={}, city={}", request.getAddressType(), request.getCity());
-    return ResponseEntity.ok(
-        ApiResponse.success(facade.createAddress(request), "Address created successfully"));
-  }
-
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<AddressDto>> getAddress(@PathVariable UUID id) {
     log.debug("Getting address: id={}", id);
@@ -51,24 +35,5 @@ public class AddressController {
     log.debug("Getting addresses by type: type={}", type);
     AddressType addressType = AddressType.valueOf(type.toUpperCase());
     return ResponseEntity.ok(ApiResponse.success(facade.getAddressesByType(addressType)));
-  }
-
-  @Operation(
-      summary = "Update a postal address",
-      description =
-          "Null or omitted fields are unchanged. Empty optional text clears it. Location changes invalidate the previous Google match.")
-  @PutMapping("/{id}")
-  public ResponseEntity<ApiResponse<AddressDto>> updateAddress(
-      @PathVariable UUID id, @Valid @RequestBody UpdateAddressRequest request) {
-    log.info("Updating address: id={}", id);
-    return ResponseEntity.ok(
-        ApiResponse.success(facade.updateAddress(id, request), "Address updated successfully"));
-  }
-
-  @DeleteMapping("/{id}")
-  public ResponseEntity<ApiResponse<Void>> deleteAddress(@PathVariable UUID id) {
-    log.info("Deleting address: id={}", id);
-    facade.deleteAddress(id);
-    return ResponseEntity.ok(ApiResponse.success(null, "Address deleted successfully"));
   }
 }

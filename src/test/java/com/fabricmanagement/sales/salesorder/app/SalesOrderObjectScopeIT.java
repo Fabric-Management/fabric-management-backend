@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -257,10 +258,10 @@ class SalesOrderObjectScopeIT extends AbstractIntegrationTest {
   }
 
   private void stubPermissionEvaluation() {
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation -> {
-              UUID userId = invocation.getArgument(3);
+              UUID userId = invocation.getArgument(1);
               Map<String, DataScope> actions = new HashMap<>();
               if (readScopes.get(userId) != null) {
                 actions.put("read", readScopes.get(userId));

@@ -178,6 +178,7 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
     assertValidationContracts(generatedDocument);
     assertPermissionCatalogueContract(generatedDocument);
     assertOnboardingCompanyAuthorityContract(generatedDocument);
+    assertOwnerScopedCommunicationContract(generatedDocument);
     assertNavPreferencesImportContract(generatedDocument);
     assertOrderIntakeStockPreviewContract(generatedDocument);
     assertDraftStockSelectionContract(generatedDocument);
@@ -226,6 +227,36 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
                   + " -Dit.test=OpenApiExportIT' to accept changes and commit.")
           .isEqualTo(existingSpec);
     }
+  }
+
+  private void assertOwnerScopedCommunicationContract(Map<String, Object> document) {
+    String common = "/api/v1/common/";
+    var paths = mapAt(document, "paths");
+    assertThat(paths)
+        .doesNotContainKeys(
+            common + "addresses",
+            common + "contacts",
+            common + "contacts/{id}/verify",
+            common + "addresses/validation/validate-and-create",
+            common + "addresses/validation/{addressId}/revalidate");
+    assertThat(mapAt(document, "paths", common + "addresses/{id}"))
+        .containsKey("get")
+        .doesNotContainKeys("put", "delete");
+    assertThat(mapAt(document, "paths", common + "contacts/{id}"))
+        .containsKey("get")
+        .doesNotContainKey("delete");
+    for (String owner : List.of("organizations/{organizationId}", "users/{userId}")) {
+      assertThat(mapAt(document, "paths", common + owner + "/addresses/{addressId}"))
+          .containsKey("put");
+    }
+    for (String schema : List.of("OrganizationContactDto", "UserContactDto")) {
+      assertThat(mapAt(document, "components", "schemas", schema, "properties"))
+          .containsKeys("label", "isPersonal");
+    }
+    assertThat(mapAt(document, "components", "schemas", "ContactDto", "properties"))
+        .doesNotContainKeys("label", "isPersonal");
+    assertThat(mapAt(document, "components", "schemas", "TradingPartnerDto", "properties"))
+        .containsKey("contactDetailsEdit");
   }
 
   /**

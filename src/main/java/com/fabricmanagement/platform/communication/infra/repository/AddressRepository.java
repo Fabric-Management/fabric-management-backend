@@ -2,9 +2,12 @@ package com.fabricmanagement.platform.communication.infra.repository;
 
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,14 +15,19 @@ import org.springframework.stereotype.Repository;
 /** Repository for Address entity. */
 @Repository
 public interface AddressRepository extends JpaRepository<Address, UUID> {
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "SELECT item FROM Address item WHERE item.tenantId = :tenantId AND item.id = :id AND"
+          + " item.isActive = true")
+  Optional<Address> lockActiveByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   /** Personal address cards and another organisation's cards cannot be edited via onboarding. */
   @Query(
-      "SELECT COUNT(a) FROM Address a WHERE a.tenantId = :tenantId AND a.id = :addressId"
-          + " AND (EXISTS (SELECT oa FROM OrganizationAddress oa WHERE oa.addressId = a.id"
-          + " AND oa.tenantId = :tenantId AND oa.organizationId <> :organizationId AND oa.isActive = true)"
-          + " OR EXISTS (SELECT ua FROM UserAddress ua WHERE ua.tenantId = :tenantId"
-          + " AND ua.addressId = a.id AND ua.isActive = true))")
+      "SELECT COUNT(a) FROM Address a WHERE a.tenantId = :tenantId AND a.id = :addressId AND"
+          + " (EXISTS (SELECT oa FROM OrganizationAddress oa WHERE oa.addressId = a.id AND"
+          + " oa.tenantId = :tenantId AND oa.organizationId <> :organizationId AND oa.isActive ="
+          + " true) OR EXISTS (SELECT ua FROM UserAddress ua WHERE ua.tenantId = :tenantId AND"
+          + " ua.addressId = a.id AND ua.isActive = true))")
   long countSharedOnboardingAddress(
       @Param("tenantId") UUID tenantId,
       @Param("addressId") UUID addressId,

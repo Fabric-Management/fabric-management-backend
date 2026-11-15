@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.sample.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -83,10 +84,10 @@ class SampleObjectScopeIT extends AbstractIntegrationTest {
               }
               return Optional.of(new PermissionIdentity("WORKER", List.of("SALES")));
             });
-    when(permissionEvaluator.evaluate(any(), any(), any(), any()))
+    when(permissionEvaluator.evaluateMembership(any(), any(), anyBoolean()))
         .thenAnswer(
             invocation -> {
-              UUID userId = invocation.getArgument(3);
+              UUID userId = invocation.getArgument(1);
               Map<String, DataScope> actions = permissions.getOrDefault(userId, Map.of());
               return actions.isEmpty()
                   ? new PermissionResult(Map.of(), false)

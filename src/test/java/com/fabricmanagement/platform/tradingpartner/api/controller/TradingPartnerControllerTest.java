@@ -23,12 +23,15 @@ class TradingPartnerControllerTest {
 
   @Mock private TradingPartnerService tradingPartnerService;
 
+  @Mock
+  private com.fabricmanagement.platform.organization.security.OrganizationWriteAccess writeAccess;
+
   private TradingPartnerController controller;
   private UUID actingUserId;
 
   @BeforeEach
   void setUp() {
-    controller = new TradingPartnerController(tradingPartnerService);
+    controller = new TradingPartnerController(tradingPartnerService, writeAccess);
     actingUserId = UUID.randomUUID();
     TenantContext.setCurrentUserId(actingUserId);
   }
