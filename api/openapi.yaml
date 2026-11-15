@@ -196,6 +196,8 @@ tags:
   name: Partner Users
 - description: Payroll Self Service operations
   name: Payroll Self Service
+- description: People and companies who sign a customer's own cheques
+  name: Partner Cheque Drawers
 - description: Fabric master data and construction dictionary
   name: Fabric Articles
 - description: Employee Profile operations
@@ -253,6 +255,8 @@ tags:
   name: Lot Evidence
 - description: Legacy reconciliation and readiness visibility
   name: Yarn Reconciliation
+- description: Cheque drawers for receiving cheques
+  name: Finance Collection Cheque Drawers
 - description: Accepted registration progress; full evaluation journey without purchase
   name: Onboarding Journey
 - description: "Catalogue order entry, proposals and acceptance"
@@ -11932,6 +11936,389 @@ paths:
       summary: Update certification
       tags:
       - Partner Certifications
+  /api/v1/common/trading-partners/{partnerId}/cheque-drawers:
+    get:
+      operationId: listTradingPartnerChequeDrawers
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: includeInactive
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListTradingPartnerChequeDrawerDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "List a customer's cheque drawers, optionally with deactivated ones"
+      tags:
+      - Partner Cheque Drawers
+    post:
+      operationId: addTradingPartnerChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveTradingPartnerChequeDrawerRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerChequeDrawerAddResultDto"
+          description: "The name already exists: outcome EXISTING or INACTIVE_DUPLICATE"
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerChequeDrawerAddResultDto"
+          description: A new drawer was recorded (outcome CREATED)
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          description: Customer not found in this tenant
+        "409":
+          description: CHEQUE_DRAWER_PARTNER_NOT_CUSTOMER or CHEQUE_DRAWER_PARTNER_REMOVED
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Add a cheque drawer; an existing name is returned instead of added
+        twice
+      tags:
+      - Partner Cheque Drawers
+  /api/v1/common/trading-partners/{partnerId}/cheque-drawers/{drawerId}:
+    put:
+      operationId: changeTradingPartnerChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: drawerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveTradingPartnerChequeDrawerRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerChequeDrawerDto"
+          description: Renamed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          description: Customer or drawer not found
+        "409":
+          description: "CHEQUE_DRAWER_NAME_TAKEN: another drawer of this customer\
+            \ has the name"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Rename or retype a cheque drawer; received cheques keep their recorded
+        name
+      tags:
+      - Partner Cheque Drawers
+  /api/v1/common/trading-partners/{partnerId}/cheque-drawers/{drawerId}/deactivation:
+    post:
+      operationId: deactivateTradingPartnerChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: drawerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerChequeDrawerDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Take a cheque drawer out of the picker; nothing is deleted
+      tags:
+      - Partner Cheque Drawers
+  /api/v1/common/trading-partners/{partnerId}/cheque-drawers/{drawerId}/reactivation:
+    post:
+      operationId: reactivateTradingPartnerChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: drawerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerChequeDrawerDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Return a deactivated cheque drawer to the picker
+      tags:
+      - Partner Cheque Drawers
   /api/v1/common/trading-partners/{partnerId}/contacts:
     get:
       operationId: listContacts
@@ -18036,6 +18423,230 @@ paths:
         \ with explicit evidence"
       tags:
       - Finance Collections
+  /api/v1/finance/collections/customers/{partnerId}/cheque-drawers:
+    get:
+      operationId: listFinanceCollectionChequeDrawers
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeDrawers"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "The customer and its active cheque drawers, with the kind a new cheque\
+        \ starts on"
+      tags:
+      - Finance Collection Cheque Drawers
+    post:
+      operationId: addFinanceCollectionChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFinanceCollectionChequeDrawerRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeDrawerAddResult"
+          description: "The name already exists: outcome EXISTING or INACTIVE_DUPLICATE"
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeDrawerAddResult"
+          description: A new drawer was recorded (outcome CREATED)
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          description: Customer not found in this tenant
+        "409":
+          description: CHEQUE_DRAWER_PARTNER_NOT_CUSTOMER or CHEQUE_DRAWER_PARTNER_REMOVED
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Add a cheque drawer from the cheque form; an existing name is returned
+        instead
+      tags:
+      - Finance Collection Cheque Drawers
+  /api/v1/finance/collections/customers/{partnerId}/cheque-drawers/{drawerId}/reactivation:
+    post:
+      operationId: reactivateFinanceCollectionChequeDrawer
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: drawerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeDrawer"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reactivate a deactivated cheque drawer so it can be selected
+      tags:
+      - Finance Collection Cheque Drawers
   /api/v1/finance/collections/payment-matches/{id}/reverse:
     post:
       operationId: reverseFinanceCollectionMatch
@@ -66064,6 +66675,18 @@ components:
           format: uuid
       required:
       - userId
+    AddFinanceCollectionChequeDrawerRequest:
+      type: object
+      properties:
+        drawerType:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerType"
+        name:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - drawerType
+      - name
     AddOrganizationCertificationRequest:
       type: object
       properties:
@@ -67632,6 +68255,60 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/FiberTestResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionChequeDrawer:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawer"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionChequeDrawerAddResult:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerAddResult"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionChequeDrawers:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawers"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -69782,6 +70459,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TradingPartnerCertificationDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListTradingPartnerChequeDrawerDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TradingPartnerChequeDrawerDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -73057,6 +73754,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/TradingPartnerCertificationDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTradingPartnerChequeDrawerAddResultDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerAddResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseTradingPartnerChequeDrawerDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -82929,6 +83662,71 @@ components:
       - dueOn
       - instrumentReference
       - receivedOn
+    FinanceCollectionChequeDrawer:
+      type: object
+      properties:
+        active:
+          type: boolean
+        drawerType:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerType"
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - active
+      - drawerType
+      - id
+      - name
+    FinanceCollectionChequeDrawerAddOutcome:
+      type: string
+      enum:
+      - CREATED
+      - EXISTING
+      - INACTIVE_DUPLICATE
+    FinanceCollectionChequeDrawerAddResult:
+      type: object
+      properties:
+        drawer:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawer"
+        outcome:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerAddOutcome"
+      required:
+      - drawer
+      - outcome
+    FinanceCollectionChequeDrawerKind:
+      type: string
+      enum:
+      - OWN
+      - ENDORSED
+    FinanceCollectionChequeDrawerType:
+      type: string
+      enum:
+      - COMPANY
+      - INDIVIDUAL
+    FinanceCollectionChequeDrawers:
+      type: object
+      properties:
+        customerName:
+          type: string
+        defaultDrawerKind:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          description: "ENDORSED when the customer's default own cheque share is 0,\
+            \ else OWN"
+        drawers:
+          type: array
+          description: Active drawers only
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeDrawer"
+        partnerId:
+          type: string
+          format: uuid
+      required:
+      - customerName
+      - defaultDrawerKind
+      - drawers
+      - partnerId
     FinanceCollectionChequeDto:
       type: object
       properties:
@@ -98559,6 +99357,18 @@ components:
       - expectedPlanVersion
       - operationId
       - paymentPlan
+    SaveTradingPartnerChequeDrawerRequest:
+      type: object
+      properties:
+        drawerType:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerType"
+        name:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - drawerType
+      - name
     SelfSignupRequest:
       type: object
       properties:
@@ -101251,6 +102061,50 @@ components:
         version:
           type: integer
           format: int64
+    TradingPartnerChequeDrawerAddOutcome:
+      type: string
+      enum:
+      - CREATED
+      - EXISTING
+      - INACTIVE_DUPLICATE
+    TradingPartnerChequeDrawerAddResultDto:
+      type: object
+      properties:
+        drawer:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerDto"
+        outcome:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerAddOutcome"
+      required:
+      - drawer
+      - outcome
+    TradingPartnerChequeDrawerDto:
+      type: object
+      properties:
+        active:
+          type: boolean
+          description: "False once deactivated: kept for history, not offered in the\
+            \ picker"
+        drawerType:
+          $ref: "#/components/schemas/TradingPartnerChequeDrawerType"
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        partnerId:
+          type: string
+          format: uuid
+      required:
+      - active
+      - drawerType
+      - id
+      - name
+      - partnerId
+    TradingPartnerChequeDrawerType:
+      type: string
+      enum:
+      - COMPANY
+      - INDIVIDUAL
     TradingPartnerDto:
       type: object
       properties:

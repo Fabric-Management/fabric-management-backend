@@ -81,6 +81,23 @@ public final class CollectionTypes {
     CORRECT
   }
 
+  /**
+   * Who drew a received cheque (PAYMENT-PLAN-7): the customer itself or one of its listed drawers
+   * ({@code OWN}), or a third party whose cheque the customer endorsed to us ({@code ENDORSED}).
+   */
+  @Schema(name = "FinanceCollectionChequeDrawerKind", enumAsRef = true)
+  public enum DrawerKind {
+    OWN,
+    ENDORSED
+  }
+
+  /** Whether a customer's listed cheque drawer is a company or a person. */
+  @Schema(name = "FinanceCollectionChequeDrawerType", enumAsRef = true)
+  public enum DrawerType {
+    COMPANY,
+    INDIVIDUAL
+  }
+
   @Schema(name = "FinanceCollectionAction", enumAsRef = true)
   public enum Action {
     MATCH_PAYMENT,

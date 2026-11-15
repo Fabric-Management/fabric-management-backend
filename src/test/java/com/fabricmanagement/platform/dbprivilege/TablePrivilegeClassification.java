@@ -88,6 +88,9 @@ final class TablePrivilegeClassification {
     // PAYMENT-PLAN-1 S2-S6: mutable roots/projections are purged by fabric_system only;
     // plan content, evidence and command receipts are append-only.
     entries.put("sales_ord.order_payment_plan", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    // PAYMENT-PLAN-7 R13: deactivated, never deleted by the application.
+    entries.put(
+        "common_company.trading_partner_cheque_drawer", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_payment_plan_revision", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_payment_plan_currency", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_payment_plan_line", TablePrivilegeClass.APPEND_ONLY_LEDGER);

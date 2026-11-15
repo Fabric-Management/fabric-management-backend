@@ -283,6 +283,8 @@ public class TenantTransactionalPurgeService {
           "sales.discount_policy",
           "common_company.partner_link",
           "common_company.partner_contact",
+          // PAYMENT-PLAN-7 R13: references the partner; never deleted by the application.
+          "common_company.trading_partner_cheque_drawer",
           "human.human_pay_run_audit_log",
           "human.human_pay_run_payout",
           "human.human_pay_run_entry",
