@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +32,7 @@ import com.fabricmanagement.platform.user.domain.PermissionOverride;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.OnboardingJourneyProvisioningPort;
+import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStepPayload;
 import com.fabricmanagement.platform.user.dto.SaveOnboardingStepRequest;
 import com.fabricmanagement.platform.user.infra.repository.PermissionOverrideRepository;
@@ -40,6 +42,10 @@ import com.fabricmanagement.testsupport.AbstractFabricAppIntegrationTest;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +70,8 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
   private static final String ORIGINAL_TAX_ID = "GB123456789";
 
   @Autowired private OrganizationRepository organizations;
+  @Autowired private OrganizationService organizationService;
+  @Autowired private CompanyOnboardingProfileService companyProfiles;
   @Autowired private RoleRepository roles;
   @Autowired private UserRepository users;
   @Autowired private PermissionOverrideRepository overrides;
@@ -130,21 +138,23 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
               new SignupEvidencePort.SignupCompany(signup, tenant, admin, "TRIAL", facts, null));
           provisioning.provision(tenant, admin, signup, "TRIAL");
         });
-    journeys.save(
-        OnboardingStepId.ORGANIZATION_DETAILS,
-        new SaveOnboardingStepRequest(
-            0L,
-            UUID.randomUUID(),
-            new OnboardingStepPayload.OrganizationDetails(
-                RENAMED,
-                ORIGINAL_TAX_ID,
-                OrganizationType.WEAVER,
-                null,
-                null,
-                "TEXTILE",
-                null,
-                null)));
+    var saved =
+        journeys.save(
+            OnboardingStepId.ORGANIZATION_DETAILS,
+            new SaveOnboardingStepRequest(
+                0L,
+                UUID.randomUUID(),
+                new OnboardingStepPayload.OrganizationDetails(
+                    "\u00a0" + RENAMED + " ",
+                    ORIGINAL_TAX_ID,
+                    OrganizationType.WEAVER,
+                    null,
+                    null,
+                    "TEXTILE",
+                    null,
+                    null)));
 
+    assertThat(saved.acceptedValues().organisation().organizationName()).isEqualTo(RENAMED);
     assertNames(RENAMED);
     assertMembershipName(RENAMED);
   }
@@ -173,6 +183,72 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
 
     update(root, RENAMED, "GBP").andExpect(status().isConflict());
     assertOriginalProfile();
+  }
+
+  @Test
+  void invalidCompanyNameLeavesTheOrganisationAndTenantUnchanged() throws Exception {
+    for (String invalid : List.of("", " \t ", "\u00a0\u2003", "Willow\0Cloth", "A".repeat(256))) {
+      update(root, invalid, "EUR")
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("ORG_INVALID_NAME"));
+      assertOriginalProfile();
+    }
+  }
+
+  @Test
+  void onboardingWithoutANameCanSaveAgainstHistoricalBlankRoot() {
+    setHistoricalRootName(" \t ");
+    saveIndustryWithoutName("TEXTILE");
+
+    var persisted = organizations.findByTenantIdAndId(tenant, root).orElseThrow();
+    assertThat(persisted.getIndustry()).isEqualTo("TEXTILE");
+    assertThat(persisted.getName()).isEqualTo(" \t ");
+    assertThat(tenants.findById(tenant).orElseThrow().name()).isEqualTo(ORIGINAL);
+  }
+
+  @Test
+  void onboardingWithoutANameResynchronisesTheCurrentNameExactly() {
+    String existing = " Willow Cloth Ltd ";
+    setHistoricalRootName(existing);
+    saveIndustryWithoutName("TEXTILE");
+
+    assertNames(existing);
+  }
+
+  private void setHistoricalRootName(String name) {
+    systemJdbc.update(
+        "UPDATE common_company.common_organization SET name = ? WHERE id = ?", name, root);
+  }
+
+  private void saveIndustryWithoutName(String industry) {
+    transactions.executeWithoutResult(
+        status ->
+            companyProfiles.save(
+                companyProfiles.prepare(
+                    CompleteOnboardingRequest.builder().industry(industry).build())));
+  }
+
+  @Test
+  void validCompanyNameIsTrimmedAndStoredInBothRecords() throws Exception {
+    String displayName = "Willow Cloth Ltd " + "A".repeat(238);
+    assertThat(displayName).hasSize(255);
+    update(root, "\u00a0" + displayName + " \t", "GBP")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(displayName));
+    assertNames(displayName);
+  }
+
+  @Test
+  void branchNamesUseTheSameValidationWithoutRenamingTheTenant() throws Exception {
+    var branch = Organization.create("Hawthorn Leeds Branch", null, OrganizationType.WEAVER);
+    branch.setParent(root);
+    UUID branchId = organizations.saveAndFlush(branch).getId();
+    update(branchId, " ", "GBP")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ORG_INVALID_NAME"));
+    assertThat(organizations.findByTenantIdAndId(tenant, branchId).orElseThrow().getName())
+        .isEqualTo("Hawthorn Leeds Branch");
+    assertNames(ORIGINAL);
   }
 
   @Test
@@ -263,13 +339,110 @@ class CompanyNameRealRolesIT extends AbstractFabricAppIntegrationTest {
   }
 
   @Test
-  void multipleRootsLeaveTheTenantNameUnchangedWhenAnAdminEditsOne() throws Exception {
-    organizations.saveAndFlush(
-        Organization.create("Willow Cloth Works Ltd", "GB567891234", OrganizationType.WEAVER));
-    update(root, RENAMED, "GBP").andExpect(status().isOk());
-    assertThat(organizations.findByTenantIdAndId(tenant, root).orElseThrow().getName())
-        .isEqualTo(RENAMED);
-    assertThat(tenants.findById(tenant).orElseThrow().name()).isEqualTo(ORIGINAL);
+  void createRejectsAnOmittedOrNullParentAsAFieldError() throws Exception {
+    for (String parentField : List.of("", ",\"parentOrganizationId\":null")) {
+      createUnit(parentField)
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+          .andExpect(
+              jsonPath("$.errors.parentOrganizationId").value("Parent organisation is required"));
+    }
+  }
+
+  @Test
+  void createRequiresAnAvailableInternalParentInTheSameTenant() throws Exception {
+    UUID otherTenant = createTenant();
+    UUID foreignParent =
+        TenantContext.executeInTenantContext(
+            otherTenant,
+            () ->
+                organizations
+                    .saveAndFlush(
+                        Organization.create("Willow Cloth Ltd", null, OrganizationType.WEAVER))
+                    .getId());
+    var inactive = Organization.create("Hawthorn York Branch", null, OrganizationType.WEAVER);
+    inactive.setParent(root);
+    inactive.delete();
+    UUID inactiveParent = organizations.saveAndFlush(inactive).getId();
+    var deleted = Organization.create("Hawthorn Hull Branch", null, OrganizationType.WEAVER);
+    deleted.setParent(root);
+    deleted.delete();
+    deleted.setIsActive(true); // An inconsistent historical row is still not a usable parent.
+    UUID deletedParent = organizations.saveAndFlush(deleted).getId();
+    UUID partnerParent =
+        organizationService.createPartnerOrganization("Dale Cloth Ltd", null, "DALE").getId();
+    for (UUID unusable : List.of(foreignParent, inactiveParent, deletedParent, partnerParent)) {
+      createUnit(",\"parentOrganizationId\":\"" + unusable + "\"")
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.code").value("ORG_PARENT_NOT_FOUND"));
+    }
+
+    createUnit(",\"parentOrganizationId\":\"" + root + "\"")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.parentOrganizationId").value(root.toString()));
+    assertThat(organizations.countCompanyRoots(tenant)).isEqualTo(1);
+    assertThat(organizations.findByTenantIdAndParentOrganizationId(tenant, root))
+        .extracting(Organization::getName)
+        .contains("Hawthorn Leeds Branch");
+  }
+
+  @Test
+  void competingRootTransactionsCommitOneOrganisationAndReturnASpecificConflict() throws Exception {
+    UUID target = createTenant();
+    var bothStarted = new CyclicBarrier(2);
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var first = pool.submit(createRootAttempt(target, "HW-10101", bothStarted));
+      var second = pool.submit(createRootAttempt(target, "HW-10102", bothStarted));
+      assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder("committed", "ORG_ROOT_ALREADY_EXISTS");
+    }
+    TenantContext.executeInTenantContext(
+        target,
+        () -> {
+          assertThat(organizations.countCompanyRoots(target)).isEqualTo(1);
+          assertThat(organizations.findByTenantIdAndIsActiveTrue(target)).hasSize(1);
+          return null;
+        });
+  }
+
+  private Callable<String> createRootAttempt(UUID target, String taxId, CyclicBarrier bothStarted) {
+    return () ->
+        TenantContext.executeInTenantContext(
+            target,
+            () -> {
+              try {
+                transactions.executeWithoutResult(
+                    status -> {
+                      try {
+                        bothStarted.await(10, TimeUnit.SECONDS);
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError(e);
+                      } catch (java.util.concurrent.BrokenBarrierException
+                          | java.util.concurrent.TimeoutException e) {
+                        throw new AssertionError(e);
+                      }
+                      organizationService.createRootOrganization(
+                          target, "Hawthorn Weaving Ltd", taxId, OrganizationType.WEAVER);
+                    });
+                return "committed";
+              } catch (PlatformDomainException conflict) {
+                assertThat(conflict.getHttpStatus()).isEqualTo(409);
+                return conflict.getErrorCode();
+              }
+            });
+  }
+
+  private ResultActions createUnit(String parentField) throws Exception {
+    return perform(
+        post("/api/v1/common/organizations")
+            .with(authentication(SecurityContextHolder.getContext().getAuthentication()))
+            .contentType("application/json")
+            .content(
+                """
+                {"name":"Hawthorn Leeds Branch","taxId":"HW-20301","organizationType":"WEAVER"%s}
+                """
+                    .formatted(parentField)));
   }
 
   @Test

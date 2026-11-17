@@ -1,9 +1,11 @@
 package com.fabricmanagement.finance.collection.dto;
 
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeAction;
+import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Method;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.OverSettlementDecision;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -183,7 +185,27 @@ public final class CollectionRequests {
               minItems = 1,
               maxItems = 500,
               schema = @Schema(implementation = Application.class))
-          List<Application> applications) {}
+          List<Application> applications,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Schema(
+              nullable = true,
+              description =
+                  "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself or a listed drawer)"
+                      + " or ENDORSED (a third party's cheque endorsed to us).")
+          DrawerKind drawerKind,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Schema(
+              nullable = true,
+              description =
+                  "A listed drawer of the customer, for OWN only; absent means the customer itself")
+          UUID drawerId,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Size(max = 200)
+          @Schema(
+              nullable = true,
+              maxLength = 200,
+              description = "The drawer's name, for ENDORSED only; the backend writes it for OWN")
+          String drawerName) {}
 
   @Schema(name = "FinanceCollectionObligationVersion")
   public record Version(
@@ -203,7 +225,36 @@ public final class CollectionRequests {
       @NotBlank
           @Size(max = 100)
           @Schema(maxLength = 100, requiredMode = Schema.RequiredMode.REQUIRED)
-          String instrumentReference) {}
+          String instrumentReference,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Schema(
+              nullable = true,
+              description =
+                  "Absent with drawerId and drawerName: the recorded classification is kept unchanged.")
+          DrawerKind drawerKind,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Schema(
+              nullable = true,
+              description =
+                  "A listed drawer of the customer, for OWN only; absent means the customer itself")
+          UUID drawerId,
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+          @Size(max = 200)
+          @Schema(
+              nullable = true,
+              maxLength = 200,
+              description = "The drawer's name, for ENDORSED only; the backend writes it for OWN")
+          String drawerName) {
+    public Correction(
+        BigDecimal amount, LocalDate receivedOn, LocalDate dueOn, String instrumentReference) {
+      this(amount, receivedOn, dueOn, instrumentReference, null, null, null);
+    }
+
+    /** Whether the correction leaves the recorded classification as it is. */
+    public boolean keepsClassification() {
+      return drawerKind == null && drawerId == null && drawerName == null;
+    }
+  }
 
   @Schema(name = "FinanceCollectionChequeTransitionRequest")
   public record Transition(

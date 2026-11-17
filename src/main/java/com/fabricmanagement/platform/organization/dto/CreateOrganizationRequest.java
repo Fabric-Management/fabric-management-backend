@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.organization.dto;
 
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -30,7 +31,10 @@ public class CreateOrganizationRequest {
   @Builder.Default
   private OrganizationType organizationType = OrganizationType.VERTICAL_MILL;
 
-  /** Parent organization for hierarchy (optional) */
+  @NotNull(message = "Parent organisation is required")
+  @Schema(
+      description = "Active internal parent organisation in the current tenant",
+      requiredMode = Schema.RequiredMode.REQUIRED)
   private UUID parentOrganizationId;
 
   @Pattern(regexp = "^[A-Za-z]{3}$", message = "Preferred currency must be a 3-letter ISO code")

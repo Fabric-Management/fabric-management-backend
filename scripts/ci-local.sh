@@ -9,8 +9,10 @@
 #   SKIP_CONTAINER=1 bash scripts/ci-local.sh   # without the Docker image build
 #
 # Each step prints how long it took, and the end repeats every step with its time and result. The
-# whole output is also written to /tmp/ci-local.log (CI_LOCAL_LOG to change it): not to target/,
-# which the test step cleans. On a Mac the script keeps the machine awake until it finishes.
+# whole output is also written to ci-local-backend.log in the workspace root beside this repo
+# (CI_LOCAL_LOG to change it; ignored by the workspace's git): not to target/, which the test step
+# cleans, and readable back after the run. On a Mac the script keeps the machine awake until it
+# finishes.
 #
 # The Dependency-Check step contacts the NVD API. With a warm cache (~/.m2/dependency-check-data)
 # and nvdValidForHours=168 it reuses local data for 7 days and won't hit NVD; on a cold cache while
@@ -18,7 +20,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-LOG="${CI_LOCAL_LOG:-/tmp/ci-local.log}"
+LOG="${CI_LOCAL_LOG:-$(cd .. && pwd)/ci-local-backend.log}"
 exec > >(tee "$LOG") 2>&1
 
 # On a Mac, stay awake until this script exits: a sleep in the middle stops the test containers and

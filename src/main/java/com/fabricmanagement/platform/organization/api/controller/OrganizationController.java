@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -85,7 +86,9 @@ public class OrganizationController {
   @PutMapping("/{id}")
   public ResponseEntity<ApiResponse<OrganizationDto>> updateOrganization(
       @PathVariable UUID id,
-      @RequestParam String name,
+      @Parameter(description = "Organisation display name with 1 to 255 characters after trimming")
+          @RequestParam
+          String name,
       @RequestParam(required = false) String taxId,
       @RequestParam(required = false) String legalName,
       @RequestParam(required = false) String preferredCurrency) {

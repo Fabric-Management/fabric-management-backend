@@ -813,9 +813,15 @@ class MembershipPermissionRevocationIT extends AbstractFabricAppIntegrationTest 
                "name":"Aire Cloth Ltd","taxId":"GB987654321","organizationType":"WEAVER","label":"Mill office",
                "streetAddress":"18 Mill Lane","city":"Leeds","country":"United Kingdom","addressType":"OFFICE",
                "addressId":"%s","orgAddressId":"%s","contactId":"%s",
-               "organizationId":"%s","departmentId":"%s"}
+               "organizationId":"%s","departmentId":"%s","parentOrganizationId":"%s"}
               """
-                  .formatted(address, addressId, point.getId(), organisationId, departmentId);
+                  .formatted(
+                      address,
+                      addressId,
+                      point.getId(),
+                      organisationId,
+                      departmentId,
+                      organisationId);
           mvc.perform(
                   request(HttpMethod.valueOf(method.name()), path)
                       .header("Authorization", "Bearer " + token)

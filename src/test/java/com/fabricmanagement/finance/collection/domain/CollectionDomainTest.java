@@ -141,6 +141,10 @@ class CollectionDomainTest {
         DATE,
         DATE.plusMonths(3),
         "NORTHBANK-0042",
-        "Signed instrument scan");
+        "Signed instrument scan",
+        new CollectionCheque.Drawer(
+            com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+            null,
+            "Northbridge Cloth"));
   }
 }

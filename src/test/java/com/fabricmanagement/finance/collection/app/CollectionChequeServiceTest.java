@@ -40,6 +40,7 @@ class CollectionChequeServiceTest {
   @Mock PaymentService payments;
   @Mock FinancialPeriodGuard periods;
   @Mock CollectionEvents changes;
+  @Mock CollectionChequeDrawerResolver drawers;
   @InjectMocks CollectionChequeService service;
   UUID tenant = UUID.randomUUID(),
       actor = UUID.randomUUID(),
@@ -79,7 +80,11 @@ class CollectionChequeServiceTest {
             date,
             date.plusMonths(3),
             "NORTHBANK-0042",
-            "Signed instrument scan");
+            "Signed instrument scan",
+            new CollectionCheque.Drawer(
+                com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+                null,
+                "Northbridge Cloth"));
     cheque.setId(chequeId);
     cheque.setTenantId(tenant);
     payment =
@@ -151,6 +156,12 @@ class CollectionChequeServiceTest {
 
   @Test
   void physicalReceiptCreatesInstrumentEvidenceWithoutCreatingOrMatchingAnyCash() {
+    when(drawers.forReceipt(any()))
+        .thenReturn(
+            new CollectionCheque.Drawer(
+                com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+                null,
+                "Northbridge Cloth"));
     service.receive(
         new CollectionRequests.ReceiveCheque(
             UUID.randomUUID(),
@@ -163,12 +174,45 @@ class CollectionChequeServiceTest {
             "Signed instrument scan",
             now,
             "Cheque handed to finance",
-            List.of(new CollectionRequests.Application(rowId, 0L, new BigDecimal("4284.00")))),
+            List.of(new CollectionRequests.Application(rowId, 0L, new BigDecimal("4284.00"))),
+            com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+            null,
+            null),
         actor);
     verifyNoInteractions(payments);
     verify(posting, never())
         .postChequeBatch(any(), any(), anyList(), anyList(), any(), any(), any(), any());
     verify(events).saveAndFlush(argThat(value -> value.getState() == ChequeState.RECEIVED));
+  }
+
+  /**
+   * PAYMENT-PLAN-7 R16, B11: a receipt stored before tagging replays; its kind is never checked.
+   */
+  @Test
+  void aReceiptWithoutAKindStillReplaysWithoutAskingForADrawer() {
+    var stored = mock(CollectionCommandReceipt.class);
+    when(commands.replay(any(), any(), any())).thenReturn(Optional.of(stored));
+    var answer =
+        service.receive(
+            new CollectionRequests.ReceiveCheque(
+                UUID.randomUUID(),
+                partner,
+                "GBP",
+                new BigDecimal("4284.00"),
+                date,
+                date.plusMonths(3),
+                "NORTHBANK-0042",
+                "Signed instrument scan",
+                now,
+                "Cheque handed to finance",
+                List.of(new CollectionRequests.Application(rowId, 0L, new BigDecimal("4284.00"))),
+                null,
+                null,
+                null),
+            actor);
+    assertThat(answer).isSameAs(stored);
+    verifyNoInteractions(drawers);
+    verify(cheques, never()).saveAndFlush(any());
   }
 
   @Test

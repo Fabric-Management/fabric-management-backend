@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
@@ -46,22 +47,7 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
     assertThat(templateCount).as("Precondition: TEMPLATE tenant must exist").isGreaterThan(0);
 
     // Insert dummy data into TEMPLATE tenant to test cloning
-    UUID orgId;
-    List<UUID> existingOrgs =
-        jdbc.queryForList(
-            "SELECT id FROM common_company.common_organization WHERE tenant_id = ? LIMIT 1",
-            UUID.class,
-            templateTenantId);
-    if (!existingOrgs.isEmpty()) {
-      orgId = existingOrgs.get(0);
-    } else {
-      orgId = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, tax_id, organization_type, is_active, created_at, updated_at, version) VALUES (?, ?, ?, 'Test Org', '1234567890', 'VERTICAL_MILL', true, now(), now(), 0)",
-          orgId,
-          templateTenantId,
-          UUID.randomUUID().toString());
-    }
+    UUID orgId = rootId(templateTenantId);
 
     UUID deptId;
     List<UUID> existingDepts =
@@ -170,7 +156,15 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
         yarnCatalogueSource);
 
     // Act
-    Tenant pg = tenantClonerService.cloneTemplateToPlayground();
+    UUID branchId = addBranch(templateTenantId, orgId, "Hawthorn Leeds Branch", true);
+    UUID unitId = addBranch(templateTenantId, branchId, "Hawthorn Leeds Dispatch", true);
+    Tenant pg;
+    try {
+      pg = tenantClonerService.cloneTemplateToPlayground();
+    } finally {
+      jdbc.update("DELETE FROM common_company.common_organization WHERE id = ?", unitId);
+      jdbc.update("DELETE FROM common_company.common_organization WHERE id = ?", branchId);
+    }
 
     // Assert - Tenant
     assertThat(pg).isNotNull();
@@ -180,7 +174,22 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
 
     // Assert - Organizations
     List<Organization> orgs = organizationRepository.findByTenantIdAndIsActiveTrue(pg.getId());
-    assertThat(orgs).isNotEmpty();
+    var clonedRoot = orgs.stream().filter(Organization::isCompanyRoot).toList();
+    assertThat(clonedRoot).hasSize(1);
+    Organization branch =
+        orgs.stream()
+            .filter(org -> org.getName().equals("Hawthorn Leeds Branch"))
+            .findFirst()
+            .orElseThrow();
+    Organization unit =
+        orgs.stream()
+            .filter(org -> org.getName().equals("Hawthorn Leeds Dispatch"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(branch.getParentOrganizationId()).isEqualTo(clonedRoot.getFirst().getId());
+    assertThat(branch.getId()).isNotEqualTo(branchId);
+    assertThat(unit.getParentOrganizationId()).isEqualTo(branch.getId());
+    assertThat(unit.getId()).isNotEqualTo(unitId);
 
     // Assert - Departments
     List<Department> depts = departmentRepository.findByTenantIdAndIsActiveTrue(pg.getId());
@@ -332,5 +341,51 @@ class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
           .as("Cloned UIDs should be fresh, not copied from template")
           .doesNotContainAnyElementsOf(templateOrgUids);
     }
+  }
+
+  @Test
+  void aBranchWithAnUnavailableParentRollsBackTheClone() {
+    UUID source = PlaygroundSourceFixture.ensureWithCatalogue(jdbc, catalogueBackfillRunner);
+    UUID inactive = addBranch(source, rootId(source), "Hawthorn York Branch", false);
+    UUID child = addBranch(source, inactive, "Hawthorn York Dispatch", true);
+    try {
+      long before = playgroundCount();
+      assertThatThrownBy(() -> tenantClonerService.cloneTemplateToPlayground())
+          .hasStackTraceContaining("an active organisation has an unavailable parent");
+      assertThat(playgroundCount()).isEqualTo(before);
+    } finally {
+      jdbc.update("DELETE FROM common_company.common_organization WHERE id = ?", child);
+      jdbc.update("DELETE FROM common_company.common_organization WHERE id = ?", inactive);
+    }
+  }
+
+  private UUID rootId(UUID tenantId) {
+    return jdbc.queryForObject(
+        """
+        SELECT id FROM common_company.common_organization
+        WHERE tenant_id = ? AND is_active = true AND parent_organization_id IS NULL
+          AND organization_type <> 'EXTERNAL_PARTNER'
+        """,
+        UUID.class,
+        tenantId);
+  }
+
+  private UUID addBranch(UUID tenantId, UUID parentId, String name, boolean active) {
+    return jdbc.queryForObject(
+        """
+        INSERT INTO common_company.common_organization
+          (tenant_id, uid, name, organization_type, parent_organization_id, is_active)
+        VALUES (?, gen_random_uuid()::varchar, ?, 'WEAVER', ?, ?) RETURNING id
+        """,
+        UUID.class,
+        tenantId,
+        name,
+        parentId,
+        active);
+  }
+
+  private long playgroundCount() {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM common_tenant.common_tenant WHERE type = 'PLAYGROUND'", Long.class);
   }
 }

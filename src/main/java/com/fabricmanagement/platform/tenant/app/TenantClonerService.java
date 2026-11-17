@@ -10,6 +10,8 @@ import com.fabricmanagement.platform.tenant.domain.port.PlaygroundFixtureProvisi
 import com.fabricmanagement.platform.tenant.domain.port.TenantCatalogueProvisioningPort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -731,6 +733,96 @@ public class TenantClonerService {
     return 1;
   }
 
+  private record SourceOrganisation(
+      UUID id,
+      UUID parentId,
+      String name,
+      String type,
+      String taxId,
+      String description,
+      boolean deleted) {
+    boolean isInternal() {
+      return !"EXTERNAL_PARTNER".equals(type);
+    }
+  }
+
+  private Map<UUID, UUID> cloneOrganisations(
+      JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    List<SourceOrganisation> source =
+        jdbc.query(
+            """
+            SELECT id, parent_organization_id, name, organization_type, tax_id, description,
+                   deleted_at IS NOT NULL AS deleted
+            FROM common_company.common_organization
+            WHERE tenant_id = ? AND is_active = true
+            """,
+            (rs, row) ->
+                new SourceOrganisation(
+                    rs.getObject("id", UUID.class),
+                    rs.getObject("parent_organization_id", UUID.class),
+                    rs.getString("name"),
+                    rs.getString("organization_type"),
+                    rs.getString("tax_id"),
+                    rs.getString("description"),
+                    rs.getBoolean("deleted")),
+            sourceTenantId);
+
+    Map<UUID, UUID> copiedIds = new HashMap<>();
+    Map<UUID, List<SourceOrganisation>> byParent = new HashMap<>();
+    for (var organisation : source) {
+      if (organisation.deleted()) {
+        throw new IllegalStateException(
+            "Cannot clone active organisation " + organisation.id() + " marked as deleted");
+      }
+      copiedIds.put(organisation.id(), UUID.randomUUID());
+      byParent
+          .computeIfAbsent(organisation.parentId(), ignored -> new ArrayList<>())
+          .add(organisation);
+    }
+
+    // Start at the roots and only write a child once its target parent exists.
+    var roots = byParent.getOrDefault(null, List.of());
+    if (roots.stream().filter(SourceOrganisation::isInternal).count() != 1) {
+      throw new IllegalStateException(
+          "Playground source tenant " + sourceTenantId + " must have one active internal root");
+    }
+    var ready = new ArrayDeque<>(roots);
+    int copied = 0;
+    while (!ready.isEmpty()) {
+      var organisation = ready.removeFirst();
+      var children = byParent.getOrDefault(organisation.id(), List.of());
+      if (!organisation.isInternal()
+          && children.stream().anyMatch(SourceOrganisation::isInternal)) {
+        throw new IllegalStateException(
+            "Cannot clone internal organisations under external partner " + organisation.id());
+      }
+      jdbc.update(
+          """
+          INSERT INTO common_company.common_organization
+            (id, tenant_id, uid, name, organization_type, tax_id, description,
+             parent_organization_id, is_active, created_at, updated_at, version)
+          VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, true, now(), now(), 0)
+          """,
+          copiedIds.get(organisation.id()),
+          targetTenantId,
+          organisation.name(),
+          organisation.type(),
+          organisation.taxId(),
+          organisation.description(),
+          copiedIds.get(organisation.parentId()));
+      copied++;
+      ready.addAll(children);
+    }
+
+    if (copied != source.size()) {
+      throw new IllegalStateException(
+          "Cannot clone organisation hierarchy for tenant "
+              + sourceTenantId
+              + ": an active organisation has an unavailable parent or belongs to a cycle");
+    }
+    return copiedIds;
+  }
+
   public Tenant cloneTemplateToPlayground() {
     log.info("Starting template clone process for new playground tenant (JDBC BYPASSRLS).");
 
@@ -774,24 +866,7 @@ public class TenantClonerService {
               // 3. Clone Hierarchical Data (Requires mapping old UUIDs to new UUIDs)
 
               // 3.1 Organization
-              Map<UUID, UUID> orgMap = new HashMap<>();
-              jdbc.query(
-                  "SELECT id, name, organization_type, tax_id, description FROM common_company.common_organization WHERE tenant_id = ? AND is_active = true",
-                  rs -> {
-                    UUID oldId = (UUID) rs.getObject("id");
-                    UUID newId = UUID.randomUUID();
-                    jdbc.update(
-                        "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, organization_type, tax_id, description, is_active, created_at, updated_at, version) "
-                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
-                        newId,
-                        newTenantId,
-                        rs.getString("name"),
-                        rs.getString("organization_type"),
-                        rs.getString("tax_id"),
-                        rs.getString("description"));
-                    orgMap.put(oldId, newId);
-                  },
-                  templateTenantId);
+              Map<UUID, UUID> orgMap = cloneOrganisations(jdbc, templateTenantId, newTenantId);
 
               // 3.2 Department
               Map<UUID, UUID> deptMap = new HashMap<>();
