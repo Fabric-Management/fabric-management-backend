@@ -98,6 +98,11 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque (
   instrument_reference varchar(100) NOT NULL,
   state varchar(20) NOT NULL CHECK(state IN ('RECEIVED','PRESENTED','CLEARED','DISHONOURED','RETURNED','CANCELLED')),
   evidence_revision bigint NOT NULL DEFAULT 0, cleared_payment_id uuid, last_evidence varchar(1000),
+  -- PAYMENT-PLAN-7 R14: who drew the cheque, written when it happens; null = not recorded.
+  drawer_kind varchar(10) CHECK(drawer_kind IN ('OWN','ENDORSED')), drawer_name varchar(255), drawer_id uuid,
+  CHECK((drawer_kind IS NULL AND drawer_name IS NULL AND drawer_id IS NULL)
+    OR (drawer_kind IS NOT NULL AND drawer_name IS NOT NULL)),
+  CHECK(drawer_kind IS DISTINCT FROM 'ENDORSED' OR drawer_id IS NULL),
   UNIQUE(tenant_id,id),
   FOREIGN KEY(tenant_id,cleared_payment_id) REFERENCES finance.finance_payment(tenant_id,id),
   CHECK(state<>'CLEARED' OR cleared_payment_id IS NOT NULL)
@@ -142,6 +147,11 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque_event (
   received_on date NOT NULL, due_on date NOT NULL, instrument_reference varchar(100) NOT NULL, payment_id uuid,
   -- Execution order, independent of clock precision.
   evidence_revision bigint NOT NULL CONSTRAINT ck_collection_cheque_event_revision CHECK(evidence_revision>=0),
+  -- PAYMENT-PLAN-7 R14: who drew the cheque, written when it happens; null = not recorded.
+  drawer_kind varchar(10) CHECK(drawer_kind IN ('OWN','ENDORSED')), drawer_name varchar(255), drawer_id uuid,
+  CHECK((drawer_kind IS NULL AND drawer_name IS NULL AND drawer_id IS NULL)
+    OR (drawer_kind IS NOT NULL AND drawer_name IS NOT NULL)),
+  CHECK(drawer_kind IS DISTINCT FROM 'ENDORSED' OR drawer_id IS NULL),
   UNIQUE(tenant_id,id),
   FOREIGN KEY(tenant_id,cheque_id) REFERENCES finance.collection_cheque(tenant_id,id),
   FOREIGN KEY(tenant_id,payment_id) REFERENCES finance.finance_payment(tenant_id,id)

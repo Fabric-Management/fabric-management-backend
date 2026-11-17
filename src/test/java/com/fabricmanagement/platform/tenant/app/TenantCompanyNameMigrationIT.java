@@ -3,34 +3,51 @@ package com.fabricmanagement.platform.tenant.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.testsupport.AbstractIntegrationTest;
+import com.fabricmanagement.testsupport.PostgresImage;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-class TenantCompanyNameMigrationIT extends AbstractIntegrationTest {
+@Testcontainers
+class TenantCompanyNameMigrationIT {
 
   private static final String OLD_NAME = "Hawthorn Weaving Ltd";
   private static final String ROOT_NAME = "Hawthorn Cloth Ltd";
 
-  private final JdbcTemplate jdbc;
-  private final TransactionTemplate transactions;
+  @Container static final PostgreSQLContainer<?> POSTGRES = PostgresImage.container();
 
-  @Autowired
-  TenantCompanyNameMigrationIT(
-      @Qualifier("dataSource") DataSource dataSource, TransactionTemplate transactions) {
-    this.jdbc = new JdbcTemplate(dataSource);
-    this.transactions = transactions;
+  private JdbcTemplate jdbc;
+
+  @BeforeAll
+  static void migrateToCompanyNameChange() {
+    Flyway.configure()
+        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+        .locations("classpath:db/migration")
+        .schemas("common_tenant")
+        .defaultSchema("common_tenant")
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
+        .target("20261114150000")
+        .load()
+        .migrate();
   }
 
   @Test
   void backfillCopiesOnlyUnambiguousRegularRootsAndCanBeReplayed() {
+    var dataSource =
+        new DriverManagerDataSource(
+            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+    jdbc = new JdbcTemplate(dataSource);
+    var transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
     // The function scans every tenant. Keep the fixture and all its writes local to this test.
     transactions.executeWithoutResult(
         status -> {

@@ -52,6 +52,16 @@ public class CollectionChequeDrawerAdapter implements CollectionChequeDrawerPort
     return drawer(drawers.reactivate(partnerId, drawerId));
   }
 
+  @Override
+  public java.util.Optional<String> customerName(UUID partnerId) {
+    return partners.findDisplayName(TenantContext.requireTenantId(), partnerId);
+  }
+
+  @Override
+  public java.util.Optional<Drawer> drawer(UUID partnerId, UUID drawerId) {
+    return drawers.find(partnerId, drawerId).map(CollectionChequeDrawerAdapter::drawer);
+  }
+
   private static Drawer drawer(TradingPartnerChequeDrawerDto value) {
     return new Drawer(
         value.id(), value.name(), DrawerType.valueOf(value.drawerType().name()), value.active());

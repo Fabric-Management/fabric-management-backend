@@ -43,6 +43,7 @@ public class CompanyOnboardingProfileService {
   public static final class PreparedProfile {
     private final Organization root;
     private final CompleteOnboardingRequest request;
+    private final String displayName;
     private final OrganizationAddress headquarters;
     private final CreateAddressRequest address;
     private final OnboardingContact email;
@@ -52,6 +53,10 @@ public class CompanyOnboardingProfileService {
   @Transactional(propagation = Propagation.MANDATORY)
   public PreparedProfile prepare(CompleteOnboardingRequest request) {
     validator.validate(request);
+    String displayName =
+        request.getOrganizationName() == null
+            ? null
+            : OrganizationNamingService.normalizeDisplayName(request.getOrganizationName());
     UUID tenant = TenantContext.requireTenantId();
     Organization root =
         organizations
@@ -112,6 +117,7 @@ public class CompanyOnboardingProfileService {
     return new PreparedProfile(
         root,
         request,
+        displayName,
         headquarters,
         address,
         contactService.prepareOnboardingContact(request.getCompanyEmail(), ContactType.EMAIL),
@@ -123,7 +129,11 @@ public class CompanyOnboardingProfileService {
   public void save(PreparedProfile prepared) {
     Organization root = prepared.root;
     var request = prepared.request;
-    naming.rename(root, patch(request.getOrganizationName(), root.getName()));
+    if (prepared.displayName == null) {
+      naming.synchronizeExistingRootName(root);
+    } else {
+      naming.rename(root, prepared.displayName);
+    }
     if (request.getOrganizationType() != null)
       root.setOrganizationType(request.getOrganizationType());
     root.setTaxId(patch(request.getTaxId(), root.getTaxId()));

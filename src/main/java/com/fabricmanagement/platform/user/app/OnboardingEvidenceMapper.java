@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.lead.domain.CompanyEvidence;
+import com.fabricmanagement.platform.organization.app.OrganizationNamingService;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStepPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,7 +68,10 @@ public class OnboardingEvidenceMapper {
                 known.add(field.getKey());
                 var value = field.getValue();
                 if (value.isTextual()) {
-                  String trimmed = value.textValue().trim();
+                  String trimmed =
+                      field.getKey().equals("organizationName")
+                          ? OrganizationNamingService.normalizeDisplayName(value.textValue())
+                          : value.textValue().trim();
                   value =
                       trimmed.isEmpty()
                           ? json.getNodeFactory().nullNode()

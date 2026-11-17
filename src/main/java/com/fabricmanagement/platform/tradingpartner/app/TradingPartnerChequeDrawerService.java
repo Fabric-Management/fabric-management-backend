@@ -44,6 +44,14 @@ public class TradingPartnerChequeDrawerService {
     return rows.stream().map(TradingPartnerChequeDrawerDto::from).toList();
   }
 
+  /** One drawer of the customer, active or not, without locking; empty when not this customer's. */
+  @Transactional(readOnly = true)
+  public java.util.Optional<TradingPartnerChequeDrawerDto> find(UUID partnerId, UUID drawerId) {
+    return drawers
+        .findByTenantIdAndPartnerIdAndId(TenantContext.requireTenantId(), partnerId, drawerId)
+        .map(TradingPartnerChequeDrawerDto::from);
+  }
+
   /**
    * Adds a drawer. A name that already exists (after normalisation) is not added again: an active
    * row is returned as {@code EXISTING}; an inactive one is returned unchanged as {@code

@@ -234,6 +234,10 @@ public final class CollectionDtos {
       @Schema(nullable = true) UUID clearedPaymentId,
       boolean clearingValid,
       boolean possibleDuplicateReference,
+      @Schema(nullable = true, description = "Null on cheques received before tagging")
+          DrawerKind drawerKind,
+      @Schema(nullable = true) UUID drawerId,
+      @Schema(nullable = true, description = "The name recorded with the cheque") String drawerName,
       List<Application> applications,
       List<Capability> capabilities,
       List<String> warnings) {}
@@ -317,5 +321,8 @@ public final class CollectionDtos {
       LocalDate receivedOn,
       LocalDate dueOn,
       String instrumentReference,
-      @Schema(nullable = true) UUID paymentId) {}
+      @Schema(nullable = true) UUID paymentId,
+      @Schema(nullable = true) DrawerKind drawerKind,
+      @Schema(nullable = true) UUID drawerId,
+      @Schema(nullable = true) String drawerName) {}
 }

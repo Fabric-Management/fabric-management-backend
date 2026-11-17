@@ -122,7 +122,7 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
     Tenant victim = tenantClonerService.cloneTemplateToPlayground();
     Tenant other = tenantClonerService.cloneTemplateToPlayground();
 
-    UUID victimOrganization = insertOrganization(victim.getId());
+    UUID victimOrganization = rootOrganisation(victim.getId());
     UUID strayDepartment = UUID.randomUUID();
     owner()
         .update(
@@ -366,25 +366,20 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
             tenantId);
   }
 
-  private static UUID insertOrganization(UUID tenantId) {
-    UUID id = UUID.randomUUID();
-    owner()
-        .update(
-            "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, tax_id,"
-                + " organization_type, is_active, created_at, updated_at, version) VALUES (?, ?,"
-                + " ?, 'Purge Org', ?, 'VERTICAL_MILL', true, now(), now(), 0)",
-            id,
-            tenantId,
-            UUID.randomUUID().toString(),
-            String.format(
-                Locale.ROOT,
-                "%010d",
-                Math.floorMod(UUID.randomUUID().getMostSignificantBits(), 10_000_000_000L)));
-    return id;
+  private static UUID rootOrganisation(UUID tenantId) {
+    return owner()
+        .queryForObject(
+            """
+        SELECT id FROM common_company.common_organization
+        WHERE tenant_id = ? AND parent_organization_id IS NULL AND is_active = true
+          AND organization_type <> 'EXTERNAL_PARTNER'
+        """,
+            UUID.class,
+            tenantId);
   }
 
   private static UUID insertUser(UUID tenantId) {
-    UUID organizationId = insertOrganization(tenantId);
+    UUID organizationId = rootOrganisation(tenantId);
     UUID roleId = UUID.randomUUID();
     JdbcTemplate owner = owner();
     owner.update(

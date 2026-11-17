@@ -21,6 +21,8 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class OrganizationService {
+
+  private static final String ROOT_INDEX = "ux_organization_active_company_root";
 
   private final OrganizationRepository organizationRepository;
   private final DomainEventPublisher eventPublisher;
@@ -61,17 +65,23 @@ public class OrganizationService {
           400);
     }
 
-    // Validate parent if provided
-    if (request.getParentOrganizationId() != null) {
-      if (!organizationRepository.existsByTenantIdAndId(
-          tenantId, request.getParentOrganizationId())) {
-        throw new PlatformDomainException(
-            "Parent organization not found", "ORG_PARENT_NOT_FOUND", 404);
-      }
-    }
-
     writeAccess.requireConfigure();
     writeAccess.requireInternalType(request.getOrganizationType());
+
+    UUID parentId = request.getParentOrganizationId();
+    if (parentId == null) {
+      throw new PlatformDomainException(
+          "Parent organisation is required", "ORG_PARENT_REQUIRED", 422);
+    }
+    organizationRepository
+        .lockByTenantIdAndId(tenantId, parentId)
+        .filter(parent -> Boolean.TRUE.equals(parent.getIsActive()))
+        .filter(parent -> parent.getDeletedAt() == null)
+        .filter(parent -> parent.getOrganizationType() != OrganizationType.EXTERNAL_PARTNER)
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Active internal parent organisation not found", "ORG_PARENT_NOT_FOUND", 404));
 
     // Validate tax ID uniqueness within tenant
     if (request.getTaxId() != null
@@ -82,7 +92,7 @@ public class OrganizationService {
 
     Organization organization =
         Organization.create(request.getName(), request.getTaxId(), request.getOrganizationType());
-    organization.setParent(request.getParentOrganizationId());
+    organization.setParent(parentId);
     organization.setPreferredCurrency(normalizePreferredCurrency(request.getPreferredCurrency()));
 
     Organization saved = organizationRepository.save(organization);
@@ -115,6 +125,7 @@ public class OrganizationService {
   public OrganizationDto createRootOrganization(
       UUID tenantId, String name, String taxId, OrganizationType organizationType) {
     log.debug("Creating root organization for tenant: {}", tenantId);
+    writeAccess.requireInternalType(organizationType);
 
     // Validate tax ID global uniqueness for root organizations
     if (taxId != null && organizationRepository.existsByTaxId(taxId)) {
@@ -122,12 +133,12 @@ public class OrganizationService {
     }
 
     // Set tenant context for entity creation
-    UUID originalTenantId = TenantContext.getCurrentTenantIdOrNull();
+    TenantContext.TenantSnapshot originalContext = TenantContext.capture();
     try {
       TenantContext.setCurrentTenantId(tenantId);
 
       Organization organization = Organization.create(name, taxId, organizationType);
-      Organization saved = organizationRepository.save(organization);
+      Organization saved = saveRoot(organization);
 
       eventPublisher.publish(
           new OrganizationCreatedEvent(
@@ -140,9 +151,23 @@ public class OrganizationService {
           saved.getTenantId());
       return OrganizationDto.from(saved);
     } finally {
-      if (originalTenantId != null) {
-        TenantContext.setCurrentTenantId(originalTenantId);
+      TenantContext.restore(originalContext);
+    }
+  }
+
+  private Organization saveRoot(Organization organization) {
+    try {
+      return organizationRepository.saveAndFlush(organization);
+    } catch (DataIntegrityViolationException failure) {
+      for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+        if (cause instanceof ConstraintViolationException violation
+            && "23505".equals(violation.getSQLState())
+            && ROOT_INDEX.equals(violation.getConstraintName())) {
+          throw new PlatformDomainException(
+              "This tenant already has a root organisation", "ORG_ROOT_ALREADY_EXISTS", 409);
+        }
       }
+      throw failure;
     }
   }
 

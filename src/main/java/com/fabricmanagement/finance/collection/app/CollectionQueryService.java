@@ -328,6 +328,9 @@ public class CollectionQueryService {
         cheque.getClearedPaymentId(),
         valid,
         duplicate,
+        cheque.getDrawerKind(),
+        cheque.getDrawerId(),
+        cheque.getDrawerName(),
         applied.stream()
             .map(
                 value ->
@@ -362,7 +365,10 @@ public class CollectionQueryService {
                     value.getReceivedOn(),
                     value.getDueOn(),
                     value.getInstrumentReference(),
-                    value.getPaymentId()));
+                    value.getPaymentId(),
+                    value.getDrawerKind(),
+                    value.getDrawerId(),
+                    value.getDrawerName()));
   }
 
   private CollectionObligation readable(UUID id, UUID actor) {

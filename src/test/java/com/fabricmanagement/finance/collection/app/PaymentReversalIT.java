@@ -462,7 +462,11 @@ class PaymentReversalIT extends AbstractIntegrationTest {
                         "Buyer handed cheque to finance",
                         List.of(
                             new CollectionRequests.Application(
-                                obligation, version, new BigDecimal("4284.00")))),
+                                obligation, version, new BigDecimal("4284.00"))),
+                        com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind
+                            .OWN,
+                        null,
+                        null),
                     actor)
                 .getResourceId());
   }

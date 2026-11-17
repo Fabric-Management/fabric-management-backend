@@ -138,9 +138,19 @@ class PlatformAdminNotificationRealRolesIT extends AbstractFabricAppIntegrationT
             PLATFORM);
   }
 
-  /** A user of the platform tenant holding its seeded {@code PLATFORM_ADMIN} role. */
+  /** A user attached to the platform's seeded organisation and {@code PLATFORM_ADMIN} role. */
   private UUID insertPlatformAdministrator() {
-    return insertUser(PLATFORM, insertOrganisation(PLATFORM), platformAdminRoleId());
+    UUID platformOrganisation =
+        owner()
+            .queryForObject(
+                """
+                SELECT id FROM common_company.common_organization
+                WHERE tenant_id = ? AND parent_organization_id IS NULL AND is_active = true
+                  AND organization_type <> 'EXTERNAL_PARTNER'
+                """,
+                UUID.class,
+                PLATFORM);
+    return insertUser(PLATFORM, platformOrganisation, platformAdminRoleId());
   }
 
   private UUID insertTenant() {

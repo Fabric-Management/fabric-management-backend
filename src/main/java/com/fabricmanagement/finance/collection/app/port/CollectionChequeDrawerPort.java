@@ -20,6 +20,12 @@ public interface CollectionChequeDrawerPort {
   /** Returns the same deactivated row to the picker. */
   Drawer reactivate(UUID partnerId, UUID drawerId);
 
+  /** The customer's current display name; empty when the partner is not this tenant's. */
+  java.util.Optional<String> customerName(UUID partnerId);
+
+  /** One drawer of this customer, active or not; empty when it is not this customer's. */
+  java.util.Optional<Drawer> drawer(UUID partnerId, UUID drawerId);
+
   record Drawer(UUID id, String name, DrawerType type, boolean active) {}
 
   /**

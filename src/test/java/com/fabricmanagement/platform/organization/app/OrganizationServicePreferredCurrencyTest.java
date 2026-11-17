@@ -52,8 +52,12 @@ class OrganizationServicePreferredCurrencyTest {
             .name("Nexus Fabrics")
             .taxId("1234567890")
             .organizationType(OrganizationType.VERTICAL_MILL)
+            .parentOrganizationId(ORG_ID)
             .preferredCurrency("gbp")
             .build();
+    when(organizationRepository.lockByTenantIdAndId(TENANT_ID, ORG_ID))
+        .thenReturn(
+            Optional.of(Organization.create("Nexus Fabrics", null, OrganizationType.WEAVER)));
     when(organizationRepository.save(any(Organization.class)))
         .thenAnswer(
             invocation -> {

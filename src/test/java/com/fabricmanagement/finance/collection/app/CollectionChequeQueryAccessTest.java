@@ -51,7 +51,11 @@ class CollectionChequeQueryAccessTest {
             LocalDate.parse("2026-10-30"),
             LocalDate.parse("2026-11-20"),
             "NORTHBANK-42",
-            "Signed physical instrument");
+            "Signed physical instrument",
+            new CollectionCheque.Drawer(
+                com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+                null,
+                "Northbridge Cloth"));
     cheque.setId(id);
     cheque.setTenantId(tenant);
     cheque.setCreatedBy(UUID.randomUUID());

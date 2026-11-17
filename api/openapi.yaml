@@ -5440,7 +5440,8 @@ paths:
         schema:
           type: string
           format: uuid
-      - in: query
+      - description: Organisation display name with 1 to 255 characters after trimming
+        in: query
         name: name
         required: true
         schema:
@@ -78277,6 +78278,7 @@ components:
         parentOrganizationId:
           type: string
           format: uuid
+          description: Active internal parent organisation in the current tenant
         preferredCurrency:
           type: string
           pattern: "^[A-Za-z]{3}$"
@@ -78287,6 +78289,7 @@ components:
       required:
       - name
       - organizationType
+      - parentOrganizationId
       - taxId
     CreatePartnerContactRequest:
       type: object
@@ -83647,6 +83650,27 @@ components:
         amount:
           type: string
           example: "4284.00"
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: "A listed drawer of the customer, for OWN only; absent means\
+            \ the customer itself"
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+          description: "Absent with drawerId and drawerName: the recorded classification\
+            \ is kept unchanged."
+        drawerName:
+          type:
+          - string
+          - "null"
+          description: "The drawer's name, for ENDORSED only; the backend writes it\
+            \ for OWN"
+          maxLength: 200
+          minLength: 0
         dueOn:
           type: string
           format: date
@@ -83749,6 +83773,21 @@ components:
           type: boolean
         currency:
           type: string
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+          description: Null on cheques received before tagging
+        drawerName:
+          type:
+          - string
+          - "null"
+          description: The name recorded with the cheque
         dueOn:
           type: string
           format: date
@@ -83802,6 +83841,19 @@ components:
           format: uuid
         amount:
           type: string
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+        drawerName:
+          type:
+          - string
+          - "null"
         dueOn:
           type: string
           format: date
@@ -84334,6 +84386,28 @@ components:
           example: GBP
           minLength: 1
           pattern: "[A-Z]{3}"
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: "A listed drawer of the customer, for OWN only; absent means\
+            \ the customer itself"
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+          description: "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself\
+            \ or a listed drawer) or ENDORSED (a third party's cheque endorsed to\
+            \ us)."
+        drawerName:
+          type:
+          - string
+          - "null"
+          description: "The drawer's name, for ENDORSED only; the backend writes it\
+            \ for OWN"
+          maxLength: 200
+          minLength: 0
         dueOn:
           type: string
           format: date

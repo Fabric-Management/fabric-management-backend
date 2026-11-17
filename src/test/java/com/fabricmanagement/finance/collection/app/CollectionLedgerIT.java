@@ -779,7 +779,10 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
             now,
             "Buyer replaced the refunded part with a cheque",
             List.of(
-                new CollectionRequests.Application(obligation, version, new BigDecimal("284.00"))));
+                new CollectionRequests.Application(obligation, version, new BigDecimal("284.00"))),
+            com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+            null,
+            null);
     assertThat(in(tenant, () -> cheques.receive(second, actor).getResourceId())).isNotNull();
   }
 
@@ -815,7 +818,11 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                         "Buyer handed cheque to finance",
                         List.of(
                             new CollectionRequests.Application(
-                                obligation, version, new BigDecimal("4284.00")))),
+                                obligation, version, new BigDecimal("4284.00"))),
+                        com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind
+                            .OWN,
+                        null,
+                        null),
                     actor)
                 .getResourceId());
   }
@@ -1253,5 +1260,204 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
         .isEqualByComparingTo("0");
     assertThat(new BigDecimal(detail.obligation().recordedOutstandingAmount()))
         .isEqualByComparingTo("4284");
+  }
+
+  // PAYMENT-PLAN-7 S2b: kind and drawer recorded on every received cheque.
+
+  @Autowired
+  com.fabricmanagement.platform.tradingpartner.app.TradingPartnerChequeDrawerService drawerList;
+
+  private List<java.util.Map<String, Object>> chequeEventsOf(UUID cheque) {
+    return jdbc.queryForList(
+        "SELECT action, drawer_kind, drawer_name, drawer_id FROM finance.collection_cheque_event"
+            + " WHERE cheque_id = ? ORDER BY evidence_revision",
+        cheque);
+  }
+
+  private CollectionRequests.Transition correct(
+      UUID cheque, LocalDate due, CollectionRequests.Correction override) {
+    long chequeVersion =
+        in(
+            tenant,
+            () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow().getVersion());
+    return new CollectionRequests.Transition(
+        UUID.randomUUID(),
+        chequeVersion,
+        ChequeAction.CORRECT,
+        date,
+        now,
+        "Customer sent a corrected copy",
+        "Corrected instrument scan",
+        null,
+        override != null
+            ? override
+            : new CollectionRequests.Correction(
+                new BigDecimal("4284.00"), date, due, "NORTHBANK-" + order),
+        null);
+  }
+
+  @Test
+  void anOwnChequeWithoutAListedDrawerRecordsTheCustomerByName() {
+    chequeSource();
+    UUID cheque = receiveCheque();
+    var stored = in(tenant, () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow());
+    assertThat(stored.getDrawerKind())
+        .isEqualTo(com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN);
+    assertThat(stored.getDrawerName()).isEqualTo("Pennine Textiles");
+    assertThat(stored.getDrawerId()).isNull();
+    assertThat(chequeEventsOf(cheque))
+        .singleElement()
+        .satisfies(event -> assertThat(event.get("drawer_name")).isEqualTo("Pennine Textiles"));
+  }
+
+  @Test
+  void aListedDrawerKeepsItsReceiptNameThroughRenameAndAnUnrelatedCorrection() {
+    chequeSource();
+    var added =
+        in(
+            tenant,
+            () ->
+                drawerList.add(
+                    partner,
+                    "Oliver Hartley",
+                    com.fabricmanagement.platform.tradingpartner.domain.ChequeDrawerType
+                        .INDIVIDUAL));
+    long version = version();
+    UUID cheque =
+        in(
+            tenant,
+            () ->
+                cheques
+                    .receive(
+                        new CollectionRequests.ReceiveCheque(
+                            UUID.randomUUID(),
+                            partner,
+                            "GBP",
+                            new BigDecimal("4284.00"),
+                            date,
+                            date.plusMonths(3),
+                            "NORTHBANK-" + order,
+                            "Signed instrument scan",
+                            now,
+                            "Partner handed over a personal cheque",
+                            List.of(
+                                new CollectionRequests.Application(
+                                    obligation, version, new BigDecimal("4284.00"))),
+                            com.fabricmanagement.finance.collection.domain.CollectionTypes
+                                .DrawerKind.OWN,
+                            added.drawer().id(),
+                            null),
+                        actor)
+                    .getResourceId());
+    in(
+        tenant,
+        () -> {
+          drawerList.change(
+              partner,
+              added.drawer().id(),
+              "Oliver J Hartley",
+              com.fabricmanagement.platform.tradingpartner.domain.ChequeDrawerType.INDIVIDUAL);
+          drawerList.deactivate(partner, added.drawer().id());
+          return null;
+        });
+    in(tenant, () -> cheques.transition(cheque, correct(cheque, date.plusMonths(4), null), actor));
+    var stored = in(tenant, () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow());
+    assertThat(stored.getDrawerName()).isEqualTo("Oliver Hartley");
+    assertThat(stored.getDrawerId()).isEqualTo(added.drawer().id());
+    assertThat(stored.getDueOn()).isEqualTo(date.plusMonths(4));
+  }
+
+  @Test
+  void aWrongTagIsCorrectedWithHistoryAndTheReceiptEventStaysAsItWas() {
+    chequeSource();
+    UUID cheque = receiveCheque();
+    in(
+        tenant,
+        () ->
+            cheques.transition(
+                cheque,
+                correct(
+                    cheque,
+                    date.plusMonths(3),
+                    new CollectionRequests.Correction(
+                        new BigDecimal("4284.00"),
+                        date,
+                        date.plusMonths(3),
+                        "NORTHBANK-" + order,
+                        com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind
+                            .ENDORSED,
+                        null,
+                        "Calder Mills")),
+                actor));
+    var history = chequeEventsOf(cheque);
+    assertThat(history).hasSize(2);
+    assertThat(history.get(0).get("drawer_kind")).isEqualTo("OWN");
+    assertThat(history.get(1).get("action")).isEqualTo("CORRECT");
+    assertThat(history.get(1).get("drawer_kind")).isEqualTo("ENDORSED");
+    assertThat(history.get(1).get("drawer_name")).isEqualTo("Calder Mills");
+  }
+
+  /** B19: a cheque from before tagging keeps its unknown kind through an ordinary correction. */
+  @Test
+  void aChequeFromBeforeTaggingStaysUnknownThroughAnOrdinaryCorrection() {
+    chequeSource();
+    UUID cheque = receiveCheque();
+    // As a row written before the drawer columns existed: nothing recorded.
+    in(
+        tenant,
+        () ->
+            jdbc.update(
+                "UPDATE finance.collection_cheque SET drawer_kind = NULL, drawer_name = NULL,"
+                    + " drawer_id = NULL WHERE id = ?",
+                cheque));
+    in(tenant, () -> cheques.transition(cheque, correct(cheque, date.plusMonths(4), null), actor));
+    var stored = in(tenant, () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow());
+    assertThat(stored.getDrawerKind()).isNull();
+    assertThat(stored.getDrawerName()).isNull();
+    assertThat(stored.getDrawerId()).isNull();
+    assertThat(stored.getDueOn()).isEqualTo(date.plusMonths(4));
+    var history = chequeEventsOf(cheque);
+    assertThat(history).hasSize(2);
+    assertThat(history.get(1).get("action")).isEqualTo("CORRECT");
+    assertThat(history.get(1).get("drawer_kind")).isNull();
+  }
+
+  @Test
+  void aReceiptWithoutAKindIsRefusedAndNothingIsRecorded() {
+    chequeSource();
+    long version = version();
+    assertThatThrownBy(
+            () ->
+                in(
+                    tenant,
+                    () ->
+                        cheques.receive(
+                            new CollectionRequests.ReceiveCheque(
+                                UUID.randomUUID(),
+                                partner,
+                                "GBP",
+                                new BigDecimal("4284.00"),
+                                date,
+                                date.plusMonths(3),
+                                "NORTHBANK-" + order,
+                                "Signed instrument scan",
+                                now,
+                                "No kind given",
+                                List.of(
+                                    new CollectionRequests.Application(
+                                        obligation, version, new BigDecimal("4284.00"))),
+                                null,
+                                null,
+                                null),
+                            actor)))
+        .isInstanceOfSatisfying(
+            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class,
+            refused -> assertThat(refused.getErrorCode()).isEqualTo("CHEQUE_DRAWER_KIND_REQUIRED"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM finance.collection_cheque WHERE tenant_id = ?",
+                Integer.class,
+                tenant))
+        .isZero();
   }
 }

@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.collection.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeState;
+import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -61,6 +62,17 @@ public class CollectionChequeEvent extends BaseEntity {
   @Column(updatable = false)
   private UUID paymentId;
 
+  /** PAYMENT-PLAN-7 R14: the classification as it stood after this event; null = not recorded. */
+  @Enumerated(EnumType.STRING)
+  @Column(updatable = false, length = 10)
+  private DrawerKind drawerKind;
+
+  @Column(updatable = false, length = 255)
+  private String drawerName;
+
+  @Column(updatable = false)
+  private UUID drawerId;
+
   @Override
   protected String getModuleCode() {
     return "CEVT";
@@ -89,6 +101,9 @@ public class CollectionChequeEvent extends BaseEntity {
     value.receivedOn = cheque.getReceivedOn();
     value.instrumentReference = cheque.getInstrumentReference();
     value.paymentId = cheque.getClearedPaymentId();
+    value.drawerKind = cheque.getDrawerKind();
+    value.drawerName = cheque.getDrawerName();
+    value.drawerId = cheque.getDrawerId();
     return value;
   }
 }

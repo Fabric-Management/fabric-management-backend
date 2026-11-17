@@ -41,6 +41,7 @@ public class CollectionChequeService {
   private final PaymentService payments;
   private final FinancialPeriodGuard periods;
   private final CollectionEvents changes;
+  private final CollectionChequeDrawerResolver drawers;
 
   public CollectionCommandReceipt receive(CollectionRequests.ReceiveCheque request, UUID actor) {
     commands.validate(request);
@@ -56,6 +57,8 @@ public class CollectionChequeService {
     var replay = commands.replay(request.operationId(), actor, hash);
     if (replay.isPresent()) return replay.get();
     commands.time(request.receivedOn(), request.occurredAt());
+    // Checked after the replay lookup, so a receipt stored before tagging still replays (R16).
+    var drawer = drawers.forReceipt(request);
     BigDecimal amount = CollectionAmounts.positive(request.amount(), request.currency());
     posting.freshAll(rows);
     var received =
@@ -106,7 +109,8 @@ public class CollectionChequeService {
                 request.receivedOn(),
                 request.dueOn(),
                 request.instrumentReference().trim(),
-                request.evidence()));
+                request.evidence(),
+                drawer));
     for (int i = 0; i < rows.size(); i++) {
       applications.save(
           CollectionChequeApplication.create(
@@ -203,7 +207,8 @@ public class CollectionChequeService {
           correction.receivedOn(),
           correction.dueOn(),
           correction.instrumentReference().trim(),
-          request.evidence());
+          request.evidence(),
+          drawers.forCorrection(cheque, correction));
     } else {
       if (cheque.getState().reversesClearing(request.action())) {
         requireVersions(rows, request.obligations(), actor);

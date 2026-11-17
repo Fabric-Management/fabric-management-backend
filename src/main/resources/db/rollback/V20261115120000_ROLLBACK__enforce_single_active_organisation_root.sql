@@ -1,0 +1,1 @@
+DROP INDEX common_company.ux_organization_active_company_root;
