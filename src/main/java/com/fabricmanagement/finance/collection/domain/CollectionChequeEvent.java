@@ -73,6 +73,10 @@ public class CollectionChequeEvent extends BaseEntity {
   @Column(updatable = false)
   private UUID drawerId;
 
+  /** PAYMENT-PLAN-9: the application an APPLY or REVERSE_APPLICATION event is about. */
+  @Column(updatable = false)
+  private UUID applicationId;
+
   @Override
   protected String getModuleCode() {
     return "CEVT";
@@ -104,6 +108,26 @@ public class CollectionChequeEvent extends BaseEntity {
     value.drawerKind = cheque.getDrawerKind();
     value.drawerName = cheque.getDrawerName();
     value.drawerId = cheque.getDrawerId();
+    return value;
+  }
+
+  /**
+   * An application or its reversal (PAYMENT-PLAN-9 R3, R3a). It carries the cheque's state as it
+   * stands, unchanged, so it never moves the cheque's state at a report cut.
+   */
+  public static CollectionChequeEvent application(
+      CollectionCheque cheque,
+      String action,
+      UUID application,
+      LocalDate effective,
+      Instant occurred,
+      UUID actor,
+      String reason,
+      String evidence) {
+    if (!"APPLY".equals(action) && !"REVERSE_APPLICATION".equals(action))
+      throw new IllegalArgumentException("Not an application event: " + action);
+    var value = record(cheque, action, effective, occurred, actor, reason, evidence);
+    value.applicationId = application;
     return value;
   }
 }

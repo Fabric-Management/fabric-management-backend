@@ -39,6 +39,19 @@ public interface SalesOrderRepository
   Optional<LiveRevisionView> findLiveRevisionViewByTenantIdAndId(UUID tenantId, UUID id);
 
   /** Projection of {@link #findLiveRevisionViewByTenantIdAndId}. */
+  /** An order's number, for finance's display through its source port (PAYMENT-PLAN-9 C2). */
+  interface OrderNumberView {
+    UUID getId();
+
+    String getOrderNumber();
+  }
+
+  @Query(
+      "select o.id as id, o.orderNumber as orderNumber from SalesOrder o"
+          + " where o.tenantId=:tenantId and o.id in :ids")
+  List<OrderNumberView> findOrderNumbers(
+      @Param("tenantId") UUID tenantId, @Param("ids") Collection<UUID> ids);
+
   interface LiveRevisionView {
     UUID getId();
 

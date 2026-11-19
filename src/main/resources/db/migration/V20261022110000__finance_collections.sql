@@ -113,7 +113,20 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque_application (
   created_by uuid, updated_by uuid, is_active boolean NOT NULL DEFAULT true,
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
   cheque_id uuid NOT NULL, obligation_id uuid NOT NULL, amount numeric(19,4) NOT NULL CHECK(amount>0),
-  UNIQUE(tenant_id,id), UNIQUE(tenant_id,cheque_id,obligation_id),
+  -- PAYMENT-PLAN-9 K2: an application is evidence, like a match. created_at is when it was recorded,
+  -- effective_date when it took effect; a wrong one is reversed once, never edited or deleted. Several
+  -- active applications of one cheque to the same obligation may coexist and are reversed separately.
+  effective_date date NOT NULL, occurred_at timestamptz NOT NULL, actor_id uuid NOT NULL,
+  reason varchar(1000) NOT NULL,
+  reversed_on date, reversed_at timestamptz, reversal_occurred_at timestamptz, reversed_by uuid,
+  reversal_reason varchar(1000),
+  CONSTRAINT ck_collection_application_reversal CHECK(
+     (reversed_at IS NULL AND reversed_on IS NULL AND reversed_by IS NULL AND reversal_reason IS NULL AND reversal_occurred_at IS NULL)
+     OR (reversed_at IS NOT NULL AND reversed_on IS NOT NULL AND reversed_by IS NOT NULL AND reversal_reason IS NOT NULL AND reversal_occurred_at IS NOT NULL
+         AND reversed_on>=effective_date AND reversed_at>=created_at)),
+  -- (tenant_id,cheque_id,id) is the target of the cheque event's foreign key: an event can only name an
+  -- application of its own cheque.
+  UNIQUE(tenant_id,id), UNIQUE(tenant_id,cheque_id,id),
   FOREIGN KEY(tenant_id,cheque_id) REFERENCES finance.collection_cheque(tenant_id,id),
   FOREIGN KEY(tenant_id,obligation_id) REFERENCES finance.collection_obligation(tenant_id,id)
 );
@@ -140,7 +153,8 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque_event (
   tenant_id uuid NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
   created_by uuid, updated_by uuid, is_active boolean NOT NULL DEFAULT true,
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
-  cheque_id uuid NOT NULL, action varchar(20) NOT NULL CHECK(action IN ('RECEIVE','PRESENT','CLEAR','DISHONOUR','RETURN','CANCEL','CORRECT')),
+  cheque_id uuid NOT NULL,
+  action varchar(20) NOT NULL CHECK(action IN ('RECEIVE','PRESENT','CLEAR','DISHONOUR','RETURN','CANCEL','CORRECT','APPLY','REVERSE_APPLICATION')),
   state varchar(20) NOT NULL CHECK(state IN ('RECEIVED','PRESENTED','CLEARED','DISHONOURED','RETURNED','CANCELLED')),
   effective_date date NOT NULL, occurred_at timestamptz NOT NULL, actor_id uuid NOT NULL,
   reason varchar(1000) NOT NULL, evidence varchar(1000) NOT NULL, amount numeric(19,4) NOT NULL CHECK(amount>0),
@@ -152,9 +166,15 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque_event (
   CHECK((drawer_kind IS NULL AND drawer_name IS NULL AND drawer_id IS NULL)
     OR (drawer_kind IS NOT NULL AND drawer_name IS NOT NULL)),
   CHECK(drawer_kind IS DISTINCT FROM 'ENDORSED' OR drawer_id IS NULL),
+  -- PAYMENT-PLAN-9: the application an APPLY or REVERSE_APPLICATION event is about; no other action names one.
+  application_id uuid,
+  CONSTRAINT ck_collection_cheque_event_application CHECK(
+    (action IN ('APPLY','REVERSE_APPLICATION')) = (application_id IS NOT NULL)),
   UNIQUE(tenant_id,id),
   FOREIGN KEY(tenant_id,cheque_id) REFERENCES finance.collection_cheque(tenant_id,id),
-  FOREIGN KEY(tenant_id,payment_id) REFERENCES finance.finance_payment(tenant_id,id)
+  FOREIGN KEY(tenant_id,payment_id) REFERENCES finance.finance_payment(tenant_id,id),
+  CONSTRAINT fk_collection_cheque_event_application FOREIGN KEY(tenant_id,cheque_id,application_id)
+    REFERENCES finance.collection_cheque_application(tenant_id,cheque_id,id)
 );
 CREATE TABLE IF NOT EXISTS finance.collection_command_receipt (
   id uuid PRIMARY KEY, uid varchar(100) UNIQUE,
@@ -162,7 +182,8 @@ CREATE TABLE IF NOT EXISTS finance.collection_command_receipt (
   created_by uuid, updated_by uuid, is_active boolean NOT NULL DEFAULT true,
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
   operation_id uuid NOT NULL, actor_id uuid NOT NULL, request_hash varchar(64) NOT NULL,
-  resource_type varchar(30) NOT NULL CHECK(resource_type IN ('OBLIGATION','CHEQUE')),
+  -- PAYMENT: a customer receipt recorded without an order (PAYMENT-PLAN-9 R1); resource_id is the payment.
+  resource_type varchar(30) NOT NULL CHECK(resource_type IN ('OBLIGATION','CHEQUE','PAYMENT')),
   resource_id uuid NOT NULL, resource_version bigint NOT NULL CHECK(resource_version>=0),
   payment_id uuid, match_ids jsonb NOT NULL DEFAULT '[]',
   UNIQUE(tenant_id,id), UNIQUE(tenant_id,operation_id),
@@ -176,10 +197,12 @@ CREATE INDEX IF NOT EXISTS idx_collection_match_payment ON finance.collection_pa
 CREATE INDEX IF NOT EXISTS idx_collection_match_obligation ON finance.collection_payment_match(tenant_id,obligation_id,created_at,id);
 CREATE INDEX IF NOT EXISTS idx_collection_match_cheque ON finance.collection_payment_match(tenant_id,cheque_id);
 CREATE INDEX IF NOT EXISTS idx_collection_application_obligation ON finance.collection_cheque_application(tenant_id,obligation_id,cheque_id);
+CREATE INDEX IF NOT EXISTS idx_collection_application_cheque ON finance.collection_cheque_application(tenant_id,cheque_id);
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_due ON finance.collection_cheque(tenant_id,state,due_on,id);
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_reference ON finance.collection_cheque(tenant_id,partner_id,currency,instrument_reference);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_cheque_clearing_payment ON finance.collection_cheque(tenant_id,cleared_payment_id) WHERE cleared_payment_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_events ON finance.collection_cheque_event(tenant_id,cheque_id,created_at,id);
+CREATE INDEX IF NOT EXISTS idx_collection_cheque_event_application ON finance.collection_cheque_event(tenant_id,cheque_id,application_id) WHERE application_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_cheque_event_revision ON finance.collection_cheque_event(tenant_id,cheque_id,evidence_revision);
 -- Same ordering as the report's DISTINCT ON (id tie-break) so the index is usable for it.
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_event_temporal_order ON finance.collection_cheque_event(tenant_id,cheque_id,effective_date DESC,evidence_revision DESC,created_at DESC,id DESC);
@@ -328,6 +351,41 @@ BEGIN
 END $$;
 CREATE TRIGGER immutable_collection_match BEFORE UPDATE OR DELETE ON finance.collection_payment_match
   FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_match_evidence();
+
+-- PAYMENT-PLAN-9 K2: a cheque application follows the match. Its original evidence never changes; its
+-- reversal (all five facts, the table CHECK keeps them together) may be added once and never changed or
+-- taken back; bookkeeping columns the ORM writes (updated_at, updated_by, version) stay writable.
+-- Deleting one is allowed only by the tenant purge.
+CREATE FUNCTION finance.guard_collection_application_evidence() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE trusted_purge_role boolean;
+BEGIN
+  IF TG_OP='DELETE' THEN
+    SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND rolsuper)
+      OR current_user='fabric_system'
+      OR EXISTS(SELECT 1 FROM pg_roles WHERE rolname='fabric_system' AND pg_has_role(current_user,oid,'MEMBER'))
+      INTO trusted_purge_role;
+    IF trusted_purge_role AND current_setting('app.collection_purge_tenant',true)=OLD.tenant_id::text THEN
+      RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'Collection evidence is append-only' USING ERRCODE='23514';
+  END IF;
+  IF ROW(NEW.id,NEW.uid,NEW.tenant_id,NEW.created_at,NEW.created_by,NEW.is_active,NEW.deleted_at,
+         NEW.cheque_id,NEW.obligation_id,NEW.amount,NEW.effective_date,NEW.occurred_at,NEW.actor_id,NEW.reason)
+     IS DISTINCT FROM
+     ROW(OLD.id,OLD.uid,OLD.tenant_id,OLD.created_at,OLD.created_by,OLD.is_active,OLD.deleted_at,
+         OLD.cheque_id,OLD.obligation_id,OLD.amount,OLD.effective_date,OLD.occurred_at,OLD.actor_id,OLD.reason) THEN
+    RAISE EXCEPTION 'A cheque application cannot be rewritten; reverse it instead' USING ERRCODE='23514';
+  END IF;
+  IF OLD.reversed_at IS NOT NULL
+     AND ROW(NEW.reversed_on,NEW.reversed_at,NEW.reversal_occurred_at,NEW.reversed_by,NEW.reversal_reason)
+         IS DISTINCT FROM
+         ROW(OLD.reversed_on,OLD.reversed_at,OLD.reversal_occurred_at,OLD.reversed_by,OLD.reversal_reason) THEN
+    RAISE EXCEPTION 'A reversed cheque application cannot change' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER immutable_collection_application BEFORE UPDATE OR DELETE ON finance.collection_cheque_application
+  FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_application_evidence();
 
 CREATE TABLE IF NOT EXISTS finance.collection_source_observation (
   id uuid PRIMARY KEY, uid varchar(100) UNIQUE,

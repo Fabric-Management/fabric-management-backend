@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.collection.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.finance.collection.app.port.CollectionSourcePort;
 import com.fabricmanagement.finance.collection.domain.*;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.*;
 import com.fabricmanagement.finance.collection.dto.CollectionDtos;
@@ -40,6 +41,7 @@ public class CollectionQueryService {
   private final CollectionExpectationRepository expectations;
   private final PaymentRepository payments;
   private final CollectionRefundLedger refundLedger;
+  private final CollectionSourcePort source;
 
   @Transactional(readOnly = true)
   public Page<CollectionDtos.Obligation> list(
@@ -86,10 +88,14 @@ public class CollectionQueryService {
                 tenant, rows.stream().map(CollectionObligation::getOrderId).distinct().toList())
             .stream()
             .collect(Collectors.toMap(CollectionProjection::getOrderId, Function.identity()));
+    var orderNumbers =
+        source.orderNumbers(
+            tenant, rows.stream().map(CollectionObligation::getOrderId).distinct().toList());
     return page.map(
         row ->
             view(
                 row,
+                orderNumbers.get(row.getOrderId()),
                 settled.getOrDefault(row.getId(), BigDecimal.ZERO),
                 received.getOrDefault(row.getId(), BigDecimal.ZERO),
                 cash.getOrDefault(row.getId(), BigDecimal.ZERO),
@@ -114,6 +120,7 @@ public class CollectionQueryService {
     var view =
         view(
             row,
+            source.orderNumbers(tenant, List.of(row.getOrderId())).get(row.getOrderId()),
             amounts.getOrDefault(id, BigDecimal.ZERO),
             received.getOrDefault(id, BigDecimal.ZERO),
             matches.nonChequeSettled(tenant, id),
@@ -258,16 +265,21 @@ public class CollectionQueryService {
     var reverse = access.reach(actor, "reverse");
     boolean allowed = write.permits(tenant, cheque.getCreatedBy(), null);
     boolean mayReverse = reverse.permits(tenant, cheque.getCreatedBy(), null);
-    var applied = applications.findByTenantIdAndChequeId(tenant, id);
-    if (!applied.isEmpty()) {
+    // Current coverage: active applications only. Access and capabilities are decided once per
+    // distinct obligation; several active rows may name the same one.
+    var applied = applications.active(tenant, id);
+    var linkedIds = CollectionChequeService.obligationIds(applied);
+    if (!linkedIds.isEmpty()) {
       allowed = true;
       mayReverse = true;
     }
     var read = access.reach(actor, "read");
     var rows =
-        obligations.findByTenantIdAndIdIn(
-            tenant, applied.stream().map(CollectionChequeApplication::getObligationId).toList());
-    if (rows.size() != applied.size()) throw new NotFoundException("Cheque application not found");
+        linkedIds.isEmpty()
+            ? List.<CollectionObligation>of()
+            : obligations.findByTenantIdAndIdIn(tenant, linkedIds);
+    if (rows.size() != linkedIds.size())
+      throw new NotFoundException("Cheque application not found");
     for (var row : rows) {
       if (!read.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId()))
         throw new NotFoundException("Cheque application not found");
@@ -294,7 +306,28 @@ public class CollectionQueryService {
             cheque.getInstrumentReference(),
             id);
     if (duplicate) warnings.add("POSSIBLE_DUPLICATE_CHEQUE_REFERENCE");
+    BigDecimal unapplied =
+        cheque
+            .getAmount()
+            .subtract(
+                applied.stream()
+                    .map(CollectionChequeApplication::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add))
+            .max(BigDecimal.ZERO);
+    // PAYMENT-PLAN-9 R3/R3a: applications change only while the cheque is held.
+    boolean held =
+        cheque.getState() == ChequeState.RECEIVED || cheque.getState() == ChequeState.PRESENTED;
+    boolean mayChangeApplications = allowed && held;
     var caps = new ArrayList<CollectionDtos.Capability>();
+    caps.add(
+        new CollectionDtos.Capability(
+            "ALLOCATE",
+            allowed && held && unapplied.signum() > 0,
+            !allowed
+                ? "PERMISSION_DENIED"
+                : !held ? "WRONG_STATE" : unapplied.signum() == 0 ? "NOTHING_UNAPPLIED" : null,
+            null,
+            false));
     for (var action : ChequeAction.values()) {
       boolean legal = cheque.getState().permits(action);
       // Dishonouring or returning a cleared instrument undoes money: it also needs reverse.
@@ -313,14 +346,7 @@ public class CollectionQueryService {
         cheque.getPartnerId(),
         cheque.getCurrency(),
         cheque.getAmount().toPlainString(),
-        cheque
-            .getAmount()
-            .subtract(
-                applied.stream()
-                    .map(CollectionChequeApplication::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add))
-            .max(BigDecimal.ZERO)
-            .toPlainString(),
+        unapplied.toPlainString(),
         cheque.getReceivedOn(),
         cheque.getDueOn(),
         cheque.getInstrumentReference(),
@@ -335,7 +361,12 @@ public class CollectionQueryService {
             .map(
                 value ->
                     new CollectionDtos.Application(
-                        value.getObligationId(), value.getAmount().toPlainString()))
+                        value.getId(),
+                        value.getObligationId(),
+                        value.getAmount().toPlainString(),
+                        value.getEffectiveDate(),
+                        value.getCreatedAt(),
+                        mayChangeApplications))
             .toList(),
         caps,
         warnings);
@@ -344,6 +375,26 @@ public class CollectionQueryService {
   @Transactional(readOnly = true)
   public Page<CollectionDtos.ChequeEvent> chequeHistory(UUID id, UUID actor, Pageable pageable) {
     readableCheque(id, actor);
+    UUID tenant = TenantContext.requireTenantId();
+    // Every application ever made, reversed ones included. A reversed one may name an obligation
+    // this viewer cannot read: its event then shows the amount but not the target.
+    var history =
+        applications.findByTenantIdAndChequeId(tenant, id).stream()
+            .collect(Collectors.toMap(CollectionChequeApplication::getId, Function.identity()));
+    var targetIds =
+        history.values().stream()
+            .map(CollectionChequeApplication::getObligationId)
+            .distinct()
+            .toList();
+    var read = access.reach(actor, "read");
+    var visible =
+        (targetIds.isEmpty()
+                ? List.<CollectionObligation>of()
+                : obligations.findByTenantIdAndIdIn(tenant, targetIds))
+            .stream()
+                .filter(row -> read.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId()))
+                .map(CollectionObligation::getId)
+                .collect(Collectors.toSet());
     return chequeEvents
         .findByTenantIdAndChequeId(
             TenantContext.requireTenantId(),
@@ -368,7 +419,19 @@ public class CollectionQueryService {
                     value.getPaymentId(),
                     value.getDrawerKind(),
                     value.getDrawerId(),
-                    value.getDrawerName()));
+                    value.getDrawerName(),
+                    eventApplication(history.get(value.getApplicationId()), visible)));
+  }
+
+  private static CollectionDtos.ChequeEventApplication eventApplication(
+      CollectionChequeApplication application, java.util.Set<UUID> visible) {
+    if (application == null) return null;
+    boolean shown = visible.contains(application.getObligationId());
+    return new CollectionDtos.ChequeEventApplication(
+        application.getId(),
+        shown ? application.getObligationId() : null,
+        application.getAmount().toPlainString(),
+        shown);
   }
 
   private CollectionObligation readable(UUID id, UUID actor) {
@@ -386,15 +449,16 @@ public class CollectionQueryService {
             .findByTenantIdAndId(TenantContext.requireTenantId(), id)
             .orElseThrow(() -> new NotFoundException("Cheque not found"));
     var reach = access.reach(actor, "read");
-    var applied = applications.findByTenantIdAndChequeId(cheque.getTenantId(), id);
+    var ids = CollectionChequeService.obligationIds(applications.active(cheque.getTenantId(), id));
     var linked =
-        obligations.findByTenantIdAndIdIn(
-            cheque.getTenantId(),
-            applied.stream().map(CollectionChequeApplication::getObligationId).toList());
-    // An appointed finance colleague may work the whole instrument only when every application
-    // is in their current scope. Unapplied instruments retain creator/global scope.
-    if (linked.size() != applied.size()
-        || (applied.isEmpty() && !reach.permits(cheque.getTenantId(), cheque.getCreatedBy(), null))
+        ids.isEmpty()
+            ? List.<CollectionObligation>of()
+            : obligations.findByTenantIdAndIdIn(cheque.getTenantId(), ids);
+    // An appointed finance colleague may work the whole instrument only when every obligation it
+    // currently covers is in their scope. Unapplied instruments retain creator/global scope. A
+    // missing obligation fails closed: the distinct count must match what was loaded.
+    if (linked.size() != ids.size()
+        || (ids.isEmpty() && !reach.permits(cheque.getTenantId(), cheque.getCreatedBy(), null))
         || linked.stream()
             .anyMatch(
                 row ->
@@ -418,6 +482,7 @@ public class CollectionQueryService {
 
   private CollectionDtos.Obligation view(
       CollectionObligation row,
+      String orderNumber,
       BigDecimal settled,
       BigDecimal received,
       BigDecimal cash,
@@ -491,6 +556,7 @@ public class CollectionQueryService {
         row.getVersion(),
         row.getLogicalId(),
         row.getOrderId(),
+        orderNumber,
         row.getPartnerId(),
         row.getPlanId(),
         row.getRevisionId(),

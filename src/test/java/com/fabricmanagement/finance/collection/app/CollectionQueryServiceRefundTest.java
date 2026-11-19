@@ -6,12 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.finance.collection.app.CollectionProjectionService.Refresh;
+import com.fabricmanagement.finance.collection.app.port.CollectionSourcePort;
 import com.fabricmanagement.finance.collection.domain.CollectionObligation;
 import com.fabricmanagement.finance.collection.domain.CollectionRefund;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Kind;
@@ -55,6 +57,7 @@ class CollectionQueryServiceRefundTest {
   CollectionChequeApplicationRepository applications;
   CollectionRefundLedger refundLedger;
   CollectionProjectionService projectionService;
+  CollectionSourcePort source;
   CollectionQueryService queries;
   CollectionObligation row;
 
@@ -69,6 +72,7 @@ class CollectionQueryServiceRefundTest {
     applications = mock(CollectionChequeApplicationRepository.class);
     refundLedger = mock(CollectionRefundLedger.class);
     projectionService = mock(CollectionProjectionService.class);
+    source = mock(CollectionSourcePort.class);
     when(projectionService.refreshIfFree(any())).thenReturn(Refresh.REFRESHED);
     queries =
         new CollectionQueryService(
@@ -82,7 +86,8 @@ class CollectionQueryServiceRefundTest {
             mock(CollectionChequeEventRepository.class),
             mock(CollectionExpectationRepository.class),
             mock(PaymentRepository.class),
-            refundLedger);
+            refundLedger,
+            source);
     row =
         CollectionObligation.create(
             UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), partner, "GBP");
@@ -143,6 +148,21 @@ class CollectionQueryServiceRefundTest {
     when(matches.findByTenantIdAndObligationId(any(), any(), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
     return queries.detail(row.getId(), actor, PageRequest.of(0, 10)).obligation();
+  }
+
+  /**
+   * PAYMENT-PLAN-9 C2: list and detail carry the order's number from the source port, read once per
+   * page for the distinct orders; an order the port cannot find leaves it null.
+   */
+  @Test
+  void listAndDetailCarryTheOrderNumberFromTheSourcePort() {
+    when(source.orderNumbers(tenant, List.of(row.getOrderId())))
+        .thenReturn(Map.of(row.getOrderId(), "SO-2026-0142"));
+    assertThat(listed().orderNumber()).isEqualTo("SO-2026-0142");
+    assertThat(detailed(Refresh.REFRESHED).orderNumber()).isEqualTo("SO-2026-0142");
+    verify(source, times(2)).orderNumbers(tenant, List.of(row.getOrderId()));
+    when(source.orderNumbers(tenant, List.of(row.getOrderId()))).thenReturn(Map.of());
+    assertThat(listed().orderNumber()).isNull();
   }
 
   @Test

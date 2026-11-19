@@ -1,10 +1,12 @@
 package com.fabricmanagement.finance.collection.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.finance.collection.app.port.CollectionChequeDrawerPort;
 import com.fabricmanagement.finance.collection.domain.CollectionCheque;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
@@ -90,6 +92,45 @@ class CollectionChequeDrawerResolverTest {
         .isEqualTo(new CollectionCheque.Drawer(DrawerKind.ENDORSED, null, "Pennine Weaving"));
     assertThat(resolver.forReceipt(receive(DrawerKind.ENDORSED, null, "Northbridge Cloth")).kind())
         .isEqualTo(DrawerKind.ENDORSED);
+  }
+
+  /** PAYMENT-PLAN-9 C1: receipts come only from a customer of this company that was not removed. */
+  @Test
+  void receiptsAreTakenOnlyFromACustomerThatWasNotRemoved() {
+    UUID other = UUID.randomUUID();
+    when(port.standing(other)).thenReturn(CollectionChequeDrawerPort.CustomerStanding.NOT_FOUND);
+    assertThat(code(() -> resolver.requireCustomer(other)))
+        .isEqualTo("COLLECTION_PARTNER_NOT_FOUND");
+    when(port.standing(other)).thenReturn(CollectionChequeDrawerPort.CustomerStanding.NOT_CUSTOMER);
+    assertThat(code(() -> resolver.requireCustomer(other)))
+        .isEqualTo("COLLECTION_PARTNER_NOT_CUSTOMER");
+    when(port.standing(other)).thenReturn(CollectionChequeDrawerPort.CustomerStanding.REMOVED);
+    assertThat(code(() -> resolver.requireCustomer(other))).isEqualTo("COLLECTION_PARTNER_REMOVED");
+    when(port.standing(other)).thenReturn(CollectionChequeDrawerPort.CustomerStanding.CUSTOMER);
+    assertThat(code(() -> resolver.requireCustomer(other))).isNull();
+  }
+
+  /**
+   * The customer view answers 404 for anyone who is not a customer; a removed one stays readable.
+   */
+  @Test
+  void theCustomerViewReadsCustomersRemovedOnesIncluded() {
+    UUID other = UUID.randomUUID();
+    for (var hidden :
+        List.of(
+            CollectionChequeDrawerPort.CustomerStanding.NOT_FOUND,
+            CollectionChequeDrawerPort.CustomerStanding.NOT_CUSTOMER)) {
+      when(port.standing(other)).thenReturn(hidden);
+      assertThatThrownBy(() -> resolver.requireCustomerToRead(other))
+          .isInstanceOf(NotFoundException.class);
+    }
+    for (var readable :
+        List.of(
+            CollectionChequeDrawerPort.CustomerStanding.REMOVED,
+            CollectionChequeDrawerPort.CustomerStanding.CUSTOMER)) {
+      when(port.standing(other)).thenReturn(readable);
+      resolver.requireCustomerToRead(other);
+    }
   }
 
   @Test

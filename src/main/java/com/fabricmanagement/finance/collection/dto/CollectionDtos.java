@@ -37,7 +37,8 @@ public final class CollectionDtos {
                 "DISHONOUR",
                 "RETURN",
                 "CANCEL",
-                "CORRECT"
+                "CORRECT",
+                "ALLOCATE"
               })
           String action,
       @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean allowed,
@@ -78,6 +79,13 @@ public final class CollectionDtos {
       long version,
       UUID logicalId,
       UUID orderId,
+      @Schema(
+              nullable = true,
+              example = "SO-2026-0142",
+              description =
+                  "The sales order's number, so instalments of repeat orders with the same date"
+                      + " and amount can be told apart; null when the order cannot be read")
+          String orderNumber,
       UUID partnerId,
       UUID planId,
       UUID revisionId,
@@ -244,8 +252,137 @@ public final class CollectionDtos {
 
   @Schema(
       name = "FinanceCollectionChequeApplicationDto",
-      requiredProperties = {"obligationId", "amount"})
-  public record Application(UUID obligationId, @Schema(type = "string") String amount) {}
+      description =
+          "An active (unreversed) application. Several may name the same obligation; send one"
+              + " expected version per distinct obligation.",
+      requiredProperties = {
+        "id",
+        "obligationId",
+        "amount",
+        "effectiveDate",
+        "recordedAt",
+        "reversible"
+      })
+  public record Application(
+      UUID id,
+      UUID obligationId,
+      @Schema(type = "string") String amount,
+      LocalDate effectiveDate,
+      Instant recordedAt,
+      @Schema(description = "Whether this viewer may reverse it now (PAYMENT-PLAN-9 R3a)")
+          boolean reversible) {}
+
+  @Schema(
+      name = "FinanceCollectionCustomerAvailabilityDto",
+      description =
+          "PAYMENT-PLAN-9 R5: what a customer has given that is not yet matched or applied to"
+              + " payment-plan instalments, per currency. Payments and held cheques are separate"
+              + " lines and are never added together; this is not an invoice-allocation balance.",
+      requiredProperties = {
+        "partnerId",
+        "currencies",
+        "chequeHistory",
+        "paymentsTruncated",
+        "chequeHistoryTruncated"
+      })
+  public record CustomerAvailability(
+      UUID partnerId,
+      List<CurrencyAvailability> currencies,
+      @Schema(
+              description =
+                  "Cheques that offer nothing for allocation (fully applied, cleared, returned,"
+                      + " cancelled or dishonoured), newest first")
+          List<HeldCheque> chequeHistory,
+      boolean paymentsTruncated,
+      boolean chequeHistoryTruncated) {}
+
+  @Schema(
+      name = "FinanceCollectionCurrencyAvailabilityDto",
+      requiredProperties = {
+        "currency",
+        "paymentsAvailable",
+        "chequesAvailable",
+        "payments",
+        "cheques"
+      })
+  public record CurrencyAvailability(
+      String currency,
+      @Schema(type = "string", description = "Payments available for instalment matching")
+          String paymentsAvailable,
+      @Schema(type = "string", description = "Held cheques available for application")
+          String chequesAvailable,
+      List<AvailablePayment> payments,
+      List<HeldCheque> cheques) {}
+
+  @Schema(
+      name = "FinanceCollectionAvailablePaymentDto",
+      requiredProperties = {
+        "id",
+        "paymentNumber",
+        "paymentDate",
+        "method",
+        "amount",
+        "matchedAmount",
+        "refundHeldAmount",
+        "availableAmount",
+        "invoiceAllocatedAmount"
+      })
+  public record AvailablePayment(
+      UUID id,
+      String paymentNumber,
+      LocalDate paymentDate,
+      String method,
+      @Schema(type = "string") String amount,
+      @Schema(type = "string") String matchedAmount,
+      @Schema(type = "string") String refundHeldAmount,
+      @Schema(type = "string") String availableAmount,
+      @Schema(
+              type = "string",
+              description =
+                  "Invoice allocations of the same payment; information only, not subtracted")
+          String invoiceAllocatedAmount,
+      @Schema(nullable = true, description = "The cleared cheque this payment is the clearing of")
+          UUID clearedChequeId) {}
+
+  @Schema(
+      name = "FinanceCollectionHeldChequeDto",
+      requiredProperties = {
+        "id",
+        "version",
+        "currency",
+        "state",
+        "instrumentReference",
+        "receivedOn",
+        "dueOn",
+        "amount",
+        "appliedAmount",
+        "availableAmount"
+      })
+  public record HeldCheque(
+      UUID id,
+      @Schema(description = "The cheque's version, expected by an allocation") long version,
+      String currency,
+      ChequeState state,
+      @Schema(nullable = true) DrawerKind drawerKind,
+      @Schema(nullable = true) String drawerName,
+      String instrumentReference,
+      LocalDate receivedOn,
+      LocalDate dueOn,
+      @Schema(type = "string") String amount,
+      @Schema(type = "string") String appliedAmount,
+      @Schema(type = "string") String availableAmount) {}
+
+  @Schema(
+      name = "FinanceCollectionChequeEventApplicationDto",
+      description =
+          "The application an APPLY or REVERSE_APPLICATION event is about. The obligation is"
+              + " shown only when the viewer may read it.",
+      requiredProperties = {"id", "amount", "targetVisible"})
+  public record ChequeEventApplication(
+      UUID id,
+      @Schema(nullable = true) UUID obligationId,
+      @Schema(type = "string") String amount,
+      boolean targetVisible) {}
 
   @Schema(
       name = "FinanceCollectionCommandResult",
@@ -258,7 +395,7 @@ public final class CollectionDtos {
       })
   public record Result(
       UUID operationId,
-      @Schema(allowableValues = {"OBLIGATION", "CHEQUE"}) String resourceType,
+      @Schema(allowableValues = {"OBLIGATION", "CHEQUE", "PAYMENT"}) String resourceType,
       UUID resourceId,
       long resourceVersion,
       @Schema(nullable = true) UUID paymentId,
@@ -324,5 +461,6 @@ public final class CollectionDtos {
       @Schema(nullable = true) UUID paymentId,
       @Schema(nullable = true) DrawerKind drawerKind,
       @Schema(nullable = true) UUID drawerId,
-      @Schema(nullable = true) String drawerName) {}
+      @Schema(nullable = true) String drawerName,
+      @Schema(nullable = true) ChequeEventApplication application) {}
 }

@@ -98,6 +98,20 @@ public class CollectionCheque extends BaseEntity {
     evidenceRevision++;
   }
 
+  /**
+   * An application added or reversed (PAYMENT-PLAN-9 R3, R3a): new evidence for the cheque, which
+   * keeps its state and amount. Each event needs its own revision.
+   */
+  public void recordApplicationChange(String evidence) {
+    if (state != ChequeState.RECEIVED && state != ChequeState.PRESENTED)
+      throw CollectionRuleException.conflict(
+          "CHEQUE_APPLICATION_NOT_ALLOWED",
+          "Applications can change only while the cheque is held; after clearing, its payment is"
+              + " allocated instead");
+    lastEvidence = evidence;
+    evidenceRevision++;
+  }
+
   /** Who drew the cheque. A kind is always paired with a name; only an own drawer has an id. */
   public record Drawer(DrawerKind kind, UUID id, String name) {
     public Drawer {

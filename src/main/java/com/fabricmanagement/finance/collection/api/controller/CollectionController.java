@@ -3,6 +3,7 @@ package com.fabricmanagement.finance.collection.api.controller;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.finance.collection.app.CollectionCommandService;
+import com.fabricmanagement.finance.collection.app.CollectionCustomerViewService;
 import com.fabricmanagement.finance.collection.app.CollectionQueryService;
 import com.fabricmanagement.finance.collection.dto.CollectionDtos;
 import com.fabricmanagement.finance.collection.dto.CollectionRequests;
@@ -41,6 +42,7 @@ import org.springframework.web.bind.annotation.*;
 public class CollectionController {
   private final CollectionQueryService queries;
   private final CollectionCommandService commands;
+  private final CollectionCustomerViewService customers;
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
@@ -218,6 +220,61 @@ public class CollectionController {
       @Valid @RequestBody CollectionRequests.Transition body,
       Authentication auth) {
     return ResponseEntity.ok(ApiResponse.success(commands.transition(id, body, actor(auth))));
+  }
+
+  @PostMapping("/customer-receipts")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
+  @Operation(
+      operationId = "recordFinanceCollectionCustomerReceipt",
+      summary =
+          "Record money received from a customer without an order as one payment, allocated to"
+              + " nothing; replay-safe")
+  public ResponseEntity<ApiResponse<CollectionDtos.Result>> receiveForCustomer(
+      @Valid @RequestBody CollectionRequests.CustomerReceipt body, Authentication auth) {
+    return ResponseEntity.ok(ApiResponse.success(commands.receiveForCustomer(body, actor(auth))));
+  }
+
+  @GetMapping("/customers/{partnerId}/availability")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
+  @Operation(
+      operationId = "getFinanceCollectionCustomerAvailability",
+      summary =
+          "Read, per currency, the customer's payments available for instalment matching and held"
+              + " cheques available for application, as separate lines")
+  public ResponseEntity<ApiResponse<CollectionDtos.CustomerAvailability>> customerAvailability(
+      @PathVariable UUID partnerId, Authentication auth) {
+    return ResponseEntity.ok(ApiResponse.success(customers.availability(partnerId, actor(auth))));
+  }
+
+  @PostMapping("/cheques/{id}/applications")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
+  @Operation(
+      operationId = "allocateFinanceCollectionCheque",
+      summary =
+          "Apply part of a held cheque to cheque instalments; refused once the cheque is cleared or"
+              + " final")
+  public ResponseEntity<ApiResponse<CollectionDtos.Result>> allocateCheque(
+      @PathVariable UUID id,
+      @Valid @RequestBody CollectionRequests.AllocateCheque body,
+      Authentication auth) {
+    return ResponseEntity.ok(ApiResponse.success(commands.allocateCheque(id, body, actor(auth))));
+  }
+
+  @PostMapping("/cheques/{id}/applications/{applicationId}/reverse")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
+  @Operation(
+      operationId = "reverseFinanceCollectionChequeApplication",
+      summary =
+          "Reverse one wrong application of a held cheque with a reason; the cheque stays held and"
+              + " no money moves")
+  public ResponseEntity<ApiResponse<CollectionDtos.Result>> reverseChequeApplication(
+      @PathVariable UUID id,
+      @PathVariable UUID applicationId,
+      @Valid @RequestBody CollectionRequests.ReverseChequeApplication body,
+      Authentication auth) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            commands.reverseChequeApplication(id, applicationId, body, actor(auth))));
   }
 
   private static UUID actor(Authentication auth) {

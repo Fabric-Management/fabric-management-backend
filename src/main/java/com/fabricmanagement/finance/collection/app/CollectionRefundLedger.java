@@ -93,6 +93,26 @@ public class CollectionRefundLedger {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
+  /** The obligations whose refunds (open, reopened or paid) hold money of this payment. */
+  public Set<UUID> holdingObligations(UUID tenant, UUID payment) {
+    return views(tenant, refunds.findByTenantIdAndPaymentId(tenant, payment)).stream()
+        .filter(view -> view.state() != RefundState.CANCELLED)
+        .map(view -> view.refund().getObligationId())
+        .collect(Collectors.toSet());
+  }
+
+  /** {@link #held} for several payments at once; a payment with nothing held is absent. */
+  public Map<UUID, BigDecimal> heldByPayment(UUID tenant, List<UUID> payments) {
+    if (payments.isEmpty()) return Map.of();
+    return views(tenant, refunds.findByTenantIdAndPaymentIdIn(tenant, payments)).stream()
+        .filter(view -> view.state() != RefundState.CANCELLED)
+        .collect(
+            java.util.stream.Collectors.toMap(
+                view -> view.refund().getPaymentId(),
+                view -> view.refund().getAmount(),
+                BigDecimal::add));
+  }
+
   /** Money of this inbound payment that has already been paid back to the customer. */
   public BigDecimal paid(UUID tenant, UUID payment) {
     return views(tenant, refunds.findByTenantIdAndPaymentId(tenant, payment)).stream()

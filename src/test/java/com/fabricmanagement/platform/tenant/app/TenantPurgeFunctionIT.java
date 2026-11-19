@@ -69,6 +69,7 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
             leadUid,
             "purge-lead-" + shortId().toLowerCase(Locale.ROOT) + "@example.test",
             victim.getId());
+    insertChequeApplicationEvidence(victim.getId());
 
     Map<String, Long> victimBefore = settledRowsByTable(victim.getId());
     Map<String, Long> bystanderBefore = settledRowsByTable(bystander.getId());
@@ -401,6 +402,66 @@ class TenantPurgeFunctionIT extends AbstractFabricAppIntegrationTest {
         organizationId,
         roleId);
     return userId;
+  }
+
+  /**
+   * PAYMENT-PLAN-9 S1: a cheque application named by a cheque event through a composite foreign
+   * key, so the purge has to delete the event before the application, and both through their
+   * guards.
+   */
+  private static void insertChequeApplicationEvidence(UUID tenantId) {
+    JdbcTemplate owner = owner();
+    UUID obligation = UUID.randomUUID();
+    UUID cheque = UUID.randomUUID();
+    UUID application = UUID.randomUUID();
+    UUID partner = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    owner.update(
+        "INSERT INTO finance.collection_obligation (id, tenant_id, uid, order_id, plan_id,"
+            + " logical_id, partner_id, currency, revision_id, amount, kind, method, created_at,"
+            + " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'GBP', ?, 6000, 'INSTALMENT', 'CHEQUE',"
+            + " now(), now())",
+        obligation,
+        tenantId,
+        obligation.toString(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        partner,
+        UUID.randomUUID());
+    owner.update(
+        "INSERT INTO finance.collection_cheque (id, tenant_id, uid, partner_id, currency, amount,"
+            + " received_on, due_on, instrument_reference, state, created_at, updated_at) VALUES"
+            + " (?, ?, ?, ?, 'GBP', 6000, DATE '2026-10-20', DATE '2026-12-20', 'NORTHBANK-PURGE',"
+            + " 'RECEIVED', now(), now())",
+        cheque,
+        tenantId,
+        cheque.toString(),
+        partner);
+    owner.update(
+        "INSERT INTO finance.collection_cheque_application (id, tenant_id, uid, cheque_id,"
+            + " obligation_id, amount, effective_date, occurred_at, actor_id, reason, created_at,"
+            + " updated_at) VALUES (?, ?, ?, ?, ?, 2000, DATE '2026-10-20', now(), ?, 'Applied at"
+            + " receipt', now(), now())",
+        application,
+        tenantId,
+        application.toString(),
+        cheque,
+        obligation,
+        actor);
+    owner.update(
+        "INSERT INTO finance.collection_cheque_event (id, tenant_id, uid, cheque_id,"
+            + " evidence_revision, action, state, effective_date, occurred_at, actor_id, reason,"
+            + " evidence, amount, received_on, due_on, instrument_reference, application_id,"
+            + " created_at, updated_at) VALUES (?, ?, ?, ?, 1, 'APPLY', 'RECEIVED', DATE"
+            + " '2026-10-20', now(), ?, 'Applied at receipt', 'Finance review', 6000, DATE"
+            + " '2026-10-20', DATE '2026-12-20', 'NORTHBANK-PURGE', ?, now(), now())",
+        UUID.randomUUID(),
+        tenantId,
+        UUID.randomUUID().toString(),
+        cheque,
+        actor,
+        application);
   }
 
   private static UUID insertIdentity() {

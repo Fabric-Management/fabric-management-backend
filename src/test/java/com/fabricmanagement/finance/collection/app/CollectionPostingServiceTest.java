@@ -43,6 +43,9 @@ class CollectionPostingServiceTest {
   @Mock CollectionRefundLedger refundLedger;
   @Mock CollectionMatchReversal matchReversal;
   @Mock CollectionChequeApplicationRepository chequeApplications;
+  @Mock CollectionPaymentAvailability availabilities;
+  @Mock CollectionChequeDrawerResolver customers;
+  @Mock CollectionChequeRepository cheques;
   @InjectMocks CollectionPostingService service;
   final UUID tenant = UUID.randomUUID(),
       actor = UUID.randomUUID(),
@@ -94,6 +97,13 @@ class CollectionPostingServiceTest {
         .thenReturn(List.of(projection));
     lenient().when(matches.matchedPayment(tenant, paymentId)).thenReturn(BigDecimal.ZERO);
     lenient().when(refundLedger.held(tenant, paymentId)).thenReturn(BigDecimal.ZERO);
+    // The guard uses the real shared calculation, fed by this test's repository mocks.
+    lenient()
+        .when(availabilities.of(eq(tenant), any(Payment.class)))
+        .thenAnswer(
+            call ->
+                new CollectionPaymentAvailability(matches, refundLedger, cheques)
+                    .of(tenant, (Payment) call.getArgument(1)));
     lenient()
         .when(matches.saveAndFlush(any()))
         .thenAnswer(
@@ -411,6 +421,127 @@ class CollectionPostingServiceTest {
 
   private CollectionRequests.Reverse reversal() {
     return new CollectionRequests.Reverse(UUID.randomUUID(), 0L, date, now, "Wrong match");
+  }
+
+  // ---- PAYMENT-PLAN-9 S4
+  // -------------------------------------------------------------------------
+
+  /** R4: the verified clearing payment of a cleared cheque is money and may be matched later. */
+  @Test
+  void aClearedChequesPaymentIsMatchedLaterWithoutTheChequesMark() {
+    payment.setMethod(PaymentMethod.CHEQUE);
+    var cheque =
+        CollectionCheque.receive(
+            partner,
+            "GBP",
+            new BigDecimal("4284.00"),
+            date,
+            date.plusMonths(3),
+            "NORTHBANK-0042",
+            "Signed instrument scan",
+            new CollectionCheque.Drawer(DrawerKind.OWN, null, "Northbridge Cloth"));
+    cheque.setId(UUID.randomUUID());
+    cheque.transition(ChequeAction.CLEAR, paymentId, "Bank confirmed clearing");
+    when(cheques.findByTenantIdAndClearedPaymentIdInAndState(
+            tenant, List.of(paymentId), ChequeState.CLEARED))
+        .thenReturn(List.of(cheque));
+    service.match(id, request("1000.00"), actor);
+    ArgumentCaptor<CollectionPaymentMatch> saved =
+        ArgumentCaptor.forClass(CollectionPaymentMatch.class);
+    verify(matches).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getChequeId()).isNull();
+    assertThat(saved.getValue().getAmount()).isEqualByComparingTo("1000.00");
+  }
+
+  /** R1: an orderless receipt is one payment, matched to nothing, recorded with its receipt. */
+  @Test
+  void aCustomerReceiptWithoutAnOrderRecordsOnePaymentAndNoMatch() {
+    var created = mock(PaymentDto.class);
+    when(created.id()).thenReturn(paymentId);
+    when(paymentService.createPayment(any())).thenReturn(created);
+    service.receiveForCustomer(customerReceipt(Method.BANK_TRANSFER), actor);
+    verify(paymentService)
+        .createPayment(
+            argThat(
+                value ->
+                    value.tradingPartnerId().equals(partner)
+                        && value.direction().equals("INBOUND")
+                        && value.method().equals("BANK_TRANSFER")
+                        && value.amount().compareTo(new BigDecimal("10000.00")) == 0
+                        && value.allocations() == null));
+    verify(customers).requireCustomer(partner);
+    verify(commands)
+        .record(
+            any(),
+            eq(actor),
+            any(),
+            eq("PAYMENT"),
+            eq(paymentId),
+            anyLong(),
+            eq(paymentId),
+            eq(List.of()));
+    verify(matches, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aCustomerReceiptReplayReturnsTheOriginalAndCreatesNoSecondPayment() {
+    var stored = mock(CollectionCommandReceipt.class);
+    when(commands.replay(any(), any(), any())).thenReturn(Optional.of(stored));
+    assertThat(service.receiveForCustomer(customerReceipt(Method.BANK_TRANSFER), actor))
+        .isSameAs(stored);
+    // The replay answers before any validation that could have changed since: even a request
+    // that would be refused now returns the stored result for its key.
+    assertThat(service.receiveForCustomer(customerReceipt(Method.CHEQUE), actor)).isSameAs(stored);
+    verify(commands, never()).time(any(), any());
+    verifyNoInteractions(paymentService, customers);
+  }
+
+  /** PAYMENT-PLAN-9 C1: no orderless payment from a supplier-only or a removed partner. */
+  @Test
+  void aCustomerReceiptFromAPartnerThatIsNotAWorkingCustomerRecordsNoPayment() {
+    for (var code : List.of("COLLECTION_PARTNER_NOT_CUSTOMER", "COLLECTION_PARTNER_REMOVED")) {
+      doThrow(CollectionRuleException.conflict(code, "Refused"))
+          .when(customers)
+          .requireCustomer(partner);
+      assertThatThrownBy(
+              () -> service.receiveForCustomer(customerReceipt(Method.BANK_TRANSFER), actor))
+          .isInstanceOf(CollectionRuleException.class)
+          .hasFieldOrPropertyWithValue("errorCode", code);
+    }
+    verifyNoInteractions(paymentService);
+    verify(commands, never()).record(any(), any(), any(), any(), any(), anyLong(), any(), any());
+  }
+
+  @Test
+  void aCustomerReceiptIsRefusedForAChequeWithoutAWriteGrantOrForAnUnknownCustomer() {
+    assertThatThrownBy(() -> service.receiveForCustomer(customerReceipt(Method.CHEQUE), actor))
+        .isInstanceOf(CollectionRuleException.class)
+        .hasMessageContaining("Receive a cheque as an instrument");
+    doThrow(CollectionRuleException.invalid("COLLECTION_PARTNER_NOT_FOUND", "Unknown customer"))
+        .when(customers)
+        .requireCustomer(partner);
+    assertThatThrownBy(() -> service.receiveForCustomer(customerReceipt(Method.CASH), actor))
+        .isInstanceOf(CollectionRuleException.class)
+        .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_PARTNER_NOT_FOUND");
+    doThrow(new AccessDeniedException("Missing finance permission: write"))
+        .when(access)
+        .requireGrant(actor, "write");
+    assertThatThrownBy(() -> service.receiveForCustomer(customerReceipt(Method.CASH), actor))
+        .isInstanceOf(AccessDeniedException.class);
+    verifyNoInteractions(paymentService);
+  }
+
+  private CollectionRequests.CustomerReceipt customerReceipt(Method method) {
+    return new CollectionRequests.CustomerReceipt(
+        UUID.randomUUID(),
+        partner,
+        "GBP",
+        new BigDecimal("10000.00"),
+        method,
+        date,
+        now,
+        "NORTHBANK-TRANSFER-77",
+        "Northbridge Cloth paid ahead of its first order");
   }
 
   private CollectionRequests.Match request(String amount) {

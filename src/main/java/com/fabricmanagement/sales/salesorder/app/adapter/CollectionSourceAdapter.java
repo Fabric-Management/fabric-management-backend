@@ -12,9 +12,12 @@ import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderReposito
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
@@ -150,6 +153,19 @@ public class CollectionSourceAdapter implements CollectionSourcePort {
         .createNativeQuery("select set_config('lock_timeout', :value, true)")
         .setParameter("value", value)
         .getSingleResult();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Map<UUID, String> orderNumbers(UUID tenant, Collection<UUID> orderIds) {
+    requireBoundTenant(tenant);
+    if (orderIds.isEmpty()) return Map.of();
+    return orders.findOrderNumbers(tenant, orderIds).stream()
+        .collect(
+            Collectors.toMap(
+                SalesOrderRepository.OrderNumberView::getId,
+                SalesOrderRepository.OrderNumberView::getOrderNumber,
+                (first, second) -> first));
   }
 
   @Override

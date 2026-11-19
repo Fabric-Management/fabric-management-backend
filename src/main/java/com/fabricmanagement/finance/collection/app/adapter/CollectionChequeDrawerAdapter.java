@@ -53,6 +53,18 @@ public class CollectionChequeDrawerAdapter implements CollectionChequeDrawerPort
   }
 
   @Override
+  public CustomerStanding standing(UUID partnerId) {
+    return partners
+        .findClassification(TenantContext.requireTenantId(), partnerId)
+        .map(
+            partner ->
+                !partner.type().isCustomer()
+                    ? CustomerStanding.NOT_CUSTOMER
+                    : partner.active() ? CustomerStanding.CUSTOMER : CustomerStanding.REMOVED)
+        .orElse(CustomerStanding.NOT_FOUND);
+  }
+
+  @Override
   public java.util.Optional<String> customerName(UUID partnerId) {
     return partners.findDisplayName(TenantContext.requireTenantId(), partnerId);
   }

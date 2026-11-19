@@ -144,6 +144,97 @@ public final class CollectionRequests {
           @Schema(type = "string", example = "4284.00", requiredMode = Schema.RequiredMode.REQUIRED)
           BigDecimal amount) {}
 
+  @Schema(
+      name = "FinanceCollectionCustomerReceiptRequest",
+      description =
+          "PAYMENT-PLAN-9 R1: money received from a customer without an order; recorded as one"
+              + " payment and allocated to nothing")
+  public record CustomerReceipt(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID partnerId,
+      @NotBlank
+          @Pattern(regexp = "[A-Z]{3}")
+          @Schema(
+              pattern = "[A-Z]{3}",
+              example = "GBP",
+              requiredMode = Schema.RequiredMode.REQUIRED)
+          String currency,
+      @NotNull
+          @DecimalMin(value = "0", inclusive = false)
+          @JsonFormat(shape = JsonFormat.Shape.STRING)
+          @Schema(
+              type = "string",
+              example = "10000.00",
+              requiredMode = Schema.RequiredMode.REQUIRED)
+          BigDecimal amount,
+      @NotNull
+          @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "How the money arrived; CHEQUE is refused (receive the cheque instead)")
+          Method method,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate paymentDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @Size(max = 100) @Schema(nullable = true, maxLength = 100, example = "NORTHBANK-TRANSFER-42")
+          String bankReference,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason) {}
+
+  @Schema(
+      name = "FinanceCollectionAllocateChequeRequest",
+      description =
+          "PAYMENT-PLAN-9 R3: apply a held cheque's unapplied amount to cheque instalments; never"
+              + " after clearing")
+  public record AllocateCheque(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          Long expectedVersion,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate effectiveDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String evidence,
+      @NotEmpty
+          @Size(min = 1, max = 500)
+          @Valid
+          @io.swagger.v3.oas.annotations.media.ArraySchema(
+              minItems = 1,
+              maxItems = 500,
+              schema = @Schema(implementation = Application.class))
+          List<Application> applications) {}
+
+  @Schema(
+      name = "FinanceCollectionReverseChequeApplicationRequest",
+      description =
+          "PAYMENT-PLAN-9 R3a: reverse one whole application of a held cheque; the cheque stays"
+              + " held with the same amount and state")
+  public record ReverseChequeApplication(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          Long expectedVersion,
+      @NotNull
+          @PositiveOrZero
+          @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "Expected version of the obligation the application covers")
+          Long expectedObligationVersion,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate effectiveDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String evidence) {}
+
   @Schema(name = "FinanceCollectionReceiveChequeRequest")
   public record ReceiveCheque(
       @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
@@ -178,11 +269,12 @@ public final class CollectionRequests {
           @Size(max = 1000)
           @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
           String reason,
-      @NotEmpty
+      // PAYMENT-PLAN-9 R1: may be empty; the cheque is then held for the customer, unapplied.
+      @NotNull
           @Size(max = 500)
           @Valid
           @io.swagger.v3.oas.annotations.media.ArraySchema(
-              minItems = 1,
+              minItems = 0,
               maxItems = 500,
               schema = @Schema(implementation = Application.class))
           List<Application> applications,
