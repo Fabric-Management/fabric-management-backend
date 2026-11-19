@@ -83999,6 +83999,7 @@ components:
           - RETURN
           - CANCEL
           - CORRECT
+          - CORRECT_DRAWER
           - ALLOCATE
         allowed:
           type: boolean
@@ -84025,6 +84026,7 @@ components:
       - RETURN
       - CANCEL
       - CORRECT
+      - CORRECT_DRAWER
     FinanceCollectionChequeApplicationDto:
       type: object
       description: An active (unreversed) application. Several may name the same obligation;
@@ -84146,6 +84148,25 @@ components:
       required:
       - drawer
       - outcome
+    FinanceCollectionChequeDrawerCorrectionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        drawerKind:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+        drawerName:
+          type:
+          - string
+          - "null"
+          maxLength: 200
+          minLength: 0
+      required:
+      - drawerKind
     FinanceCollectionChequeDrawerKind:
       type: string
       enum:
@@ -84368,6 +84389,10 @@ components:
         correction:
           anyOf:
           - $ref: "#/components/schemas/FinanceCollectionChequeCorrection"
+          - type: "null"
+        drawerCorrection:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerCorrectionRequest"
           - type: "null"
         effectiveDate:
           type: string

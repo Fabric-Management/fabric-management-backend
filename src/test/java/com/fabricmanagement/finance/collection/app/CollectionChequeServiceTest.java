@@ -23,6 +23,8 @@ import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -402,6 +404,119 @@ class CollectionChequeServiceTest {
     service.transition(chequeId, transition(ChequeAction.RETURN), actor);
     assertThat(cheque.getState()).isEqualTo(ChequeState.RETURNED);
     verifyNoInteractions(payments);
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChequeState.class)
+  void linkedDrawerCorrectionKeepsStateAndFinancialFacts(ChequeState state) {
+    assertDrawerCorrection(state);
+    verify(obligations).findByTenantIdAndIdIn(tenant, List.of(rowId));
+    verifyNoInteractions(posting);
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChequeState.class)
+  void unlinkedDrawerCorrectionKeepsStateAndFinancialFacts(ChequeState state) {
+    unlinked();
+    assertDrawerCorrection(state);
+  }
+
+  private void assertDrawerCorrection(ChequeState state) {
+    switch (state) {
+      case RECEIVED -> {}
+      case PRESENTED -> cheque.transition(ChequeAction.PRESENT, null, "Presented");
+      case CLEARED -> cheque.transition(ChequeAction.CLEAR, paymentId, "Bank confirmation");
+      case DISHONOURED -> {
+        cheque.transition(ChequeAction.PRESENT, null, "Presented");
+        cheque.transition(ChequeAction.DISHONOUR, null, "Bank refusal");
+      }
+      case RETURNED -> cheque.transition(ChequeAction.RETURN, null, "Returned");
+      case CANCELLED -> cheque.transition(ChequeAction.CANCEL, null, "Cancelled");
+    }
+    long revision = cheque.getEvidenceRevision();
+    UUID clearingPayment = cheque.getClearedPaymentId();
+    var request = correctDrawer(null, null, null);
+    when(drawers.forDrawerCorrection(cheque, request.drawerCorrection()))
+        .thenReturn(new CollectionCheque.Drawer(DrawerKind.ENDORSED, null, "Calder Mills"));
+
+    service.transition(chequeId, request, actor);
+
+    assertThat(cheque.getState()).isEqualTo(state);
+    assertThat(cheque.getDrawerKind()).isEqualTo(DrawerKind.ENDORSED);
+    assertThat(cheque.getDrawerName()).isEqualTo("Calder Mills");
+    assertThat(cheque.getClearedPaymentId()).isEqualTo(clearingPayment);
+    assertThat(cheque.getAmount()).isEqualByComparingTo("4284.00");
+    assertThat(cheque.getEvidenceRevision()).isEqualTo(revision + 1);
+    verify(access, never()).reach(actor, "reverse");
+    verify(obligations, never()).save(any());
+    verify(obligations, never()).flush();
+    verifyNoInteractions(changes, payments);
+    var snapshot = ArgumentCaptor.forClass(CollectionChequeEvent.class);
+    verify(events).saveAndFlush(snapshot.capture());
+    assertThat(snapshot.getValue().getAction()).isEqualTo("CORRECT_DRAWER");
+    assertThat(snapshot.getValue().getState()).isEqualTo(state);
+    assertThat(snapshot.getValue().getDrawerName()).isEqualTo("Calder Mills");
+  }
+
+  @Test
+  void drawerCorrectionRefusesFinancialChangesAndObligationVersions() {
+    var financialCorrection =
+        new CollectionRequests.Correction(new BigDecimal("3000.00"), date, date, "GB-0042");
+    for (var request :
+        List.of(
+            correctDrawer(paymentId, null, null),
+            correctDrawer(null, financialCorrection, null),
+            correctDrawer(null, null, List.of(new CollectionRequests.Version(rowId, 0L))))) {
+      assertThatThrownBy(() -> service.transition(chequeId, request, actor))
+          .isInstanceOf(CollectionRuleException.class);
+    }
+    verify(cheques, never()).saveAndFlush(any());
+    verify(events, never()).saveAndFlush(any());
+    verifyNoInteractions(changes, payments, drawers);
+  }
+
+  @Test
+  void drawerCorrectionRequiresWriteAccessToEveryActiveTarget() {
+    when(access.reach(actor, "write"))
+        .thenReturn(new CollectionAccessService.Reach(tenant, DataScope.OWN, Set.of(actor)));
+    assertThatThrownBy(() -> service.transition(chequeId, correctDrawer(null, null, null), actor))
+        .isInstanceOf(
+            com.fabricmanagement.common.infrastructure.web.exception.NotFoundException.class);
+    verify(cheques, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aFormerInstalmentOwnerCannotCorrectAColleaguesUnlinkedCheque() {
+    unlinked();
+    cheque.setCreatedBy(UUID.randomUUID());
+    row.assignResponsible(actor);
+    for (var scope : List.of(DataScope.OWN, DataScope.DEPARTMENT)) {
+      when(access.reach(actor, "write"))
+          .thenReturn(new CollectionAccessService.Reach(tenant, scope, Set.of(actor)));
+      assertThatThrownBy(() -> service.transition(chequeId, correctDrawer(null, null, null), actor))
+          .isInstanceOf(
+              com.fabricmanagement.common.infrastructure.web.exception.NotFoundException.class);
+    }
+    verify(cheques, never()).saveAndFlush(any());
+    verifyNoInteractions(events, changes, payments, drawers);
+  }
+
+  private CollectionRequests.Transition correctDrawer(
+      UUID payment,
+      CollectionRequests.Correction correction,
+      List<CollectionRequests.Version> versions) {
+    return new CollectionRequests.Transition(
+        UUID.randomUUID(),
+        0L,
+        ChequeAction.CORRECT_DRAWER,
+        date,
+        now,
+        "Verified drawer identity",
+        "Cheque image reviewed",
+        payment,
+        correction,
+        versions,
+        new CollectionRequests.DrawerCorrection(DrawerKind.ENDORSED, null, "Calder Mills"));
   }
 
   private CollectionChequeApplication application(String amount) {

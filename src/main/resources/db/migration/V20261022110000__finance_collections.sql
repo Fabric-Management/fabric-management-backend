@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque_event (
   created_by uuid, updated_by uuid, is_active boolean NOT NULL DEFAULT true,
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
   cheque_id uuid NOT NULL,
-  action varchar(20) NOT NULL CHECK(action IN ('RECEIVE','PRESENT','CLEAR','DISHONOUR','RETURN','CANCEL','CORRECT','APPLY','REVERSE_APPLICATION')),
+  action varchar(20) NOT NULL CHECK(action IN ('RECEIVE','PRESENT','CLEAR','DISHONOUR','RETURN','CANCEL','CORRECT','CORRECT_DRAWER','APPLY','REVERSE_APPLICATION')),
   state varchar(20) NOT NULL CHECK(state IN ('RECEIVED','PRESENTED','CLEARED','DISHONOURED','RETURNED','CANCELLED')),
   effective_date date NOT NULL, occurred_at timestamptz NOT NULL, actor_id uuid NOT NULL,
   reason varchar(1000) NOT NULL, evidence varchar(1000) NOT NULL, amount numeric(19,4) NOT NULL CHECK(amount>0),

@@ -38,6 +38,7 @@ public final class CollectionDtos {
                 "RETURN",
                 "CANCEL",
                 "CORRECT",
+                "CORRECT_DRAWER",
                 "ALLOCATE"
               })
           String action,

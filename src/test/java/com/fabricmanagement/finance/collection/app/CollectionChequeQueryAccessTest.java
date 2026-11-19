@@ -110,6 +110,10 @@ class CollectionChequeQueryAccessTest {
                 assertThat(c.allowed()).isFalse();
                 assertThat(c.reason()).isEqualTo("PERMISSION_DENIED");
               });
+    assertThat(queries.cheque(id, actor).capabilities())
+        .filteredOn(c -> c.action().equals("CORRECT_DRAWER"))
+        .singleElement()
+        .satisfies(c -> assertThat(c.allowed()).isTrue());
     when(access.reach(actor, "reverse"))
         .thenReturn(new CollectionAccessService.Reach(tenant, DataScope.OWN, Set.of(actor)));
     for (var action : List.of("DISHONOUR", "RETURN"))
@@ -158,8 +162,7 @@ class CollectionChequeQueryAccessTest {
         .filteredOn(c -> c.action().equals("CLEAR"))
         .singleElement()
         .satisfies(c -> assertThat(c.allowed()).isTrue());
-    // Once in the read check and once for the view: always the single distinct obligation.
-    verify(obligations, times(2)).findByTenantIdAndIdIn(tenant, List.of(rowId));
+    verify(obligations).findByTenantIdAndIdIn(tenant, List.of(rowId));
   }
 
   /** A covered obligation that cannot be loaded still hides the whole instrument. */
@@ -192,7 +195,7 @@ class CollectionChequeQueryAccessTest {
     var result = queries.cheque(id, actor);
     assertThat(new BigDecimal(result.unappliedAmount())).isEqualByComparingTo("4284");
     assertThat(result.applications()).isEmpty();
-    for (var action : List.of("PRESENT", "CLEAR", "RETURN", "CANCEL", "CORRECT"))
+    for (var action : List.of("PRESENT", "CLEAR", "RETURN", "CANCEL", "CORRECT", "CORRECT_DRAWER"))
       assertThat(result.capabilities())
           .filteredOn(c -> c.action().equals(action))
           .singleElement()
@@ -224,7 +227,7 @@ class CollectionChequeQueryAccessTest {
             new CollectionAccessService.Reach(
                 tenant, DataScope.DEPARTMENT, Set.of(actor, colleague)));
     assertThat(queries.cheque(id, actor).capabilities())
-        .filteredOn(c -> c.action().equals("PRESENT"))
+        .filteredOn(c -> c.action().equals("CORRECT_DRAWER"))
         .singleElement()
         .satisfies(c -> assertThat(c.allowed()).isTrue());
     // OWN over one's own cheque: readable and workable.
@@ -232,7 +235,7 @@ class CollectionChequeQueryAccessTest {
     when(access.reach(actor, "read"))
         .thenReturn(new CollectionAccessService.Reach(tenant, DataScope.OWN, Set.of(actor)));
     assertThat(queries.cheque(id, actor).capabilities())
-        .filteredOn(c -> c.action().equals("PRESENT"))
+        .filteredOn(c -> c.action().equals("CORRECT_DRAWER"))
         .singleElement()
         .satisfies(c -> assertThat(c.allowed()).isTrue());
     cheque.setCreatedBy(colleague);
@@ -244,7 +247,7 @@ class CollectionChequeQueryAccessTest {
     when(access.reach(actor, "write"))
         .thenReturn(new CollectionAccessService.Reach(tenant, DataScope.OWN, Set.of(actor)));
     assertThat(queries.cheque(id, actor).capabilities())
-        .filteredOn(c -> c.action().equals("PRESENT"))
+        .filteredOn(c -> c.action().equals("CORRECT_DRAWER"))
         .singleElement()
         .satisfies(
             c -> {

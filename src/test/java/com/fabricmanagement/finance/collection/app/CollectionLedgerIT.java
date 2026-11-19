@@ -801,8 +801,8 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
         jdbc.queryForList(
             "SELECT a.amount,a.effective_date,a.occurred_at,a.actor_id,a.reason,a.reversed_at,"
                 + " e.effective_date AS event_date,e.occurred_at AS event_at,e.actor_id AS"
-                + " event_actor,e.reason AS event_reason FROM finance.collection_cheque_application a"
-                + " JOIN finance.collection_cheque_event e ON e.tenant_id=a.tenant_id AND"
+                + " event_actor,e.reason AS event_reason FROM finance.collection_cheque_application"
+                + " a JOIN finance.collection_cheque_event e ON e.tenant_id=a.tenant_id AND"
                 + " e.cheque_id=a.cheque_id AND e.action='RECEIVE' WHERE a.cheque_id=?",
             cheque);
     assertThat(rows)
@@ -1287,7 +1287,8 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
         .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_APPLICATION_NOT_ALLOWED");
     assertThat(
             jdbc.queryForObject(
-                "SELECT count(*) FROM finance.collection_cheque_application WHERE cheque_id IN (?,?)",
+                "SELECT count(*) FROM finance.collection_cheque_application WHERE cheque_id IN"
+                    + " (?,?)",
                 Long.class,
                 small,
                 large))
@@ -2034,7 +2035,8 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
   private UUID seedApplication(UUID cheque, String amount, boolean reversed) {
     UUID id = UUID.randomUUID();
     String columns =
-        "INSERT INTO finance.collection_cheque_application(id,uid,tenant_id,cheque_id,obligation_id,"
+        "INSERT INTO"
+            + " finance.collection_cheque_application(id,uid,tenant_id,cheque_id,obligation_id,"
             + "amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at";
     if (reversed)
       jdbc.update(
@@ -2846,6 +2848,379 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
     assertThat(history.get(1).get("action")).isEqualTo("CORRECT");
     assertThat(history.get(1).get("drawer_kind")).isEqualTo("ENDORSED");
     assertThat(history.get(1).get("drawer_name")).isEqualTo("Calder Mills");
+  }
+
+  @Test
+  void aClearedChequesDrawerCorrectionReplaysWithoutTouchingMoneyOrInstalmentVersion() {
+    chequeSource("4000.00");
+    UUID cheque = receiveUnlinked("6000.00");
+    in(
+        tenant,
+        () -> cheques.allocate(cheque, allocation(cheque, UUID.randomUUID(), "4000.00"), actor));
+    var clearing =
+        in(
+            tenant,
+            () ->
+                cheques.transition(
+                    cheque,
+                    transition(
+                        UUID.randomUUID(), ChequeAction.CLEAR, chequeVersion(cheque), version()),
+                    actor));
+    var second = lowerToWithSecondInstalment("4000.00", "3000.00");
+    long secondVersion =
+        in(
+            tenant,
+            () -> obligations.findByTenantIdAndId(tenant, second).orElseThrow().getVersion());
+    var later =
+        in(
+            tenant,
+            () ->
+                posting.match(
+                    second, match(clearing.getPaymentId(), "1000.00", secondVersion), actor));
+    lines("1000.00", "0.00");
+    var before = in(tenant, () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow());
+    long obligationVersion = version();
+    var request =
+        new CollectionRequests.Transition(
+            UUID.randomUUID(),
+            before.getVersion(),
+            ChequeAction.CORRECT_DRAWER,
+            date,
+            now,
+            "Verified drawer identity",
+            "Cheque image reviewed",
+            null,
+            null,
+            null,
+            new CollectionRequests.DrawerCorrection(
+                com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.ENDORSED,
+                null,
+                "Calder Mills"));
+
+    var saved = in(tenant, () -> cheques.transition(cheque, request, actor));
+    assertThat(in(tenant, () -> cheques.transition(cheque, request, actor)).getId())
+        .isEqualTo(saved.getId());
+    for (var key : List.of(request.operationId(), UUID.randomUUID())) {
+      var changed =
+          new CollectionRequests.Transition(
+              key,
+              request.expectedVersion(),
+              request.action(),
+              request.effectiveDate(),
+              request.occurredAt(),
+              request.reason(),
+              request.evidence(),
+              null,
+              null,
+              null,
+              new CollectionRequests.DrawerCorrection(
+                  com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind
+                      .ENDORSED,
+                  null,
+                  "Pennine Weaving"));
+      assertThatThrownBy(() -> in(tenant, () -> cheques.transition(cheque, changed, actor)))
+          .hasFieldOrPropertyWithValue(
+              "errorCode",
+              key.equals(request.operationId())
+                  ? "COLLECTION_OPERATION_REUSED"
+                  : "COLLECTION_VERSION_CONFLICT");
+    }
+    var after = in(tenant, () -> instruments.findByTenantIdAndId(tenant, cheque).orElseThrow());
+    assertThat(after.getVersion()).isEqualTo(before.getVersion() + 1);
+    assertThat(after.getState()).isEqualTo(before.getState());
+    assertThat(after.getClearedPaymentId()).isEqualTo(clearing.getPaymentId());
+    assertThat(after.getDrawerName()).isEqualTo("Calder Mills");
+    assertThat(version()).isEqualTo(obligationVersion);
+    assertThat(in(tenant, () -> posting.settled(obligation))).isEqualByComparingTo("4000.00");
+    assertThat(in(tenant, () -> posting.settled(second))).isEqualByComparingTo("1000.00");
+    assertThat(
+            in(
+                tenant,
+                () ->
+                    matches.findByTenantIdAndPaymentIdAndReversedAtIsNull(
+                        tenant, clearing.getPaymentId())))
+        .extracting(m -> m.getId())
+        .containsExactlyInAnyOrder(
+            clearing.getMatchIds().getFirst(), later.getMatchIds().getFirst());
+    lines("1000.00", "0.00");
+    var history = chequeEventsOf(cheque);
+    assertThat(history)
+        .extracting(event -> event.get("action"))
+        .containsExactly("RECEIVE", "APPLY", "CLEAR", "CORRECT_DRAWER");
+    assertThat(history.getFirst().get("drawer_kind")).isEqualTo("OWN");
+    assertThat(history.getLast().get("drawer_kind")).isEqualTo("ENDORSED");
+  }
+
+  @Test
+  void anUnknownLegacyReceiptRemainsUnknownInHistoryAfterClassification() {
+    UUID cheque = UUID.randomUUID();
+    in(
+        tenant,
+        () -> {
+          jdbc.update(
+              """
+              INSERT INTO finance.collection_cheque(
+                id, tenant_id, partner_id, currency, amount, received_on, due_on, instrument_reference,
+                state, created_at, updated_at, created_by)
+              VALUES (?, ?, ?, 'GBP', 4284, ?, ?, 'NORTHBANK-LEGACY', 'RECEIVED', ?, ?, ?)
+              """,
+              cheque,
+              tenant,
+              partner,
+              date,
+              date.plusMonths(3),
+              java.sql.Timestamp.from(now),
+              java.sql.Timestamp.from(now),
+              actor);
+          jdbc.update(
+              """
+              INSERT INTO finance.collection_cheque_event(
+                id, tenant_id, cheque_id, evidence_revision, action, state, effective_date, occurred_at,
+                actor_id, reason, evidence, amount, received_on, due_on, instrument_reference,
+                created_at, updated_at)
+              VALUES (?, ?, ?, 0, 'RECEIVE', 'RECEIVED', ?, ?, ?, 'Cheque received', 'Signed cheque',
+                4284, ?, ?, 'NORTHBANK-LEGACY', ?, ?)
+              """,
+              UUID.randomUUID(),
+              tenant,
+              cheque,
+              date,
+              java.sql.Timestamp.from(now),
+              actor,
+              date,
+              date.plusMonths(3),
+              java.sql.Timestamp.from(now),
+              java.sql.Timestamp.from(now));
+          return null;
+        });
+
+    var request =
+        new CollectionRequests.Transition(
+            UUID.randomUUID(),
+            chequeVersion(cheque),
+            ChequeAction.CORRECT_DRAWER,
+            date,
+            now,
+            "Verified drawer identity",
+            "Cheque image reviewed",
+            null,
+            null,
+            null,
+            new CollectionRequests.DrawerCorrection(
+                com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.ENDORSED,
+                null,
+                "Calder Mills"));
+    in(tenant, () -> cheques.transition(cheque, request, actor));
+
+    var current = in(tenant, () -> queries.cheque(cheque, actor));
+    assertThat(current.drawerName()).isEqualTo("Calder Mills");
+    var history = chequeEventsOf(cheque);
+    assertThat(history).hasSize(2);
+    assertThat(history.getFirst().get("drawer_kind")).isNull();
+    assertThat(history.getLast().get("action")).isEqualTo("CORRECT_DRAWER");
+    assertThat(history.getLast().get("drawer_kind")).isEqualTo("ENDORSED");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void anEndorsedReceiptKeepsItsNameAndRejectsForeignDrawersRegardlessOfSplitTracking(
+      boolean tracking) {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE common_tenant.common_tenant SET settings = coalesce(settings, '{}'::jsonb)"
+                    + " || jsonb_build_object('chequeSplitTracking', CAST(? AS boolean)) WHERE"
+                    + " id=?",
+                tracking,
+                tenant));
+    var endorsed = endorsedChequeFrom(partner);
+    var saved = in(tenant, () -> cheques.receive(endorsed, actor));
+    var stored =
+        in(
+            tenant,
+            () -> instruments.findByTenantIdAndId(tenant, saved.getResourceId()).orElseThrow());
+    assertThat(stored.getDrawerKind().name()).isEqualTo("ENDORSED");
+    assertThat(stored.getDrawerName()).isEqualTo("Harrowgate Mills Ltd");
+    assertThat(stored.getDrawerId()).isNull();
+    var foreign =
+        in(
+            otherTenant,
+            () ->
+                drawerList.add(
+                    otherPartner,
+                    "Oliver Hartley",
+                    com.fabricmanagement.platform.tradingpartner.domain.ChequeDrawerType
+                        .INDIVIDUAL));
+    var wrongDrawer =
+        new CollectionRequests.ReceiveCheque(
+            UUID.randomUUID(),
+            partner,
+            "GBP",
+            endorsed.amount(),
+            endorsed.receivedOn(),
+            endorsed.dueOn(),
+            "NORTHBANK-FOREIGN",
+            endorsed.evidence(),
+            endorsed.occurredAt(),
+            endorsed.reason(),
+            List.of(),
+            com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind.OWN,
+            foreign.drawer().id(),
+            null);
+    assertThatThrownBy(() -> in(tenant, () -> cheques.receive(wrongDrawer, actor)))
+        .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_DRAWER_INVALID");
+    var missingKind =
+        new CollectionRequests.ReceiveCheque(
+            UUID.randomUUID(),
+            partner,
+            "GBP",
+            endorsed.amount(),
+            endorsed.receivedOn(),
+            endorsed.dueOn(),
+            "NORTHBANK-UNKNOWN",
+            endorsed.evidence(),
+            endorsed.occurredAt(),
+            endorsed.reason(),
+            List.of(),
+            null,
+            null,
+            null);
+    assertThatThrownBy(() -> in(tenant, () -> cheques.receive(missingKind, actor)))
+        .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_DRAWER_KIND_REQUIRED");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM finance.collection_cheque WHERE tenant_id = ?",
+                Integer.class,
+                tenant))
+        .isEqualTo(1);
+  }
+
+  private record LegacyCommand(String action, UUID target, Object body) {}
+
+  private record LegacyChequeReceipt(
+      UUID operationId,
+      UUID partnerId,
+      String currency,
+      @com.fasterxml.jackson.annotation.JsonFormat(
+              shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
+          BigDecimal amount,
+      LocalDate receivedOn,
+      LocalDate dueOn,
+      String instrumentReference,
+      String evidence,
+      Instant occurredAt,
+      String reason,
+      List<CollectionRequests.Application> applications) {}
+
+  private record LegacyChequeCorrection(
+      @com.fasterxml.jackson.annotation.JsonFormat(
+              shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
+          BigDecimal amount,
+      LocalDate receivedOn,
+      LocalDate dueOn,
+      String instrumentReference) {}
+
+  private record LegacyChequeTransition(
+      UUID operationId,
+      Long expectedVersion,
+      ChequeAction action,
+      LocalDate effectiveDate,
+      Instant occurredAt,
+      String reason,
+      String evidence,
+      UUID paymentId,
+      LegacyChequeCorrection correction,
+      List<CollectionRequests.Version> obligations) {}
+
+  @Test
+  void preTagReceiptAndOrdinaryCorrectionReplaysUseTheirPersistedCommandResults() {
+    chequeSource();
+    UUID cheque = receiveCheque();
+    var legacyReceive =
+        new CollectionRequests.ReceiveCheque(
+            UUID.randomUUID(),
+            partner,
+            "GBP",
+            new BigDecimal("4284.00"),
+            date,
+            date.plusMonths(3),
+            "NORTHBANK-LEGACY",
+            "Cheque image reviewed",
+            now,
+            "Cheque received",
+            List.of(new CollectionRequests.Application(obligation, 0L, new BigDecimal("4284.00"))),
+            null,
+            null,
+            null);
+    var legacyCorrection = correct(cheque, date.plusMonths(4), null);
+    var beforeTagging =
+        new LegacyChequeReceipt(
+            legacyReceive.operationId(),
+            partner,
+            legacyReceive.currency(),
+            legacyReceive.amount(),
+            legacyReceive.receivedOn(),
+            legacyReceive.dueOn(),
+            legacyReceive.instrumentReference(),
+            legacyReceive.evidence(),
+            legacyReceive.occurredAt(),
+            legacyReceive.reason(),
+            legacyReceive.applications());
+    var correction = legacyCorrection.correction();
+    var beforeCorrection =
+        new LegacyChequeTransition(
+            legacyCorrection.operationId(),
+            legacyCorrection.expectedVersion(),
+            ChequeAction.CORRECT,
+            legacyCorrection.effectiveDate(),
+            legacyCorrection.occurredAt(),
+            legacyCorrection.reason(),
+            legacyCorrection.evidence(),
+            null,
+            new LegacyChequeCorrection(
+                correction.amount(),
+                correction.receivedOn(),
+                correction.dueOn(),
+                correction.instrumentReference()),
+            legacyCorrection.obligations());
+    var receiveHash =
+        com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint.of(
+            new LegacyCommand("RECEIVE_CHEQUE", partner, beforeTagging));
+    var correctionHash =
+        com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint.of(
+            new LegacyCommand("CHEQUE_TRANSITION", cheque, beforeCorrection));
+    var receiveReceipt =
+        in(
+            tenant,
+            () ->
+                commands.record(
+                    legacyReceive.operationId(),
+                    actor,
+                    receiveHash,
+                    "CHEQUE",
+                    cheque,
+                    0L,
+                    null,
+                    List.of()));
+    var correctionReceipt =
+        in(
+            tenant,
+            () ->
+                commands.record(
+                    legacyCorrection.operationId(),
+                    actor,
+                    correctionHash,
+                    "CHEQUE",
+                    cheque,
+                    1L,
+                    null,
+                    List.of()));
+
+    assertThat(in(tenant, () -> cheques.receive(legacyReceive, actor)).getId())
+        .isEqualTo(receiveReceipt.getId());
+    assertThat(in(tenant, () -> cheques.transition(cheque, legacyCorrection, actor)).getId())
+        .isEqualTo(correctionReceipt.getId());
+    assertThat(chequeEventsOf(cheque)).hasSize(1);
   }
 
   /** B19: a cheque from before tagging keeps its unknown kind through an ordinary correction. */

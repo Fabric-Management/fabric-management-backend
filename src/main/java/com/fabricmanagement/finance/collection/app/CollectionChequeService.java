@@ -168,8 +168,14 @@ public class CollectionChequeService {
             .orElseThrow(() -> new NotFoundException("Cheque not found"));
     // Current coverage only: a reversed application no longer ties the cheque to its obligation.
     var applied = applications.active(tenant, chequeId);
-    requireChequeWrite(cheque, applied, actor);
-    var rows = posting.writableBatch(obligationIds(applied), actor);
+    var linked = requireChequeWrite(cheque, applied, actor);
+    boolean drawerOnly = request.action() == ChequeAction.CORRECT_DRAWER;
+    if (drawerOnly && linked.stream().anyMatch(row -> !Boolean.TRUE.equals(row.getIsActive())))
+      throw new NotFoundException("Cheque not found");
+    var rows =
+        drawerOnly
+            ? List.<CollectionObligation>of()
+            : posting.writableBatch(obligationIds(applied), actor);
     requireClearingReversal(cheque, request.action(), rows, actor);
     String hash = commands.hash("CHEQUE_TRANSITION", chequeId, request);
     var replay = commands.replay(request.operationId(), actor, hash);
@@ -189,8 +195,17 @@ public class CollectionChequeService {
         || request.action() != ChequeAction.CORRECT && request.correction() != null)
       throw CollectionRuleException.invalid(
           "Payment and correction fields are valid only for their specific action");
+    if (!drawerOnly && request.drawerCorrection() != null)
+      throw CollectionRuleException.invalid("Drawer correction is valid only for CORRECT_DRAWER");
     var matchIds = new ArrayList<UUID>();
-    if (request.action() == ChequeAction.CLEAR) {
+    if (drawerOnly) {
+      if (request.drawerCorrection() == null)
+        throw CollectionRuleException.invalid("Corrected drawer classification is required");
+      if (request.obligations() != null && !request.obligations().isEmpty())
+        throw CollectionRuleException.invalid("Drawer correction takes no obligation versions");
+      cheque.correctDrawer(
+          drawers.forDrawerCorrection(cheque, request.drawerCorrection()), request.evidence());
+    } else if (request.action() == ChequeAction.CLEAR) {
       requireVersions(rows, request.obligations(), actor);
       var payment = clear(cheque, applied, rows, request, actor, matchIds);
       cheque.transition(ChequeAction.CLEAR, payment, request.evidence());
@@ -229,14 +244,16 @@ public class CollectionChequeService {
       cheque.transition(request.action(), null, request.evidence());
     }
     cheques.saveAndFlush(cheque);
-    // Present/return/correct also change instrument facts relevant to the expectation's version.
-    rows.forEach(
-        row -> {
-          row.financialChange();
-          obligations.save(row);
-          changes.changed(row.getId());
-        });
-    obligations.flush();
+    if (!drawerOnly) {
+      // Financial transitions change instrument facts relevant to the expectation's version.
+      rows.forEach(
+          row -> {
+            row.financialChange();
+            obligations.save(row);
+            changes.changed(row.getId());
+          });
+      obligations.flush();
+    }
     events.saveAndFlush(
         CollectionChequeEvent.record(
             cheque,
@@ -645,7 +662,7 @@ public class CollectionChequeService {
                     BigDecimal.ZERO, CollectionChequeApplication::getAmount, BigDecimal::add)));
   }
 
-  private void requireChequeWrite(
+  private List<CollectionObligation> requireChequeWrite(
       CollectionCheque cheque, List<CollectionChequeApplication> applied, UUID actor) {
     var reach = access.reach(actor, "write");
     var ids = obligationIds(applied);
@@ -662,6 +679,7 @@ public class CollectionChequeService {
                     !reach.permits(
                         row.getTenantId(), row.getCreatedBy(), row.getResponsibleUserId())))
       throw new NotFoundException("Cheque not found");
+    return linked;
   }
 
   private void requireInstrumentTarget(CollectionObligation row, UUID partner, String currency) {

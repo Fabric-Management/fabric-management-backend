@@ -260,32 +260,27 @@ public class CollectionQueryService {
   @Transactional(readOnly = true)
   public CollectionDtos.Cheque cheque(UUID id, UUID actor) {
     UUID tenant = TenantContext.requireTenantId();
-    var cheque = readableCheque(id, actor);
+    var context = readableCheque(id, actor);
+    var cheque = context.cheque();
+    var applied = context.applications();
     var write = access.reach(actor, "write");
     var reverse = access.reach(actor, "reverse");
-    boolean allowed = write.permits(tenant, cheque.getCreatedBy(), null);
-    boolean mayReverse = reverse.permits(tenant, cheque.getCreatedBy(), null);
-    // Current coverage: active applications only. Access and capabilities are decided once per
-    // distinct obligation; several active rows may name the same one.
-    var applied = applications.active(tenant, id);
-    var linkedIds = CollectionChequeService.obligationIds(applied);
-    if (!linkedIds.isEmpty()) {
-      allowed = true;
-      mayReverse = true;
-    }
-    var read = access.reach(actor, "read");
-    var rows =
-        linkedIds.isEmpty()
-            ? List.<CollectionObligation>of()
-            : obligations.findByTenantIdAndIdIn(tenant, linkedIds);
-    if (rows.size() != linkedIds.size())
-      throw new NotFoundException("Cheque application not found");
-    for (var row : rows) {
-      if (!read.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId()))
-        throw new NotFoundException("Cheque application not found");
-      allowed &= write.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId());
-      mayReverse &= reverse.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId());
-    }
+    boolean allowed =
+        context.obligations().isEmpty()
+            ? write.permits(tenant, cheque.getCreatedBy(), null)
+            : context.obligations().stream()
+                .allMatch(
+                    row -> write.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId()));
+    boolean mayReverse =
+        context.obligations().isEmpty()
+            ? reverse.permits(tenant, cheque.getCreatedBy(), null)
+            : context.obligations().stream()
+                .allMatch(
+                    row -> reverse.permits(tenant, row.getCreatedBy(), row.getResponsibleUserId()));
+    boolean mayCorrectDrawer =
+        allowed
+            && context.obligations().stream()
+                .allMatch(row -> Boolean.TRUE.equals(row.getIsActive()));
     boolean valid =
         cheque.getClearedPaymentId() != null
             && payments
@@ -331,7 +326,10 @@ public class CollectionQueryService {
     for (var action : ChequeAction.values()) {
       boolean legal = cheque.getState().permits(action);
       // Dishonouring or returning a cleared instrument undoes money: it also needs reverse.
-      boolean granted = allowed && (!cheque.getState().reversesClearing(action) || mayReverse);
+      boolean granted =
+          action == ChequeAction.CORRECT_DRAWER
+              ? mayCorrectDrawer
+              : allowed && (!cheque.getState().reversesClearing(action) || mayReverse);
       caps.add(
           new CollectionDtos.Capability(
               action.name(),
@@ -443,13 +441,14 @@ public class CollectionQueryService {
     return row;
   }
 
-  private CollectionCheque readableCheque(UUID id, UUID actor) {
+  private ChequeRead readableCheque(UUID id, UUID actor) {
     var cheque =
         cheques
             .findByTenantIdAndId(TenantContext.requireTenantId(), id)
             .orElseThrow(() -> new NotFoundException("Cheque not found"));
     var reach = access.reach(actor, "read");
-    var ids = CollectionChequeService.obligationIds(applications.active(cheque.getTenantId(), id));
+    var applied = applications.active(cheque.getTenantId(), id);
+    var ids = CollectionChequeService.obligationIds(applied);
     var linked =
         ids.isEmpty()
             ? List.<CollectionObligation>of()
@@ -465,8 +464,13 @@ public class CollectionQueryService {
                     !reach.permits(
                         row.getTenantId(), row.getCreatedBy(), row.getResponsibleUserId())))
       throw new NotFoundException("Cheque not found");
-    return cheque;
+    return new ChequeRead(cheque, applied, linked);
   }
+
+  private record ChequeRead(
+      CollectionCheque cheque,
+      List<CollectionChequeApplication> applications,
+      List<CollectionObligation> obligations) {}
 
   private static String noticeOf(CollectionProjectionService.Refresh refresh) {
     return switch (refresh) {

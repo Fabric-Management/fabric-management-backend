@@ -4,6 +4,7 @@ import com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeActi
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Method;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.OverSettlementDecision;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -282,8 +283,8 @@ public final class CollectionRequests {
           @Schema(
               nullable = true,
               description =
-                  "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself or a listed drawer)"
-                      + " or ENDORSED (a third party's cheque endorsed to us).")
+                  "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself or a listed"
+                      + " drawer) or ENDORSED (a third party's cheque endorsed to us).")
           DrawerKind drawerKind,
       @JsonInclude(JsonInclude.Include.NON_NULL)
           @Schema(
@@ -322,7 +323,8 @@ public final class CollectionRequests {
           @Schema(
               nullable = true,
               description =
-                  "Absent with drawerId and drawerName: the recorded classification is kept unchanged.")
+                  "Absent with drawerId and drawerName: the recorded classification is kept"
+                      + " unchanged.")
           DrawerKind drawerKind,
       @JsonInclude(JsonInclude.Include.NON_NULL)
           @Schema(
@@ -345,6 +347,20 @@ public final class CollectionRequests {
     /** Whether the correction leaves the recorded classification as it is. */
     public boolean keepsClassification() {
       return drawerKind == null && drawerId == null && drawerName == null;
+    }
+  }
+
+  @Schema(
+      name = "FinanceCollectionChequeDrawerCorrectionRequest",
+      additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
+  public record DrawerCorrection(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DrawerKind drawerKind,
+      @Schema(nullable = true) UUID drawerId,
+      @Size(max = 200) @Schema(nullable = true, maxLength = 200) String drawerName) {
+
+    @JsonAnySetter
+    public void rejectUnknown(String property, Object value) {
+      throw new IllegalArgumentException("Unexpected drawer correction field: " + property);
     }
   }
 
@@ -377,5 +393,33 @@ public final class CollectionRequests {
               description =
                   "Required for clearing and reversing a cleared cheque; all affected obligation"
                       + " versions")
-          List<Version> obligations) {}
+          List<Version> obligations,
+      @Valid @JsonInclude(JsonInclude.Include.NON_NULL) @Schema(nullable = true)
+          DrawerCorrection drawerCorrection) {
+
+    public Transition(
+        UUID operationId,
+        Long expectedVersion,
+        ChequeAction action,
+        LocalDate effectiveDate,
+        Instant occurredAt,
+        String reason,
+        String evidence,
+        UUID paymentId,
+        Correction correction,
+        List<Version> obligations) {
+      this(
+          operationId,
+          expectedVersion,
+          action,
+          effectiveDate,
+          occurredAt,
+          reason,
+          evidence,
+          paymentId,
+          correction,
+          obligations,
+          null);
+    }
+  }
 }

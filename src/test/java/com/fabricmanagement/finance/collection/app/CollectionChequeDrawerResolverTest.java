@@ -210,6 +210,80 @@ class CollectionChequeDrawerResolverTest {
         .isEqualTo("CHEQUE_DRAWER_KIND_REQUIRED");
   }
 
+  @Test
+  void classificationCorrectionRefreshesAnActiveOwnDrawerButKeepsAnInactiveSnapshot() {
+    var active = new CollectionCheque.Drawer(DrawerKind.OWN, listedId, "Oliver J Hartley");
+    var inactive = new CollectionCheque.Drawer(DrawerKind.OWN, retiredId, "Ava Pryce");
+    assertThat(
+            resolver.forDrawerCorrection(
+                cheque(active),
+                new CollectionRequests.DrawerCorrection(DrawerKind.OWN, listedId, null)))
+        .isEqualTo(new CollectionCheque.Drawer(DrawerKind.OWN, listedId, "Oliver Hartley"));
+    assertThat(
+            resolver.forDrawerCorrection(
+                cheque(inactive),
+                new CollectionRequests.DrawerCorrection(DrawerKind.OWN, retiredId, null)))
+        .isEqualTo(inactive);
+  }
+
+  private record TransitionBeforeDrawerCorrection(
+      UUID operationId,
+      Long expectedVersion,
+      com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeAction action,
+      LocalDate effectiveDate,
+      Instant occurredAt,
+      String reason,
+      String evidence,
+      UUID paymentId,
+      CollectionRequests.Correction correction,
+      List<CollectionRequests.Version> obligations) {}
+
+  @Test
+  void anOrdinaryTransitionKeepsItsFingerprintWithoutTheNewPayload() {
+    var previous =
+        new TransitionBeforeDrawerCorrection(
+            UUID.randomUUID(),
+            2L,
+            com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeAction.CORRECT,
+            LocalDate.of(2026, 11, 15),
+            Instant.parse("2026-11-15T12:00:00Z"),
+            "Updated evidence",
+            "Signed cheque image",
+            null,
+            correction(null, null, null),
+            null);
+    var current =
+        new CollectionRequests.Transition(
+            previous.operationId(),
+            previous.expectedVersion(),
+            previous.action(),
+            previous.effectiveDate(),
+            previous.occurredAt(),
+            previous.reason(),
+            previous.evidence(),
+            previous.paymentId(),
+            previous.correction(),
+            previous.obligations());
+    assertThat(CanonicalJsonFingerprint.of(current))
+        .isEqualTo(CanonicalJsonFingerprint.of(previous));
+  }
+
+  @Test
+  void drawerCorrectionRejectsUnexpectedJsonEvenWhenTheMapperIgnoresUnknownFields() {
+    var mapper =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .disable(
+                com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    assertThatThrownBy(
+            () ->
+                mapper.readValue(
+                    """
+                    {"drawerKind":"ENDORSED","drawerName":"Calder Mills","amount":"1000.00"}
+                    """,
+                    CollectionRequests.DrawerCorrection.class))
+        .hasMessageContaining("Unexpected drawer correction field: amount");
+  }
+
   /** The receive request as stored before tagging (PAYMENT-PLAN-7), for the fingerprint check. */
   private record ReceiveBeforeTagging(
       UUID operationId,

@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -53,6 +54,7 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanInput;
+import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.ChequeDateMode;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Frequency;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Method;
 import com.fabricmanagement.sales.salesorder.dto.CustomerApprovalDtos;
@@ -61,6 +63,7 @@ import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.GrantApprovalAut
 import com.fabricmanagement.sales.salesorder.dto.OrderPartyDtos.RevokeApprovalAuthorityRequest;
 import com.fabricmanagement.sales.salesorder.dto.PublicOrderApprovalDtos;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Save;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Submit;
 import com.fabricmanagement.sales.salesorder.infra.repository.DeliveryProposalRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.OrderVersionRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
@@ -334,6 +337,143 @@ class CustomerApprovalFlowIT {
                 Integer.class,
                 token))
         .isZero();
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {40, 80})
+  void aChequeSplitRevisionChangesOnlyAfterCustomerApproval(int revised) {
+    setChequeSplitTracking(true);
+    moveOrder(order -> order.moveFlowTo(OrderFlowStage.DRAFT));
+    var rules =
+        new PaymentPlanInput.Rules(
+            Frequency.MONTH,
+            3,
+            LocalDate.now().plusDays(10),
+            20,
+            Method.CHEQUE,
+            null,
+            null,
+            null,
+            null,
+            ChequeDateMode.COMMON_DATE,
+            LocalDate.now().plusMonths(4));
+    var firstPlan =
+        new PaymentPlanInput(List.of(new PaymentPlanInput.CurrencyInput("GBP", rules, null, 60)));
+    var first = asSales(() -> paymentPlans.read(orderId, sales));
+    asSales(
+        () ->
+            paymentPlans.save(
+                orderId,
+                new Save(
+                    UUID.randomUUID(),
+                    first.orderVersion(),
+                    first.planVersion(),
+                    firstPlan,
+                    "Cheque terms"),
+                sales));
+    planned();
+
+    String token = send();
+    var original = publicApprovals.verify(token, code(token));
+    var originalGroup = original.version().content().paymentPlan().currencyGroups().getFirst();
+    assertThat(originalGroup.ownChequePercent()).isEqualTo(60);
+    publicApprovals.approve(token, original.session(), "203.0.113.7", "JUnit");
+    jdbc.update(
+        "UPDATE common_company.common_trading_partner SET default_own_cheque_percent=25 WHERE id=?",
+        partnerId);
+    setChequeSplitTracking(revised == 40);
+    var agreed = asSales(() -> paymentPlans.read(orderId, sales));
+    assertThat(agreed.defaultOwnChequePercent()).isEqualTo(25);
+    assertThat(agreed.agreed().content().currencyGroups().getFirst().ownChequePercent())
+        .isEqualTo(60);
+
+    var rows =
+        originalGroup.lines().stream()
+            .map(
+                line ->
+                    new PaymentPlanInput.Row(
+                        line.obligationId(),
+                        line.kind(),
+                        line.amount(),
+                        line.method(),
+                        line.dateTrigger(),
+                        line.expectedDate(),
+                        line.chequePaymentDate()))
+            .toList();
+    var changed =
+        new PaymentPlanInput(
+            List.of(
+                new PaymentPlanInput.CurrencyInput("GBP", originalGroup.rules(), rows, revised)));
+    var draft =
+        asSales(
+            () ->
+                paymentPlans.save(
+                    orderId,
+                    new Save(
+                        UUID.randomUUID(),
+                        agreed.orderVersion(),
+                        agreed.planVersion(),
+                        changed,
+                        "Revised cheque terms"),
+                    sales));
+    var ready = asSales(() -> paymentPlans.read(orderId, sales));
+    clearInvocations(mailer);
+    asSales(
+        () ->
+            customerApprovals.submitPaymentPlan(
+                orderId,
+                draft.id(),
+                new Submit(ready.orderVersion(), ready.planVersion(), 48, false),
+                sales));
+    var awaiting = asSales(() -> paymentPlans.read(orderId, sales));
+    assertThat(awaiting.agreed().content().currencyGroups().getFirst().ownChequePercent())
+        .isEqualTo(60);
+
+    ArgumentCaptor<String> newToken = ArgumentCaptor.forClass(String.class);
+    verify(mailer)
+        .sendApprovalRequest(
+            eq(tenantId),
+            eq("jane@northern-garments.example"),
+            any(),
+            any(),
+            newToken.capture(),
+            any());
+    String nextToken = newToken.getValue();
+    var replacement = publicApprovals.verify(nextToken, code(nextToken));
+    assertThat(
+            replacement
+                .version()
+                .content()
+                .paymentPlan()
+                .currencyGroups()
+                .getFirst()
+                .ownChequePercent())
+        .isEqualTo(revised);
+    publicApprovals.approve(nextToken, replacement.session(), "203.0.113.7", "JUnit");
+    assertThat(
+            asSales(() -> paymentPlans.read(orderId, sales))
+                .agreed()
+                .content()
+                .currencyGroups()
+                .getFirst()
+                .ownChequePercent())
+        .isEqualTo(revised);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT (content #>> '{paymentPlan,currencyGroups,0,ownChequePercent}')::integer"
+                    + " FROM sales_ord.order_version WHERE sales_order_id = ? AND version_no = ?",
+                Integer.class,
+                orderId,
+                original.version().versionNo()))
+        .isEqualTo(60);
+  }
+
+  private void setChequeSplitTracking(boolean tracking) {
+    jdbc.update(
+        "UPDATE common_tenant.common_tenant SET settings=coalesce(settings, '{}'::jsonb)"
+            + " || jsonb_build_object('chequeSplitTracking', CAST(? AS boolean)) WHERE id=?",
+        tracking,
+        tenantId);
   }
 
   /**

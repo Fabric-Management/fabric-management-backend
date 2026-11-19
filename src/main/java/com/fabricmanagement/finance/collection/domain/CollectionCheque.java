@@ -135,6 +135,12 @@ public class CollectionCheque extends BaseEntity {
     drawerName = drawer.name();
   }
 
+  public void correctDrawer(Drawer drawer, String evidence) {
+    classify(drawer);
+    lastEvidence = evidence;
+    evidenceRevision++;
+  }
+
   public void correct(
       BigDecimal amount,
       LocalDate received,

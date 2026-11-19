@@ -81,6 +81,28 @@ class CollectionChequeDrawerResolver {
         cheque.drawer().orElse(null));
   }
 
+  CollectionCheque.Drawer forDrawerCorrection(
+      CollectionCheque cheque, CollectionRequests.DrawerCorrection correction) {
+    if (correction.drawerKind() == null) throw kindRequired();
+    var recorded = cheque.drawer().orElse(null);
+    if (correction.drawerKind() == DrawerKind.OWN
+        && correction.drawerName() == null
+        && correction.drawerId() != null
+        && recorded != null
+        && recorded.kind() == DrawerKind.OWN
+        && Objects.equals(recorded.id(), correction.drawerId())) {
+      var listed = drawers.drawer(cheque.getPartnerId(), correction.drawerId());
+      if (listed.isEmpty() || !listed.get().active()) return recorded;
+      return new CollectionCheque.Drawer(DrawerKind.OWN, listed.get().id(), listed.get().name());
+    }
+    return resolve(
+        cheque.getPartnerId(),
+        correction.drawerKind(),
+        correction.drawerId(),
+        correction.drawerName(),
+        null);
+  }
+
   private CollectionCheque.Drawer resolve(
       UUID partnerId,
       DrawerKind kind,

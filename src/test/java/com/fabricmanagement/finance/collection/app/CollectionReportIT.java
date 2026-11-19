@@ -337,7 +337,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_expectation(id,tenant_id,obligation_id,revision_id,approval_id,agreed_at,activated_at,amount,kind,method,expected_date,created_at,updated_at)"
-                  + " VALUES(?,?,?,?,?,'2026-10-31T12:00Z','2026-10-31T12:00Z',800,'INSTALMENT','BANK_TRANSFER',CAST('2026-10-30' AS date),'2026-10-31T12:00Z','2026-10-31T12:00Z')",
+                  + " VALUES(?,?,?,?,?,'2026-10-31T12:00Z','2026-10-31T12:00Z',800,'INSTALMENT','BANK_TRANSFER',CAST('2026-10-30'"
+                  + " AS date),'2026-10-31T12:00Z','2026-10-31T12:00Z')",
               UUID.randomUUID(),
               tenant,
               obligation,
@@ -380,7 +381,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund(id,tenant_id,created_at,updated_at,obligation_id,payment_id,partner_id,currency,amount,effective_date,occurred_at,actor_id,reason)"
-                  + " VALUES(?,?,'2026-11-04T12:00Z','2026-11-04T12:00Z',?,?,?,'GBP',200,'2026-11-03','2026-11-03T12:00Z',?,'Buyer overpaid')",
+                  + " VALUES(?,?,'2026-11-04T12:00Z','2026-11-04T12:00Z',?,?,?,'GBP',200,'2026-11-03','2026-11-03T12:00Z',?,'Buyer"
+                  + " overpaid')",
               refund,
               tenant,
               obligation,
@@ -390,7 +392,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund_event(id,tenant_id,created_at,updated_at,refund_id,step,action,effective_date,occurred_at,actor_id,reason,payment_id)"
-                  + " VALUES(?,?,'2026-11-07T12:00Z','2026-11-07T12:00Z',?,1,'SETTLE','2026-11-06','2026-11-06T12:00Z',?,'Refund sent',?)",
+                  + " VALUES(?,?,'2026-11-07T12:00Z','2026-11-07T12:00Z',?,1,'SETTLE','2026-11-06','2026-11-06T12:00Z',?,'Refund"
+                  + " sent',?)",
               UUID.randomUUID(),
               tenant,
               refund,
@@ -399,7 +402,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund_event(id,tenant_id,created_at,updated_at,refund_id,step,action,effective_date,occurred_at,actor_id,reason,payment_id)"
-                  + " VALUES(?,?,'2026-11-08T12:00Z','2026-11-08T12:00Z',?,2,'REOPEN','2026-11-08','2026-11-08T12:00Z',?,'Settling payment reversed',?)",
+                  + " VALUES(?,?,'2026-11-08T12:00Z','2026-11-08T12:00Z',?,2,'REOPEN','2026-11-08','2026-11-08T12:00Z',?,'Settling"
+                  + " payment reversed',?)",
               UUID.randomUUID(),
               tenant,
               refund,
@@ -736,7 +740,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_cheque(id,tenant_id,partner_id,currency,amount,received_on,due_on,instrument_reference,state,created_at,updated_at)"
-                  + " VALUES(?,?,?,'GBP',4284,'2026-10-22',CAST(? AS date),'NORTHBANK-77','RECEIVED','2026-10-22T12:00Z','2026-10-22T12:00Z')",
+                  + " VALUES(?,?,?,'GBP',4284,'2026-10-22',CAST(? AS"
+                  + " date),'NORTHBANK-77','RECEIVED','2026-10-22T12:00Z','2026-10-22T12:00Z')",
               cheque,
               tenant,
               partner,
@@ -745,8 +750,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
               "INSERT INTO"
                   + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
                   + " VALUES(?,?,?,0,'RECEIVE','RECEIVED','2026-10-22','2026-10-22T12:00Z',?,'Cheque"
-                  + " received','Physical instrument"
-                  + " verified',4284,'2026-10-22',CAST(? AS date),'NORTHBANK-77','2026-10-22T12:00Z','2026-10-22T12:00Z')",
+                  + " received','Physical instrument verified',4284,'2026-10-22',CAST(? AS"
+                  + " date),'NORTHBANK-77','2026-10-22T12:00Z','2026-10-22T12:00Z')",
               UUID.randomUUID(),
               tenant,
               cheque,
@@ -866,6 +871,30 @@ class CollectionReportIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void aDrawerCorrectionPreservesCoverageAcrossReportCuts() {
+    UUID cheque = heldCheque();
+    applied(cheque, UUID.randomUUID(), "2000", "2026-10-22", "2026-10-22T12:00:00Z");
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                """
+                INSERT INTO finance.collection_cheque_event(
+                  id, tenant_id, cheque_id, evidence_revision, action, state, effective_date, occurred_at,
+                  actor_id, reason, evidence, amount, received_on, due_on, instrument_reference,
+                  drawer_kind, drawer_name, created_at, updated_at)
+                VALUES (?, ?, ?, 1, 'CORRECT_DRAWER', 'RECEIVED', '2026-10-24', '2026-10-24T12:00Z',
+                  ?, 'Verified drawer', 'Cheque image reviewed', 4284, '2026-10-22', '2026-11-30',
+                  'NORTHBANK-77', 'ENDORSED', 'Calder Mills', '2026-10-24T12:00Z', '2026-10-24T12:00Z')
+                """,
+                UUID.randomUUID(),
+                tenant,
+                cheque,
+                actor));
+    held("2026-10-23", "2026-11-10T00:00:00Z", "2000");
+    held("2026-10-25", "2026-11-10T00:00:00Z", "2000");
+  }
+
+  @Test
   void aReplacementOnTheSameInstalmentCountsOnlyFromItsOwnCut() {
     UUID cheque = heldCheque(), original = UUID.randomUUID();
     applied(cheque, original, "2000", "2026-10-23", "2026-10-25T10:00:00Z");
@@ -902,7 +931,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
               "INSERT INTO"
                   + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,payment_id,created_at,updated_at)"
                   + " VALUES(?,?,?,1,'CLEAR','CLEARED','2026-10-24','2026-10-24T12:00Z',?,'Cheque"
-                  + " cleared','Bank statement',4284,'2026-10-22','2026-11-30','NORTHBANK-77',?,'2026-10-24T12:00Z','2026-10-24T12:00Z')",
+                  + " cleared','Bank"
+                  + " statement',4284,'2026-10-22','2026-11-30','NORTHBANK-77',?,'2026-10-24T12:00Z','2026-10-24T12:00Z')",
               UUID.randomUUID(),
               tenant,
               cheque,
@@ -913,8 +943,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
               "INSERT INTO"
                   + " finance.collection_payment_match(id,tenant_id,obligation_id,payment_id,cheque_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at,reversed_on,reversed_at,reversal_occurred_at,reversed_by,reversal_reason)"
                   + " VALUES(?,?,?,?,?,3000,'2026-10-24','2026-10-24T12:00Z',?,'Cheque cleared',"
-                  + "'2026-10-24T12:00Z','2026-10-24T12:00Z','2026-10-26','2026-10-26T12:00Z',"
-                  + "'2026-10-26T12:00Z',?,'Part refunded to the buyer')",
+                  + "'2026-10-24T12:00Z','2026-10-24T12:00Z','2026-10-26','2026-10-26T12:00Z','2026-10-26T12:00Z',?,'Part"
+                  + " refunded to the buyer')",
               UUID.randomUUID(),
               tenant,
               obligation,
@@ -990,7 +1020,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
               "INSERT INTO"
                   + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,payment_id,created_at,updated_at)"
                   + " VALUES(?,?,?,1,'CLEAR','CLEARED','2026-10-28','2026-10-28T12:00Z',?,'Cheque"
-                  + " cleared','Bank statement',6000,'2026-10-25','2026-10-27','NORTHBANK-HELD',?,'2026-10-28T12:00Z','2026-10-28T12:00Z')",
+                  + " cleared','Bank"
+                  + " statement',6000,'2026-10-25','2026-10-27','NORTHBANK-HELD',?,'2026-10-28T12:00Z','2026-10-28T12:00Z')",
               UUID.randomUUID(),
               tenant,
               cleared,
