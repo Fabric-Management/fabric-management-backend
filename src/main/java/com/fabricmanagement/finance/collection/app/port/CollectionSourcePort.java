@@ -5,7 +5,9 @@ import com.fabricmanagement.finance.collection.domain.CollectionTypes.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +52,13 @@ public interface CollectionSourcePort {
    * reads. A change racing with the listing is seen on the next run.
    */
   List<SourceStamp> stamps(UUID tenantId, UUID afterOrderId, int limit);
+
+  /**
+   * The order numbers of these orders, read without a lock, for display only (PAYMENT-PLAN-9 C2:
+   * two instalments with the same date and amount on repeat orders must be told apart). An order
+   * that is not found is absent from the map.
+   */
+  Map<UUID, String> orderNumbers(UUID tenantId, Collection<UUID> orderIds);
 
   /** The cheap, lock-free fingerprint of one agreed order; see {@link #stamps}. */
   record SourceStamp(

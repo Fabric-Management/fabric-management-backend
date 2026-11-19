@@ -4,6 +4,7 @@ import com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeActi
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Method;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.OverSettlementDecision;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -144,6 +145,97 @@ public final class CollectionRequests {
           @Schema(type = "string", example = "4284.00", requiredMode = Schema.RequiredMode.REQUIRED)
           BigDecimal amount) {}
 
+  @Schema(
+      name = "FinanceCollectionCustomerReceiptRequest",
+      description =
+          "PAYMENT-PLAN-9 R1: money received from a customer without an order; recorded as one"
+              + " payment and allocated to nothing")
+  public record CustomerReceipt(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID partnerId,
+      @NotBlank
+          @Pattern(regexp = "[A-Z]{3}")
+          @Schema(
+              pattern = "[A-Z]{3}",
+              example = "GBP",
+              requiredMode = Schema.RequiredMode.REQUIRED)
+          String currency,
+      @NotNull
+          @DecimalMin(value = "0", inclusive = false)
+          @JsonFormat(shape = JsonFormat.Shape.STRING)
+          @Schema(
+              type = "string",
+              example = "10000.00",
+              requiredMode = Schema.RequiredMode.REQUIRED)
+          BigDecimal amount,
+      @NotNull
+          @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "How the money arrived; CHEQUE is refused (receive the cheque instead)")
+          Method method,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate paymentDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @Size(max = 100) @Schema(nullable = true, maxLength = 100, example = "NORTHBANK-TRANSFER-42")
+          String bankReference,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason) {}
+
+  @Schema(
+      name = "FinanceCollectionAllocateChequeRequest",
+      description =
+          "PAYMENT-PLAN-9 R3: apply a held cheque's unapplied amount to cheque instalments; never"
+              + " after clearing")
+  public record AllocateCheque(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          Long expectedVersion,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate effectiveDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String evidence,
+      @NotEmpty
+          @Size(min = 1, max = 500)
+          @Valid
+          @io.swagger.v3.oas.annotations.media.ArraySchema(
+              minItems = 1,
+              maxItems = 500,
+              schema = @Schema(implementation = Application.class))
+          List<Application> applications) {}
+
+  @Schema(
+      name = "FinanceCollectionReverseChequeApplicationRequest",
+      description =
+          "PAYMENT-PLAN-9 R3a: reverse one whole application of a held cheque; the cheque stays"
+              + " held with the same amount and state")
+  public record ReverseChequeApplication(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+      @NotNull @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+          Long expectedVersion,
+      @NotNull
+          @PositiveOrZero
+          @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              description = "Expected version of the obligation the application covers")
+          Long expectedObligationVersion,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate effectiveDate,
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant occurredAt,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String reason,
+      @NotBlank
+          @Size(max = 1000)
+          @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
+          String evidence) {}
+
   @Schema(name = "FinanceCollectionReceiveChequeRequest")
   public record ReceiveCheque(
       @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
@@ -178,11 +270,12 @@ public final class CollectionRequests {
           @Size(max = 1000)
           @Schema(maxLength = 1000, requiredMode = Schema.RequiredMode.REQUIRED)
           String reason,
-      @NotEmpty
+      // PAYMENT-PLAN-9 R1: may be empty; the cheque is then held for the customer, unapplied.
+      @NotNull
           @Size(max = 500)
           @Valid
           @io.swagger.v3.oas.annotations.media.ArraySchema(
-              minItems = 1,
+              minItems = 0,
               maxItems = 500,
               schema = @Schema(implementation = Application.class))
           List<Application> applications,
@@ -190,8 +283,8 @@ public final class CollectionRequests {
           @Schema(
               nullable = true,
               description =
-                  "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself or a listed drawer)"
-                      + " or ENDORSED (a third party's cheque endorsed to us).")
+                  "Who drew the cheque (PAYMENT-PLAN-7): OWN (the customer itself or a listed"
+                      + " drawer) or ENDORSED (a third party's cheque endorsed to us).")
           DrawerKind drawerKind,
       @JsonInclude(JsonInclude.Include.NON_NULL)
           @Schema(
@@ -230,7 +323,8 @@ public final class CollectionRequests {
           @Schema(
               nullable = true,
               description =
-                  "Absent with drawerId and drawerName: the recorded classification is kept unchanged.")
+                  "Absent with drawerId and drawerName: the recorded classification is kept"
+                      + " unchanged.")
           DrawerKind drawerKind,
       @JsonInclude(JsonInclude.Include.NON_NULL)
           @Schema(
@@ -253,6 +347,20 @@ public final class CollectionRequests {
     /** Whether the correction leaves the recorded classification as it is. */
     public boolean keepsClassification() {
       return drawerKind == null && drawerId == null && drawerName == null;
+    }
+  }
+
+  @Schema(
+      name = "FinanceCollectionChequeDrawerCorrectionRequest",
+      additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
+  public record DrawerCorrection(
+      @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DrawerKind drawerKind,
+      @Schema(nullable = true) UUID drawerId,
+      @Size(max = 200) @Schema(nullable = true, maxLength = 200) String drawerName) {
+
+    @JsonAnySetter
+    public void rejectUnknown(String property, Object value) {
+      throw new IllegalArgumentException("Unexpected drawer correction field: " + property);
     }
   }
 
@@ -285,5 +393,33 @@ public final class CollectionRequests {
               description =
                   "Required for clearing and reversing a cleared cheque; all affected obligation"
                       + " versions")
-          List<Version> obligations) {}
+          List<Version> obligations,
+      @Valid @JsonInclude(JsonInclude.Include.NON_NULL) @Schema(nullable = true)
+          DrawerCorrection drawerCorrection) {
+
+    public Transition(
+        UUID operationId,
+        Long expectedVersion,
+        ChequeAction action,
+        LocalDate effectiveDate,
+        Instant occurredAt,
+        String reason,
+        String evidence,
+        UUID paymentId,
+        Correction correction,
+        List<Version> obligations) {
+      this(
+          operationId,
+          expectedVersion,
+          action,
+          effectiveDate,
+          occurredAt,
+          reason,
+          evidence,
+          paymentId,
+          correction,
+          obligations,
+          null);
+    }
+  }
 }

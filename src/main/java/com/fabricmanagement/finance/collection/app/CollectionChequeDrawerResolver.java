@@ -1,5 +1,6 @@
 package com.fabricmanagement.finance.collection.app;
 
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.finance.collection.app.port.CollectionChequeDrawerPort;
 import com.fabricmanagement.finance.collection.domain.CollectionCheque;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.DrawerKind;
@@ -21,6 +22,39 @@ import org.springframework.stereotype.Component;
 class CollectionChequeDrawerResolver {
 
   private final CollectionChequeDrawerPort drawers;
+
+  /**
+   * PAYMENT-PLAN-9 C1: money or a cheque is received only from a customer of this company (type
+   * customer or both) that was not removed. Before orderless receipts the instalment's sales order
+   * guaranteed this; now the command checks it. A customer on hold is not refused: it may still pay
+   * an old debt.
+   */
+  void requireCustomer(UUID partnerId) {
+    switch (drawers.standing(partnerId)) {
+      case NOT_FOUND ->
+          throw CollectionRuleException.invalid(
+              "COLLECTION_PARTNER_NOT_FOUND", "The customer is not known in this company");
+      case NOT_CUSTOMER ->
+          throw CollectionRuleException.conflict(
+              "COLLECTION_PARTNER_NOT_CUSTOMER",
+              "Money and cheques are received only from a customer");
+      case REMOVED ->
+          throw CollectionRuleException.conflict(
+              "COLLECTION_PARTNER_REMOVED", "This customer was removed; it takes no new receipts");
+      case CUSTOMER -> {}
+    }
+  }
+
+  /**
+   * The customer view (R5) reads a customer's history, a removed one's included. A partner that is
+   * not a customer is answered like an unknown one: a read has no conflict to resolve.
+   */
+  void requireCustomerToRead(UUID partnerId) {
+    var standing = drawers.standing(partnerId);
+    if (standing == CollectionChequeDrawerPort.CustomerStanding.NOT_FOUND
+        || standing == CollectionChequeDrawerPort.CustomerStanding.NOT_CUSTOMER)
+      throw new NotFoundException("Customer not found");
+  }
 
   /** At receipt a kind is always required. */
   CollectionCheque.Drawer forReceipt(CollectionRequests.ReceiveCheque request) {
@@ -45,6 +79,28 @@ class CollectionChequeDrawerResolver {
         correction.drawerId(),
         correction.drawerName(),
         cheque.drawer().orElse(null));
+  }
+
+  CollectionCheque.Drawer forDrawerCorrection(
+      CollectionCheque cheque, CollectionRequests.DrawerCorrection correction) {
+    if (correction.drawerKind() == null) throw kindRequired();
+    var recorded = cheque.drawer().orElse(null);
+    if (correction.drawerKind() == DrawerKind.OWN
+        && correction.drawerName() == null
+        && correction.drawerId() != null
+        && recorded != null
+        && recorded.kind() == DrawerKind.OWN
+        && Objects.equals(recorded.id(), correction.drawerId())) {
+      var listed = drawers.drawer(cheque.getPartnerId(), correction.drawerId());
+      if (listed.isEmpty() || !listed.get().active()) return recorded;
+      return new CollectionCheque.Drawer(DrawerKind.OWN, listed.get().id(), listed.get().name());
+    }
+    return resolve(
+        cheque.getPartnerId(),
+        correction.drawerKind(),
+        correction.drawerId(),
+        correction.drawerName(),
+        null);
   }
 
   private CollectionCheque.Drawer resolve(

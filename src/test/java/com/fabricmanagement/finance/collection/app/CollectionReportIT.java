@@ -337,7 +337,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_expectation(id,tenant_id,obligation_id,revision_id,approval_id,agreed_at,activated_at,amount,kind,method,expected_date,created_at,updated_at)"
-                  + " VALUES(?,?,?,?,?,'2026-10-31T12:00Z','2026-10-31T12:00Z',800,'INSTALMENT','BANK_TRANSFER',CAST('2026-10-30' AS date),'2026-10-31T12:00Z','2026-10-31T12:00Z')",
+                  + " VALUES(?,?,?,?,?,'2026-10-31T12:00Z','2026-10-31T12:00Z',800,'INSTALMENT','BANK_TRANSFER',CAST('2026-10-30'"
+                  + " AS date),'2026-10-31T12:00Z','2026-10-31T12:00Z')",
               UUID.randomUUID(),
               tenant,
               obligation,
@@ -380,7 +381,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund(id,tenant_id,created_at,updated_at,obligation_id,payment_id,partner_id,currency,amount,effective_date,occurred_at,actor_id,reason)"
-                  + " VALUES(?,?,'2026-11-04T12:00Z','2026-11-04T12:00Z',?,?,?,'GBP',200,'2026-11-03','2026-11-03T12:00Z',?,'Buyer overpaid')",
+                  + " VALUES(?,?,'2026-11-04T12:00Z','2026-11-04T12:00Z',?,?,?,'GBP',200,'2026-11-03','2026-11-03T12:00Z',?,'Buyer"
+                  + " overpaid')",
               refund,
               tenant,
               obligation,
@@ -390,7 +392,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund_event(id,tenant_id,created_at,updated_at,refund_id,step,action,effective_date,occurred_at,actor_id,reason,payment_id)"
-                  + " VALUES(?,?,'2026-11-07T12:00Z','2026-11-07T12:00Z',?,1,'SETTLE','2026-11-06','2026-11-06T12:00Z',?,'Refund sent',?)",
+                  + " VALUES(?,?,'2026-11-07T12:00Z','2026-11-07T12:00Z',?,1,'SETTLE','2026-11-06','2026-11-06T12:00Z',?,'Refund"
+                  + " sent',?)",
               UUID.randomUUID(),
               tenant,
               refund,
@@ -399,7 +402,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
           sql.update(
               "INSERT INTO"
                   + " finance.collection_refund_event(id,tenant_id,created_at,updated_at,refund_id,step,action,effective_date,occurred_at,actor_id,reason,payment_id)"
-                  + " VALUES(?,?,'2026-11-08T12:00Z','2026-11-08T12:00Z',?,2,'REOPEN','2026-11-08','2026-11-08T12:00Z',?,'Settling payment reversed',?)",
+                  + " VALUES(?,?,'2026-11-08T12:00Z','2026-11-08T12:00Z',?,2,'REOPEN','2026-11-08','2026-11-08T12:00Z',?,'Settling"
+                  + " payment reversed',?)",
               UUID.randomUUID(),
               tenant,
               refund,
@@ -467,12 +471,14 @@ class CollectionReportIT extends AbstractIntegrationTest {
               partner);
           sql.update(
               "INSERT INTO"
-                  + " finance.collection_cheque_application(id,tenant_id,cheque_id,obligation_id,amount,created_at,updated_at)"
-                  + " VALUES(?,?,?,?,4284,'2026-10-30T12:00Z','2026-10-30T12:00Z')",
+                  + " finance.collection_cheque_application(id,tenant_id,cheque_id,obligation_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,4284,'2026-10-30','2026-10-30T12:00Z',?,'Cheque"
+                  + " received','2026-10-30T12:00Z','2026-10-30T12:00Z')",
               UUID.randomUUID(),
               tenant,
               cheque,
-              obligation);
+              obligation,
+              actor);
           sql.update(
               "INSERT INTO"
                   + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
@@ -673,12 +679,14 @@ class CollectionReportIT extends AbstractIntegrationTest {
               partner);
           sql.update(
               "INSERT INTO"
-                  + " finance.collection_cheque_application(id,tenant_id,cheque_id,obligation_id,amount,created_at,updated_at)"
-                  + " VALUES(?,?,?,?,4284,'2026-10-30T12:00Z','2026-10-30T12:00Z')",
+                  + " finance.collection_cheque_application(id,tenant_id,cheque_id,obligation_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,4284,'2026-10-30','2026-10-30T12:00Z',?,'Cheque"
+                  + " received','2026-10-30T12:00Z','2026-10-30T12:00Z')",
               UUID.randomUUID(),
               tenant,
               cheque,
-              obligation);
+              obligation,
+              actor);
           sql.update(
               "INSERT INTO"
                   + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
@@ -692,6 +700,349 @@ class CollectionReportIT extends AbstractIntegrationTest {
           return null;
         });
     return cheque;
+  }
+
+  // ---- PAYMENT-PLAN-9 S1: applications cut by effective date and recording time ----------------
+  // The ticket's dates (5, 7, 9, 11 and 12 Oct) are moved to 23, 25, 27, 29 and 30 Oct, keeping
+  // their order and the exact 10:00 UTC boundaries: this fixture's agreement starts on 20-21 Oct.
+
+  /** A cheque obligation, and a cheque held since 22 Oct with no application yet. */
+  private UUID heldCheque() {
+    return heldCheque("2026-11-30");
+  }
+
+  private UUID heldCheque(String due) {
+    UUID cheque = UUID.randomUUID();
+    system.executeInTransaction(
+        sql -> {
+          sql.update(
+              "UPDATE finance.collection_obligation SET method='CHEQUE' WHERE id=?", obligation);
+          UUID next = UUID.randomUUID();
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_expectation(id,tenant_id,obligation_id,revision_id,approval_id,agreed_at,activated_at,amount,kind,method,expected_date,cheque_payment_date,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,?,'2026-10-21T12:00Z','2026-10-21T12:00Z',4284,'INSTALMENT','CHEQUE','2026-10-30','2026-11-30','2026-10-21T12:00Z','2026-10-21T12:00Z')",
+              UUID.randomUUID(),
+              tenant,
+              obligation,
+              next,
+              UUID.randomUUID());
+          source(
+              sql,
+              order,
+              plan,
+              next,
+              logical,
+              false,
+              "2026-10-21T12:00:00Z",
+              "2026-10-21T12:00:00Z",
+              2);
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_cheque(id,tenant_id,partner_id,currency,amount,received_on,due_on,instrument_reference,state,created_at,updated_at)"
+                  + " VALUES(?,?,?,'GBP',4284,'2026-10-22',CAST(? AS"
+                  + " date),'NORTHBANK-77','RECEIVED','2026-10-22T12:00Z','2026-10-22T12:00Z')",
+              cheque,
+              tenant,
+              partner,
+              due);
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
+                  + " VALUES(?,?,?,0,'RECEIVE','RECEIVED','2026-10-22','2026-10-22T12:00Z',?,'Cheque"
+                  + " received','Physical instrument verified',4284,'2026-10-22',CAST(? AS"
+                  + " date),'NORTHBANK-77','2026-10-22T12:00Z','2026-10-22T12:00Z')",
+              UUID.randomUUID(),
+              tenant,
+              cheque,
+              actor,
+              due);
+          return null;
+        });
+    return cheque;
+  }
+
+  private void applied(UUID cheque, UUID id, String amount, String effective, String recorded) {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "INSERT INTO"
+                    + " finance.collection_cheque_application(id,tenant_id,cheque_id,obligation_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at)"
+                    + " VALUES(?,?,?,?,CAST(? AS numeric),CAST(? AS date),?,?,'Applied to the"
+                    + " instalment',?,?)",
+                id,
+                tenant,
+                cheque,
+                obligation,
+                amount,
+                effective,
+                at(recorded),
+                actor,
+                at(recorded),
+                at(recorded)));
+  }
+
+  private void reversed(UUID id, String effective, String recorded) {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE finance.collection_cheque_application SET reversed_on=CAST(? AS date),"
+                    + "reversed_at=?,reversal_occurred_at=?,reversed_by=?,"
+                    + "reversal_reason='Applied to the wrong instalment' WHERE id=?",
+                effective,
+                at(recorded),
+                at(recorded),
+                actor,
+                id));
+  }
+
+  private Row cut(String asOf, String cutoff) {
+    return row(report(asOf, cutoff, null, 0, 20));
+  }
+
+  /** Received cheque coverage at the cut; no money is collected while the cheque is only held. */
+  private void held(String asOf, String cutoff, String received) {
+    var value = cut(asOf, cutoff);
+    money(value.receivedChequeAmount(), received);
+    money(value.recordedCashAmount(), "0");
+    money(value.outstandingAmount(), "4284");
+  }
+
+  @Test
+  void anApplicationCountsOnceEffectiveAndRecordedAndItsReversalOnceBothItsCutsAreReached() {
+    UUID cheque = heldCheque(), application = UUID.randomUUID();
+    applied(cheque, application, "2000", "2026-10-23", "2026-10-25T10:00:00Z");
+    reversed(application, "2026-10-27", "2026-10-29T10:00:00Z");
+    held("2026-10-22", "2026-11-10T00:00:00Z", "0"); // not yet effective
+    held("2026-10-24", "2026-10-25T09:59:59Z", "0"); // effective, not yet recorded
+    held("2026-10-24", "2026-10-25T10:00:00Z", "2000"); // both reached, exact boundary
+    held("2026-10-26", "2026-11-10T00:00:00Z", "2000"); // reversal recorded but not yet effective
+    held("2026-10-28", "2026-10-29T09:59:59Z", "2000"); // reversal effective, not yet recorded
+    held("2026-10-27", "2026-10-29T10:00:00Z", "0"); // both reversal cuts reached exactly
+    held("2026-11-03", "2026-11-10T00:00:00Z", "0");
+  }
+
+  @Test
+  void dueFlagsComeOnlyFromApplicationsVisibleAtTheCut() {
+    UUID cheque = heldCheque("2026-10-24"), application = UUID.randomUUID();
+    applied(cheque, application, "4284", "2026-10-22", "2026-10-22T12:00:00Z");
+    reversed(application, "2026-10-27", "2026-10-27T12:00:00Z");
+    assertThat(cut("2026-10-24", "2026-11-10T00:00:00Z").buckets()).contains("DUE_TODAY");
+    assertThat(cut("2026-10-26", "2026-11-10T00:00:00Z").buckets()).contains("CHEQUE_CASH_OVERDUE");
+    // Once its only application is reversed, the held cheque says nothing about the instalment.
+    assertThat(cut("2026-10-28", "2026-11-10T00:00:00Z").buckets())
+        .doesNotContain("CHEQUE_CASH_OVERDUE", "DUE_TODAY", "CHEQUE_AWAITING_CLEARING");
+  }
+
+  /**
+   * PAYMENT-PLAN-9 S3 (F2): an APPLY event carries the cheque's state as it stands, so the cheque's
+   * state at a cut after it is the state before it.
+   */
+  @Test
+  void anApplyEventDoesNotMoveTheChequesStateAtACut() {
+    UUID cheque = heldCheque(), application = UUID.randomUUID();
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "INSERT INTO"
+                    + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
+                    + " VALUES(?,?,?,1,'PRESENT','PRESENTED','2026-10-24','2026-10-24T12:00Z',?,'Presented','Bank"
+                    + " slip',4284,'2026-10-22','2026-11-30','NORTHBANK-77','2026-10-24T12:00Z','2026-10-24T12:00Z')",
+                UUID.randomUUID(),
+                tenant,
+                cheque,
+                actor));
+    applied(cheque, application, "2000", "2026-10-25", "2026-10-25T12:00:00Z");
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "INSERT INTO"
+                    + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,application_id,created_at,updated_at)"
+                    + " VALUES(?,?,?,2,'APPLY','PRESENTED','2026-10-25','2026-10-25T12:00Z',?,'Applied','Buyer"
+                    + " instruction',4284,'2026-10-22','2026-11-30','NORTHBANK-77',?,'2026-10-25T12:00Z','2026-10-25T12:00Z')",
+                UUID.randomUUID(),
+                tenant,
+                cheque,
+                actor,
+                application));
+    held("2026-10-24", "2026-11-10T00:00:00Z", "0");
+    // Still presented, so the application counts as held coverage.
+    held("2026-10-26", "2026-11-10T00:00:00Z", "2000");
+  }
+
+  @Test
+  void aDrawerCorrectionPreservesCoverageAcrossReportCuts() {
+    UUID cheque = heldCheque();
+    applied(cheque, UUID.randomUUID(), "2000", "2026-10-22", "2026-10-22T12:00:00Z");
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                """
+                INSERT INTO finance.collection_cheque_event(
+                  id, tenant_id, cheque_id, evidence_revision, action, state, effective_date, occurred_at,
+                  actor_id, reason, evidence, amount, received_on, due_on, instrument_reference,
+                  drawer_kind, drawer_name, created_at, updated_at)
+                VALUES (?, ?, ?, 1, 'CORRECT_DRAWER', 'RECEIVED', '2026-10-24', '2026-10-24T12:00Z',
+                  ?, 'Verified drawer', 'Cheque image reviewed', 4284, '2026-10-22', '2026-11-30',
+                  'NORTHBANK-77', 'ENDORSED', 'Calder Mills', '2026-10-24T12:00Z', '2026-10-24T12:00Z')
+                """,
+                UUID.randomUUID(),
+                tenant,
+                cheque,
+                actor));
+    held("2026-10-23", "2026-11-10T00:00:00Z", "2000");
+    held("2026-10-25", "2026-11-10T00:00:00Z", "2000");
+  }
+
+  @Test
+  void aReplacementOnTheSameInstalmentCountsOnlyFromItsOwnCut() {
+    UUID cheque = heldCheque(), original = UUID.randomUUID();
+    applied(cheque, original, "2000", "2026-10-23", "2026-10-25T10:00:00Z");
+    reversed(original, "2026-10-27", "2026-10-29T10:00:00Z");
+    applied(cheque, UUID.randomUUID(), "1500", "2026-10-30", "2026-10-30T10:00:00Z");
+    held("2026-10-26", "2026-11-10T00:00:00Z", "2000"); // before the reversal
+    held("2026-10-29", "2026-11-10T00:00:00Z", "0"); // between reversal and replacement
+    held("2026-10-31", "2026-10-29T12:00:00Z", "0"); // replacement not known yet
+    held("2026-10-31", "2026-11-10T00:00:00Z", "1500"); // after the replacement
+  }
+
+  @Test
+  void aClearedPairIsCappedOnceAtWhatItsMatchesStillHold() {
+    UUID cheque = heldCheque(), clearing = UUID.randomUUID();
+    applied(cheque, UUID.randomUUID(), "2000", "2026-10-22", "2026-10-22T12:00:00Z");
+    applied(cheque, UUID.randomUUID(), "1000", "2026-10-22", "2026-10-22T12:00:00Z");
+    system.executeInTransaction(
+        sql -> {
+          sql.update(
+              "INSERT INTO"
+                  + " finance.finance_payment(id,tenant_id,uid,trading_partner_id,payment_number,direction,method,status,amount,currency,payment_date,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,?,'INBOUND','CHEQUE','RECEIVED',4284,'GBP','2026-10-24','2026-10-24T12:00Z','2026-10-24T12:00Z')",
+              clearing,
+              tenant,
+              clearing.toString(),
+              partner,
+              "S1-" + clearing);
+          sql.update(
+              "UPDATE finance.collection_cheque SET state='CLEARED',cleared_payment_id=?,"
+                  + "evidence_revision=1 WHERE id=?",
+              clearing,
+              cheque);
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,payment_id,created_at,updated_at)"
+                  + " VALUES(?,?,?,1,'CLEAR','CLEARED','2026-10-24','2026-10-24T12:00Z',?,'Cheque"
+                  + " cleared','Bank"
+                  + " statement',4284,'2026-10-22','2026-11-30','NORTHBANK-77',?,'2026-10-24T12:00Z','2026-10-24T12:00Z')",
+              UUID.randomUUID(),
+              tenant,
+              cheque,
+              actor,
+              clearing);
+          // The clearing match for both applications, then a refund of 2,000 leaves 1,000 held.
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_payment_match(id,tenant_id,obligation_id,payment_id,cheque_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at,reversed_on,reversed_at,reversal_occurred_at,reversed_by,reversal_reason)"
+                  + " VALUES(?,?,?,?,?,3000,'2026-10-24','2026-10-24T12:00Z',?,'Cheque cleared',"
+                  + "'2026-10-24T12:00Z','2026-10-24T12:00Z','2026-10-26','2026-10-26T12:00Z','2026-10-26T12:00Z',?,'Part"
+                  + " refunded to the buyer')",
+              UUID.randomUUID(),
+              tenant,
+              obligation,
+              clearing,
+              cheque,
+              actor,
+              actor);
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_payment_match(id,tenant_id,obligation_id,payment_id,cheque_id,amount,effective_date,occurred_at,actor_id,reason,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,?,1000,'2026-10-26','2026-10-26T12:00Z',?,'Remainder after"
+                  + " refund','2026-10-26T12:00Z','2026-10-26T12:00Z')",
+              UUID.randomUUID(),
+              tenant,
+              obligation,
+              clearing,
+              cheque,
+              actor);
+          return null;
+        });
+    var before = cut("2026-10-25", "2026-11-10T00:00:00Z");
+    money(before.receivedChequeAmount(), "3000");
+    money(before.recordedCashAmount(), "3000");
+    var after = cut("2026-10-27", "2026-11-10T00:00:00Z");
+    // Capping each row would give 2,000 + 1,000 capped to 1,000 + 1,000 = 2,000.
+    money(after.receivedChequeAmount(), "1000");
+    money(after.recordedCashAmount(), "1000");
+  }
+
+  /**
+   * PAYMENT-PLAN-9 S2 (D12): cheques applied to nothing, one held and one cleared, sit beside the
+   * obligation. The report measures obligations (decision 10): it runs, counts neither as collected
+   * money, and the clearing payment stays an ordinary received payment.
+   */
+  @Test
+  void unlinkedChequesNeitherBreakTheReportNorCountAsCollectedMoney() {
+    UUID held = UUID.randomUUID(), cleared = UUID.randomUUID(), clearing = UUID.randomUUID();
+    system.executeInTransaction(
+        sql -> {
+          sql.update(
+              "INSERT INTO"
+                  + " finance.finance_payment(id,tenant_id,uid,trading_partner_id,payment_number,direction,method,status,amount,currency,payment_date,created_at,updated_at)"
+                  + " VALUES(?,?,?,?,?,'INBOUND','CHEQUE','RECEIVED',6000,'GBP','2026-10-28','2026-10-28T12:00Z','2026-10-28T12:00Z')",
+              clearing,
+              tenant,
+              clearing.toString(),
+              partner,
+              "S2-" + clearing);
+          for (UUID cheque : List.of(held, cleared)) {
+            boolean isCleared = cheque.equals(cleared);
+            sql.update(
+                "INSERT INTO"
+                    + " finance.collection_cheque(id,tenant_id,partner_id,currency,amount,received_on,due_on,instrument_reference,state,cleared_payment_id,evidence_revision,created_at,updated_at)"
+                    + " VALUES(?,?,?,'GBP',6000,'2026-10-25','2026-10-27','NORTHBANK-HELD',?,?,?,'2026-10-25T12:00Z','2026-10-25T12:00Z')",
+                cheque,
+                tenant,
+                partner,
+                isCleared ? "CLEARED" : "RECEIVED",
+                isCleared ? clearing : null,
+                isCleared ? 1 : 0);
+            sql.update(
+                "INSERT INTO"
+                    + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)"
+                    + " VALUES(?,?,?,0,'RECEIVE','RECEIVED','2026-10-25','2026-10-25T12:00Z',?,'Kept"
+                    + " for future purchases','Physical instrument"
+                    + " verified',6000,'2026-10-25','2026-10-27','NORTHBANK-HELD','2026-10-25T12:00Z','2026-10-25T12:00Z')",
+                UUID.randomUUID(),
+                tenant,
+                cheque,
+                actor);
+          }
+          sql.update(
+              "INSERT INTO"
+                  + " finance.collection_cheque_event(id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,payment_id,created_at,updated_at)"
+                  + " VALUES(?,?,?,1,'CLEAR','CLEARED','2026-10-28','2026-10-28T12:00Z',?,'Cheque"
+                  + " cleared','Bank"
+                  + " statement',6000,'2026-10-25','2026-10-27','NORTHBANK-HELD',?,'2026-10-28T12:00Z','2026-10-28T12:00Z')",
+              UUID.randomUUID(),
+              tenant,
+              cleared,
+              actor,
+              clearing);
+          return null;
+        });
+    var report = report("2026-11-03", "2026-11-04T12:00:00Z", null, 0, 20);
+    var value = row(report);
+    money(value.receivedChequeAmount(), "0");
+    money(value.recordedCashAmount(), "0");
+    money(value.outstandingAmount(), "4284");
+    assertThat(report.totalElements()).isEqualTo(1);
+    assertThat(report.currencies())
+        .singleElement()
+        .satisfies(
+            total -> {
+              money(total.recordedCashAmount(), "0");
+              money(total.receivedChequeAmount(), "0");
+            });
+    assertThat(value.buckets()).doesNotContain("CHEQUE_CASH_OVERDUE", "DISHONOURED");
   }
 
   @Test

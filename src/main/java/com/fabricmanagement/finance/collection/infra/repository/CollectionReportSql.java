@@ -67,6 +67,15 @@ final class CollectionReportSql {
         -- money slices a match, but the application it came from never changes.
         SELECT cheque_id,obligation_id,sum(amount) AS held FROM match_cut
         WHERE cheque_id IS NOT NULL GROUP BY cheque_id,obligation_id
+      ), application_cut AS (
+        -- An application counts once it is both effective and recorded at the cut, and stops counting
+        -- only when its reversal is both effective and recorded too (PAYMENT-PLAN-9 K2). Rows of one
+        -- cheque and obligation are summed first, so a cleared pair is capped once at what it holds.
+        SELECT a.cheque_id,a.obligation_id,sum(a.amount) AS amount
+        FROM finance.collection_cheque_application a JOIN scoped o ON o.id=a.obligation_id
+        WHERE a.tenant_id=:tenant AND a.effective_date<=:asOf AND a.created_at<=:cutoff
+          AND NOT (a.reversed_at IS NOT NULL AND a.reversed_on<=:asOf AND a.reversed_at<=:cutoff)
+        GROUP BY a.cheque_id,a.obligation_id
       ), instruments AS (
         SELECT a.obligation_id,
           sum(CASE WHEN v.state IN ('RECEIVED','PRESENTED') THEN a.amount
@@ -74,10 +83,10 @@ final class CollectionReportSql {
           bool_or(v.state IN ('RECEIVED','PRESENTED') AND v.due_on<:asOf) AS overdue_cheque,
           bool_or(v.state IN ('RECEIVED','PRESENTED') AND v.due_on=:asOf) AS cheque_due_today,
           bool_or(v.state='DISHONOURED') AS dishonoured
-        FROM finance.collection_cheque_application a JOIN scoped o ON o.id=a.obligation_id
+        FROM application_cut a
         JOIN cheque_cut v ON v.cheque_id=a.cheque_id
         LEFT JOIN cheque_held h ON h.cheque_id=a.cheque_id AND h.obligation_id=a.obligation_id
-        WHERE a.tenant_id=:tenant AND a.created_at<=:cutoff GROUP BY a.obligation_id
+        GROUP BY a.obligation_id
       ), balances AS (
         SELECT e.*,COALESCE(c.unknown,false) AS unknown,
           CASE WHEN e.cancelled THEN 0 ELSE e.amount END AS planned,

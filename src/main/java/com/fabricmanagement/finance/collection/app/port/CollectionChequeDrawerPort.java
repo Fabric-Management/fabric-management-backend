@@ -20,6 +20,12 @@ public interface CollectionChequeDrawerPort {
   /** Returns the same deactivated row to the picker. */
   Drawer reactivate(UUID partnerId, UUID drawerId);
 
+  /**
+   * Where the partner stands as a customer of this tenant (PAYMENT-PLAN-9 C1): its type, then
+   * whether it was removed. An inactive status is not removal; a customer on hold may still pay.
+   */
+  CustomerStanding standing(UUID partnerId);
+
   /** The customer's current display name; empty when the partner is not this tenant's. */
   java.util.Optional<String> customerName(UUID partnerId);
 
@@ -27,6 +33,17 @@ public interface CollectionChequeDrawerPort {
   java.util.Optional<Drawer> drawer(UUID partnerId, UUID drawerId);
 
   record Drawer(UUID id, String name, DrawerType type, boolean active) {}
+
+  enum CustomerStanding {
+    /** Not a partner of this tenant. */
+    NOT_FOUND,
+    /** A partner whose type is neither customer nor both (a supplier, for example). */
+    NOT_CUSTOMER,
+    /** A customer that was removed: its history stays readable, it takes no new receipts. */
+    REMOVED,
+    /** A customer (type customer or both) that was not removed. */
+    CUSTOMER
+  }
 
   /**
    * @param defaultOwnChequePercent the customer's default, 100 when never set

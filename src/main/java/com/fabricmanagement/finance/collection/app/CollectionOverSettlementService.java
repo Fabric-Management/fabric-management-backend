@@ -256,11 +256,12 @@ public class CollectionOverSettlementService {
   }
 
   /**
-   * Takes the surplus from the latest receipts first. Money held by a cheque clearing cannot move
-   * to another instalment, nor be parked as an unmatched advance (a cheque payment is only ever
-   * matched through its instrument), so such matches are left alone unless the surplus is being
-   * refunded: what remains of a sliced match keeps its cheque, and the cheque's own flow cancels an
-   * unpaid refund if the cheque later fails.
+   * Takes the surplus from the latest receipts first. Money a cheque clearing holds for the
+   * cheque's own coverage (a match carrying {@code cheque_id}) cannot move to another instalment,
+   * nor be parked as an unmatched advance, so such matches are left alone unless the surplus is
+   * being refunded: what remains of a sliced match keeps its cheque, and the cheque's own flow
+   * cancels an unpaid refund if the cheque later fails. A later match of the clearing payment's
+   * remainder (PAYMENT-PLAN-9 R4) carries no {@code cheque_id} and is ordinary money here.
    */
   private List<Slice> slices(
       CollectionObligation row,

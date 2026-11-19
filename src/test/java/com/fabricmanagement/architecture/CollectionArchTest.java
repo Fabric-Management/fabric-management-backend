@@ -84,7 +84,15 @@ class CollectionArchTest {
   @Test
   void allCollectionEndpointsUseTheirFinancePermissionAndNeverSalesAuthority() {
     var reads =
-        Set.of("list", "detail", "expectations", "chequeIds", "cheque", "chequeEvents", "refunds");
+        Set.of(
+            "list",
+            "detail",
+            "expectations",
+            "chequeIds",
+            "cheque",
+            "chequeEvents",
+            "refunds",
+            "customerAvailability");
     var reversals = Set.of("reverse", "cancelRefund");
     for (var method : CollectionController.class.getDeclaredMethods()) {
       if (!Modifier.isPublic(method.getModifiers())) continue;

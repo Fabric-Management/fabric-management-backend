@@ -16,4 +16,6 @@ public interface CollectionRefundRepository extends JpaRepository<CollectionRefu
   List<CollectionRefund> findByTenantIdAndObligationIdIn(UUID tenant, Collection<UUID> obligations);
 
   List<CollectionRefund> findByTenantIdAndPaymentId(UUID tenant, UUID payment);
+
+  List<CollectionRefund> findByTenantIdAndPaymentIdIn(UUID tenant, Collection<UUID> payments);
 }

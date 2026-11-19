@@ -41,6 +41,52 @@ public class CollectionPostingService {
   private final CollectionMatchReversal matchReversal;
   private final CollectionRefundLedger refundLedger;
   private final CollectionChequeApplicationRepository chequeApplications;
+  private final CollectionPaymentAvailability availabilities;
+  private final CollectionChequeDrawerResolver customers;
+
+  /**
+   * PAYMENT-PLAN-9 R1: money received from a customer with no order behind it. One payment, no
+   * match: nothing is allocated (decision 4). The collection lock, request hash and replay store
+   * make a retried request return the original payment, and refuse the same key with other content.
+   */
+  public CollectionCommandReceipt receiveForCustomer(
+      CollectionRequests.CustomerReceipt request, UUID actor) {
+    commands.validate(request);
+    access.requireGrant(actor, "write");
+    commands.lock();
+    String hash = commands.hash("RECORD_CUSTOMER_RECEIPT", request.partnerId(), request);
+    var replay = commands.replay(request.operationId(), actor, hash);
+    if (replay.isPresent()) return replay.get();
+    if (request.method() == CollectionTypes.Method.CHEQUE)
+      throw CollectionRuleException.invalid(
+          "Receive a cheque as an instrument; only clearing records its payment");
+    commands.time(request.paymentDate(), request.occurredAt());
+    customers.requireCustomer(request.partnerId());
+    BigDecimal amount = CollectionAmounts.positive(request.amount(), request.currency());
+    periods.assertPostingAllowed(TenantContext.requireTenantId(), request.paymentDate());
+    var created =
+        paymentService.createPayment(
+            new CreatePaymentRequest(
+                request.partnerId(),
+                "INBOUND",
+                request.method().name(),
+                amount,
+                request.currency(),
+                request.paymentDate(),
+                request.bankReference(),
+                request.reason(),
+                null));
+    var payment = payment(created.id());
+    return commands.record(
+        request.operationId(),
+        actor,
+        hash,
+        "PAYMENT",
+        payment.getId(),
+        payment.getVersion(),
+        payment.getId(),
+        List.of());
+  }
 
   public CollectionCommandReceipt match(
       UUID obligationId, CollectionRequests.Match request, UUID actor) {
@@ -169,6 +215,7 @@ public class CollectionPostingService {
   }
 
   java.util.List<CollectionObligation> writableBatch(java.util.List<UUID> ids, UUID actor) {
+    if (ids.isEmpty()) return java.util.List.of();
     var tenant = TenantContext.requireTenantId();
     var reach = access.reach(actor, "write");
     var rows =
@@ -203,6 +250,7 @@ public class CollectionPostingService {
   }
 
   void freshAll(java.util.List<CollectionObligation> rows) {
+    if (rows.isEmpty()) return;
     var orderIds =
         rows.stream()
             .map(CollectionObligation::getOrderId)
@@ -291,7 +339,14 @@ public class CollectionPostingService {
     BigDecimal exact = CollectionAmounts.positive(amount, row.getCurrency());
     var payment = payment(paymentId);
     requirePayment(payment, row);
-    if (payment.getMethod() == PaymentMethod.CHEQUE && clearingChequeId == null)
+    // The same calculation the customer view shows (PAYMENT-PLAN-9 R5).
+    var availability = availabilities.of(TenantContext.requireTenantId(), payment);
+    // A cheque payment is money only as the verified clearing of a cleared cheque (R4); an
+    // arbitrary payment whose method says CHEQUE is not evidence of one. Its match carries no
+    // cheque_id: that marks a cheque's own clearing coverage (decision 8).
+    if (payment.getMethod() == PaymentMethod.CHEQUE
+        && clearingChequeId == null
+        && availability.clearedChequeId() == null)
       throw CollectionRuleException.conflict(
           "LEGACY_CHEQUE_UNVERIFIED",
           "A cheque payment requires an explicit instrument clearing, not a legacy payment method");
@@ -301,10 +356,7 @@ public class CollectionPostingService {
     row.requireMatchable(settled(row.getId()), exact);
     // A clearing is the cheque's own coverage turning into money; only cash competes with it.
     if (clearingChequeId == null) requireRoomBesideCheques(row, exact);
-    if (claimed(TenantContext.requireTenantId(), paymentId)
-            .add(exact)
-            .compareTo(payment.getAmount().getAmount())
-        > 0)
+    if (exact.compareTo(availability.available()) > 0)
       throw CollectionRuleException.conflict(
           "COLLECTION_PAYMENT_OVERMATCH",
           "Match exceeds the payment amount available for collection matching");

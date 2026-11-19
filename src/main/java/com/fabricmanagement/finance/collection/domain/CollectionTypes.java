@@ -44,6 +44,7 @@ public final class CollectionTypes {
             this == RECEIVED || this == PRESENTED || this == CLEARED || this == DISHONOURED;
         case CANCEL -> this == RECEIVED || this == PRESENTED;
         case CORRECT -> this == RECEIVED || this == PRESENTED;
+        case CORRECT_DRAWER -> true;
       };
     }
 
@@ -66,7 +67,7 @@ public final class CollectionTypes {
         case DISHONOUR -> DISHONOURED;
         case RETURN -> RETURNED;
         case CANCEL -> CANCELLED;
-        case CORRECT -> this;
+        case CORRECT, CORRECT_DRAWER -> this;
       };
     }
   }
@@ -78,7 +79,8 @@ public final class CollectionTypes {
     DISHONOUR,
     RETURN,
     CANCEL,
-    CORRECT
+    CORRECT,
+    CORRECT_DRAWER
   }
 
   /**

@@ -34,6 +34,22 @@ public class CollectionCommandService {
     return CollectionQueryService.result(cheques.transition(id, body, actor));
   }
 
+  public CollectionDtos.Result receiveForCustomer(
+      CollectionRequests.CustomerReceipt body, UUID actor) {
+    return CollectionQueryService.result(posting.receiveForCustomer(body, actor));
+  }
+
+  public CollectionDtos.Result allocateCheque(
+      UUID id, CollectionRequests.AllocateCheque body, UUID actor) {
+    return CollectionQueryService.result(cheques.allocate(id, body, actor));
+  }
+
+  public CollectionDtos.Result reverseChequeApplication(
+      UUID id, UUID applicationId, CollectionRequests.ReverseChequeApplication body, UUID actor) {
+    return CollectionQueryService.result(
+        cheques.reverseApplication(id, applicationId, body, actor));
+  }
+
   public CollectionDtos.Result resolveOverSettlement(
       UUID id, CollectionRequests.ResolveOverSettlement body, UUID actor) {
     return CollectionQueryService.result(overSettlements.resolve(id, body, actor));

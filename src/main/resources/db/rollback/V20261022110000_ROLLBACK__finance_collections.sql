@@ -26,3 +26,4 @@ ALTER TABLE finance.finance_payment
 DROP INDEX IF EXISTS finance.uq_collection_payment_tenant_id;
 DROP FUNCTION IF EXISTS finance.guard_collection_immutable_evidence();
 DROP FUNCTION IF EXISTS finance.guard_collection_match_evidence();
+DROP FUNCTION IF EXISTS finance.guard_collection_application_evidence();

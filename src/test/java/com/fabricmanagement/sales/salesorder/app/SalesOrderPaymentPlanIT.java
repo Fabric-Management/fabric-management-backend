@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanContent;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanInput;
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.DateTrigger;
@@ -15,6 +16,7 @@ import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes
 import com.fabricmanagement.sales.salesorder.domain.paymentplan.PaymentPlanTypes.Method;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Save;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderPaymentPlanDtos.Submit;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
@@ -363,9 +365,8 @@ class SalesOrderPaymentPlanIT extends AbstractIntegrationTest {
     system.executeInTransaction(
         sql ->
             sql.update(
-                "update common_tenant.common_tenant set settings ="
-                    + " coalesce(settings, '{}'::jsonb) || jsonb_build_object('chequeSplitTracking',"
-                    + " ?::boolean) where id = ?",
+                "update common_tenant.common_tenant set settings = coalesce(settings, '{}'::jsonb)"
+                    + " || jsonb_build_object('chequeSplitTracking', ?::boolean) where id = ?",
                 on,
                 tenant));
   }
@@ -446,6 +447,66 @@ class SalesOrderPaymentPlanIT extends AbstractIntegrationTest {
         .containsExactly(60, 60, 40);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 50, 100})
+  void theSubmittedChequeShareIsStoredExactly(int own) {
+    chequeSplitTracking(true);
+    var saved =
+        in(
+            tenant,
+            () ->
+                plans.save(
+                    orderId,
+                    next(cheques(own, LocalDate.of(2026, 10, 30)), "Agreed cheque terms"),
+                    actor));
+    assertThat(in(tenant, () -> plans.read(orderId, actor)).draft().id()).isEqualTo(saved.id());
+    assertThat(
+            in(tenant, () -> plans.read(orderId, actor))
+                .draft()
+                .content()
+                .currencyGroups()
+                .getFirst()
+                .ownChequePercent())
+        .isEqualTo(own);
+  }
+
+  @Test
+  void aChequeDownPaymentAloneStoresItsSplit() {
+    chequeSplitTracking(true);
+    var input =
+        new PaymentPlanInput(
+            List.of(
+                new PaymentPlanInput.CurrencyInput(
+                    "GBP",
+                    null,
+                    List.of(
+                        new PaymentPlanInput.Row(
+                            null,
+                            Kind.DOWN_PAYMENT,
+                            new BigDecimal("40.00"),
+                            Method.CHEQUE,
+                            DateTrigger.EXPLICIT_DATE,
+                            LocalDate.of(2026, 10, 30),
+                            LocalDate.of(2026, 12, 31)),
+                        new PaymentPlanInput.Row(
+                            null,
+                            Kind.INSTALMENT,
+                            new BigDecimal("60.00"),
+                            Method.BANK_TRANSFER,
+                            DateTrigger.EXPLICIT_DATE,
+                            LocalDate.of(2026, 11, 30),
+                            null)),
+                    60)));
+    in(tenant, () -> plans.save(orderId, next(input, "Agreed cheque deposit"), actor));
+    var group =
+        in(tenant, () -> plans.read(orderId, actor)).draft().content().currencyGroups().getFirst();
+    assertThat(group.ownChequePercent()).isEqualTo(60);
+    assertThat(group.lines())
+        .filteredOn(line -> line.method() == Method.CHEQUE)
+        .singleElement()
+        .satisfies(line -> assertThat(line.kind()).isEqualTo(Kind.DOWN_PAYMENT));
+  }
+
   @Test
   void aTrackedChequePlanWithoutASplitIsIncompleteAndAnUntrackedOneIsNot() {
     chequeSplitTracking(true);
@@ -463,6 +524,25 @@ class SalesOrderPaymentPlanIT extends AbstractIntegrationTest {
                         "Initial schedule"),
                     actor));
     assertThat(tracked.content().validationIssues()).contains("GBP:CHEQUE_SPLIT_REQUIRED");
+
+    assertThatThrownBy(
+            () ->
+                in(
+                    tenant,
+                    () -> {
+                      orders
+                          .findByTenantIdAndId(tenant, orderId)
+                          .orElseThrow()
+                          .setStatus(OrderStatus.CONFIRMED);
+                      em.flush();
+                      var view = plans.read(orderId, actor);
+                      return plans.requireSubmission(
+                          orderId,
+                          tracked.id(),
+                          new Submit(view.orderVersion(), view.planVersion(), 48, false),
+                          actor);
+                    }))
+        .hasMessageContaining("CHEQUE_SPLIT_REQUIRED");
 
     chequeSplitTracking(false);
     var untracked =
@@ -503,6 +583,91 @@ class SalesOrderPaymentPlanIT extends AbstractIntegrationTest {
         new Save(operation, 0L, 0L, cheques(40, LocalDate.of(2026, 10, 30)), "Initial");
     assertThatThrownBy(() -> in(tenant, () -> plans.save(orderId, differentSplit, actor)))
         .hasMessageContaining("different content");
+  }
+
+  private record PreSplitCurrency(
+      String currency, PaymentPlanInput.Rules rules, List<PaymentPlanInput.Row> rows) {}
+
+  private record PreSplitPlan(List<PreSplitCurrency> currencyGroups) {}
+
+  private record PreSplitSave(
+      UUID operationId,
+      Long expectedOrderVersion,
+      Long expectedPlanVersion,
+      PreSplitPlan paymentPlan,
+      String changeReason) {}
+
+  @Test
+  void aPersistedPreSplitCommandReplaysTheOriginalRevision() {
+    var request = first(UUID.randomUUID());
+    var initial = in(tenant, () -> plans.save(orderId, request, actor));
+    var group = request.paymentPlan().currencyGroups().getFirst();
+    String originalHash =
+        com.fabricmanagement.common.infrastructure.serialization.CanonicalJsonFingerprint.of(
+            new PreSplitSave(
+                request.operationId(),
+                request.expectedOrderVersion(),
+                request.expectedPlanVersion(),
+                new PreSplitPlan(
+                    List.of(new PreSplitCurrency(group.currency(), group.rules(), group.rows()))),
+                request.changeReason()));
+    assertThat(
+            in(
+                tenant,
+                () ->
+                    jdbc.queryForObject(
+                        "select request_hash from sales_ord.order_payment_plan_revision where"
+                            + " tenant_id=? and id=?",
+                        String.class,
+                        tenant,
+                        initial.id())))
+        .isEqualTo(originalHash);
+    assertThat(in(tenant, () -> plans.save(orderId, request, actor)).id()).isEqualTo(initial.id());
+  }
+
+  @Test
+  void requestValidationRejectsOutOfRangeSplitAtTheControllerBoundary() throws Exception {
+    var validator = new org.springframework.validation.beanvalidation.LocalValidatorFactoryBean();
+    validator.afterPropertiesSet();
+    try {
+      var service = mock(SalesOrderPaymentPlanService.class);
+      var controller =
+          new com.fabricmanagement.sales.salesorder.api.controller.SalesOrderPaymentPlanController(
+              service, null, null);
+      var mvc =
+          org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller)
+              .setValidator(validator)
+              .build();
+      for (int own : new int[] {-1, 101}) {
+        mvc.perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/v1/sales/orders/{orderId}/payment-plan/revisions", orderId)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"operationId":"%s","expectedOrderVersion":0,"expectedPlanVersion":0,
+                         "paymentPlan":{"currencyGroups":[{"currency":"GBP","ownChequePercent":%d}]},
+                         "changeReason":"Agreed cheque terms"}
+                        """
+                            .formatted(UUID.randomUUID(), own)))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                    .isBadRequest())
+            .andExpect(
+                result ->
+                    assertThat(result.getResolvedException())
+                        .isInstanceOfSatisfying(
+                            org.springframework.web.bind.MethodArgumentNotValidException.class,
+                            failure ->
+                                assertThat(failure.getBindingResult().getFieldErrors())
+                                    .extracting(org.springframework.validation.FieldError::getField)
+                                    .containsExactly(
+                                        "paymentPlan.currencyGroups[0].ownChequePercent")));
+      }
+      verifyNoInteractions(service);
+    } finally {
+      validator.close();
+    }
   }
 
   @Test

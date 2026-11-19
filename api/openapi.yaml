@@ -18268,6 +18268,170 @@ paths:
       summary: "Read cheque evidence, clearance validity and available transitions"
       tags:
       - Finance Collections
+  /api/v1/finance/collections/cheques/{id}/applications:
+    post:
+      operationId: allocateFinanceCollectionCheque
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionAllocateChequeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCommandResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionConflict"
+          description: "Resource version, balance, cheque state, financial period\
+            \ or operation replay conflict"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Apply part of a held cheque to cheque instalments; refused once the
+        cheque is cleared or final
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/cheques/{id}/applications/{applicationId}/reverse:
+    post:
+      operationId: reverseFinanceCollectionChequeApplication
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: applicationId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionReverseChequeApplicationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCommandResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionConflict"
+          description: "Resource version, balance, cheque state, financial period\
+            \ or operation replay conflict"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reverse one wrong application of a held cheque with a reason; the cheque
+        stays held and no money moves
+      tags:
+      - Finance Collections
   /api/v1/finance/collections/cheques/{id}/events:
     get:
       operationId: listFinanceCollectionChequeEvents
@@ -18422,6 +18586,151 @@ paths:
           description: Internal Server Error
       summary: "Present, clear, dishonour, return, cancel or correct an instrument\
         \ with explicit evidence"
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/customer-receipts:
+    post:
+      operationId: recordFinanceCollectionCustomerReceipt
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionCustomerReceiptRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCommandResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionConflict"
+          description: "Resource version, balance, cheque state, financial period\
+            \ or operation replay conflict"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Record money received from a customer without an order as one payment,\
+        \ allocated to nothing; replay-safe"
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/customers/{partnerId}/availability:
+    get:
+      operationId: getFinanceCollectionCustomerAvailability
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCustomerAvailabilityDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionConflict"
+          description: "Resource version, balance, cheque state, financial period\
+            \ or operation replay conflict"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Read, per currency, the customer's payments available for instalment\
+        \ matching and held cheques available for application, as separate lines"
       tags:
       - Finance Collections
   /api/v1/finance/collections/customers/{partnerId}/cheque-drawers:
@@ -68359,6 +68668,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFinanceCollectionCustomerAvailabilityDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionCustomerAvailabilityDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFinanceCollectionDetailDto:
       type: object
       properties:
@@ -83545,6 +83872,87 @@ components:
         version:
           type: integer
           format: int64
+    FinanceCollectionAllocateChequeRequest:
+      type: object
+      description: "PAYMENT-PLAN-9 R3: apply a held cheque's unapplied amount to cheque\
+        \ instalments; never after clearing"
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeApplicationInput"
+          maxItems: 500
+          minItems: 1
+        effectiveDate:
+          type: string
+          format: date
+        evidence:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        occurredAt:
+          type: string
+          format: date-time
+        operationId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - applications
+      - effectiveDate
+      - evidence
+      - expectedVersion
+      - occurredAt
+      - operationId
+      - reason
+    FinanceCollectionAvailablePaymentDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        availableAmount:
+          type: string
+        clearedChequeId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The cleared cheque this payment is the clearing of
+        id:
+          type: string
+          format: uuid
+        invoiceAllocatedAmount:
+          type: string
+          description: "Invoice allocations of the same payment; information only,\
+            \ not subtracted"
+        matchedAmount:
+          type: string
+        method:
+          type: string
+        paymentDate:
+          type: string
+          format: date
+        paymentNumber:
+          type: string
+        refundHeldAmount:
+          type: string
+      required:
+      - amount
+      - availableAmount
+      - id
+      - invoiceAllocatedAmount
+      - matchedAmount
+      - method
+      - paymentDate
+      - paymentNumber
+      - refundHeldAmount
     FinanceCollectionCancelRefundRequest:
       type: object
       properties:
@@ -83591,6 +83999,8 @@ components:
           - RETURN
           - CANCEL
           - CORRECT
+          - CORRECT_DRAWER
+          - ALLOCATE
         allowed:
           type: boolean
         needsApproval:
@@ -83616,17 +84026,36 @@ components:
       - RETURN
       - CANCEL
       - CORRECT
+      - CORRECT_DRAWER
     FinanceCollectionChequeApplicationDto:
       type: object
+      description: An active (unreversed) application. Several may name the same obligation;
+        send one expected version per distinct obligation.
       properties:
         amount:
           type: string
+        effectiveDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
         obligationId:
           type: string
           format: uuid
+        recordedAt:
+          type: string
+          format: date-time
+        reversible:
+          type: boolean
+          description: Whether this viewer may reverse it now (PAYMENT-PLAN-9 R3a)
       required:
       - amount
+      - effectiveDate
+      - id
       - obligationId
+      - recordedAt
+      - reversible
     FinanceCollectionChequeApplicationInput:
       type: object
       properties:
@@ -83719,6 +84148,25 @@ components:
       required:
       - drawer
       - outcome
+    FinanceCollectionChequeDrawerCorrectionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        drawerKind:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+        drawerName:
+          type:
+          - string
+          - "null"
+          maxLength: 200
+          minLength: 0
+      required:
+      - drawerKind
     FinanceCollectionChequeDrawerKind:
       type: string
       enum:
@@ -83831,6 +84279,27 @@ components:
       - unappliedAmount
       - version
       - warnings
+    FinanceCollectionChequeEventApplicationDto:
+      type: object
+      description: The application an APPLY or REVERSE_APPLICATION event is about.
+        The obligation is shown only when the viewer may read it.
+      properties:
+        amount:
+          type: string
+        id:
+          type: string
+          format: uuid
+        obligationId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        targetVisible:
+          type: boolean
+      required:
+      - amount
+      - id
+      - targetVisible
     FinanceCollectionChequeEventDto:
       type: object
       properties:
@@ -83841,6 +84310,10 @@ components:
           format: uuid
         amount:
           type: string
+        application:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeEventApplicationDto"
+          - type: "null"
         drawerId:
           type:
           - string
@@ -83917,6 +84390,10 @@ components:
           anyOf:
           - $ref: "#/components/schemas/FinanceCollectionChequeCorrection"
           - type: "null"
+        drawerCorrection:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerCorrectionRequest"
+          - type: "null"
         effectiveDate:
           type: string
           format: date
@@ -83987,6 +84464,7 @@ components:
           enum:
           - OBLIGATION
           - CHEQUE
+          - PAYMENT
         resourceVersion:
           type: integer
           format: int64
@@ -84011,6 +84489,110 @@ components:
       required:
       - code
       - detail
+    FinanceCollectionCurrencyAvailabilityDto:
+      type: object
+      properties:
+        cheques:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionHeldChequeDto"
+        chequesAvailable:
+          type: string
+          description: Held cheques available for application
+        currency:
+          type: string
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionAvailablePaymentDto"
+        paymentsAvailable:
+          type: string
+          description: Payments available for instalment matching
+      required:
+      - cheques
+      - chequesAvailable
+      - currency
+      - payments
+      - paymentsAvailable
+    FinanceCollectionCustomerAvailabilityDto:
+      type: object
+      description: "PAYMENT-PLAN-9 R5: what a customer has given that is not yet matched\
+        \ or applied to payment-plan instalments, per currency. Payments and held\
+        \ cheques are separate lines and are never added together; this is not an\
+        \ invoice-allocation balance."
+      properties:
+        chequeHistory:
+          type: array
+          description: "Cheques that offer nothing for allocation (fully applied,\
+            \ cleared, returned, cancelled or dishonoured), newest first"
+          items:
+            $ref: "#/components/schemas/FinanceCollectionHeldChequeDto"
+        chequeHistoryTruncated:
+          type: boolean
+        currencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionCurrencyAvailabilityDto"
+        partnerId:
+          type: string
+          format: uuid
+        paymentsTruncated:
+          type: boolean
+      required:
+      - chequeHistory
+      - chequeHistoryTruncated
+      - currencies
+      - partnerId
+      - paymentsTruncated
+    FinanceCollectionCustomerReceiptRequest:
+      type: object
+      description: "PAYMENT-PLAN-9 R1: money received from a customer without an order;\
+        \ recorded as one payment and allocated to nothing"
+      properties:
+        amount:
+          type: string
+          example: "10000.00"
+        bankReference:
+          type:
+          - string
+          - "null"
+          example: NORTHBANK-TRANSFER-42
+          maxLength: 100
+          minLength: 0
+        currency:
+          type: string
+          example: GBP
+          minLength: 1
+          pattern: "[A-Z]{3}"
+        method:
+          $ref: "#/components/schemas/FinanceCollectionMethod"
+          description: How the money arrived; CHEQUE is refused (receive the cheque
+            instead)
+        occurredAt:
+          type: string
+          format: date-time
+        operationId:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
+        paymentDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - amount
+      - currency
+      - method
+      - occurredAt
+      - operationId
+      - partnerId
+      - paymentDate
+      - reason
     FinanceCollectionDetailDto:
       type: object
       properties:
@@ -84067,6 +84649,53 @@ components:
       - method
       - recordedAt
       - revisionId
+    FinanceCollectionHeldChequeDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        appliedAmount:
+          type: string
+        availableAmount:
+          type: string
+        currency:
+          type: string
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+        drawerName:
+          type:
+          - string
+          - "null"
+        dueOn:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        instrumentReference:
+          type: string
+        receivedOn:
+          type: string
+          format: date
+        state:
+          $ref: "#/components/schemas/FinanceCollectionChequeState"
+        version:
+          type: integer
+          format: int64
+          description: "The cheque's version, expected by an allocation"
+      required:
+      - amount
+      - appliedAmount
+      - availableAmount
+      - currency
+      - dueOn
+      - id
+      - instrumentReference
+      - receivedOn
+      - state
+      - version
     FinanceCollectionKind:
       type: string
       enum:
@@ -84150,6 +84779,14 @@ components:
         orderId:
           type: string
           format: uuid
+        orderNumber:
+          type:
+          - string
+          - "null"
+          description: "The sales order's number, so instalments of repeat orders\
+            \ with the same date and amount can be told apart; null when the order\
+            \ cannot be read"
+          example: SO-2026-0142
         overmatchedAmount:
           type: string
         partnerId:
@@ -84804,6 +85441,45 @@ components:
       - amount
       - decision
       - effectiveDate
+      - expectedVersion
+      - occurredAt
+      - operationId
+      - reason
+    FinanceCollectionReverseChequeApplicationRequest:
+      type: object
+      description: "PAYMENT-PLAN-9 R3a: reverse one whole application of a held cheque;\
+        \ the cheque stays held with the same amount and state"
+      properties:
+        effectiveDate:
+          type: string
+          format: date
+        evidence:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        expectedObligationVersion:
+          type: integer
+          format: int64
+          description: Expected version of the obligation the application covers
+          minimum: 0
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        occurredAt:
+          type: string
+          format: date-time
+        operationId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - effectiveDate
+      - evidence
+      - expectedObligationVersion
       - expectedVersion
       - occurredAt
       - operationId
