@@ -87,6 +87,7 @@ public class CollectionChequeService {
                         CollectionPaymentMatchRepository.Balance::getId,
                         CollectionPaymentMatchRepository.Balance::getAmount));
     var ids = new HashSet<UUID>();
+    var allocations = new ArrayList<ReceiptApplication>();
     BigDecimal applied = BigDecimal.ZERO;
     for (int i = 0; i < rows.size(); i++) {
       var row = rows.get(i);
@@ -94,58 +95,40 @@ public class CollectionChequeService {
       if (!ids.add(row.getId()))
         throw CollectionRuleException.invalid("Each obligation may appear only once per cheque");
       commands.version(input.expectedVersion(), row.getVersion());
-      requireInstrumentTarget(row, request.partnerId(), request.currency());
-      BigDecimal value = CollectionAmounts.positive(input.amount(), row.getCurrency());
-      if (value.compareTo(
-              row.getAmount()
-                  .subtract(received.getOrDefault(row.getId(), BigDecimal.ZERO))
-                  .subtract(cash.getOrDefault(row.getId(), BigDecimal.ZERO))
-                  .max(BigDecimal.ZERO))
-          > 0)
+      BigDecimal available =
+          row.getAmount()
+              .subtract(received.getOrDefault(row.getId(), BigDecimal.ZERO))
+              .subtract(cash.getOrDefault(row.getId(), BigDecimal.ZERO))
+              .max(BigDecimal.ZERO);
+      BigDecimal value =
+          validateReceiptApplication(row, request.partnerId(), request.currency(), input.amount());
+      if (value.compareTo(available) > 0)
         throw CollectionRuleException.conflict(
             "CHEQUE_OVERAPPLICATION", "Cheque application exceeds the missing instrument amount");
+      allocations.add(new ReceiptApplication(row.getId(), value));
       applied = applied.add(value);
     }
     if (applied.compareTo(amount) > 0)
       throw CollectionRuleException.invalid("Applications exceed the cheque amount");
-    var cheque =
-        cheques.saveAndFlush(
-            CollectionCheque.receive(
-                request.partnerId(),
-                request.currency(),
-                amount,
-                request.receivedOn(),
-                request.dueOn(),
-                request.instrumentReference().trim(),
-                request.evidence(),
-                drawer));
-    for (int i = 0; i < rows.size(); i++) {
-      // The application is evidence of the receipt: same date, time, actor and reason as RECEIVE.
-      applications.save(
-          CollectionChequeApplication.create(
-              cheque.getId(),
-              rows.get(i).getId(),
-              CollectionAmounts.positive(
-                  request.applications().get(i).amount(), request.currency()),
-              request.receivedOn(),
-              request.occurredAt(),
-              actor,
-              request.reason()));
-      rows.get(i).financialChange();
-      obligations.save(rows.get(i));
-      changes.changed(rows.get(i).getId());
-    }
-    applications.flush();
-    obligations.flush();
-    events.saveAndFlush(
-        CollectionChequeEvent.record(
-            cheque,
-            "RECEIVE",
+    var evidence =
+        new ReceiptEvidence(
+            request.partnerId(),
             request.receivedOn(),
             request.occurredAt(),
             actor,
             request.reason(),
-            request.evidence()));
+            request.evidence());
+    var cheque =
+        persistReceipt(
+            evidence,
+            request.currency(),
+            amount,
+            request.dueOn(),
+            request.instrumentReference(),
+            drawer,
+            allocations,
+            null);
+    changeReceiptTargets(rows);
     return commands.record(
         request.operationId(),
         actor,
@@ -156,6 +139,90 @@ public class CollectionChequeService {
         null,
         List.of());
   }
+
+  CollectionCheque persistReceipt(
+      ReceiptEvidence evidence,
+      String currency,
+      BigDecimal amount,
+      LocalDate dueOn,
+      String reference,
+      CollectionCheque.Drawer drawer,
+      List<ReceiptApplication> allocations,
+      HandoverPosition position) {
+    var cheque =
+        cheques.saveAndFlush(
+            position == null
+                ? CollectionCheque.receive(
+                    evidence.partner(),
+                    currency,
+                    amount,
+                    evidence.receivedOn(),
+                    dueOn,
+                    reference.trim(),
+                    evidence.evidence(),
+                    drawer)
+                : CollectionCheque.receiveInHandover(
+                    evidence.partner(),
+                    currency,
+                    amount,
+                    evidence.receivedOn(),
+                    dueOn,
+                    reference.trim(),
+                    evidence.evidence(),
+                    drawer,
+                    position.id(),
+                    position.ordinal()));
+    for (var allocation : allocations) {
+      // Applications made at receipt carry the same evidence as the RECEIVE event.
+      applications.save(
+          CollectionChequeApplication.create(
+              cheque.getId(),
+              allocation.obligationId(),
+              allocation.amount(),
+              evidence.receivedOn(),
+              evidence.occurredAt(),
+              evidence.actor(),
+              evidence.reason()));
+    }
+    applications.flush();
+    events.saveAndFlush(
+        CollectionChequeEvent.record(
+            cheque,
+            "RECEIVE",
+            evidence.receivedOn(),
+            evidence.occurredAt(),
+            evidence.actor(),
+            evidence.reason(),
+            evidence.evidence()));
+    return cheque;
+  }
+
+  void changeReceiptTargets(List<CollectionObligation> rows) {
+    for (var row : rows) {
+      row.financialChange();
+      obligations.save(row);
+      changes.changed(row.getId());
+    }
+    obligations.flush();
+  }
+
+  BigDecimal validateReceiptApplication(
+      CollectionObligation row, UUID partner, String currency, BigDecimal requested) {
+    requireInstrumentTarget(row, partner, currency);
+    return CollectionAmounts.positive(requested, currency);
+  }
+
+  record ReceiptEvidence(
+      UUID partner,
+      LocalDate receivedOn,
+      Instant occurredAt,
+      UUID actor,
+      String reason,
+      String evidence) {}
+
+  record ReceiptApplication(UUID obligationId, BigDecimal amount) {}
+
+  record HandoverPosition(UUID id, int ordinal) {}
 
   public CollectionCommandReceipt transition(
       UUID chequeId, CollectionRequests.Transition request, UUID actor) {

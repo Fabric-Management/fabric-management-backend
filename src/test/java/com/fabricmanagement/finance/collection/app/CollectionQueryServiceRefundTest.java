@@ -87,7 +87,10 @@ class CollectionQueryServiceRefundTest {
             mock(CollectionExpectationRepository.class),
             mock(PaymentRepository.class),
             refundLedger,
-            source);
+            source,
+            mock(
+                com.fabricmanagement.finance.collection.infra.repository
+                    .CollectionChequeHandoverRepository.class));
     row =
         CollectionObligation.create(
             UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), partner, "GBP");

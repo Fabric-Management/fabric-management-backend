@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS finance.collection_cheque_event;
 DROP TABLE IF EXISTS finance.collection_payment_match;
 DROP TABLE IF EXISTS finance.collection_cheque_application;
 DROP TABLE IF EXISTS finance.collection_cheque;
+DROP TABLE IF EXISTS finance.collection_cheque_handover;
 DROP TABLE IF EXISTS finance.collection_expectation;
 DROP TABLE IF EXISTS finance.collection_obligation;
 DROP TABLE IF EXISTS finance.collection_projection;

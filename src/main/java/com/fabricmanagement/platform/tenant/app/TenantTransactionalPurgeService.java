@@ -111,6 +111,7 @@ public class TenantTransactionalPurgeService {
           "finance.collection_payment_match",
           "finance.collection_cheque_application",
           "finance.collection_cheque",
+          "finance.collection_cheque_handover",
           "finance.collection_expectation",
           "finance.collection_obligation",
           "finance.collection_reconciliation_health",

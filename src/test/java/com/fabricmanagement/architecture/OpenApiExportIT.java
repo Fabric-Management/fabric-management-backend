@@ -106,7 +106,23 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
           // CONSIGNEE-1 S1: a quick-create that needs a decision wrote nothing, so it has no
           // partner and no link yet.
           new NullableReference("QuickCreatePartnerLinkResponse", "partner", "TradingPartnerDto"),
-          new NullableReference("QuickCreatePartnerLinkResponse", "link", "PartnerLinkDto"));
+          new NullableReference("QuickCreatePartnerLinkResponse", "link", "PartnerLinkDto"),
+          new NullableReference(
+              "FinanceCollectionChequeHandoverPreviewDto",
+              "notice",
+              "FinanceCollectionChequeHandoverPreviewNotice"),
+          new NullableReference(
+              "FinanceCollectionChequeHandoverPreviewApplicationDto",
+              "target",
+              "FinanceCollectionChequeHandoverTargetDto"),
+          new NullableReference(
+              "FinanceCollectionChequeHandoverPreviewRowInput",
+              "drawerKind",
+              "FinanceCollectionChequeDrawerKind"),
+          new NullableReference(
+              "FinanceCollectionChequeHandoverChequeDto",
+              "drawerKind",
+              "FinanceCollectionChequeDrawerKind"));
 
   /** Non-nullable reference control: the plain {@code $ref} form must survive unchanged. */
   private static final NullableReference NON_NULLABLE_CONTROL =
@@ -189,6 +205,7 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
     assertDiscriminatedUnionsAreClosed(generatedDocument);
     assertPagedResponsesAreComplete(generatedDocument);
     assertCollectionReportNullsAreRequired(generatedDocument);
+    assertChequeHandoverContract(generatedDocument);
 
     // Red probe uses a separate copy: the actual export must never contain the mutated value.
     Map<String, Object> corruptedDocument =
@@ -351,6 +368,51 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
    * COLLECTION-REPORT-1: a nullable report field is written as null, never omitted, so it is both
    * nullable and required. Null means the balance is unknown; absent would be a third state.
    */
+  private void assertChequeHandoverContract(Map<String, Object> document) {
+    String base = "/api/v1/finance/collections";
+    String handovers = base + "/cheque-handovers";
+    var list = mapAt(document, "paths", handovers, "get");
+    assertThat(list).containsEntry("operationId", "listFinanceCollectionChequeHandovers");
+    @SuppressWarnings("unchecked")
+    var parameters = (List<Map<String, Object>>) list.get("parameters");
+    assertThat(parameters)
+        .extracting(parameter -> parameter.get("name"))
+        .containsExactlyInAnyOrder("partnerId", "number", "page", "size");
+    for (String name : List.of("page", "size")) {
+      var query =
+          parameters.stream()
+              .filter(parameter -> name.equals(parameter.get("name")))
+              .findFirst()
+              .orElseThrow();
+      assertThat(query).containsEntry("in", "query").doesNotContainEntry("required", true);
+      assertThat(mapAt(query, "schema")).containsEntry("type", "integer");
+    }
+    assertThat(mapAt(document, "paths", handovers, "post"))
+        .containsEntry("operationId", "saveFinanceCollectionChequeHandover");
+    assertThat(mapAt(document, "paths", handovers + "/preview", "post"))
+        .containsEntry("operationId", "previewFinanceCollectionChequeHandover");
+    assertThat(mapAt(document, "paths", handovers + "/target-refresh", "post"))
+        .containsEntry("operationId", "refreshFinanceCollectionChequeHandoverTargets");
+    assertThat(mapAt(document, "paths", handovers + "/{id}", "get"))
+        .containsEntry("operationId", "getFinanceCollectionChequeHandover");
+    // Both callers migrate together after PP-13. The additive contract keeps the old POST.
+    assertThat(mapAt(document, "paths", base + "/cheques", "post"))
+        .containsEntry("operationId", "receiveFinanceCollectionCheque");
+    assertThat(
+            schemaProperty(document, "FinanceCollectionCommandResult", "resourceType").get("enum"))
+        .isInstanceOfSatisfying(
+            List.class,
+            resourceTypes ->
+                assertThat(resourceTypes)
+                    .contains("OBLIGATION", "CHEQUE", "PAYMENT", "CHEQUE_HANDOVER"));
+    for (String schema : List.of("FinanceCollectionChequeDto", "FinanceCollectionHeldChequeDto")) {
+      assertThat(schemaProperty(document, schema, "handoverId").get("type"))
+          .isEqualTo(List.of("string", "null"));
+      assertThat(schemaProperty(document, schema, "handoverNumber").get("type"))
+          .isEqualTo(List.of("string", "null"));
+    }
+  }
+
   private void assertCollectionReportNullsAreRequired(Map<String, Object> document) {
     for (String schema : COLLECTION_REPORT_SCHEMAS) {
       List<String> required = requiredOf(document, schema);

@@ -1,10 +1,12 @@
 package com.fabricmanagement.finance.collection.infra.repository;
 
 import com.fabricmanagement.finance.collection.domain.CollectionCheque;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface CollectionChequeRepository extends JpaRepository<CollectionCheque, UUID> {
   Optional<CollectionCheque> findByTenantIdAndId(UUID tenant, UUID id);
@@ -32,6 +34,22 @@ public interface CollectionChequeRepository extends JpaRepository<CollectionCheq
               com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeState>
           states,
       org.springframework.data.domain.Pageable page);
+
+  interface Reference {
+    String getCurrency();
+
+    String getInstrumentReference();
+  }
+
+  @Query(
+      """
+      select distinct c.currency as currency, c.instrumentReference as instrumentReference
+      from CollectionCheque c
+      where c.tenantId = :tenant and c.partnerId = :partner
+        and c.currency in :currencies and c.instrumentReference in :references
+      """)
+  List<Reference> references(
+      UUID tenant, UUID partner, Collection<String> currencies, Collection<String> references);
 
   boolean existsByTenantIdAndPartnerIdAndCurrencyAndInstrumentReferenceAndIdNot(
       UUID tenant, UUID partner, String currency, String reference, UUID id);

@@ -249,7 +249,9 @@ public final class CollectionDtos {
       @Schema(nullable = true, description = "The name recorded with the cheque") String drawerName,
       List<Application> applications,
       List<Capability> capabilities,
-      List<String> warnings) {}
+      List<String> warnings,
+      @Schema(nullable = true) UUID handoverId,
+      @Schema(nullable = true) String handoverNumber) {}
 
   @Schema(
       name = "FinanceCollectionChequeApplicationDto",
@@ -371,7 +373,9 @@ public final class CollectionDtos {
       LocalDate dueOn,
       @Schema(type = "string") String amount,
       @Schema(type = "string") String appliedAmount,
-      @Schema(type = "string") String availableAmount) {}
+      @Schema(type = "string") String availableAmount,
+      @Schema(nullable = true) UUID handoverId,
+      @Schema(nullable = true) String handoverNumber) {}
 
   @Schema(
       name = "FinanceCollectionChequeEventApplicationDto",
@@ -396,7 +400,8 @@ public final class CollectionDtos {
       })
   public record Result(
       UUID operationId,
-      @Schema(allowableValues = {"OBLIGATION", "CHEQUE", "PAYMENT"}) String resourceType,
+      @Schema(allowableValues = {"OBLIGATION", "CHEQUE", "PAYMENT", "CHEQUE_HANDOVER"})
+          String resourceType,
       UUID resourceId,
       long resourceVersion,
       @Schema(nullable = true) UUID paymentId,

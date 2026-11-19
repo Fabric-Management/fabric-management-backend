@@ -14,11 +14,14 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.web.exception.GlobalExceptionHandler;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.collection.api.controller.CollectionChequeHandoverController;
 import com.fabricmanagement.finance.collection.api.controller.CollectionController;
 import com.fabricmanagement.finance.collection.app.port.CollectionSourcePort;
 import com.fabricmanagement.finance.collection.app.port.CollectionSourcePort.*;
 import com.fabricmanagement.finance.collection.domain.*;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.*;
+import com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException;
+import com.fabricmanagement.finance.collection.dto.ChequeHandoverDtos;
 import com.fabricmanagement.finance.collection.dto.CollectionDtos;
 import com.fabricmanagement.finance.collection.dto.CollectionRequests;
 import com.fabricmanagement.finance.collection.infra.repository.*;
@@ -82,6 +85,9 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
   @Autowired CollectionRefundService refundService;
   @Autowired CollectionRefundLedger refundLedger;
   @Autowired CollectionQueryService queries;
+  @Autowired CollectionChequePreviewService chequePreviews;
+  @Autowired CollectionChequeHandoverService handovers;
+  @Autowired CollectionChequeHandoverQueryService handoverQueries;
   @Autowired CollectionCustomerViewService customerView;
   @Autowired CollectionReconciliationJob reconciliation;
   @Autowired CollectionReconciliationHealthService reconciliationHealth;
@@ -210,6 +216,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     "collection_payment_match",
                     "collection_cheque_application",
                     "collection_cheque",
+                    "collection_cheque_handover",
                     "collection_expectation",
                     "collection_obligation",
                     "collection_projection",
@@ -224,6 +231,1110 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
           }
           return null;
         });
+  }
+
+  @Test
+  void chequePreviewReadsTheProjectionWhileTheFinanceCommandLockIsHeld() throws Exception {
+    chequeSource();
+    UUID secondOrder = UUID.randomUUID();
+    var secondAgreement =
+        new Agreement(
+            secondOrder,
+            partner,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            1,
+            approval,
+            now,
+            now,
+            false,
+            false,
+            List.of(
+                new Expectation(
+                    UUID.randomUUID(),
+                    "GBP",
+                    new BigDecimal("1000"),
+                    Kind.INSTALMENT,
+                    Method.CHEQUE,
+                    date,
+                    false,
+                    date.plusMonths(3))),
+            null,
+            1L);
+    when(source.find(tenant, secondOrder)).thenReturn(Optional.of(secondAgreement));
+    when(source.orderNumbers(eq(tenant), anyCollection()))
+        .thenReturn(Map.of(order, "SO-001", secondOrder, "SO-002"));
+    var secondObligation =
+        in(
+            tenant,
+            () -> {
+              projection.synchronize(secondOrder);
+              return obligations.findByTenantIdAndOrderId(tenant, secondOrder).getFirst().getId();
+            });
+    var request =
+        new ChequeHandoverDtos.PreviewRequest(
+            partner,
+            obligation,
+            false,
+            List.of(
+                new ChequeHandoverDtos.PreviewRowInput(
+                    "northbridge-1",
+                    "CH-001",
+                    "GBP",
+                    new BigDecimal("5000"),
+                    date.plusMonths(3),
+                    DrawerKind.OWN,
+                    ChequeHandoverDtos.RowIntent.AUTO,
+                    List.of())));
+    long before = version();
+    clearInvocations(commands, source);
+    var executor = Executors.newVirtualThreadPerTaskExecutor();
+    try {
+      in(
+          tenant,
+          () -> {
+            paymentRepository.lockFinanceTenant(tenant);
+            var answer =
+                executor.submit(
+                    () ->
+                        TenantContext.executeInTenantContext(
+                            tenant, () -> chequePreviews.preview(request, actor)));
+            try {
+              var preview = answer.get(5, TimeUnit.SECONDS);
+              assertThat(preview.rows().getFirst().applications())
+                  .extracting(ChequeHandoverDtos.PreviewApplication::obligationId)
+                  .containsExactly(obligation);
+              assertThat(preview.rows().getFirst().unallocatedAmount()).isEqualTo("716.00");
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              throw new AssertionError(interrupted);
+            } catch (ExecutionException | TimeoutException failure) {
+              throw new AssertionError(
+                  "Preview must complete while another transaction holds the lock", failure);
+            }
+            return null;
+          });
+    } finally {
+      executor.close();
+    }
+    var withOtherOrders =
+        TenantContext.executeInTenantContext(
+            tenant,
+            () ->
+                chequePreviews.preview(
+                    new ChequeHandoverDtos.PreviewRequest(
+                        partner, obligation, true, request.rows()),
+                    actor));
+    assertThat(withOtherOrders.rows().getFirst().applications())
+        .extracting(ChequeHandoverDtos.PreviewApplication::obligationId)
+        .containsExactly(obligation, secondObligation);
+    assertThat(withOtherOrders.rows().getFirst().unallocatedAmount()).isEqualTo("0.00");
+    verifyNoInteractions(commands);
+    verify(source, never()).tryHold(any(), any());
+    verify(source, never()).find(any(), any());
+    assertThat(version()).isEqualTo(before);
+    assertThat(in(tenant, () -> instruments.count())).isZero();
+  }
+
+  @Test
+  void revisedPlanRemainsStaleAfterRollbackUntilTheTargetIsRefreshed() throws Exception {
+    chequeSource();
+    var drafted =
+        new ChequeHandoverDtos.PreviewRequest(
+            partner,
+            obligation,
+            false,
+            List.of(
+                new ChequeHandoverDtos.PreviewRowInput(
+                    "northbridge-1",
+                    "CH-001",
+                    "GBP",
+                    new BigDecimal("5000"),
+                    date.plusMonths(3),
+                    DrawerKind.OWN,
+                    ChequeHandoverDtos.RowIntent.AUTO,
+                    List.of())));
+    var oldTarget =
+        in(tenant, () -> chequePreviews.preview(drafted, actor))
+            .candidates()
+            .getFirst()
+            .obligations()
+            .getFirst();
+    UUID operation = UUID.randomUUID();
+    var original =
+        handover(
+            operation,
+            List.of(new CollectionRequests.Version(obligation, oldTarget.version())),
+            handoverRow(
+                "northbridge-1",
+                "5000",
+                List.of(handoverApplication(obligation, "4284")),
+                DrawerKind.OWN,
+                null));
+
+    revision = UUID.randomUUID();
+    when(source.find(tenant, order))
+        .thenAnswer(call -> Optional.of(agreement(Method.CHEQUE, "4000.00")));
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(original, actor)))
+        .isInstanceOfSatisfying(
+            CollectionRuleException.class,
+            stale -> {
+              assertThat(stale.getErrorCode()).isEqualTo("CHEQUE_HANDOVER_STALE");
+              assertThat(stale.getHttpStatus()).isEqualTo(409);
+              assertThat(stale.getDetails())
+                  .containsOnlyKeys("obligationIds")
+                  .containsEntry("obligationIds", List.of(obligation));
+            });
+    assertThat(version()).isEqualTo(oldTarget.version());
+    assertThat(
+            in(tenant, () -> chequePreviews.preview(drafted, actor))
+                .candidates()
+                .getFirst()
+                .obligations()
+                .getFirst())
+        .isEqualTo(oldTarget);
+
+    var refresh = new ChequeHandoverDtos.RefreshRequest(List.of(obligation));
+    var executor = Executors.newVirtualThreadPerTaskExecutor();
+    try {
+      in(
+          tenant,
+          () -> {
+            paymentRepository.lockFinanceTenant(tenant);
+            var pending =
+                executor.submit(
+                    () -> asUser(actor, () -> handovers.refreshTargets(refresh, actor)));
+            try {
+              assertThat(pending.get(5, TimeUnit.SECONDS))
+                  .containsExactly(
+                      new ChequeHandoverDtos.TargetRefresh(
+                          order, ChequeHandoverDtos.RefreshStatus.BUSY));
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              throw new AssertionError(interrupted);
+            } catch (ExecutionException | TimeoutException failure) {
+              throw new AssertionError(
+                  "Refresh must answer without waiting for the command lock", failure);
+            }
+            return null;
+          });
+    } finally {
+      executor.close();
+    }
+    assertThat(version()).isEqualTo(oldTarget.version());
+    when(source.tryHold(tenant, order)).thenReturn(true);
+    assertThat(in(tenant, () -> handovers.refreshTargets(refresh, actor)))
+        .containsExactly(
+            new ChequeHandoverDtos.TargetRefresh(
+                order, ChequeHandoverDtos.RefreshStatus.REFRESHED));
+
+    var updated =
+        in(tenant, () -> chequePreviews.preview(drafted, actor))
+            .candidates()
+            .getFirst()
+            .obligations()
+            .getFirst();
+    assertThat(updated.version()).isGreaterThan(oldTarget.version());
+    assertThat(updated.lackingAmount()).isEqualTo("4000.00");
+    var confirmed =
+        handover(
+            operation,
+            List.of(new CollectionRequests.Version(obligation, updated.version())),
+            handoverRow(
+                "northbridge-1",
+                "5000",
+                List.of(handoverApplication(obligation, "4000")),
+                DrawerKind.OWN,
+                null));
+    assertThat(in(tenant, () -> handovers.save(confirmed, actor)).resourceType())
+        .isEqualTo("CHEQUE_HANDOVER");
+    assertThat(handoverNumber()).isEqualTo("CHB-2026-000001");
+  }
+
+  @Test
+  void refreshRefusesTheWholeRequestWhenAnyTargetIsOutsideCurrentWriteScope() throws Exception {
+    chequeSource();
+    UUID secondOrder = UUID.randomUUID();
+    UUID foreignOrder = UUID.randomUUID();
+    var secondAgreement = anotherChequeAgreement(secondOrder, partner);
+    var foreignAgreement = anotherChequeAgreement(foreignOrder, otherPartner);
+    when(source.find(tenant, secondOrder)).thenReturn(Optional.of(secondAgreement));
+    when(source.find(otherTenant, foreignOrder)).thenReturn(Optional.of(foreignAgreement));
+    var outsideReach =
+        in(
+            tenant,
+            () -> {
+              projection.synchronize(secondOrder);
+              return obligations.findByTenantIdAndOrderId(tenant, secondOrder).getFirst().getId();
+            });
+    var foreign =
+        in(
+            otherTenant,
+            () -> {
+              projection.synchronize(foreignOrder);
+              return obligations
+                  .findByTenantIdAndOrderId(otherTenant, foreignOrder)
+                  .getFirst()
+                  .getId();
+            });
+    // The actor could have reached both before permissions changed after preview.
+    var draft =
+        new ChequeHandoverDtos.PreviewRequest(
+            partner,
+            null,
+            true,
+            List.of(
+                new ChequeHandoverDtos.PreviewRowInput(
+                    "northbridge-1",
+                    "CH-001",
+                    "GBP",
+                    new BigDecimal("5000"),
+                    date.plusMonths(3),
+                    DrawerKind.OWN,
+                    ChequeHandoverDtos.RowIntent.AUTO,
+                    List.of())));
+    assertThat(
+            in(tenant, () -> chequePreviews.preview(draft, actor))
+                .candidates()
+                .getFirst()
+                .obligations())
+        .extracting(ChequeHandoverDtos.Target::obligationId)
+        .containsExactlyInAnyOrder(obligation, outsideReach);
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE finance.collection_obligation SET responsible_user_id=? WHERE id=?",
+                actor,
+                obligation));
+    reach(actor, DataScope.OWN, actor);
+    long before = version();
+    clearInvocations(source);
+    for (UUID refused : List.of(outsideReach, UUID.randomUUID(), foreign)) {
+      var request = new ChequeHandoverDtos.RefreshRequest(List.of(obligation, refused));
+      assertThatThrownBy(() -> in(tenant, () -> handovers.refreshTargets(request, actor)))
+          .isExactlyInstanceOf(NotFoundException.class)
+          .hasMessage("Collection obligation not found");
+    }
+    var mvc =
+        MockMvcBuilders.standaloneSetup(
+                new CollectionChequeHandoverController(chequePreviews, handovers, handoverQueries))
+            .setControllerAdvice(new GlobalExceptionHandler(null))
+            .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+            .build();
+    var principal = new AuthenticatedUserContext(actor, "FINANCE_MANAGER", List.of(), null, tenant);
+    var authentication =
+        UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
+    TenantContext.setCurrentTenantId(tenant);
+    TenantContext.setCurrentUserId(actor);
+    try {
+      mvc.perform(
+              post("/api/v1/finance/collections/cheque-handovers/target-refresh")
+                  .principal(authentication)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      objectMapper.writeValueAsBytes(
+                          new ChequeHandoverDtos.RefreshRequest(
+                              List.of(obligation, outsideReach)))))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.detail").value("Collection obligation not found"))
+          .andExpect(jsonPath("$.data").doesNotExist())
+          .andExpect(jsonPath("$.orderId").doesNotExist());
+    } finally {
+      TenantContext.clear();
+    }
+    verifyNoInteractions(source);
+    assertThat(version()).isEqualTo(before);
+
+    // The second target can also be reassigned while a refresh is reaching the tenant lock.
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE finance.collection_obligation SET responsible_user_id=? WHERE id=?",
+                actor,
+                outsideReach));
+    var lockAttempt = new CountDownLatch(1);
+    var reassigned = new CountDownLatch(1);
+    doAnswer(
+            call -> {
+              lockAttempt.countDown();
+              if (!reassigned.await(5, TimeUnit.SECONDS))
+                throw new AssertionError("Reassignment timed out");
+              return call.callRealMethod();
+            })
+        .when(commands)
+        .tryLock();
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      var attempt =
+          executor.submit(
+              () ->
+                  asUser(
+                      actor,
+                      () ->
+                          handovers.refreshTargets(
+                              new ChequeHandoverDtos.RefreshRequest(
+                                  List.of(obligation, outsideReach)),
+                              actor)));
+      try {
+        assertThat(lockAttempt.await(5, TimeUnit.SECONDS)).isTrue();
+        in(
+            tenant,
+            () -> {
+              paymentRepository.lockFinanceTenant(tenant);
+              return tenantJdbc.update(
+                  "UPDATE finance.collection_obligation SET responsible_user_id=? WHERE id=?",
+                  UUID.randomUUID(),
+                  outsideReach);
+            });
+      } finally {
+        reassigned.countDown();
+      }
+      assertThatThrownBy(() -> attempt.get(5, TimeUnit.SECONDS))
+          .hasCauseInstanceOf(NotFoundException.class)
+          .hasRootCauseMessage("Collection obligation not found");
+    }
+    verifyNoInteractions(source);
+  }
+
+  @Test
+  void handoverRecordsRowsInOrderWithOneReceiptAndOneTargetRevisionAcrossReplay() {
+    chequeSource();
+    long before = version();
+    UUID operation = UUID.randomUUID();
+    var fresh =
+        handover(
+            operation,
+            List.of(new CollectionRequests.Version(obligation, before)),
+            handoverRow(
+                "001",
+                "3000",
+                List.of(handoverApplication(obligation, "3000")),
+                DrawerKind.OWN,
+                null),
+            handoverRow(
+                "002",
+                "3000",
+                List.of(handoverApplication(obligation, "1284")),
+                DrawerKind.ENDORSED,
+                "Pennine Weaving"),
+            handoverRow("003", "4000", List.of(), DrawerKind.OWN, null));
+    clearInvocations(events, source);
+    var saved = in(tenant, () -> handovers.save(fresh, actor));
+    assertThat(saved.resourceType()).isEqualTo("CHEQUE_HANDOVER");
+    assertThat(saved.resourceVersion()).isZero();
+    assertThat(saved.matchIds()).isEmpty();
+    assertThat(handoverNumber()).isEqualTo("CHB-2026-000001");
+    assertThat(version()).isEqualTo(before + 1);
+    verify(source, times(1)).find(tenant, order);
+    verify(events, times(1))
+        .publish(
+            any(
+                com.fabricmanagement.finance.collection.domain.event
+                    .CollectionObligationChangedEvent.class));
+
+    var recorded =
+        jdbc.query(
+            """
+        SELECT id,instrument_reference,drawer_kind,drawer_name,handover_ordinal FROM finance.collection_cheque
+        WHERE tenant_id=? AND handover_id=? ORDER BY handover_ordinal
+        """,
+            (rs, row) ->
+                new SavedHandoverCheque(
+                    rs.getObject("id", UUID.class),
+                    rs.getString("instrument_reference"),
+                    rs.getString("drawer_kind"),
+                    rs.getString("drawer_name"),
+                    rs.getInt("handover_ordinal")),
+            tenant,
+            saved.resourceId());
+    assertThat(recorded)
+        .extracting(SavedHandoverCheque::reference)
+        .containsExactly("CH-001", "CH-002", "CH-003");
+    assertThat(recorded)
+        .extracting(SavedHandoverCheque::kind)
+        .containsExactly("OWN", "ENDORSED", "OWN");
+    assertThat(recorded)
+        .extracting(SavedHandoverCheque::name)
+        .containsExactly("Pennine Textiles", "Pennine Weaving", "Pennine Textiles");
+    assertThat(recorded).extracting(SavedHandoverCheque::ordinal).containsExactly(1, 2, 3);
+    assertThat(
+            jdbc.queryForList(
+                """
+        SELECT e.action FROM finance.collection_cheque_event e JOIN finance.collection_cheque c
+          ON c.tenant_id=e.tenant_id AND c.id=e.cheque_id
+        WHERE c.tenant_id=? AND c.handover_id=?
+        """,
+                String.class,
+                tenant,
+                saved.resourceId()))
+        .containsExactly("RECEIVE", "RECEIVE", "RECEIVE");
+    assertThat(
+            jdbc.queryForList(
+                """
+        SELECT a.amount FROM finance.collection_cheque_application a JOIN finance.collection_cheque c
+          ON c.tenant_id=a.tenant_id AND c.id=a.cheque_id
+        WHERE c.tenant_id=? AND c.handover_id=? ORDER BY c.handover_ordinal
+        """,
+                BigDecimal.class,
+                tenant,
+                saved.resourceId()))
+        .usingElementComparator(BigDecimal::compareTo)
+        .containsExactly(new BigDecimal("3000"), new BigDecimal("1284"));
+
+    UUID unallocated = recorded.getLast().id();
+    in(
+        tenant,
+        () ->
+            cheques.transition(
+                unallocated,
+                new CollectionRequests.Transition(
+                    UUID.randomUUID(),
+                    0L,
+                    ChequeAction.CANCEL,
+                    date,
+                    now,
+                    "Cheque cancelled",
+                    "Original instrument returned",
+                    null,
+                    null,
+                    List.of()),
+                actor));
+    reach(
+        actor,
+        DataScope.OWN,
+        actor); // The actor retains the grant, but the original target is out of reach.
+    clearInvocations(source);
+    assertThat(in(tenant, () -> handovers.save(fresh, actor))).isEqualTo(saved);
+    verifyNoInteractions(source);
+    var altered =
+        handover(
+            operation,
+            fresh.obligationVersions(),
+            fresh.rows().get(1),
+            fresh.rows().getFirst(),
+            fresh.rows().getLast());
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(altered, actor)))
+        .isInstanceOfSatisfying(
+            CollectionRuleException.class,
+            reused -> assertThat(reused.getErrorCode()).isEqualTo("COLLECTION_OPERATION_REUSED"));
+    assertThat(tenantRowCount("collection_cheque_handover")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_cheque")).isEqualTo(3);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM finance.collection_command_receipt"
+                    + " WHERE tenant_id=? AND resource_type='CHEQUE_HANDOVER'",
+                Long.class,
+                tenant))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void finalRowRefusalKeepsTheLedgerAndNumberUnchangedAndAllowsAnOrderlessRetry() {
+    chequeSource();
+    long before = version();
+    var earlier =
+        handover(
+            UUID.randomUUID(),
+            List.of(),
+            handoverRow("001", "1000", List.of(), DrawerKind.OWN, null));
+    in(tenant, () -> handovers.save(earlier, actor));
+    UUID operation = UUID.randomUUID();
+    var first = handoverRow("002", "1100", List.of(), DrawerKind.OWN, null);
+    var invalid = handoverRow("003", "1300", List.of(), DrawerKind.ENDORSED, null);
+    var lastRowInvalid = handover(operation, List.of(), first, invalid);
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(lastRowInvalid, actor)))
+        .isInstanceOfSatisfying(
+            CollectionRuleException.class,
+            rejected -> {
+              assertThat(rejected.getErrorCode()).isEqualTo("CHEQUE_DRAWER_NAME_REQUIRED");
+              assertThat(rejected.getDetails())
+                  .containsEntry("rowKey", "003")
+                  .containsEntry("row", 1);
+            });
+    assertThat(tenantRowCount("collection_cheque_handover")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_cheque")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_command_receipt")).isEqualTo(1);
+    var oversized =
+        handover(
+            operation,
+            List.of(),
+            first,
+            handoverRow("003", "1300", List.of(), DrawerKind.ENDORSED, "ﬃ".repeat(90)));
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(oversized, actor)))
+        .isInstanceOfSatisfying(
+            CollectionRuleException.class,
+            rejected -> {
+              assertThat(rejected.getErrorCode()).isEqualTo("CHEQUE_DRAWER_INVALID");
+              assertThat(rejected.getDetails())
+                  .containsEntry("rowKey", "003")
+                  .containsEntry("row", 1);
+            });
+    var currentVersions = List.of(new CollectionRequests.Version(obligation, before));
+    var overapplied =
+        handover(
+            UUID.randomUUID(),
+            currentVersions,
+            handoverRow(
+                "014",
+                "4000",
+                List.of(handoverApplication(obligation, "4000")),
+                DrawerKind.OWN,
+                null),
+            handoverRow(
+                "015",
+                "1000",
+                List.of(handoverApplication(obligation, "1000")),
+                DrawerKind.OWN,
+                null));
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(overapplied, actor)))
+        .isInstanceOfSatisfying(
+            CollectionRuleException.class,
+            rejected -> {
+              assertThat(rejected.getErrorCode()).isEqualTo("CHEQUE_OVERAPPLICATION");
+              assertThat(rejected.getHttpStatus()).isEqualTo(400);
+              assertThat(rejected.getDetails())
+                  .containsEntry("rowKey", "015")
+                  .containsEntry("row", 1);
+            });
+    assertThat(tenantRowCount("collection_cheque_handover")).isEqualTo(1);
+    var fixed =
+        handover(
+            operation,
+            List.of(),
+            first,
+            handoverRow("003", "1300", List.of(), DrawerKind.ENDORSED, "Pennine Weaving"));
+    // Also exercise rollback after the number, handover and all cheque rows have been written.
+    doThrow(CollectionRuleException.invalid("Receipt write failed"))
+        .when(commands)
+        .record(
+            eq(operation),
+            eq(actor),
+            anyString(),
+            eq("CHEQUE_HANDOVER"),
+            any(UUID.class),
+            eq(0L),
+            isNull(),
+            eq(List.of()));
+    assertThatThrownBy(() -> in(tenant, () -> handovers.save(fixed, actor)))
+        .isInstanceOf(CollectionRuleException.class)
+        .hasMessage("Receipt write failed");
+    assertThat(tenantRowCount("collection_cheque_handover")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_cheque")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_cheque_event")).isEqualTo(1);
+    assertThat(tenantRowCount("collection_command_receipt")).isEqualTo(1);
+    doCallRealMethod()
+        .when(commands)
+        .record(
+            eq(operation),
+            eq(actor),
+            anyString(),
+            eq("CHEQUE_HANDOVER"),
+            any(UUID.class),
+            eq(0L),
+            isNull(),
+            eq(List.of()));
+    var result = in(tenant, () -> handovers.save(fixed, actor));
+    assertThat(handoverNumber()).isEqualTo("CHB-2026-000002");
+    assertThat(tenantRowCount("collection_cheque")).isEqualTo(3);
+    assertThat(tenantRowCount("collection_cheque_application")).isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT cheque_count FROM finance.collection_cheque_handover" + " WHERE id=?",
+                Integer.class,
+                result.resourceId()))
+        .isEqualTo(2);
+    assertThat(version()).isEqualTo(before);
+    var orderless =
+        new ChequeHandoverDtos.SaveRequest(
+            UUID.randomUUID(),
+            otherPartner,
+            date,
+            now,
+            "Customer handed over a cheque",
+            "Handover slip",
+            List.of(),
+            List.of(handoverRow("004", "2500", List.of(), DrawerKind.OWN, null)));
+    assertThat(in(otherTenant, () -> handovers.save(orderless, actor)).resourceType())
+        .isEqualTo("CHEQUE_HANDOVER");
+  }
+
+  @Test
+  void handoverSchemaRejectsMutationAndInvalidLinksAndTenantRlsHidesTheEvidence() {
+    var saved =
+        in(
+            tenant,
+            () ->
+                handovers.save(
+                    handover(
+                        UUID.randomUUID(),
+                        List.of(),
+                        handoverRow("001", "1000", List.of(), DrawerKind.OWN, null),
+                        handoverRow("002", "2000", List.of(), DrawerKind.OWN, null)),
+                    actor));
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "UPDATE finance.collection_cheque_handover SET reason='Changed' WHERE id=?",
+                    saved.resourceId()))
+        .hasMessageContaining("Collection evidence is append-only");
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "DELETE FROM finance.collection_cheque_handover WHERE id=?",
+                    saved.resourceId()))
+        .hasMessageContaining("Collection evidence is append-only");
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "UPDATE finance.collection_cheque SET handover_ordinal=NULL WHERE handover_id=?",
+                    saved.resourceId()))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "UPDATE finance.collection_cheque SET handover_ordinal=1 WHERE handover_id=?",
+                    saved.resourceId()))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "UPDATE finance.collection_cheque SET handover_id=? WHERE handover_id=?",
+                    UUID.randomUUID(),
+                    saved.resourceId()))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    system.executeInTransaction(
+        sql -> {
+          sql.execute(
+              "DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='collection_handover_rls_probe')"
+                  + " THEN CREATE ROLE collection_handover_rls_probe NOLOGIN NOBYPASSRLS; END IF; END $$");
+          sql.execute("GRANT USAGE ON SCHEMA finance TO collection_handover_rls_probe");
+          sql.execute(
+              "GRANT SELECT ON finance.collection_cheque_handover TO collection_handover_rls_probe");
+          return null;
+        });
+    for (UUID testTenant : List.of(tenant, otherTenant)) {
+      assertThat(
+              in(
+                  testTenant,
+                  () -> {
+                    tenantJdbc.execute("SET LOCAL ROLE collection_handover_rls_probe");
+                    tenantJdbc.execute("SET LOCAL row_security=on");
+                    return tenantJdbc.queryForObject(
+                        "SELECT count(*) FROM finance.collection_cheque_handover WHERE id=?",
+                        Long.class,
+                        saved.resourceId());
+                  }))
+          .isEqualTo(testTenant.equals(tenant) ? 1 : 0);
+    }
+  }
+
+  @Test
+  void handoverReadsKeepReceiptTotalsAfterCorrectionsAndLifecycleChanges() {
+    LocalDate firstDue = date.plusMonths(3);
+    LocalDate secondDue = firstDue.plusDays(20);
+    var first =
+        in(
+            tenant,
+            () ->
+                handovers.save(
+                    handover(
+                        UUID.randomUUID(),
+                        List.of(),
+                        handoverRow("001", "1000", List.of(), DrawerKind.OWN, null),
+                        new ChequeHandoverDtos.SaveRowInput(
+                            "002",
+                            "CH-002",
+                            "GBP",
+                            new BigDecimal("3000"),
+                            secondDue,
+                            DrawerKind.ENDORSED,
+                            null,
+                            "Pennine Weaving",
+                            List.of())),
+                    actor));
+    var second =
+        in(
+            tenant,
+            () ->
+                handovers.save(
+                    new ChequeHandoverDtos.SaveRequest(
+                        UUID.randomUUID(),
+                        partner,
+                        date,
+                        now.plusSeconds(3600),
+                        "Second handover",
+                        "Second handover slip",
+                        List.of(),
+                        List.of(handoverRow("003", "2500", List.of(), DrawerKind.OWN, null))),
+                    actor));
+    var original = in(tenant, () -> handoverQueries.detail(first.resourceId(), actor));
+    assertThat(original.receiptTotals())
+        .containsExactly(
+            new ChequeHandoverDtos.ReceiptTotal("GBP", 2, "4000.00", firstDue.plusDays(15)));
+    assertThat(original.actorId()).isEqualTo(actor);
+    assertThat(original.evidence()).isEqualTo("Cheque handover slip");
+    assertThat(original.partial()).isFalse();
+    UUID firstCheque = original.cheques().getFirst().id();
+    UUID secondCheque = original.cheques().getLast().id();
+
+    var correction =
+        new CollectionRequests.Correction(
+            new BigDecimal("1500"), date, firstDue.plusDays(5), "CH-001-CORRECTED");
+    handoverChequeTransition(firstCheque, ChequeAction.CORRECT, correction);
+    handoverChequeTransition(firstCheque, ChequeAction.RETURN, null);
+    handoverChequeTransition(secondCheque, ChequeAction.CANCEL, null);
+
+    var current = in(tenant, () -> handoverQueries.detail(first.resourceId(), actor));
+    assertThat(current.receiptTotals()).isEqualTo(original.receiptTotals());
+    assertThat(current.cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::id)
+        .containsExactly(firstCheque, secondCheque);
+    assertThat(current.cheques().getFirst())
+        .isEqualTo(
+            new ChequeHandoverDtos.HandoverCheque(
+                firstCheque,
+                1,
+                "CH-001-CORRECTED",
+                "GBP",
+                "1500.00",
+                firstDue.plusDays(5),
+                DrawerKind.OWN,
+                "Pennine Textiles",
+                ChequeState.RETURNED,
+                true,
+                "0.00",
+                "1500.00"));
+    assertThat(current.cheques().getLast().state()).isEqualTo(ChequeState.CANCELLED);
+
+    var target = in(tenant, () -> queries.cheque(firstCheque, actor));
+    assertThat(target.handoverId()).isEqualTo(first.resourceId());
+    assertThat(target.handoverNumber()).isEqualTo("CHB-2026-000001");
+    var available = in(tenant, () -> customerView.availability(partner, actor));
+    assertThat(available.chequeHistory())
+        .filteredOn(item -> item.id().equals(firstCheque))
+        .singleElement()
+        .satisfies(
+            item -> {
+              assertThat(item.handoverId()).isEqualTo(first.resourceId());
+              assertThat(item.handoverNumber()).isEqualTo("CHB-2026-000001");
+            });
+    UUID legacy =
+        in(
+            tenant,
+            () ->
+                cheques
+                    .receive(
+                        new CollectionRequests.ReceiveCheque(
+                            UUID.randomUUID(),
+                            partner,
+                            "GBP",
+                            new BigDecimal("1000"),
+                            date,
+                            firstDue,
+                            "NORTHBANK-LEGACY",
+                            "Signed instrument scan",
+                            now,
+                            "Cheque handed to finance",
+                            List.of(),
+                            DrawerKind.OWN,
+                            null,
+                            null),
+                        actor)
+                    .getResourceId());
+    assertThat(in(tenant, () -> queries.cheque(legacy, actor)).handoverId()).isNull();
+
+    var page = in(tenant, () -> handoverQueries.list(actor, partner, null, PageRequest.of(0, 1)));
+    assertThat(page.getTotalElements()).isEqualTo(2);
+    assertThat(page.getContent())
+        .extracting(ChequeHandoverDtos.HandoverSummary::id)
+        .containsExactly(second.resourceId());
+    var secondPage =
+        in(tenant, () -> handoverQueries.list(actor, partner, null, PageRequest.of(1, 1)));
+    assertThat(secondPage.getContent())
+        .extracting(ChequeHandoverDtos.HandoverSummary::id)
+        .containsExactly(first.resourceId());
+    var byNumber =
+        in(
+            tenant,
+            () -> handoverQueries.list(actor, null, "chb-2026-000001", PageRequest.of(0, 20)));
+    assertThat(byNumber.getContent())
+        .extracting(ChequeHandoverDtos.HandoverSummary::id)
+        .containsExactly(first.resourceId());
+    assertThat(
+            in(
+                tenant,
+                () -> handoverQueries.list(actor, partner, "CHB-2026", PageRequest.of(0, 20))))
+        .isEmpty();
+    assertThat(
+            in(
+                tenant,
+                () -> handoverQueries.list(actor, UUID.randomUUID(), null, PageRequest.of(0, 20))))
+        .isEmpty();
+  }
+
+  @Test
+  void handoverVisibilityRequiresEveryActiveTargetAndListsOnlyVisibleHandovers() {
+    chequeSource();
+    UUID secondOrder = UUID.randomUUID();
+    when(source.find(tenant, secondOrder))
+        .thenReturn(Optional.of(anotherChequeAgreement(secondOrder, partner)));
+    var secondObligation =
+        in(
+            tenant,
+            () -> {
+              projection.synchronize(secondOrder);
+              return obligations.findByTenantIdAndOrderId(tenant, secondOrder).getFirst();
+            });
+    UUID owner = UUID.randomUUID();
+    UUID readerWithoutReach = UUID.randomUUID();
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE finance.collection_obligation SET responsible_user_id=? WHERE id=?",
+                owner,
+                obligation));
+    reach(owner, DataScope.OWN, owner);
+    reach(readerWithoutReach, DataScope.OWN, readerWithoutReach);
+    var version = new CollectionRequests.Version(obligation, version());
+    var secondVersion =
+        new CollectionRequests.Version(secondObligation.getId(), secondObligation.getVersion());
+    var shared =
+        in(
+            tenant,
+            () ->
+                handovers.save(
+                    handover(
+                        UUID.randomUUID(),
+                        List.of(version, secondVersion),
+                        handoverRow("001", "500", List.of(), DrawerKind.OWN, null),
+                        handoverRow(
+                            "002",
+                            "1000",
+                            List.of(handoverApplication(obligation, "1000")),
+                            DrawerKind.OWN,
+                            null),
+                        handoverRow(
+                            "003",
+                            "4000",
+                            List.of(
+                                handoverApplication(obligation, "2000"),
+                                handoverApplication(secondObligation.getId(), "1000")),
+                            DrawerKind.ENDORSED,
+                            "Pennine Weaving")),
+                    actor));
+    var hidden =
+        in(
+            tenant,
+            () ->
+                handovers.save(
+                    handover(
+                        UUID.randomUUID(),
+                        List.of(),
+                        handoverRow("004", "2000", List.of(), DrawerKind.OWN, null)),
+                    actor));
+
+    var readable = asUser(owner, () -> handoverQueries.detail(shared.resourceId(), owner));
+    assertThat(readable.partial()).isTrue();
+    assertThat(readable.cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::ordinal)
+        .containsExactly(2);
+    assertThat(readable.receiptTotals())
+        .containsExactly(
+            new ChequeHandoverDtos.ReceiptTotal("GBP", 1, "1000.00", date.plusMonths(3)));
+    var link = asUser(owner, () -> queries.cheque(readable.cheques().getFirst().id(), owner));
+    assertThat(link.handoverId()).isEqualTo(shared.resourceId());
+
+    var ownerPage =
+        asUser(owner, () -> handoverQueries.list(owner, partner, null, PageRequest.of(0, 1)));
+    assertThat(ownerPage.getTotalElements()).isEqualTo(1);
+    assertThat(ownerPage.getContent())
+        .extracting(ChequeHandoverDtos.HandoverSummary::id)
+        .containsExactly(shared.resourceId());
+    assertThat(
+            asUser(
+                owner,
+                () -> handoverQueries.list(owner, null, "CHB-2026-000002", PageRequest.of(0, 20))))
+        .isEmpty();
+    assertThatThrownBy(
+            () -> asUser(owner, () -> handoverQueries.detail(hidden.resourceId(), owner)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Cheque handover not found");
+    assertThatThrownBy(
+            () ->
+                asUser(
+                    readerWithoutReach,
+                    () -> handoverQueries.detail(shared.resourceId(), readerWithoutReach)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Cheque handover not found");
+    assertThat(
+            asUser(
+                readerWithoutReach,
+                () ->
+                    handoverQueries.list(readerWithoutReach, partner, null, PageRequest.of(0, 20))))
+        .isEmpty();
+    assertThatThrownBy(
+            () -> in(otherTenant, () -> handoverQueries.detail(shared.resourceId(), actor)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Cheque handover not found");
+
+    // An unapplied cheque is reached through its creator, not by ownership of other rows.
+    reach(actor, DataScope.OWN, actor);
+    var creator = asUser(actor, () -> handoverQueries.detail(shared.resourceId(), actor));
+    assertThat(creator.partial()).isTrue();
+    assertThat(creator.cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::ordinal)
+        .containsExactly(1);
+    assertThat(creator.receiptTotals().getFirst().totalRecordedAtReceipt()).isEqualTo("500.00");
+
+    reach(actor, DataScope.ORGANIZATION, actor);
+    UUID split =
+        in(tenant, () -> handoverQueries.detail(shared.resourceId(), actor))
+            .cheques()
+            .getLast()
+            .id();
+    reverseHandoverApplication(split, secondObligation.getId(), "1000.00");
+    var afterHiddenReversal =
+        asUser(owner, () -> handoverQueries.detail(shared.resourceId(), owner));
+    assertThat(afterHiddenReversal.cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::ordinal)
+        .containsExactly(2, 3);
+    assertThat(afterHiddenReversal.receiptTotals().getFirst().totalRecordedAtReceipt())
+        .isEqualTo("5000.00");
+    reverseHandoverApplication(split, obligation, "2000.00");
+    var afterLastReversal = asUser(owner, () -> handoverQueries.detail(shared.resourceId(), owner));
+    assertThat(afterLastReversal.cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::ordinal)
+        .containsExactly(2);
+    reach(actor, DataScope.OWN, actor);
+    assertThat(asUser(actor, () -> handoverQueries.detail(shared.resourceId(), actor)).cheques())
+        .extracting(ChequeHandoverDtos.HandoverCheque::ordinal)
+        .containsExactly(1, 3);
+  }
+
+  private void reverseHandoverApplication(UUID cheque, UUID target, String amount) {
+    UUID application = applicationOf(cheque, amount);
+    in(
+        tenant,
+        () -> {
+          long chequeVersion =
+              instruments.findByTenantIdAndId(tenant, cheque).orElseThrow().getVersion();
+          long targetVersion =
+              obligations.findByTenantIdAndId(tenant, target).orElseThrow().getVersion();
+          return cheques.reverseApplication(
+              cheque,
+              application,
+              new CollectionRequests.ReverseChequeApplication(
+                  UUID.randomUUID(),
+                  chequeVersion,
+                  targetVersion,
+                  date,
+                  now.plusSeconds(7200),
+                  "Correct application target",
+                  "Original handover slip reviewed"),
+              actor);
+        });
+  }
+
+  private void handoverChequeTransition(
+      UUID cheque, ChequeAction action, CollectionRequests.Correction correction) {
+    in(
+        tenant,
+        () -> {
+          long version = instruments.findByTenantIdAndId(tenant, cheque).orElseThrow().getVersion();
+          return cheques.transition(
+              cheque,
+              new CollectionRequests.Transition(
+                  UUID.randomUUID(),
+                  version,
+                  action,
+                  date,
+                  now.plusSeconds(7200),
+                  "Bank evidence reviewed",
+                  "Cheque evidence",
+                  null,
+                  correction,
+                  List.of()),
+              actor);
+        });
+  }
+
+  private long tenantRowCount(String table) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM finance." + table + " WHERE tenant_id=?", Long.class, tenant);
+  }
+
+  private record SavedHandoverCheque(
+      UUID id, String reference, String kind, String name, int ordinal) {}
+
+  private Agreement anotherChequeAgreement(UUID orderId, UUID customer) {
+    return new Agreement(
+        orderId,
+        customer,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        1,
+        approval,
+        now,
+        now,
+        false,
+        false,
+        List.of(
+            new Expectation(
+                UUID.randomUUID(),
+                "GBP",
+                new BigDecimal("1000"),
+                Kind.INSTALMENT,
+                Method.CHEQUE,
+                date,
+                false,
+                date.plusMonths(3))),
+        null,
+        1L);
+  }
+
+  private ChequeHandoverDtos.SaveRequest handover(
+      UUID operation,
+      List<CollectionRequests.Version> versions,
+      ChequeHandoverDtos.SaveRowInput... rows) {
+    return new ChequeHandoverDtos.SaveRequest(
+        operation,
+        partner,
+        date,
+        now,
+        "Received from Northbridge Cloth",
+        "Cheque handover slip",
+        versions,
+        List.of(rows));
+  }
+
+  private ChequeHandoverDtos.SaveRowInput handoverRow(
+      String key,
+      String amount,
+      List<ChequeHandoverDtos.SaveApplication> applied,
+      DrawerKind kind,
+      String drawerName) {
+    return new ChequeHandoverDtos.SaveRowInput(
+        key,
+        "CH-" + key,
+        "GBP",
+        new BigDecimal(amount),
+        date.plusMonths(3),
+        kind,
+        null,
+        drawerName,
+        applied);
+  }
+
+  private static ChequeHandoverDtos.SaveApplication handoverApplication(
+      UUID target, String amount) {
+    return new ChequeHandoverDtos.SaveApplication(target, new BigDecimal(amount));
+  }
+
+  private String handoverNumber() {
+    return jdbc.queryForObject(
+        "SELECT handover_number FROM finance.collection_cheque_handover WHERE tenant_id=?"
+            + " ORDER BY handover_number DESC LIMIT 1",
+        String.class,
+        tenant);
   }
 
   @Test
@@ -906,8 +2017,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         posting.receive(
                             obligation, receipt(UUID.randomUUID(), "3000.01", version), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasMessageContaining("have not cleared");
     in(
         tenant,
@@ -932,8 +2042,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                             cheque,
                             transition(UUID.randomUUID(), ChequeAction.CLEAR, 0L, version),
                             actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasMessageContaining("outstanding");
     assertThat(
             in(
@@ -1258,8 +2367,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         cheques.allocate(
                             small, allocation(small, UUID.randomUUID(), "1000.01"), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasMessageContaining("unapplied amount");
     receiveCheque("5000.00", "5000.00");
     UUID large = receiveUnlinked("6000.00");
@@ -1270,8 +2378,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         cheques.allocate(
                             large, allocation(large, UUID.randomUUID(), "1000.01"), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasMessageContaining("missing instrument amount");
     in(tenant, () -> cheques.transition(large, unlinked(large, ChequeAction.CLEAR), actor));
     // D7: after clearing the cheque is never allocated; its payment is.
@@ -1282,8 +2389,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         cheques.allocate(
                             large, allocation(large, UUID.randomUUID(), "500.00"), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_APPLICATION_NOT_ALLOWED");
     assertThat(
             jdbc.queryForObject(
@@ -1315,8 +2421,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                 in(
                     tenant,
                     () -> cheques.allocate(cheque, allocation(cheque, operation, "100.00"), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_OPERATION_REUSED");
   }
 
@@ -1393,8 +2498,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
     assertThat(replay.getId()).isEqualTo(first.getId());
     assertThatThrownBy(
             () -> in(tenant, () -> cheques.reverseApplication(cheque, application, stale, actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_VERSION_CONFLICT");
 
     // Two reversals of one application racing with the same versions: one wins.
@@ -1431,8 +2535,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
     assertThatThrownBy(
             () ->
                 in(tenant, () -> cheques.reverseApplication(cheque, application, refreshed, actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_VERSION_CONFLICT");
 
     // 2,000 left on the cheque; two allocations of 1,500 race for it: one wins.
@@ -1466,8 +2569,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         cheques.reverseApplication(
                             cheque, application, reversal(cheque, UUID.randomUUID()), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_APPLICATION_NOT_ALLOWED");
     // D19: payment and clearing unchanged.
     assertThat(in(tenant, () -> matches.matchedPayment(tenant, cleared.getPaymentId())))
@@ -1570,8 +2672,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                 in(
                     tenant,
                     () -> posting.match(second, match(payment, "3000.01", secondVersion), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_PAYMENT_OVERMATCH");
     in(tenant, () -> posting.match(second, match(payment, "3000.00", secondVersion), actor));
     assertThat(gbp()).isNull();
@@ -1628,8 +2729,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                     () ->
                         posting.receiveForCustomer(
                             customerReceiptRequest(operation, "9000.00"), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_OPERATION_REUSED");
   }
 
@@ -1703,8 +2803,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
             () -> obligations.findByTenantIdAndId(tenant, second).orElseThrow().getVersion());
     assertThatThrownBy(
             () -> in(tenant, () -> posting.match(second, match(payment, "0.01", again), actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_PAYMENT_OVERMATCH");
     // D21: the clearing cannot be reversed while the later match stands.
     assertThatThrownBy(
@@ -1720,8 +2819,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                                 chequeVersion(cheque),
                                 version()),
                             actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "CHEQUE_CLEARING_HAS_OTHER_BINDINGS");
     in(
         tenant,
@@ -1851,8 +2949,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
             null,
             "Harrowgate Mills Ltd");
     assertThatThrownBy(() -> in(tenant, () -> cheques.receive(request, actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class)
+        .isInstanceOf(CollectionRuleException.class)
         .hasFieldOrPropertyWithValue("errorCode", "COLLECTION_PARTNER_NOT_FOUND");
     assertThat(
             jdbc.queryForObject(
@@ -2421,6 +3518,26 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
       assertThat(reads(owner, cheque)).as("%s owner before", scope).isTrue();
       var body = reversal(cheque, UUID.randomUUID());
       var first = asUser(owner, () -> cheques.reverseApplication(cheque, application, body, owner));
+      // C22: reversing the sole application makes its full instalment available to preview.
+      var request =
+          new ChequeHandoverDtos.PreviewRequest(
+              partner,
+              obligation,
+              false,
+              List.of(
+                  new ChequeHandoverDtos.PreviewRowInput(
+                      "northbridge-1",
+                      "CH-NEW",
+                      "GBP",
+                      new BigDecimal("6000"),
+                      date.plusMonths(3),
+                      DrawerKind.OWN,
+                      ChequeHandoverDtos.RowIntent.AUTO,
+                      List.of())));
+      var preview = asUser(owner, () -> chequePreviews.preview(request, owner));
+      assertThat(preview.candidates().getFirst().obligations().getFirst().lackingAmount())
+          .isEqualTo("6000.00");
+      assertThat(preview.rows().getFirst().applications().getFirst().amount()).isEqualTo("6000.00");
       // After: only the creator's side keeps the cheque.
       assertThat(reads(owner, cheque)).as("%s owner after", scope).isFalse();
       assertThat(reads(recorder, cheque)).as("%s recorder after", scope).isTrue();
@@ -2525,7 +3642,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
             "Spending the held money");
     assertThatThrownBy(() -> in(tenant, () -> posting.match(next, spendingHeldMoney, actor)))
         .isInstanceOfSatisfying(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class,
+            CollectionRuleException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo("COLLECTION_PAYMENT_OVERMATCH"));
 
     UUID outbound =
@@ -2693,8 +3810,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
     var fitting = resolution(OverSettlementDecision.REAPPLY, "200.00", next);
 
     assertThatThrownBy(() -> in(tenant, () -> overSettlements.resolve(obligation, tooMuch, actor)))
-        .isInstanceOf(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class);
+        .isInstanceOf(CollectionRuleException.class);
     assertThat(in(tenant, () -> posting.settled(obligation))).isEqualByComparingTo("4284.00");
 
     in(tenant, () -> overSettlements.resolve(obligation, fitting, actor));
@@ -3277,7 +4393,7 @@ class CollectionLedgerIT extends AbstractIntegrationTest {
                                 null),
                             actor)))
         .isInstanceOfSatisfying(
-            com.fabricmanagement.finance.collection.domain.exception.CollectionRuleException.class,
+            CollectionRuleException.class,
             refused -> assertThat(refused.getErrorCode()).isEqualTo("CHEQUE_DRAWER_KIND_REQUIRED"));
     assertThat(
             jdbc.queryForObject(

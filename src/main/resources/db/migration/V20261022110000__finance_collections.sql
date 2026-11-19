@@ -88,6 +88,18 @@ CREATE TABLE IF NOT EXISTS finance.collection_expectation (
   UNIQUE(tenant_id,id), UNIQUE(tenant_id,obligation_id,revision_id),
   FOREIGN KEY(tenant_id,obligation_id) REFERENCES finance.collection_obligation(tenant_id,id)
 );
+-- PAYMENT-PLAN-8: a numbered, immutable record of one physical handover.
+CREATE TABLE IF NOT EXISTS finance.collection_cheque_handover (
+  id uuid PRIMARY KEY, uid varchar(100) UNIQUE,
+  tenant_id uuid NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
+  created_by uuid, updated_by uuid, is_active boolean NOT NULL DEFAULT true,
+  deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
+  partner_id uuid NOT NULL, handover_number varchar(40) NOT NULL,
+  received_on date NOT NULL, occurred_at timestamptz NOT NULL, actor_id uuid NOT NULL,
+  reason varchar(1000) NOT NULL, evidence varchar(1000) NOT NULL,
+  cheque_count integer NOT NULL CHECK(cheque_count BETWEEN 1 AND 50),
+  UNIQUE(tenant_id,id), UNIQUE(tenant_id,handover_number)
+);
 CREATE TABLE IF NOT EXISTS finance.collection_cheque (
   id uuid PRIMARY KEY, uid varchar(100) UNIQUE,
   tenant_id uuid NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
@@ -100,6 +112,11 @@ CREATE TABLE IF NOT EXISTS finance.collection_cheque (
   evidence_revision bigint NOT NULL DEFAULT 0, cleared_payment_id uuid, last_evidence varchar(1000),
   -- PAYMENT-PLAN-7 R14: who drew the cheque, written when it happens; null = not recorded.
   drawer_kind varchar(10) CHECK(drawer_kind IN ('OWN','ENDORSED')), drawer_name varchar(255), drawer_id uuid,
+  handover_id uuid, handover_ordinal integer,
+  CHECK((handover_id IS NULL) = (handover_ordinal IS NULL)),
+  CHECK(handover_ordinal BETWEEN 1 AND 50),
+  UNIQUE(tenant_id,handover_id,handover_ordinal),
+  FOREIGN KEY(tenant_id,handover_id) REFERENCES finance.collection_cheque_handover(tenant_id,id),
   CHECK((drawer_kind IS NULL AND drawer_name IS NULL AND drawer_id IS NULL)
     OR (drawer_kind IS NOT NULL AND drawer_name IS NOT NULL)),
   CHECK(drawer_kind IS DISTINCT FROM 'ENDORSED' OR drawer_id IS NULL),
@@ -183,7 +200,7 @@ CREATE TABLE IF NOT EXISTS finance.collection_command_receipt (
   deleted_at timestamptz, version bigint NOT NULL DEFAULT 0,
   operation_id uuid NOT NULL, actor_id uuid NOT NULL, request_hash varchar(64) NOT NULL,
   -- PAYMENT: a customer receipt recorded without an order (PAYMENT-PLAN-9 R1); resource_id is the payment.
-  resource_type varchar(30) NOT NULL CHECK(resource_type IN ('OBLIGATION','CHEQUE','PAYMENT')),
+  resource_type varchar(30) NOT NULL CHECK(resource_type IN ('OBLIGATION','CHEQUE','PAYMENT','CHEQUE_HANDOVER')),
   resource_id uuid NOT NULL, resource_version bigint NOT NULL CHECK(resource_version>=0),
   payment_id uuid, match_ids jsonb NOT NULL DEFAULT '[]',
   UNIQUE(tenant_id,id), UNIQUE(tenant_id,operation_id),
@@ -198,6 +215,10 @@ CREATE INDEX IF NOT EXISTS idx_collection_match_obligation ON finance.collection
 CREATE INDEX IF NOT EXISTS idx_collection_match_cheque ON finance.collection_payment_match(tenant_id,cheque_id);
 CREATE INDEX IF NOT EXISTS idx_collection_application_obligation ON finance.collection_cheque_application(tenant_id,obligation_id,cheque_id);
 CREATE INDEX IF NOT EXISTS idx_collection_application_cheque ON finance.collection_cheque_application(tenant_id,cheque_id);
+CREATE INDEX IF NOT EXISTS idx_collection_handover_partner_received
+  ON finance.collection_cheque_handover(tenant_id,partner_id,received_on DESC,occurred_at DESC,created_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS idx_collection_handover_number_lookup
+  ON finance.collection_cheque_handover(tenant_id,upper(handover_number));
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_due ON finance.collection_cheque(tenant_id,state,due_on,id);
 CREATE INDEX IF NOT EXISTS idx_collection_cheque_reference ON finance.collection_cheque(tenant_id,partner_id,currency,instrument_reference);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_cheque_clearing_payment ON finance.collection_cheque(tenant_id,cleared_payment_id) WHERE cleared_payment_id IS NOT NULL;
@@ -239,6 +260,17 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_object THEN NULL; END $$;
 DO $$ BEGIN
   GRANT SELECT, INSERT, DELETE ON finance.collection_expectation TO fabric_system;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+ALTER TABLE finance.collection_cheque_handover ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.collection_cheque_handover FORCE ROW LEVEL SECURITY;
+CREATE POLICY rls_tenant_isolation ON finance.collection_cheque_handover
+  USING(tenant_id = current_setting('app.current_tenant', true)::uuid)
+  WITH CHECK(tenant_id = current_setting('app.current_tenant', true)::uuid);
+DO $$ BEGIN
+  GRANT SELECT, INSERT ON finance.collection_cheque_handover TO fabric_app;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+DO $$ BEGIN
+  GRANT SELECT, INSERT, DELETE ON finance.collection_cheque_handover TO fabric_system;
 EXCEPTION WHEN undefined_object THEN NULL; END $$;
 ALTER TABLE finance.collection_cheque ENABLE ROW LEVEL SECURITY;
 ALTER TABLE finance.collection_cheque FORCE ROW LEVEL SECURITY;
@@ -307,6 +339,7 @@ BEGIN
     AND current_setting('app.collection_purge_tenant',true)=OLD.tenant_id::text THEN RETURN OLD; END IF;
   RAISE EXCEPTION 'Collection evidence is append-only' USING ERRCODE='23514';
 END $$;
+CREATE TRIGGER immutable_collection_evidence BEFORE UPDATE OR DELETE ON finance.collection_cheque_handover FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_immutable_evidence();
 CREATE TRIGGER immutable_collection_evidence BEFORE UPDATE OR DELETE ON finance.collection_expectation FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_immutable_evidence();
 CREATE TRIGGER immutable_collection_evidence BEFORE UPDATE OR DELETE ON finance.collection_cheque_event FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_immutable_evidence();
 CREATE TRIGGER immutable_collection_evidence BEFORE UPDATE OR DELETE ON finance.collection_command_receipt FOR EACH ROW EXECUTE FUNCTION finance.guard_collection_immutable_evidence();
