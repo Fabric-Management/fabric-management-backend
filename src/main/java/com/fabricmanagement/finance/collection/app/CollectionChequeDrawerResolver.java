@@ -21,6 +21,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class CollectionChequeDrawerResolver {
 
+  private static final int STORED_DRAWER_NAME_LENGTH = 255;
+
   private final CollectionChequeDrawerPort drawers;
 
   /**
@@ -58,9 +60,14 @@ class CollectionChequeDrawerResolver {
 
   /** At receipt a kind is always required. */
   CollectionCheque.Drawer forReceipt(CollectionRequests.ReceiveCheque request) {
-    if (request.drawerKind() == null) throw kindRequired();
-    return resolve(
-        request.partnerId(), request.drawerKind(), request.drawerId(), request.drawerName(), null);
+    return forReceipt(
+        request.partnerId(), request.drawerKind(), request.drawerId(), request.drawerName());
+  }
+
+  CollectionCheque.Drawer forReceipt(
+      UUID partner, DrawerKind kind, UUID drawerId, String drawerName) {
+    if (kind == null) throw kindRequired();
+    return resolve(partner, kind, drawerId, drawerName, null);
   }
 
   /**
@@ -117,6 +124,8 @@ class CollectionChequeDrawerResolver {
         if (name == null)
           throw CollectionRuleException.invalid(
               "CHEQUE_DRAWER_NAME_REQUIRED", "Enter the name of the endorsed cheque's drawer");
+        if (name.codePointCount(0, name.length()) > STORED_DRAWER_NAME_LENGTH)
+          throw invalid("The recorded drawer name must contain at most 255 characters");
         yield new CollectionCheque.Drawer(DrawerKind.ENDORSED, null, name);
       }
       case OWN -> {

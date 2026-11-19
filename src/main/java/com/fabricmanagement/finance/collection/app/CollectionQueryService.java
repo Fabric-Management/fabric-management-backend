@@ -42,6 +42,7 @@ public class CollectionQueryService {
   private final PaymentRepository payments;
   private final CollectionRefundLedger refundLedger;
   private final CollectionSourcePort source;
+  private final CollectionChequeHandoverRepository handovers;
 
   @Transactional(readOnly = true)
   public Page<CollectionDtos.Obligation> list(
@@ -338,6 +339,13 @@ public class CollectionQueryService {
               null,
               false));
     }
+    String handoverNumber =
+        cheque.getHandoverId() == null
+            ? null
+            : handovers
+                .findByTenantIdAndId(tenant, cheque.getHandoverId())
+                .map(CollectionChequeHandover::getHandoverNumber)
+                .orElse(null);
     return new CollectionDtos.Cheque(
         id,
         cheque.getVersion(),
@@ -367,7 +375,9 @@ public class CollectionQueryService {
                         mayChangeApplications))
             .toList(),
         caps,
-        warnings);
+        warnings,
+        cheque.getHandoverId(),
+        handoverNumber);
   }
 
   @Transactional(readOnly = true)
@@ -509,22 +519,19 @@ public class CollectionQueryService {
     if (owedBack.signum() > 0) warnings.add("REFUND_PENDING");
     if (row.isCancelled() && (settled.signum() > 0 || received.signum() > 0))
       warnings.add("CANCELLED_EXPECTATION_HAS_RECEIPTS_OR_INSTRUMENTS");
-    boolean mayWrite =
-        write.permits(row.getTenantId(), row.getCreatedBy(), row.getResponsibleUserId());
+    boolean mayWrite = CollectionChequeTargets.permits(write, row);
     boolean mayReverse =
         reverse.permits(row.getTenantId(), row.getCreatedBy(), row.getResponsibleUserId());
     boolean payable =
         !row.isCancelled() && !sourceMissing && settled.compareTo(row.getAmount()) < 0;
+    var chequeTarget = new CollectionChequeTargets.Facts(!sourceMissing, settled, received, cash);
     var caps = new ArrayList<CollectionDtos.Capability>();
     for (var action : Action.values()) {
       boolean legal =
           switch (action) {
             case REVERSE_MATCH -> true;
             case RESOLVE_OVER_SETTLEMENT, REFUND_OVER_SETTLEMENT -> over.signum() > 0;
-            case RECEIVE_CHEQUE ->
-                payable
-                    && row.getMethod() == Method.CHEQUE
-                    && row.getAmount().subtract(received).subtract(cash).signum() > 0;
+            case RECEIVE_CHEQUE -> chequeTarget.acceptsCheque(row);
             case MATCH_PAYMENT, RECORD_RECEIPT -> payable;
           };
       boolean allowed =
@@ -576,7 +583,7 @@ public class CollectionQueryService {
         money(
             row.isCancelled() || row.getMethod() != Method.CHEQUE
                 ? BigDecimal.ZERO
-                : row.getAmount().subtract(received).subtract(cash).max(BigDecimal.ZERO),
+                : chequeTarget.lacking(row),
             row),
         money(over, row),
         money(owedBack, row),
