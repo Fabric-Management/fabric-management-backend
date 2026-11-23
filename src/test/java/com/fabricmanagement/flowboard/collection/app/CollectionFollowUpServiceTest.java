@@ -118,7 +118,8 @@ class CollectionFollowUpServiceTest {
             false,
             false,
             false,
-            actor);
+            actor,
+            false);
     lenient().when(cases.findByTenantIdAndId(tenant, id)).thenReturn(Optional.of(c));
     lenient()
         .when(cases.findFirstByTenantIdAndObligationIdOrderByEpisodeDesc(tenant, obligation))
@@ -196,6 +197,36 @@ class CollectionFollowUpServiceTest {
     assertThat(task.getClosedAt()).isNull();
     verify(contacts).saveAndFlush(any());
     verify(source, never()).eligible(any(), any());
+  }
+
+  @Test
+  void confirmedChequeOfferBlocksThePaymentContactAndKeepsTheAgreedAmount() {
+    var review =
+        new CollectionFollowUpPort.Facts(
+            obligation,
+            facts.version(),
+            facts.partnerId(),
+            facts.currency(),
+            facts.expected(),
+            facts.outstanding(),
+            facts.missingInstrument(),
+            facts.agreedDate(),
+            null,
+            false,
+            false,
+            false,
+            false,
+            actor,
+            true);
+    when(source.current(obligation)).thenReturn(review);
+    var detail = service.detail(id, actor);
+    assertThat(detail.phase()).isEqualTo("REVIEW_PAYMENT_METHOD");
+    assertThat(new BigDecimal(detail.expectedAmount())).isEqualByComparingTo(facts.expected());
+    assertThat(detail.actions().getFirst().allowed()).isFalse();
+    assertThatThrownBy(() -> service.recordContact(id, actor, request(UUID.randomUUID(), 3)))
+        .hasMessageContaining("REVIEW_PAYMENT_METHOD");
+    verifyNoInteractions(contacts);
+    verify(receipts, never()).saveAndFlush(any());
   }
 
   @Test
@@ -326,7 +357,8 @@ class CollectionFollowUpServiceTest {
             false,
             false,
             false,
-            actor);
+            actor,
+            false);
     when(source.current(obligation)).thenReturn(settled);
     service.synchronize(obligation);
     assertThat(c.getClosedAt()).isEqualTo(clock.instant());
@@ -446,7 +478,8 @@ class CollectionFollowUpServiceTest {
         false,
         false,
         false,
-        owner);
+        owner,
+        false);
   }
 
   /** The case has seen the ledger as it is in {@code facts}. */

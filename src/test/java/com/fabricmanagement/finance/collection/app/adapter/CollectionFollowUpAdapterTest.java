@@ -17,6 +17,7 @@ import com.fabricmanagement.finance.collection.domain.CollectionProjection;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Kind;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.Method;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionChequeApplicationRepository;
+import com.fabricmanagement.finance.collection.infra.repository.CollectionChequeOfferRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionObligationRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionPaymentMatchRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionPaymentMatchRepository.Balance;
@@ -65,6 +66,7 @@ class CollectionFollowUpAdapterTest {
             projections,
             matches,
             cheques,
+            mock(CollectionChequeOfferRepository.class),
             commands,
             mock(CollectionAccessService.class),
             new FinancePostingDates(clock, calendar),

@@ -7,6 +7,10 @@ import static org.mockito.Mockito.*;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantBusinessCalendarPort;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.finance.collection.dto.CollectionCustomerSummaryDtos.Coverage;
+import com.fabricmanagement.finance.collection.dto.CollectionCustomerSummaryDtos.NextAction;
+import com.fabricmanagement.finance.collection.dto.CollectionCustomerSummaryDtos.Summary;
 import com.fabricmanagement.finance.collection.dto.CollectionReportDtos.Report;
 import com.fabricmanagement.finance.collection.dto.CollectionReportDtos.Row;
 import com.fabricmanagement.finance.collection.security.CollectionAccessService;
@@ -41,6 +45,8 @@ class CollectionReportIT extends AbstractIntegrationTest {
   }
 
   @Autowired CollectionReportService reports;
+  @Autowired CollectionCustomerSummaryService summaries;
+  @Autowired CollectionChequeOfferService offers;
   @Autowired SystemTransactionExecutor system;
   @MockitoBean CollectionAccessService access;
   @MockitoBean TradingPartnerResolver partners;
@@ -66,6 +72,11 @@ class CollectionReportIT extends AbstractIntegrationTest {
     registry = UUID.randomUUID();
     when(calendar.zone()).thenReturn(ZoneId.of("Europe/London"));
     when(access.reach(actor, "read"))
+        .thenAnswer(
+            i ->
+                new CollectionAccessService.Reach(
+                    TenantContext.requireTenantId(), DataScope.ORGANIZATION, Set.of(actor)));
+    when(access.reach(actor, "write"))
         .thenAnswer(
             i ->
                 new CollectionAccessService.Reach(
@@ -616,6 +627,271 @@ class CollectionReportIT extends AbstractIntegrationTest {
     assertThat(result.warnings()).contains("LEGACY_AND_UNPROJECTED_COVERAGE_UNKNOWN");
   }
 
+  @Test
+  void unappliedHeldChequeDoesNotReduceDeliveryDueAndItsApplicationIsNotCash() {
+    UUID cheque = heldCheque();
+    markDiscoveryCurrent();
+    var before = summary().currencies().getFirst();
+    money(before.chequeDeliveryDue(), "4284");
+    money(before.unallocatedCheques(), "4284");
+    var application = UUID.randomUUID();
+    applied(cheque, application, "2000", "2026-10-30", "2026-10-30T12:30:00Z");
+    var after = summary().currencies().getFirst();
+    money(after.chequeDeliveryDue(), "2284");
+    money(after.unpaidInstalments(), "4284");
+    money(after.appliedHeldCheques(), "2000");
+    money(after.unallocatedCheques(), "2284");
+
+    chequeState(cheque, 1, "PRESENT", "PRESENTED", "2026-11-08");
+    assertThat(summary().currencies().getFirst().presentedCheques())
+        .singleElement()
+        .satisfies(row -> assertThat(row.id()).isEqualTo(cheque));
+    chequeState(cheque, 2, "DISHONOUR", "DISHONOURED", "2026-11-09");
+    var dishonoured = summary().currencies().getFirst();
+    money(dishonoured.chequeDeliveryDue(), "4284");
+    money(dishonoured.appliedHeldCheques(), "0");
+    assertThat(dishonoured.awaitingBankResult()).isZero();
+
+    chequeState(cheque, 3, "PRESENT", "PRESENTED", "2026-11-10");
+    chequeState(cheque, 4, "CLEAR", "CLEARED", "2026-11-10");
+    system.executeInTransaction(
+        sql -> {
+          sql.update(
+              "UPDATE finance.finance_payment SET amount=4284, method='CHEQUE' WHERE id=?",
+              payment);
+          sql.update(
+              "UPDATE finance.collection_cheque SET state='CLEARED', cleared_payment_id=? WHERE id=?",
+              payment,
+              cheque);
+          sql.update(
+              """
+              INSERT INTO finance.collection_payment_match
+                (id,tenant_id,obligation_id,payment_id,cheque_id,amount,effective_date,occurred_at,
+                 actor_id,reason,created_at,updated_at)
+              VALUES (gen_random_uuid(),?,?,?,?,2000,'2026-11-10','2026-11-10T10:00Z',
+                ?,'Cheque cleared','2026-11-10T10:00Z','2026-11-10T10:00Z')
+              """,
+              tenant,
+              obligation,
+              payment,
+              cheque,
+              actor);
+          return null;
+        });
+    var cleared = summary().currencies().getFirst();
+    money(cleared.unpaidInstalments(), "2284");
+    money(cleared.chequeDeliveryDue(), "2284");
+    money(cleared.unallocatedPayments(), "2284");
+    money(cleared.unallocatedCheques(), "0");
+  }
+
+  @Test
+  void dueWorkUsesTheTenantDayAndBankFollowUpCountsInstrumentsRatherThanApplications() {
+    UUID cheque = heldCheque();
+    markDiscoveryCurrent();
+    var due = addSummaryPlan("CHEQUE", "2026-11-10", false);
+    addSummaryPlan("BANK_TRANSFER", "2026-11-11", false);
+    addSummaryPlan("BANK_TRANSFER", null, false);
+    addSummaryPlan("BANK_TRANSFER", "2026-11-09", true);
+    applied(cheque, UUID.randomUUID(), "1000", "2026-11-10", "2026-11-10T08:00:00Z");
+    appliedTo(cheque, due, UUID.randomUUID(), "1000", "2026-11-10", "2026-11-10T08:00:00Z");
+    chequeState(cheque, 1, "PRESENT", "PRESENTED", "2026-11-10");
+
+    var result = summary();
+    assertThat(result.asOfDate()).isEqualTo(LocalDate.parse("2026-11-10"));
+    var gbp = result.currencies().getFirst();
+    money(gbp.paymentDue(), "0");
+    money(gbp.chequeDeliveryDue(), "6568");
+    assertThat(gbp.undatedOpenInstalments()).isOne();
+    assertThat(gbp.awaitingBankResult()).isOne();
+    assertThat(gbp.presentedCheques())
+        .singleElement()
+        .satisfies(
+            item -> {
+              assertThat(item.id()).isEqualTo(cheque);
+              assertThat(item.bankDueDate()).isEqualTo(LocalDate.parse("2026-11-30"));
+            });
+  }
+
+  private UUID addSummaryPlan(String method, String due, boolean cancelled) {
+    UUID id = UUID.randomUUID();
+    UUID logicalId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+    UUID planId = UUID.randomUUID();
+    UUID revisionId = UUID.randomUUID();
+    system.executeInTransaction(
+        sql -> {
+          obligation(sql, id, logicalId, orderId, planId, revisionId, "GBP", method, due, actor);
+          source(
+              sql,
+              orderId,
+              planId,
+              revisionId,
+              logicalId,
+              cancelled,
+              "2026-10-20T12:00:00Z",
+              "2026-10-20T12:00:00Z",
+              1);
+          return null;
+        });
+    return id;
+  }
+
+  @Test
+  void completeSummaryCrossesTheCandidateLimitAndReportsRestrictedAndStaleCoverage() {
+    markDiscoveryCurrent();
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                """
+        INSERT INTO finance.finance_payment
+          (id,tenant_id,trading_partner_id,payment_number,direction,method,status,amount,currency,
+           payment_date,created_at,updated_at,created_by)
+        SELECT gen_random_uuid(),?, ?, 'NORTHBANK-' || i,'INBOUND','BANK_TRANSFER','RECEIVED',
+          1,CASE WHEN i=502 THEN 'EUR' ELSE 'GBP' END,'2026-11-10',now(),now(),?
+        FROM generate_series(1,502) i
+        """,
+                tenant,
+                partner,
+                actor));
+    assertThat(summary().currencies())
+        .satisfiesExactly(
+            eur -> {
+              assertThat(eur.currency()).isEqualTo("EUR");
+              money(eur.unallocatedPayments(), "1");
+            },
+            gbp -> {
+              assertThat(gbp.currency()).isEqualTo("GBP");
+              money(gbp.unallocatedPayments(), "1501");
+            });
+    doAnswer(
+            i ->
+                new CollectionAccessService.Reach(
+                    TenantContext.requireTenantId(), DataScope.OWN, Set.of(actor)))
+        .when(access)
+        .reach(actor, "read");
+    var restricted = summary();
+    assertThat(restricted.coverage()).isEqualTo(Coverage.RESTRICTED_RECORDED_PLANS);
+    money(restricted.currencies().getLast().unallocatedPayments(), "501");
+
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                "UPDATE finance.collection_reconciliation_health SET failed=true WHERE tenant_id=?",
+                tenant));
+    var stale = summary();
+    assertThat(stale.sourceDiscoveryStale()).isTrue();
+    assertThat(stale.currencies())
+        .allSatisfy(
+            line -> {
+              assertThat(line.paymentDue()).isNull();
+              assertThat(line.unpaidInstalments()).isNull();
+              assertThat(line.unallocatedPayments()).isNull();
+            });
+    assertThatThrownBy(
+            () ->
+                TenantContext.executeInTenantContext(
+                    UUID.randomUUID(), () -> summaries.summary(partner, actor)))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void confirmedChequeOfferReplacesThePaymentPromptAndSurvivesReloadWithoutAllocation() {
+    markDiscoveryCurrent();
+    UUID cheque = UUID.randomUUID();
+    system.executeInTransaction(
+        sql -> {
+          sql.update(
+              """
+          INSERT INTO finance.collection_projection
+            (id,tenant_id,created_at,updated_at,order_id,plan_id,revision_id,source_order_version,
+             source_read_at,source_changed_at)
+          VALUES (gen_random_uuid(),?,now(),now(),?,?,?,0,now(),now())
+          """,
+              tenant,
+              order,
+              plan,
+              revision);
+          sql.update(
+              """
+          INSERT INTO finance.collection_cheque
+            (id,tenant_id,partner_id,currency,amount,received_on,due_on,instrument_reference,state,
+             created_at,updated_at,created_by)
+          VALUES (?,?,?,'GBP',4284,'2026-11-08','2026-11-30','NORTHBANK-84','PRESENTED',
+            '2026-11-08T12:00Z','2026-11-08T12:00Z',?)
+          """,
+              cheque,
+              tenant,
+              partner,
+              actor);
+          return null;
+        });
+    chequeState(cheque, 0, "PRESENT", "PRESENTED", "2026-11-10");
+    var unrelated = summary().currencies().getFirst();
+    money(unrelated.paymentDue(), "4284");
+    assertThat(unrelated.awaitingBankResult()).isOne();
+    assertThat(unrelated.instalments().getFirst().nextAction()).isEqualTo(NextAction.PAYMENT_DUE);
+
+    var recorded =
+        TenantContext.executeInTenantContext(
+            tenant, () -> offers.record(cheque, obligation, actor));
+    assertThat(
+            TenantContext.executeInTenantContext(
+                tenant, () -> offers.record(cheque, obligation, actor)))
+        .isEqualTo(recorded);
+    var reloaded = summary().currencies().getFirst();
+    var row = reloaded.instalments().getFirst();
+    assertThat(row.nextAction()).isEqualTo(NextAction.REVIEW_PAYMENT_METHOD);
+    assertThat(row.offers()).containsExactly(recorded);
+    money(row.agreedAmount(), "4284");
+    money(reloaded.paymentDue(), "0");
+    money(reloaded.unpaidInstalments(), "4284");
+    money(reloaded.appliedHeldCheques(), "0");
+    money(reloaded.unallocatedCheques(), "4284");
+  }
+
+  private Summary summary() {
+    return TenantContext.executeInTenantContext(tenant, () -> summaries.summary(partner, actor));
+  }
+
+  private void markDiscoveryCurrent() {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                """
+        INSERT INTO finance.collection_reconciliation_health
+          (id,tenant_id,created_at,updated_at,completed_at)
+        VALUES (gen_random_uuid(),?,now(),now(),'2026-11-10T12:00Z')
+        """,
+                tenant));
+  }
+
+  private void chequeState(
+      UUID cheque, int revisionNumber, String action, String state, String date) {
+    system.executeInTransaction(
+        sql ->
+            sql.update(
+                """
+        INSERT INTO finance.collection_cheque_event
+          (id,tenant_id,cheque_id,evidence_revision,action,state,effective_date,occurred_at,
+           actor_id,reason,evidence,amount,received_on,due_on,instrument_reference,created_at,updated_at)
+        SELECT gen_random_uuid(),tenant_id,id,?,?,?,CAST(? AS date),CAST(? AS timestamptz),?,
+          'Bank status verified','Bank record',amount,received_on,due_on,instrument_reference,
+          CAST(? AS timestamptz),CAST(? AS timestamptz)
+        FROM finance.collection_cheque WHERE tenant_id=? AND id=?
+        """,
+                revisionNumber,
+                action,
+                state,
+                date,
+                date + "T09:00Z",
+                actor,
+                date + "T09:00Z",
+                date + "T09:00Z",
+                tenant,
+                cheque));
+  }
+
   @AfterEach
   void clear() {
     TenantContext.clear();
@@ -629,6 +905,9 @@ class CollectionReportIT extends AbstractIntegrationTest {
               List.of(
                   "collection_source_observation",
                   "collection_cheque_event",
+                  "collection_cheque_offer",
+                  "collection_reconciliation_health",
+                  "collection_projection",
                   "collection_refund_event",
                   "collection_refund",
                   "collection_payment_match",
@@ -763,6 +1042,11 @@ class CollectionReportIT extends AbstractIntegrationTest {
   }
 
   private void applied(UUID cheque, UUID id, String amount, String effective, String recorded) {
+    appliedTo(cheque, obligation, id, amount, effective, recorded);
+  }
+
+  private void appliedTo(
+      UUID cheque, UUID target, UUID id, String amount, String effective, String recorded) {
     system.executeInTransaction(
         sql ->
             sql.update(
@@ -773,7 +1057,7 @@ class CollectionReportIT extends AbstractIntegrationTest {
                 id,
                 tenant,
                 cheque,
-                obligation,
+                target,
                 amount,
                 effective,
                 at(recorded),

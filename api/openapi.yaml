@@ -18576,6 +18576,83 @@ paths:
       summary: Record a physical cheque and its applications without recording cash
       tags:
       - Finance Collections
+  /api/v1/finance/collections/cheques/{chequeId}/offer:
+    put:
+      operationId: recordFinanceCollectionChequeOffer
+      parameters:
+      - in: path
+        name: chequeId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionRecordChequeOfferRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeOfferDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Cheque or transfer instalment is incompatible with the offer
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Confirm that a held cheque was offered for a transfer instalment
+      tags:
+      - Finance Collections
   /api/v1/finance/collections/cheques/{id}:
     get:
       operationId: getFinanceCollectionCheque
@@ -19337,6 +19414,77 @@ paths:
       summary: Reactivate a deactivated cheque drawer so it can be selected
       tags:
       - Finance Collection Cheque Drawers
+  /api/v1/finance/collections/customers/{partnerId}/summary:
+    get:
+      operationId: getFinanceCollectionCustomerSummary
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCustomerSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read the customer's scoped collection follow-up and payment plan balances
+      tags:
+      - Finance Collections
   /api/v1/finance/collections/payment-matches/{id}/reverse:
     post:
       operationId: reverseFinanceCollectionMatch
@@ -69066,6 +69214,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFinanceCollectionChequeOfferDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeOfferDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFinanceCollectionCommandResult:
       type: object
       properties:
@@ -69089,6 +69255,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/FinanceCollectionCustomerAvailabilityDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionCustomerSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionCustomerSummaryDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -76636,6 +76820,7 @@ components:
           - COLLECT_PAYMENT
           - RECEIVE_CHEQUE
           - CLEAR_CHEQUE
+          - REVIEW_PAYMENT_METHOD
         promisedAmount:
           type:
           - string
@@ -85448,6 +85633,21 @@ components:
       enum:
       - POSSIBLE_DUPLICATE_CHEQUE_REFERENCE
       - CHEQUE_DUE_AFTER_AGREED_DATE
+    FinanceCollectionChequeOfferDto:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        chequeId:
+          type: string
+          format: uuid
+        instalmentId:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
     FinanceCollectionChequeState:
       type: string
       enum:
@@ -85670,6 +85870,78 @@ components:
       - partnerId
       - paymentDate
       - reason
+    FinanceCollectionCustomerSummaryCurrencyDto:
+      type: object
+      properties:
+        appliedHeldCheques:
+          type:
+          - string
+          - "null"
+        awaitingBankResult:
+          type: integer
+          format: int64
+        chequeDeliveryDue:
+          type:
+          - string
+          - "null"
+        chequesAvailableToOffer:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryChequeDto"
+        currency:
+          type: string
+        instalments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryInstalmentDto"
+        paymentDue:
+          type:
+          - string
+          - "null"
+        presentedCheques:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryChequeDto"
+        unallocatedCheques:
+          type:
+          - string
+          - "null"
+        unallocatedPayments:
+          type:
+          - string
+          - "null"
+        unavailablePlanInstalments:
+          type: integer
+          format: int64
+        undatedOpenInstalments:
+          type: integer
+          format: int64
+        unpaidInstalments:
+          type:
+          - string
+          - "null"
+    FinanceCollectionCustomerSummaryDto:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date
+        calculatedAt:
+          type: string
+          format: date-time
+        coverage:
+          $ref: "#/components/schemas/FinanceCollectionSummaryCoverage"
+        currencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionCustomerSummaryCurrencyDto"
+        partnerId:
+          type: string
+          format: uuid
+        sourceDiscoveryStale:
+          type: boolean
+        timeZone:
+          type: string
     FinanceCollectionDetailDto:
       type: object
       properties:
@@ -86171,6 +86443,14 @@ components:
       - partnerId
       - reason
       - receivedOn
+    FinanceCollectionRecordChequeOfferRequest:
+      type: object
+      properties:
+        instalmentId:
+          type: string
+          format: uuid
+      required:
+      - instalmentId
     FinanceCollectionRefundDto:
       type: object
       properties:
@@ -86623,6 +86903,64 @@ components:
       - operationId
       - paymentId
       - reason
+    FinanceCollectionSummaryChequeDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        bankDueDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+    FinanceCollectionSummaryCoverage:
+      type: string
+      enum:
+      - RECORDED_PLANS
+      - RESTRICTED_RECORDED_PLANS
+    FinanceCollectionSummaryInstalmentDto:
+      type: object
+      properties:
+        agreedAmount:
+          type: string
+        canRecordChequeOffer:
+          type: boolean
+        expectedDate:
+          type:
+          - string
+          - "null"
+          format: date
+        id:
+          type: string
+          format: uuid
+        missingChequeAmount:
+          type:
+          - string
+          - "null"
+        nextAction:
+          $ref: "#/components/schemas/FinanceCollectionSummaryNextAction"
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeOfferDto"
+        orderNumber:
+          type:
+          - string
+          - "null"
+        outstandingAmount:
+          type:
+          - string
+          - "null"
+    FinanceCollectionSummaryNextAction:
+      type: string
+      enum:
+      - PAYMENT_DUE
+      - CHEQUE_DELIVERY_DUE
+      - REVIEW_PAYMENT_METHOD
+      - NONE
     FinanceWarningDto:
       type: object
       properties:

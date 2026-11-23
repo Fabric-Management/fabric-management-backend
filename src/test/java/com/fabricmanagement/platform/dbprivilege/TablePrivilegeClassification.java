@@ -107,6 +107,7 @@ final class TablePrivilegeClassification {
     entries.put("finance.collection_refund_event", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("finance.collection_command_receipt", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("finance.collection_cheque_handover", TablePrivilegeClass.APPEND_ONLY_LEDGER);
+    entries.put("finance.collection_cheque_offer", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("finance.collection_source_observation", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put(
         "finance.collection_reconciliation_health", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);

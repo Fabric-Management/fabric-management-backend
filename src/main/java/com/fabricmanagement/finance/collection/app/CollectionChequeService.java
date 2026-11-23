@@ -36,6 +36,7 @@ public class CollectionChequeService {
   private final CollectionChequeRepository cheques;
   private final CollectionChequeApplicationRepository applications;
   private final CollectionChequeEventRepository events;
+  private final CollectionChequeOfferRepository offers;
   private final CollectionObligationRepository obligations;
   private final CollectionPaymentMatchRepository matches;
   private final CollectionPostingService posting;
@@ -330,6 +331,7 @@ public class CollectionChequeService {
             actor,
             request.reason(),
             request.evidence()));
+    if (!drawerOnly) notifyOfferChange(tenant, chequeId);
     return commands.record(
         request.operationId(),
         actor,
@@ -436,6 +438,7 @@ public class CollectionChequeService {
     }
     cheques.saveAndFlush(cheque);
     events.flush();
+    notifyOfferChange(tenant, chequeId);
     return commands.record(
         request.operationId(),
         actor,
@@ -507,6 +510,7 @@ public class CollectionChequeService {
             actor,
             request.reason(),
             request.evidence()));
+    notifyOfferChange(tenant, chequeId);
     return commands.record(
         request.operationId(),
         actor,
@@ -727,6 +731,10 @@ public class CollectionChequeService {
                 java.util.LinkedHashMap::new,
                 Collectors.reducing(
                     BigDecimal.ZERO, CollectionChequeApplication::getAmount, BigDecimal::add)));
+  }
+
+  private void notifyOfferChange(UUID tenant, UUID chequeId) {
+    offers.find(tenant, chequeId).ifPresent(offer -> changes.changed(offer.obligationId()));
   }
 
   private List<CollectionObligation> requireChequeWrite(

@@ -187,7 +187,8 @@ class CollectionFollowUpIT extends AbstractIntegrationTest {
         false,
         false,
         false,
-        actor);
+        actor,
+        false);
   }
 
   <T> T in(UUID tenant, Supplier<T> work) {

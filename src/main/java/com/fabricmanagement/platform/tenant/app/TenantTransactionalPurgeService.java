@@ -110,6 +110,8 @@ public class TenantTransactionalPurgeService {
           "finance.collection_refund",
           "finance.collection_payment_match",
           "finance.collection_cheque_application",
+          // The offer references its cheque and its obligation: delete it before both.
+          "finance.collection_cheque_offer",
           "finance.collection_cheque",
           "finance.collection_cheque_handover",
           "finance.collection_expectation",

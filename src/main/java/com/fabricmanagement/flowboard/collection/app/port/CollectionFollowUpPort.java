@@ -56,12 +56,14 @@ public interface CollectionFollowUpPort {
       boolean cancelled,
       boolean sourceMissing,
       boolean stale,
-      UUID owner) {
+      UUID owner,
+      boolean methodReview) {
     public boolean closed() {
       return !sourceMissing && (cancelled || outstanding.signum() == 0);
     }
 
     public String phase() {
+      if (methodReview) return "REVIEW_PAYMENT_METHOD";
       return !cheque
           ? "COLLECT_PAYMENT"
           : missingInstrument.signum() > 0 ? "RECEIVE_CHEQUE" : "CLEAR_CHEQUE";
