@@ -240,12 +240,16 @@ public class CollectionFollowUpService {
         List.of(
             new Capability(
                 "RECORD_CONTACT",
-                holder,
-                holder
-                    ? null
-                    : !ready
-                        ? "SOURCE_NOT_ACTIONABLE"
-                        : c.getResponsibleUserId() == null ? "UNASSIGNED" : "ASSIGNED_ELSEWHERE",
+                holder && !facts.methodReview(),
+                facts.methodReview()
+                    ? "REVIEW_PAYMENT_METHOD"
+                    : holder
+                        ? null
+                        : !ready
+                            ? "SOURCE_NOT_ACTIONABLE"
+                            : c.getResponsibleUserId() == null
+                                ? "UNASSIGNED"
+                                : "ASSIGNED_ELSEWHERE",
                 null,
                 false),
             new Capability(

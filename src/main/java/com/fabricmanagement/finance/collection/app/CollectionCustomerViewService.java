@@ -4,10 +4,12 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.finance.collection.domain.CollectionAmounts;
 import com.fabricmanagement.finance.collection.domain.CollectionCheque;
 import com.fabricmanagement.finance.collection.domain.CollectionChequeApplication;
+import com.fabricmanagement.finance.collection.domain.CollectionChequeHandover;
 import com.fabricmanagement.finance.collection.domain.CollectionObligation;
 import com.fabricmanagement.finance.collection.domain.CollectionTypes.ChequeState;
 import com.fabricmanagement.finance.collection.dto.CollectionDtos;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionChequeApplicationRepository;
+import com.fabricmanagement.finance.collection.infra.repository.CollectionChequeHandoverRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionChequeRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionObligationRepository;
 import com.fabricmanagement.finance.collection.infra.repository.CollectionPaymentMatchRepository;
@@ -18,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -56,6 +59,7 @@ public class CollectionCustomerViewService {
   private final CollectionChequeRepository cheques;
   private final CollectionChequeApplicationRepository applications;
   private final CollectionObligationRepository obligations;
+  private final CollectionChequeHandoverRepository handovers;
 
   @Transactional(readOnly = true)
   public CollectionDtos.CustomerAvailability availability(UUID partnerId, UUID actor) {
@@ -66,9 +70,7 @@ public class CollectionCustomerViewService {
     var lines = new TreeMap<String, Line>();
 
     // Payments: the shared availability, eligible payments with something left only.
-    boolean allScope =
-        read.scope() == com.fabricmanagement.platform.user.domain.DataScope.GLOBAL
-            || read.scope() == com.fabricmanagement.platform.user.domain.DataScope.ORGANIZATION;
+    boolean allScope = read.unrestricted();
     var candidates =
         matches.unmatchedPaymentIds(
             tenant, partnerId, allScope, read.principals(), PAYMENT_LIMIT + 1);
@@ -139,13 +141,26 @@ public class CollectionCustomerViewService {
                 ? List.<CollectionObligation>of()
                 : obligations.findByTenantIdAndIdIn(tenant, targetIds))
             .stream().collect(Collectors.toMap(CollectionObligation::getId, Function.identity()));
+    var handoverIds =
+        all.stream()
+            .map(CollectionCheque::getHandoverId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    var handoverNumbers =
+        handoverIds.isEmpty()
+            ? Map.<UUID, String>of()
+            : handovers.findByTenantIdAndIdIn(tenant, handoverIds).stream()
+                .collect(
+                    Collectors.toMap(
+                        CollectionChequeHandover::getId,
+                        CollectionChequeHandover::getHandoverNumber));
     var history = new ArrayList<CollectionDtos.HeldCheque>();
     for (var cheque : held) {
       var rows = byCheque.getOrDefault(cheque.getId(), List.of());
       if (!visible(read, tenant, cheque, rows, targets)) continue;
       BigDecimal applied = total(rows);
       BigDecimal left = cheque.getAmount().subtract(applied).max(BigDecimal.ZERO);
-      var item = cheque(cheque, applied, left);
+      var item = cheque(cheque, applied, left, handoverNumbers);
       if (left.signum() > 0)
         lines.computeIfAbsent(cheque.getCurrency(), Line::new).cheque(item, left);
       else history.add(item);
@@ -153,7 +168,7 @@ public class CollectionCustomerViewService {
     for (var cheque : past.getContent()) {
       var rows = byCheque.getOrDefault(cheque.getId(), List.of());
       if (visible(read, tenant, cheque, rows, targets))
-        history.add(cheque(cheque, total(rows), BigDecimal.ZERO));
+        history.add(cheque(cheque, total(rows), BigDecimal.ZERO, handoverNumbers));
     }
     history.sort(
         java.util.Comparator.comparing(CollectionDtos.HeldCheque::receivedOn)
@@ -192,7 +207,10 @@ public class CollectionCustomerViewService {
   }
 
   private static CollectionDtos.HeldCheque cheque(
-      CollectionCheque cheque, BigDecimal applied, BigDecimal available) {
+      CollectionCheque cheque,
+      BigDecimal applied,
+      BigDecimal available,
+      Map<UUID, String> handoverNumbers) {
     String currency = cheque.getCurrency();
     return new CollectionDtos.HeldCheque(
         cheque.getId(),
@@ -206,7 +224,9 @@ public class CollectionCustomerViewService {
         cheque.getDueOn(),
         CollectionAmounts.text(cheque.getAmount(), currency),
         CollectionAmounts.text(applied, currency),
-        CollectionAmounts.text(available, currency));
+        CollectionAmounts.text(available, currency),
+        cheque.getHandoverId(),
+        cheque.getHandoverId() == null ? null : handoverNumbers.get(cheque.getHandoverId()));
   }
 
   /** One currency's two lines, accumulated separately and never added together. */

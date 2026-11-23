@@ -35,6 +35,7 @@ class CollectionChequeServiceTest {
   @Mock CollectionChequeRepository cheques;
   @Mock CollectionChequeApplicationRepository applications;
   @Mock CollectionChequeEventRepository events;
+  @Mock CollectionChequeOfferRepository offers;
   @Mock CollectionObligationRepository obligations;
   @Mock CollectionPaymentMatchRepository matches;
   @Mock CollectionPostingService posting;

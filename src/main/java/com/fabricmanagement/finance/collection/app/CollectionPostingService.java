@@ -251,6 +251,15 @@ public class CollectionPostingService {
 
   void freshAll(java.util.List<CollectionObligation> rows) {
     if (rows.isEmpty()) return;
+    var orderIds = synchronizeTargets(rows);
+    var sources = projections.findByTenantIdAndOrderIdIn(TenantContext.requireTenantId(), orderIds);
+    if (sources.size() != orderIds.size()
+        || sources.stream().anyMatch(value -> value.isSourceMissing()))
+      throw CollectionRuleException.conflict(
+          "COLLECTION_SOURCE_MISSING", "The source agreement could not be verified");
+  }
+
+  java.util.List<UUID> synchronizeTargets(java.util.List<CollectionObligation> rows) {
     var orderIds =
         rows.stream()
             .map(CollectionObligation::getOrderId)
@@ -258,11 +267,7 @@ public class CollectionPostingService {
             .sorted(java.util.Comparator.comparing(UUID::toString))
             .toList();
     orderIds.forEach(projectionService::synchronize);
-    var sources = projections.findByTenantIdAndOrderIdIn(TenantContext.requireTenantId(), orderIds);
-    if (sources.size() != orderIds.size()
-        || sources.stream().anyMatch(value -> value.isSourceMissing()))
-      throw CollectionRuleException.conflict(
-          "COLLECTION_SOURCE_MISSING", "The source agreement could not be verified");
+    return orderIds;
   }
 
   /**

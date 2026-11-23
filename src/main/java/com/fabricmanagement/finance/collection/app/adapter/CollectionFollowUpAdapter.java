@@ -26,6 +26,7 @@ public class CollectionFollowUpAdapter implements CollectionFollowUpPort {
   private final CollectionProjectionRepository projections;
   private final CollectionPaymentMatchRepository matches;
   private final CollectionChequeApplicationRepository cheques;
+  private final CollectionChequeOfferRepository offers;
   private final CollectionCommandStore commands;
   private final CollectionAccessService access;
   private final FinancePostingDates dates;
@@ -87,13 +88,19 @@ public class CollectionFollowUpAdapter implements CollectionFollowUpPort {
             .findFirst()
             .map(CollectionPaymentMatchRepository.Balance::getAmount)
             .orElse(BigDecimal.ZERO);
+    var outstanding = CollectionAmounts.outstanding(row.getAmount(), cash);
+    boolean methodReview =
+        !row.isCancelled()
+            && outstanding.signum() > 0
+            && row.getMethod() == CollectionTypes.Method.BANK_TRANSFER
+            && offers.hasHeldOffer(tenant, id);
     return new Facts(
         id,
         row.getVersion(),
         row.getPartnerId(),
         row.getCurrency(),
         row.getAmount(),
-        CollectionAmounts.outstanding(row.getAmount(), cash),
+        outstanding,
         row.getMethod() == CollectionTypes.Method.CHEQUE
             ? CollectionAmounts.outstanding(row.getAmount(), received.add(nonCheque))
             : BigDecimal.ZERO,
@@ -103,7 +110,8 @@ public class CollectionFollowUpAdapter implements CollectionFollowUpPort {
         row.isCancelled(),
         state == null || state.isSourceMissing(),
         state != null && state.isStale(),
-        row.getResponsibleUserId());
+        row.getResponsibleUserId(),
+        methodReview);
   }
 
   @Override

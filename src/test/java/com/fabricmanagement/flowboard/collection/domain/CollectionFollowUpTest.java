@@ -48,7 +48,8 @@ class CollectionFollowUpTest {
             false,
             false,
             false,
-            null);
+            null,
+            false);
     assertThat(f.phase()).isEqualTo("CLEAR_CHEQUE");
     assertThat(f.closed()).isFalse();
     assertThat(f.dueDate()).isEqualTo(LocalDate.of(2027, 7, 20));
@@ -67,7 +68,8 @@ class CollectionFollowUpTest {
             false,
             true,
             false,
-            null);
+            null,
+            false);
     assertThat(missing.closed()).as("Missing evidence is never a settled source").isFalse();
   }
 

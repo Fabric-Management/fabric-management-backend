@@ -60,6 +60,12 @@ public class CollectionCheque extends BaseEntity {
 
   private UUID drawerId;
 
+  @Column(updatable = false)
+  private UUID handoverId;
+
+  @Column(updatable = false)
+  private Integer handoverOrdinal;
+
   @Override
   protected String getModuleCode() {
     return "CHQ";
@@ -85,6 +91,23 @@ public class CollectionCheque extends BaseEntity {
     value.lastEvidence = evidence;
     value.state = ChequeState.RECEIVED;
     return value;
+  }
+
+  public static CollectionCheque receiveInHandover(
+      UUID partner,
+      String currency,
+      BigDecimal amount,
+      LocalDate received,
+      LocalDate due,
+      String reference,
+      String evidence,
+      Drawer drawer,
+      UUID handover,
+      int ordinal) {
+    var cheque = receive(partner, currency, amount, received, due, reference, evidence, drawer);
+    cheque.handoverId = handover;
+    cheque.handoverOrdinal = ordinal;
+    return cheque;
   }
 
   public void transition(ChequeAction action, UUID paymentId, String evidence) {

@@ -18125,6 +18125,386 @@ paths:
       summary: Read paged expectations with per-currency balances and source freshness
       tags:
       - Finance Collections
+  /api/v1/finance/collections/cheque-handovers:
+    get:
+      description: "The optional number filter matches a full handover number, ignoring\
+        \ case."
+      operationId: listFinanceCollectionChequeHandovers
+      parameters:
+      - in: query
+        name: partnerId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: number
+        required: false
+        schema:
+          type: string
+      - description: Zero-based page index
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, capped at 100"
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePageFinanceCollectionChequeHandoverSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Find readable cheque handovers, newest first"
+      tags:
+      - Finance Collections
+    post:
+      operationId: saveFinanceCollectionChequeHandover
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionChequeHandoverSaveRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCommandResult"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionChequeHandoverProblem"
+          description: Invalid handover or cheque row
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/FinanceCollectionChequeHandoverProblem"
+          description: "Stale instalments, replay conflict or rejected cheque row"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Record a numbered cheque handover atomically with replay protection
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/cheque-handovers/preview:
+    post:
+      operationId: previewFinanceCollectionChequeHandover
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeHandoverPreviewDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Propose cheque applications and compare maturity without posting or
+        refreshing
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/cheque-handovers/target-refresh:
+    post:
+      operationId: refreshFinanceCollectionChequeHandoverTargets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionChequeHandoverRefreshRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListFinanceCollectionChequeHandoverTargetRefreshDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: At least one target is missing or outside write scope
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Refresh authorised targets from a stale handover without waiting for
+        another command
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/cheque-handovers/{id}:
+    get:
+      operationId: getFinanceCollectionChequeHandover
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeHandoverDetailDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The handover is absent or none of its cheques are readable
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read a handover's visible cheques in receipt order with original receipt
+        totals
+      tags:
+      - Finance Collections
   /api/v1/finance/collections/cheques:
     post:
       operationId: receiveFinanceCollectionCheque
@@ -18194,6 +18574,83 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Record a physical cheque and its applications without recording cash
+      tags:
+      - Finance Collections
+  /api/v1/finance/collections/cheques/{chequeId}/offer:
+    put:
+      operationId: recordFinanceCollectionChequeOffer
+      parameters:
+      - in: path
+        name: chequeId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinanceCollectionRecordChequeOfferRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionChequeOfferDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Cheque or transfer instalment is incompatible with the offer
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Confirm that a held cheque was offered for a transfer instalment
       tags:
       - Finance Collections
   /api/v1/finance/collections/cheques/{id}:
@@ -18957,6 +19414,77 @@ paths:
       summary: Reactivate a deactivated cheque drawer so it can be selected
       tags:
       - Finance Collection Cheque Drawers
+  /api/v1/finance/collections/customers/{partnerId}/summary:
+    get:
+      operationId: getFinanceCollectionCustomerSummary
+      parameters:
+      - in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinanceCollectionCustomerSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Read the customer's scoped collection follow-up and payment plan balances
+      tags:
+      - Finance Collections
   /api/v1/finance/collections/payment-matches/{id}/reverse:
     post:
       operationId: reverseFinanceCollectionMatch
@@ -68650,6 +69178,60 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFinanceCollectionChequeHandoverDetailDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverDetailDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionChequeHandoverPreviewDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionChequeOfferDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionChequeOfferDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFinanceCollectionCommandResult:
       type: object
       properties:
@@ -68673,6 +69255,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/FinanceCollectionCustomerAvailabilityDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinanceCollectionCustomerSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinanceCollectionCustomerSummaryDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -69628,6 +70228,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FiberTestResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListFinanceCollectionChequeHandoverTargetRefreshDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverTargetRefreshDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -71796,6 +72416,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PageFinanceCollectionChequeEventDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePageFinanceCollectionChequeHandoverSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PageFinanceCollectionChequeHandoverSummaryDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -76182,6 +76820,7 @@ components:
           - COLLECT_PAYMENT
           - RECEIVE_CHEQUE
           - CLEAR_CHEQUE
+          - REVIEW_PAYMENT_METHOD
         promisedAmount:
           type:
           - string
@@ -84239,6 +84878,15 @@ components:
         dueOn:
           type: string
           format: date
+        handoverId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        handoverNumber:
+          type:
+          - string
+          - "null"
         id:
           type: string
           format: uuid
@@ -84372,6 +85020,634 @@ components:
       - receivedOn
       - recordedAt
       - state
+    FinanceCollectionChequeHandoverApplicationInput:
+      type: object
+      properties:
+        amount:
+          type: string
+          example: "1000.00"
+        obligationId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - obligationId
+    FinanceCollectionChequeHandoverCandidatesDto:
+      type: object
+      properties:
+        currency:
+          type: string
+        obligations:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverTargetDto"
+        truncated:
+          type: boolean
+      required:
+      - currency
+      - obligations
+      - truncated
+    FinanceCollectionChequeHandoverChequeDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        appliedAmount:
+          type: string
+        corrected:
+          type: boolean
+        currency:
+          type: string
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+        drawerName:
+          type:
+          - string
+          - "null"
+        dueOn:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        instrumentReference:
+          type: string
+        ordinal:
+          type: integer
+          format: int32
+        state:
+          $ref: "#/components/schemas/FinanceCollectionChequeState"
+        unappliedAmount:
+          type: string
+      required:
+      - amount
+      - appliedAmount
+      - corrected
+      - currency
+      - dueOn
+      - id
+      - instrumentReference
+      - ordinal
+      - state
+      - unappliedAmount
+    FinanceCollectionChequeHandoverCurrencyTotalDto:
+      type: object
+      properties:
+        averageDueOn:
+          type: string
+          format: date
+        chequeCount:
+          type: integer
+          format: int32
+        currency:
+          type: string
+        endorsedTotal:
+          type: string
+        ownTotal:
+          type: string
+        total:
+          type: string
+        unallocatedAmount:
+          type: string
+      required:
+      - averageDueOn
+      - chequeCount
+      - currency
+      - endorsedTotal
+      - ownTotal
+      - total
+      - unallocatedAmount
+    FinanceCollectionChequeHandoverDetailDto:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        cheques:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverChequeDto"
+        evidence:
+          type: string
+        handoverNumber:
+          type: string
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        partial:
+          type: boolean
+          description: At least one cheque is outside the viewer's read scope
+        partnerId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        receiptTotals:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverReceiptTotalDto"
+        receivedOn:
+          type: string
+          format: date
+      required:
+      - actorId
+      - cheques
+      - evidence
+      - handoverNumber
+      - id
+      - occurredAt
+      - partial
+      - partnerId
+      - reason
+      - receiptTotals
+      - receivedOn
+    FinanceCollectionChequeHandoverIssueCode:
+      type: string
+      enum:
+      - CHEQUE_AMOUNT_INVALID
+      - CHEQUE_APPLICATION_AMOUNT_INVALID
+      - CHEQUE_APPLICATION_INCOMPATIBLE
+      - CHEQUE_APPLICATION_REQUIRED
+      - CHEQUE_APPLICATION_DUPLICATE
+      - CHEQUE_DRAWER_KIND_REQUIRED
+      - CHEQUE_OVERAPPLICATION
+      - CHEQUE_REFERENCE_REQUIRED
+    FinanceCollectionChequeHandoverMaturityComparisonDto:
+      type: object
+      properties:
+        agreedAmount:
+          type: string
+        agreedAverageDueOn:
+          type:
+          - string
+          - "null"
+          format: date
+        chequeAverageDueOn:
+          type:
+          - string
+          - "null"
+          format: date
+        coveredByHandoverAmount:
+          type: string
+        currency:
+          type: string
+        differenceInDays:
+          type:
+          - integer
+          - "null"
+          format: int64
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type:
+          - string
+          - "null"
+        partial:
+          type: boolean
+        previouslyCoveredAmount:
+          type: string
+        undatedAmount:
+          type: string
+      required:
+      - agreedAmount
+      - coveredByHandoverAmount
+      - currency
+      - orderId
+      - partial
+      - previouslyCoveredAmount
+      - undatedAmount
+    FinanceCollectionChequeHandoverPreviewApplicationDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        obligationId:
+          type: string
+          format: uuid
+        target:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeHandoverTargetDto"
+          - type: "null"
+      required:
+      - amount
+      - obligationId
+    FinanceCollectionChequeHandoverPreviewDto:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverCandidatesDto"
+        comparisons:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverMaturityComparisonDto"
+        notice:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewNotice"
+          - type: "null"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewRowDto"
+        totals:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverCurrencyTotalDto"
+      required:
+      - candidates
+      - comparisons
+      - rows
+      - totals
+    FinanceCollectionChequeHandoverPreviewNotice:
+      type: string
+      enum:
+      - CHEQUE_HANDOVER_APPLICATION_LIMIT
+    FinanceCollectionChequeHandoverPreviewRequest:
+      type: object
+      properties:
+        includeOtherObligations:
+          type: boolean
+          default: false
+        partnerId:
+          type: string
+          format: uuid
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewRowInput"
+          maxItems: 50
+          minItems: 1
+        targetObligationId:
+          type:
+          - string
+          - "null"
+          format: uuid
+      required:
+      - partnerId
+      - rows
+    FinanceCollectionChequeHandoverPreviewRowDto:
+      type: object
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverPreviewApplicationDto"
+        incomplete:
+          type: boolean
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverRowIssueDto"
+        rowKey:
+          type: string
+        unallocatedAmount:
+          type:
+          - string
+          - "null"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverRowWarningDto"
+      required:
+      - applications
+      - incomplete
+      - issues
+      - rowKey
+      - warnings
+    FinanceCollectionChequeHandoverPreviewRowInput:
+      type: object
+      properties:
+        amount:
+          type:
+          - string
+          - "null"
+          example: "1000.00"
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverApplicationInput"
+          maxItems: 500
+          minItems: 0
+        currency:
+          type:
+          - string
+          - "null"
+          example: GBP
+          pattern: "[A-Z]{3}"
+        drawerKind:
+          anyOf:
+          - $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+          - type: "null"
+        dueOn:
+          type:
+          - string
+          - "null"
+          format: date
+        instrumentReference:
+          type:
+          - string
+          - "null"
+          maxLength: 100
+          minLength: 0
+        intent:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverRowIntent"
+        rowKey:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - intent
+      - rowKey
+    FinanceCollectionChequeHandoverProblem:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+        obligationIds:
+          type: array
+          description: Changed targets when the code is CHEQUE_HANDOVER_STALE
+          items:
+            type: string
+            format: uuid
+        row:
+          type: integer
+          format: int32
+          description: Zero-based index of the refused cheque row
+        rowKey:
+          type: string
+          description: Client row key when the refusal concerns one cheque
+      required:
+      - code
+      - detail
+    FinanceCollectionChequeHandoverReceiptTotalDto:
+      type: object
+      description: Original RECEIVE evidence of the visible cheques in one currency
+      properties:
+        averageDueOnAtReceipt:
+          type: string
+          format: date
+        chequeCount:
+          type: integer
+          format: int32
+        currency:
+          type: string
+        totalRecordedAtReceipt:
+          type: string
+      required:
+      - averageDueOnAtReceipt
+      - chequeCount
+      - currency
+      - totalRecordedAtReceipt
+    FinanceCollectionChequeHandoverRefreshRequest:
+      type: object
+      properties:
+        obligationIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 500
+          minItems: 1
+      required:
+      - obligationIds
+    FinanceCollectionChequeHandoverRefreshStatus:
+      type: string
+      enum:
+      - REFRESHED
+      - BUSY
+      - UNREADABLE
+    FinanceCollectionChequeHandoverRowIntent:
+      type: string
+      enum:
+      - AUTO
+      - FIXED
+      - NONE
+    FinanceCollectionChequeHandoverRowIssueDto:
+      type: object
+      properties:
+        code:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverIssueCode"
+        obligationId:
+          type:
+          - string
+          - "null"
+          format: uuid
+      required:
+      - code
+    FinanceCollectionChequeHandoverRowWarningDto:
+      type: object
+      properties:
+        code:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverWarningCode"
+        obligationId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        plannedChequePaymentDate:
+          type:
+          - string
+          - "null"
+          format: date
+      required:
+      - code
+    FinanceCollectionChequeHandoverSaveApplication:
+      type: object
+      properties:
+        amount:
+          type: string
+          example: "1000.00"
+        obligationId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - obligationId
+    FinanceCollectionChequeHandoverSaveRequest:
+      type: object
+      properties:
+        evidence:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        obligationVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionObligationVersion"
+          maxItems: 500
+          minItems: 0
+        occurredAt:
+          type: string
+          format: date-time
+        operationId:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        receivedOn:
+          type: string
+          format: date
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverSaveRowInput"
+          maxItems: 50
+          minItems: 1
+      required:
+      - evidence
+      - obligationVersions
+      - occurredAt
+      - operationId
+      - partnerId
+      - reason
+      - receivedOn
+      - rows
+    FinanceCollectionChequeHandoverSaveRowInput:
+      type: object
+      properties:
+        amount:
+          type: string
+          example: "1000.00"
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverSaveApplication"
+          maxItems: 500
+          minItems: 0
+        currency:
+          type: string
+          example: GBP
+          minLength: 1
+          pattern: "[A-Z]{3}"
+        drawerId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        drawerKind:
+          $ref: "#/components/schemas/FinanceCollectionChequeDrawerKind"
+        drawerName:
+          type:
+          - string
+          - "null"
+          maxLength: 200
+          minLength: 0
+        dueOn:
+          type: string
+          format: date
+        instrumentReference:
+          type: string
+          maxLength: 100
+          minLength: 0
+        rowKey:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - amount
+      - applications
+      - currency
+      - drawerKind
+      - dueOn
+      - instrumentReference
+      - rowKey
+    FinanceCollectionChequeHandoverSummaryDto:
+      type: object
+      properties:
+        handoverNumber:
+          type: string
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        partnerId:
+          type: string
+          format: uuid
+        receivedOn:
+          type: string
+          format: date
+      required:
+      - handoverNumber
+      - id
+      - occurredAt
+      - partnerId
+      - receivedOn
+    FinanceCollectionChequeHandoverTargetDto:
+      type: object
+      properties:
+        expectedDate:
+          type:
+          - string
+          - "null"
+          format: date
+        lackingAmount:
+          type: string
+        obligationId:
+          type: string
+          format: uuid
+        orderNumber:
+          type:
+          - string
+          - "null"
+        plannedChequePaymentDate:
+          type:
+          - string
+          - "null"
+          format: date
+        version:
+          type: integer
+          format: int64
+      required:
+      - lackingAmount
+      - obligationId
+      - version
+    FinanceCollectionChequeHandoverTargetRefreshDto:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/FinanceCollectionChequeHandoverRefreshStatus"
+      required:
+      - orderId
+      - status
+    FinanceCollectionChequeHandoverWarningCode:
+      type: string
+      enum:
+      - POSSIBLE_DUPLICATE_CHEQUE_REFERENCE
+      - CHEQUE_DUE_AFTER_AGREED_DATE
+    FinanceCollectionChequeOfferDto:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        chequeId:
+          type: string
+          format: uuid
+        instalmentId:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
     FinanceCollectionChequeState:
       type: string
       enum:
@@ -84465,6 +85741,7 @@ components:
           - OBLIGATION
           - CHEQUE
           - PAYMENT
+          - CHEQUE_HANDOVER
         resourceVersion:
           type: integer
           format: int64
@@ -84593,6 +85870,78 @@ components:
       - partnerId
       - paymentDate
       - reason
+    FinanceCollectionCustomerSummaryCurrencyDto:
+      type: object
+      properties:
+        appliedHeldCheques:
+          type:
+          - string
+          - "null"
+        awaitingBankResult:
+          type: integer
+          format: int64
+        chequeDeliveryDue:
+          type:
+          - string
+          - "null"
+        chequesAvailableToOffer:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryChequeDto"
+        currency:
+          type: string
+        instalments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryInstalmentDto"
+        paymentDue:
+          type:
+          - string
+          - "null"
+        presentedCheques:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionSummaryChequeDto"
+        unallocatedCheques:
+          type:
+          - string
+          - "null"
+        unallocatedPayments:
+          type:
+          - string
+          - "null"
+        unavailablePlanInstalments:
+          type: integer
+          format: int64
+        undatedOpenInstalments:
+          type: integer
+          format: int64
+        unpaidInstalments:
+          type:
+          - string
+          - "null"
+    FinanceCollectionCustomerSummaryDto:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date
+        calculatedAt:
+          type: string
+          format: date-time
+        coverage:
+          $ref: "#/components/schemas/FinanceCollectionSummaryCoverage"
+        currencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionCustomerSummaryCurrencyDto"
+        partnerId:
+          type: string
+          format: uuid
+        sourceDiscoveryStale:
+          type: boolean
+        timeZone:
+          type: string
     FinanceCollectionDetailDto:
       type: object
       properties:
@@ -84671,6 +86020,15 @@ components:
         dueOn:
           type: string
           format: date
+        handoverId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        handoverNumber:
+          type:
+          - string
+          - "null"
         id:
           type: string
           format: uuid
@@ -85085,6 +86443,14 @@ components:
       - partnerId
       - reason
       - receivedOn
+    FinanceCollectionRecordChequeOfferRequest:
+      type: object
+      properties:
+        instalmentId:
+          type: string
+          format: uuid
+      required:
+      - instalmentId
     FinanceCollectionRefundDto:
       type: object
       properties:
@@ -85537,6 +86903,64 @@ components:
       - operationId
       - paymentId
       - reason
+    FinanceCollectionSummaryChequeDto:
+      type: object
+      properties:
+        amount:
+          type: string
+        bankDueDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+    FinanceCollectionSummaryCoverage:
+      type: string
+      enum:
+      - RECORDED_PLANS
+      - RESTRICTED_RECORDED_PLANS
+    FinanceCollectionSummaryInstalmentDto:
+      type: object
+      properties:
+        agreedAmount:
+          type: string
+        canRecordChequeOffer:
+          type: boolean
+        expectedDate:
+          type:
+          - string
+          - "null"
+          format: date
+        id:
+          type: string
+          format: uuid
+        missingChequeAmount:
+          type:
+          - string
+          - "null"
+        nextAction:
+          $ref: "#/components/schemas/FinanceCollectionSummaryNextAction"
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeOfferDto"
+        orderNumber:
+          type:
+          - string
+          - "null"
+        outstandingAmount:
+          type:
+          - string
+          - "null"
+    FinanceCollectionSummaryNextAction:
+      type: string
+      enum:
+      - PAYMENT_DUE
+      - CHEQUE_DELIVERY_DUE
+      - REVIEW_PAYMENT_METHOD
+      - NONE
     FinanceWarningDto:
       type: object
       properties:
@@ -90620,6 +92044,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FinanceCollectionChequeEventDto"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageFinanceCollectionChequeHandoverSummaryDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceCollectionChequeHandoverSummaryDto"
         empty:
           type: boolean
         first:

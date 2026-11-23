@@ -112,6 +112,8 @@ classified_relations AS (
                WHEN 'finance.collection_refund' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'finance.collection_refund_event' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'finance.collection_command_receipt' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'finance.collection_cheque_handover' THEN 'APPEND_ONLY_LEDGER'
+               WHEN 'finance.collection_cheque_offer' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'finance.collection_source_observation' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'finance.collection_reconciliation_health' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'flowboard.collection_follow_up' THEN 'MUTABLE_SYSTEM_PURGE'

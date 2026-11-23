@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fabricmanagement.finance.collection.api.controller.CollectionChequeDrawerController;
+import com.fabricmanagement.finance.collection.api.controller.CollectionChequeHandoverController;
 import com.fabricmanagement.finance.collection.api.controller.CollectionController;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderPaymentPlanAgreedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderPaymentPlanCancelledEvent;
@@ -94,16 +95,19 @@ class CollectionArchTest {
             "refunds",
             "customerAvailability");
     var reversals = Set.of("reverse", "cancelRefund");
-    for (var method : CollectionController.class.getDeclaredMethods()) {
-      if (!Modifier.isPublic(method.getModifiers())) continue;
-      assertThat(method.getAnnotation(PreAuthorize.class)).isNotNull();
-      assertThat(method.getAnnotation(PreAuthorize.class).value())
-          .isEqualTo(
-              "@auth.can(authentication, 'finance', '"
-                  + (reads.contains(method.getName())
-                      ? "read"
-                      : reversals.contains(method.getName()) ? "reverse" : "write")
-                  + "')");
+    for (var controller :
+        List.of(CollectionController.class, CollectionChequeHandoverController.class)) {
+      for (var method : controller.getDeclaredMethods()) {
+        if (!Modifier.isPublic(method.getModifiers())) continue;
+        assertThat(method.getAnnotation(PreAuthorize.class)).isNotNull();
+        assertThat(method.getAnnotation(PreAuthorize.class).value())
+            .isEqualTo(
+                "@auth.can(authentication, 'finance', '"
+                    + (reads.contains(method.getName())
+                        ? "read"
+                        : reversals.contains(method.getName()) ? "reverse" : "write")
+                    + "')");
+      }
     }
   }
 

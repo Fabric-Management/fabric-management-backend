@@ -62,11 +62,14 @@ public class CollectionAccessService {
   }
 
   public record Reach(UUID tenantId, DataScope scope, Set<UUID> principals) {
+    public boolean unrestricted() {
+      return scope == DataScope.GLOBAL || scope == DataScope.ORGANIZATION;
+    }
+
     public boolean permits(UUID tenant, UUID creator, UUID owner) {
       return tenantId.equals(tenant)
           && scope != null
-          && (scope == DataScope.GLOBAL
-              || scope == DataScope.ORGANIZATION
+          && (unrestricted()
               || (creator != null && principals.contains(creator))
               || (owner != null && principals.contains(owner)));
     }
@@ -77,7 +80,7 @@ public class CollectionAccessService {
               cb.equal(root.get("tenantId"), tenantId),
               scope == null
                   ? cb.disjunction()
-                  : scope == DataScope.GLOBAL || scope == DataScope.ORGANIZATION
+                  : unrestricted()
                       ? cb.conjunction()
                       : cb.or(
                           root.get("createdBy").in(principals),

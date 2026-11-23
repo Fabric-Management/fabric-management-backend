@@ -126,7 +126,14 @@ public final class CollectionFollowUpDtos {
       @Schema(type = "string") String expectedAmount,
       @Schema(type = "string") String recordedOutstanding,
       @Schema(type = "string") String missingInstrumentAmount,
-      @Schema(allowableValues = {"COLLECT_PAYMENT", "RECEIVE_CHEQUE", "CLEAR_CHEQUE"}) String phase,
+      @Schema(
+              allowableValues = {
+                "COLLECT_PAYMENT",
+                "RECEIVE_CHEQUE",
+                "CLEAR_CHEQUE",
+                "REVIEW_PAYMENT_METHOD"
+              })
+          String phase,
       @Schema(nullable = true) LocalDate agreedDate,
       @Schema(nullable = true) LocalDate dueDate,
       @Schema(nullable = true) LocalDate promisedOn,
