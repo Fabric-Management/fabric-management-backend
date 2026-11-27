@@ -61,7 +61,10 @@ public class FiberQualityQueryService {
 
   /** Outcome of re-evaluating a stored batch; an empty standard keeps the manual path. */
   public record StoredEvaluation(
-      FiberQualityStandard standard, String targetLabel, String diagnosticCode) {
+      FiberQualityStandard standard,
+      String targetLabel,
+      String diagnosticCode,
+      String targetIsoCode) {
     public Optional<FiberQualityStandard> standardOptional() {
       return Optional.ofNullable(standard);
     }
@@ -210,34 +213,46 @@ public class FiberQualityQueryService {
       UUID storedProfileId) {
     Optional<Fiber> fiber = findByProductId(tenantId, productId);
     if (fiber.isEmpty()) {
-      return new StoredEvaluation(null, null, "FIBER_PRODUCT_NOT_FOUND");
+      return new StoredEvaluation(null, null, "FIBER_PRODUCT_NOT_FOUND", null);
     }
-    String label = fiber.get().getFiberName();
+    Fiber definition = fiber.get();
+    String label = definition.getFiberName();
     if (snapshot.isEmpty() || snapshot.get().isEmpty()) {
-      return new StoredEvaluation(null, label, "BATCH_COMPOSITION_UNKNOWN");
+      return new StoredEvaluation(null, label, "BATCH_COMPOSITION_UNKNOWN", null);
     }
     EffectiveComposition effective =
         new EffectiveComposition(
-            fiber.get().getId(),
-            fiber.get().getFiberIsoCodeId(),
-            fiber.get().getKind(),
+            definition.getId(),
+            definition.getFiberIsoCodeId(),
+            definition.getKind(),
             label,
             FiberComposition.normalize(snapshot.get()));
     if (storedProfileId != null) {
       Optional<FiberQualityStandard> stored =
           qualityStandardRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, storedProfileId);
       if (stored.isEmpty()) {
-        return new StoredEvaluation(null, label, "QUALITY_PROFILE_UNAVAILABLE");
+        return new StoredEvaluation(null, label, "QUALITY_PROFILE_UNAVAILABLE", null);
       }
       if (!applies(stored.get(), effective)) {
-        return new StoredEvaluation(null, label, "QUALITY_PROFILE_NOT_APPLICABLE");
+        return new StoredEvaluation(null, label, "QUALITY_PROFILE_NOT_APPLICABLE", null);
       }
-      return new StoredEvaluation(stored.get(), label, null);
+      return resolvedEvaluation(stored.get(), definition, label);
     }
     QualityResolution resolution = resolveDefault(tenantId, effective);
     return resolution.profile() == null
-        ? new StoredEvaluation(null, label, "NO_APPLICABLE_QUALITY_PROFILE")
-        : new StoredEvaluation(resolution.profile(), label, null);
+        ? new StoredEvaluation(null, label, "NO_APPLICABLE_QUALITY_PROFILE", null)
+        : resolvedEvaluation(resolution.profile(), definition, label);
+  }
+
+  private static StoredEvaluation resolvedEvaluation(
+      FiberQualityStandard profile, Fiber definition, String label) {
+    var isoCode =
+        switch (profile.getTargetType()) {
+          case ISO_CODE -> profile.getIsoCode();
+          case FIBER -> definition.isPure() ? definition.getFiberIsoCode() : null;
+        };
+    return new StoredEvaluation(
+        profile, label, null, isoCode == null ? null : isoCode.getIsoCode());
   }
 
   private static boolean applies(FiberQualityStandard profile, EffectiveComposition effective) {

@@ -1,10 +1,12 @@
 package com.fabricmanagement.production.quality.result.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -58,7 +60,23 @@ public class CreateFiberTestResultRequest {
   private Double uniformityIndex;
 
   // Metadata
+  @Schema(description = "Optional active external laboratory. Uses the trading partner identifier.")
+  private UUID laboratoryId;
+
+  @Schema(description = "Optional active fibre test standard catalogue identifier.")
+  private UUID testStandardId;
+
+  @Schema(
+      deprecated = true,
+      description = "Legacy laboratory text. Omit when selecting laboratoryId.")
+  @Size(max = 255)
   private String testLab;
+
+  @Schema(
+      deprecated = true,
+      description = "Legacy standard text. Omit when selecting testStandardId.")
+  @Size(max = 100)
   private String testStandard;
+
   private String remarks;
 }

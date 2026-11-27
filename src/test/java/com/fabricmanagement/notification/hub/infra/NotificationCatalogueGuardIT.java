@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.notification.hub.domain.NotificationEvent;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Parameter;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -202,6 +203,31 @@ class NotificationCatalogueGuardIT extends AbstractIntegrationTest {
     }
 
     assertThat(missing).as("labels a template uses but no tenant translation provides").isEmpty();
+  }
+
+  @Test
+  void everyFibreMeasurementParameterHasPlainWordingInBothLanguages() {
+    for (Parameter parameter : Parameter.values()) {
+      String key = "notification.label.parameter." + parameter.name();
+      for (String locale : List.of("EN", "TR")) {
+        String wording =
+            jdbc.queryForObject(
+                """
+                SELECT tv.value FROM i18n.translation_key tk
+                JOIN i18n.translation_value tv
+                  ON tv.translation_key_id = tk.id AND tv.tenant_id = tk.tenant_id
+                WHERE tk.tenant_id = ? AND tk.key_code = ? AND tv.locale = ?
+                  AND tk.is_active AND tv.is_active
+                """,
+                String.class,
+                GOLDEN,
+                key,
+                locale);
+        assertThat(wording).as("%s (%s)", key, locale).isNotBlank().isNotEqualTo(parameter.name());
+        Pattern rawWording = "EN".equals(locale) ? NOT_PLAIN_ENGLISH : NOT_TURKISH;
+        assertThat(rawWording.matcher(wording).find()).as("%s (%s)", key, locale).isFalse();
+      }
+    }
   }
 
   private record Text(UUID tenant, String key, String english, String turkish) {}

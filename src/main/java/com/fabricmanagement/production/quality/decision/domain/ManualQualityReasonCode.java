@@ -11,6 +11,7 @@ public enum ManualQualityReasonCode {
   SHADE_VARIATION,
   SHORT_LENGTH,
   MEASURE_MISMATCH,
+  OUT_OF_SPECIFICATION,
   OTHER;
 
   public QualityReasonCode toDomainCode() {

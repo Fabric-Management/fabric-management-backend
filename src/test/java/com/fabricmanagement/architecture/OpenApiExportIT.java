@@ -206,6 +206,7 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
     assertPagedResponsesAreComplete(generatedDocument);
     assertCollectionReportNullsAreRequired(generatedDocument);
     assertChequeHandoverContract(generatedDocument);
+    assertFiberTestCatalogueContract(generatedDocument);
 
     // Red probe uses a separate copy: the actual export must never contain the mutated value.
     Map<String, Object> corruptedDocument =
@@ -364,10 +365,50 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
     }
   }
 
-  /**
-   * COLLECTION-REPORT-1: a nullable report field is written as null, never omitted, so it is both
-   * nullable and required. Null means the balance is unknown; absent would be a third state.
-   */
+  private void assertFiberTestCatalogueContract(Map<String, Object> document) {
+    String tests = "/api/v1/production/quality/fiber-tests";
+    for (String catalogue : List.of("/standards", "/laboratories")) {
+      var operation = mapAt(document, "paths", tests + catalogue, "get");
+      @SuppressWarnings("unchecked")
+      var parameters = (List<Map<String, Object>>) operation.get("parameters");
+      assertThat(parameters)
+          .extracting(parameter -> parameter.get("name"))
+          .containsExactlyInAnyOrder("search", "page", "size");
+      for (var parameter : parameters) {
+        assertThat(parameter).containsEntry("in", "query").doesNotContainEntry("required", true);
+        String type = "search".equals(parameter.get("name")) ? "string" : "integer";
+        assertThat(mapAt(parameter, "schema")).containsEntry("type", type);
+      }
+    }
+    assertThat(mapAt(document, "paths", tests + "/standards", "get", "responses"))
+        .containsKeys("200", "403", "422");
+    assertThat(mapAt(document, "paths", tests + "/standards", "post", "responses"))
+        .containsKeys("201", "403", "409");
+    assertThat(mapAt(document, "paths", tests + "/standards/{id}", "patch", "responses"))
+        .containsKeys("200", "404");
+    assertThat(mapAt(document, "paths", tests + "/standards/{id}/deactivate", "post", "responses"))
+        .containsKeys("204", "404");
+    assertThat(mapAt(document, "paths", tests + "/laboratories", "get", "responses"))
+        .containsKeys("200", "403", "422");
+    assertThat(mapAt(document, "paths", tests + "/laboratories", "post", "responses"))
+        .containsKeys("200", "403", "404", "409");
+    assertThat(
+            mapAt(document, "paths", tests + "/laboratories/{id}/deactivate", "post", "responses"))
+        .containsKeys("204", "404");
+    assertThat(mapAt(document, "paths", tests, "post", "responses")).containsKeys("201", "404");
+
+    var request = mapAt(document, "components", "schemas", "CreateFiberTestResultRequest");
+    assertThat(mapAt(request, "properties", "laboratoryId")).containsEntry("format", "uuid");
+    assertThat(mapAt(request, "properties", "testStandardId")).containsEntry("format", "uuid");
+    assertThat(String.valueOf(request.get("required")))
+        .doesNotContain("laboratoryId", "testStandardId");
+    assertThat(mapAt(document, "components", "schemas", "FiberTestResultDto", "properties"))
+        .containsKeys("laboratoryId", "testStandardId", "testStandardName", "testStandardRevision");
+    assertThat(allowsNull(schemaProperty(document, "FiberTestStandardDto", "revision")))
+        .as("Fibre test standard revision permits null")
+        .isTrue();
+  }
+
   private void assertChequeHandoverContract(Map<String, Object> document) {
     String base = "/api/v1/finance/collections";
     String handovers = base + "/cheque-handovers";
@@ -413,6 +454,10 @@ public class OpenApiExportIT extends AbstractIntegrationTest {
     }
   }
 
+  /**
+   * COLLECTION-REPORT-1: a nullable report field is written as null, never omitted, so it is both
+   * nullable and required. Null means the balance is unknown; absent would be a third state.
+   */
   private void assertCollectionReportNullsAreRequired(Map<String, Object> document) {
     for (String schema : COLLECTION_REPORT_SCHEMAS) {
       List<String> required = requiredOf(document, schema);

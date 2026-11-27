@@ -9,11 +9,10 @@ import java.util.UUID;
 import lombok.Getter;
 
 /**
- * Published when a fiber test result receives an approval decision (APPROVED, REJECTED,
- * CONDITIONAL_ACCEPT).
+ * Published when a fibre test result's approval status is set by hand.
  *
- * <p>The QC decision listener records APPROVED/REJECTED as immutable quality decisions.
- * CONDITIONAL_ACCEPT remains pending and requests a separate concession review.
+ * <p>Conditional acceptance requests a separate concession review. Stock disposition is decided
+ * independently.
  */
 @Getter
 public class FiberTestResultApprovedEvent extends DomainEvent {

@@ -20,6 +20,7 @@ public final class QualityDecisionReasonPolicy {
           ManualQualityReasonCode.SHADE_VARIATION,
           ManualQualityReasonCode.SHORT_LENGTH,
           ManualQualityReasonCode.MEASURE_MISMATCH,
+          ManualQualityReasonCode.OUT_OF_SPECIFICATION,
           ManualQualityReasonCode.OTHER);
 
   private QualityDecisionReasonPolicy() {}

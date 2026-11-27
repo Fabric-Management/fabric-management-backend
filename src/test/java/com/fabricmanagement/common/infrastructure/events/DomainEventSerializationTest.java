@@ -31,7 +31,9 @@ import com.fabricmanagement.production.core.stockunit.domain.event.StockUnitCrea
 import com.fabricmanagement.production.core.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.core.workorder.domain.event.WorkOrderCompletedEvent;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Parameter;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fabricmanagement.production.quality.result.domain.event.FiberMeasurementOutOfLimitsEvent;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.salesorder.domain.OrderCoverCaseState;
@@ -297,6 +299,9 @@ class DomainEventSerializationTest {
         event(
             new FiberTestResultApprovedEvent(
                 tenantId, uuid(), uuid(), TestApprovalStatus.APPROVED, uuid())),
+        event(
+            new FiberMeasurementOutOfLimitsEvent(
+                tenantId, uuid(), uuid(), "AB-0042", Parameter.MOISTURE, 1)),
         event(
             new ProductionOutputConfirmedEvent(
                 tenantId,

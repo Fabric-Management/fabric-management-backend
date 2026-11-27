@@ -23,8 +23,11 @@ import com.fabricmanagement.production.core.batch.dto.BatchDto;
 import com.fabricmanagement.production.core.batch.dto.CreateBatchRequest;
 import com.fabricmanagement.production.core.batch.dto.PartialAcceptanceSplitRequest;
 import com.fabricmanagement.production.quality.result.app.FiberTestResultService;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Outcome;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Parameter;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
+import com.fabricmanagement.production.quality.result.dto.FiberTestEvaluationDto.FiberTestParameterEvaluationDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -252,23 +255,42 @@ class FiberQualityTargetIT extends FiberSourceIntegrationSupport {
         .isEqualTo(83.0);
 
     BatchDto batch = batch(canonicalProductId("CO"), null, null);
-    assertThat(
-            testResultService
-                .create(
-                    CreateFiberTestResultRequest.builder()
-                        .batchId(batch.getId())
-                        .testDate(Instant.now())
-                        .fineness(4.0)
-                        .lengthMm(28.0)
-                        .strengthCndTex(29.0)
-                        .elongationPercent(6.0)
-                        .moisturePercent(7.0)
-                        .trashContentPercent(2.0)
-                        .uniformityIndex(79.0)
-                        .build())
-                .getApprovalStatus())
-        .as("uniformity below its minimum rejects")
-        .isEqualTo(TestApprovalStatus.REJECTED);
+    var result =
+        testResultService.create(
+            CreateFiberTestResultRequest.builder()
+                .batchId(batch.getId())
+                .testDate(Instant.now())
+                .fineness(4.0)
+                .lengthMm(28.0)
+                .strengthCndTex(29.0)
+                .elongationPercent(6.0)
+                .moisturePercent(7.0)
+                .trashContentPercent(2.0)
+                .uniformityIndex(79.0)
+                .build());
+    assertThat(result.getApprovalStatus())
+        .as("strength has an unconfirmed unit despite the out-of-limit uniformity")
+        .isEqualTo(TestApprovalStatus.PENDING);
+    var evaluation = result.getEvaluation();
+    assertThat(evaluation.complete()).isFalse();
+    assertThat(evaluation.limitDefined()).isTrue();
+    assertThat(evaluation.outsideLimits()).isTrue();
+    assertThat(evaluation.parameters())
+        .extracting(FiberTestParameterEvaluationDto::parameter)
+        .containsExactly(
+            Parameter.FINENESS,
+            Parameter.LENGTH,
+            Parameter.STRENGTH,
+            Parameter.ELONGATION,
+            Parameter.MOISTURE,
+            Parameter.TRASH_CONTENT,
+            Parameter.UNIFORMITY_INDEX);
+    assertThat(evaluation.parameters())
+        .contains(
+            new FiberTestParameterEvaluationDto(
+                Parameter.STRENGTH, 29.0, 25.0, null, null, null, Outcome.UNIT_UNCONFIRMED),
+            new FiberTestParameterEvaluationDto(
+                Parameter.UNIFORMITY_INDEX, 79.0, 80.0, 90.0, 83.0, -4.0, Outcome.OUTSIDE_LIMITS));
 
     FiberQualityStandardDto replacement = isoProfile("CO", "Replacement", false);
     standardService.delete(full.getId());

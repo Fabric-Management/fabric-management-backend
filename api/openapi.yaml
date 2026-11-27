@@ -72,6 +72,8 @@ tags:
   name: Product
 - description: Address Validation operations
   name: Address Validation
+- description: External laboratories and standards for fibre tests
+  name: Fiber Test Catalogue
 - description: Batch Lineage operations
   name: Batch Lineage
 - description: Short-lived roll ownership before a commercial stock choice
@@ -29087,6 +29089,7 @@ paths:
           - BATCH_QC_FAILED
           - BATCH_QC_PENDING
           - BATCH_CONCESSION_REVIEW
+          - BATCH_MEASUREMENT_OUT_OF_LIMITS
           - BATCH_NO_QUALITY_STANDARD
           - BATCH_CERTIFICATION_EXPIRING
           - GOODS_RECEIPT_CONFIRMED
@@ -43123,6 +43126,8 @@ paths:
       tags:
       - Fiber Test Result
     post:
+      description: Requires quality:write. Optional catalogue selections are validated
+        before recording.
       operationId: createTestResult
       requestBody:
         content:
@@ -43131,39 +43136,38 @@ paths:
               $ref: "#/components/schemas/CreateFiberTestResultRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseFiberTestResultDto"
-          description: OK
+          description: Fibre test result recorded
         "400":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
+          description: The request could not be parsed or mixes a selection with its
+            legacy text
         "401":
           content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
+          description: Authentication is required
         "403":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
+          description: Quality write access is required
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
+          description: The selected laboratory or standard is unavailable in this
+            company
         "409":
           content:
             application/problem+json:
@@ -43175,7 +43179,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
+          description: The request fields fail validation
         "429":
           content:
             application/problem+json:
@@ -43188,6 +43192,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
+      summary: Record a fibre test result
       tags:
       - Fiber Test Result
   /api/v1/production/quality/fiber-tests/batch/{batchId}:
@@ -43260,6 +43265,621 @@ paths:
           description: Internal Server Error
       tags:
       - Fiber Test Result
+  /api/v1/production/quality/fiber-tests/batch/{batchId}/bales:
+    get:
+      description: "Returns active stock units in bale-code order, regardless of status."
+      operationId: listFiberTestBaleChoices
+      parameters:
+      - in: path
+        name: batchId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Case-insensitive substring of the bale code
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+          default: ""
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseFiberTestBaleChoiceDto"
+          description: Page of active bale choices
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: "The batch identifier, page or size could not be parsed"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Quality write access is required
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The lot is not visible in this tenant
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Page must be zero or greater and size must be between 1 and
+            200
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List active bale choices for recording a fibre test
+      tags:
+      - Fiber Test Result
+  /api/v1/production/quality/fiber-tests/laboratories:
+    get:
+      description: Requires quality:write or quality:manage.
+      operationId: listFiberTestLaboratories
+      parameters:
+      - in: query
+        name: search
+        required: false
+        schema:
+          type: string
+          default: ""
+          maxLength: 255
+          minLength: 0
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseFiberTestLaboratoryDto"
+          description: Page of eligible external laboratories
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request fields fail validation
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Search active external laboratories by trading partner name
+      tags:
+      - Fiber Test Catalogue
+    post:
+      description: Requires quality:manage. An inactive registration is re-enabled.
+      operationId: registerFiberTestLaboratory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterFiberTestLaboratoryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFiberTestLaboratoryDto"
+          description: External laboratory enabled
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The selection is unavailable in this company
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The catalogue entry conflicts with an existing entry or has
+            changed
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request fields fail validation
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Enable an existing trading partner as an external laboratory
+      tags:
+      - Fiber Test Catalogue
+  /api/v1/production/quality/fiber-tests/laboratories/{id}/deactivate:
+    post:
+      description: Requires quality:manage. The identifier is the trading partner
+        ID.
+      operationId: deactivateFiberTestLaboratory
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: External laboratory inactive
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The selection is unavailable in this company
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The catalogue entry conflicts with an existing entry or has
+            changed
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Remove a trading partner from new laboratory selections
+      tags:
+      - Fiber Test Catalogue
+  /api/v1/production/quality/fiber-tests/standards:
+    get:
+      description: Requires quality:write or quality:manage.
+      operationId: listFiberTestStandards
+      parameters:
+      - in: query
+        name: search
+        required: false
+        schema:
+          type: string
+          default: ""
+          maxLength: 255
+          minLength: 0
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseFiberTestStandardDto"
+          description: Page of active test standards
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request fields fail validation
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Search active fibre test standards by code or name
+      tags:
+      - Fiber Test Catalogue
+    post:
+      description: Requires quality:manage. Code and revision identify one entry per
+        company.
+      operationId: createFiberTestStandard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFiberTestStandardRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFiberTestStandardDto"
+          description: Standard created
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The code and revision already exist (FIBER_TEST_STANDARD_DUPLICATE)
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request fields fail validation
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Add a fibre test standard or a new revision
+      tags:
+      - Fiber Test Catalogue
+  /api/v1/production/quality/fiber-tests/standards/{id}:
+    patch:
+      description: Requires quality:manage. Code and revision are immutable.
+      operationId: renameFiberTestStandard
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameFiberTestStandardRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFiberTestStandardDto"
+          description: Standard renamed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The selection is unavailable in this company
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The catalogue entry conflicts with an existing entry or has
+            changed
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request fields fail validation
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Update the display name of an active fibre test standard
+      tags:
+      - Fiber Test Catalogue
+  /api/v1/production/quality/fiber-tests/standards/{id}/deactivate:
+    post:
+      description: Requires quality:manage. Existing results retain the recorded standard.
+      operationId: deactivateFiberTestStandard
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Standard inactive
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The request could not be parsed
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Authentication is required
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The required quality permission is missing
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The selection is unavailable in this company
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: The catalogue entry conflicts with an existing entry or has
+            changed
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Retire a fibre test standard from new selections
+      tags:
+      - Fiber Test Catalogue
   /api/v1/production/quality/fiber-tests/status/{status}:
     get:
       operationId: getTestResultsByStatus
@@ -69088,11 +69708,47 @@ components:
           type: array
           items:
             type: string
+    ApiResponseFiberTestLaboratoryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FiberTestLaboratoryDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseFiberTestResultDto:
       type: object
       properties:
         data:
           $ref: "#/components/schemas/FiberTestResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFiberTestStandardDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FiberTestStandardDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -72668,6 +73324,60 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseFiberRequestDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseFiberTestBaleChoiceDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseFiberTestBaleChoiceDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseFiberTestLaboratoryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseFiberTestLaboratoryDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseFiberTestStandardDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseFiberTestStandardDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -78920,6 +79630,11 @@ components:
           type: number
           format: double
           minimum: 0
+        laboratoryId:
+          type: string
+          format: uuid
+          description: Optional active external laboratory. Uses the trading partner
+            identifier.
         lengthMm:
           type: number
           format: double
@@ -78943,8 +79658,20 @@ components:
           format: date-time
         testLab:
           type: string
+          deprecated: true
+          description: Legacy laboratory text. Omit when selecting laboratoryId.
+          maxLength: 255
+          minLength: 0
         testStandard:
           type: string
+          deprecated: true
+          description: Legacy standard text. Omit when selecting testStandardId.
+          maxLength: 100
+          minLength: 0
+        testStandardId:
+          type: string
+          format: uuid
+          description: Optional active fibre test standard catalogue identifier.
         testType:
           type: string
         trashContentPercent:
@@ -78962,6 +79689,26 @@ components:
           format: int64
       required:
       - testDate
+    CreateFiberTestStandardRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 100
+          minLength: 0
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        revision:
+          type:
+          - string
+          - "null"
+          maxLength: 100
+          minLength: 0
+      required:
+      - code
+      - name
     CreateGoodsReceiptRequest:
       type: object
       properties:
@@ -82837,6 +83584,7 @@ components:
           - BATCH_QC_FAILED
           - BATCH_QC_PENDING
           - BATCH_CONCESSION_REVIEW
+          - BATCH_MEASUREMENT_OUT_OF_LIMITS
           - BATCH_NO_QUALITY_STANDARD
           - BATCH_CERTIFICATION_EXPIRING
           - GOODS_RECEIPT_CONFIRMED
@@ -84444,6 +85192,133 @@ components:
         updatedAt:
           type: string
           format: date-time
+    FiberTestBaleChoiceDto:
+      type: object
+      description: An active stock unit that can be named on a fibre test result
+      properties:
+        code:
+          type: string
+          description: Scannable bale code
+        id:
+          type: string
+          format: uuid
+          description: Stock unit identifier
+      required:
+      - code
+      - id
+    FiberTestEvaluationDto:
+      type: object
+      description: "Fibre test evaluation as recorded, unaffected by later profile\
+        \ edits"
+      properties:
+        complete:
+          type: boolean
+          description: A profile applied and no parameter was unmeasured or had an
+            unconfirmed unit
+        diagnosticCode:
+          type:
+          - string
+          - "null"
+          description: Reason code when no profile applied
+        limitDefined:
+          type: boolean
+          description: The profile set at least one minimum or maximum
+        outsideLimits:
+          type: boolean
+          description: At least one comparable measured value was outside its limits
+        parameters:
+          type: array
+          description: Measured or profiled parameters in test form order
+          items:
+            $ref: "#/components/schemas/FiberTestParameterEvaluationDto"
+        profileId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Identifier of the profile used
+        profileName:
+          type:
+          - string
+          - "null"
+          description: Name of the profile when the result was recorded
+      required:
+      - complete
+      - limitDefined
+      - outsideLimits
+      - parameters
+    FiberTestEvaluationOutcome:
+      type: string
+      enum:
+      - NOT_MEASURED
+      - UNIT_UNCONFIRMED
+      - OUTSIDE_LIMITS
+      - WITHIN_LIMITS
+      - NO_LIMIT
+    FiberTestEvaluationParameter:
+      type: string
+      enum:
+      - FINENESS
+      - LENGTH
+      - STRENGTH
+      - ELONGATION
+      - MOISTURE
+      - TRASH_CONTENT
+      - UNIFORMITY_INDEX
+    FiberTestLaboratoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Trading partner identifier.
+        name:
+          type: string
+          maxLength: 255
+      required:
+      - id
+      - name
+    FiberTestParameterEvaluationDto:
+      type: object
+      description: Recorded assessment of one fibre test parameter
+      properties:
+        differenceFromTarget:
+          type:
+          - number
+          - "null"
+          format: double
+          description: "Measured value minus target, when comparable"
+        max:
+          type:
+          - number
+          - "null"
+          format: double
+          description: Maximum set by the applicable profile
+        min:
+          type:
+          - number
+          - "null"
+          format: double
+          description: Minimum set by the applicable profile
+        outcome:
+          $ref: "#/components/schemas/FiberTestEvaluationOutcome"
+        parameter:
+          $ref: "#/components/schemas/FiberTestEvaluationParameter"
+        target:
+          type:
+          - number
+          - "null"
+          format: double
+          description: Target set by the applicable profile
+        value:
+          type:
+          - number
+          - "null"
+          format: double
+          description: "Measured value, when available"
+      required:
+      - outcome
+      - parameter
     FiberTestResultDto:
       type: object
       properties:
@@ -84463,6 +85338,10 @@ components:
         elongationPercent:
           type: number
           format: double
+        evaluation:
+          $ref: "#/components/schemas/FiberTestEvaluationDto"
+          description: Evaluation at recording time. Absent for older results and
+            non-fibre lots.
         fineness:
           type: number
           format: double
@@ -84471,6 +85350,11 @@ components:
           format: uuid
         isActive:
           type: boolean
+        laboratoryId:
+          type: string
+          format: uuid
+          description: "Recorded external laboratory trading partner identifier, if\
+            \ selected."
         lengthMm:
           type: number
           format: double
@@ -84493,8 +85377,22 @@ components:
           format: date-time
         testLab:
           type: string
+          description: "Laboratory name captured at recording time, or legacy laboratory\
+            \ text."
         testStandard:
           type: string
+          description: "Standard code captured at recording time, or legacy standard\
+            \ text."
+        testStandardId:
+          type: string
+          format: uuid
+          description: "Recorded fibre test standard catalogue identifier, if selected."
+        testStandardName:
+          type: string
+          description: "Standard name captured at recording time, if selected."
+        testStandardRevision:
+          type: string
+          description: "Standard revision captured at recording time, when specified."
         testType:
           type: string
         trashContentPercent:
@@ -84511,6 +85409,30 @@ components:
         version:
           type: integer
           format: int64
+    FiberTestStandardDto:
+      type: object
+      properties:
+        active:
+          type: boolean
+        code:
+          type: string
+          maxLength: 100
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+        revision:
+          type:
+          - string
+          - "null"
+          maxLength: 100
+      required:
+      - active
+      - code
+      - id
+      - name
     FinanceCollectionAllocateChequeRequest:
       type: object
       description: "PAYMENT-PLAN-9 R3: apply a held cheque's unapplied amount to cheque\
@@ -92592,6 +93514,99 @@ components:
       - size
       - totalElements
       - totalPages
+    PagedResponseFiberTestBaleChoiceDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiberTestBaleChoiceDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - first
+      - last
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PagedResponseFiberTestLaboratoryDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiberTestLaboratoryDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - first
+      - last
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PagedResponseFiberTestStandardDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiberTestStandardDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - first
+      - last
+      - page
+      - size
+      - totalElements
+      - totalPages
     PagedResponseInventoryBalanceDto:
       type: object
       properties:
@@ -95824,6 +96839,7 @@ components:
           - SHADE_VARIATION
           - SHORT_LENGTH
           - MEASURE_MISMATCH
+          - OUT_OF_SPECIFICATION
           - OTHER
           - SYSTEM_QC_PASSED
           - SYSTEM_QC_REJECTED
@@ -95887,6 +96903,7 @@ components:
           - SHADE_VARIATION
           - SHORT_LENGTH
           - MEASURE_MISMATCH
+          - OUT_OF_SPECIFICATION
           - OTHER
         remarksRequired:
           type: boolean
@@ -97548,6 +98565,7 @@ components:
           - SHADE_VARIATION
           - SHORT_LENGTH
           - MEASURE_MISMATCH
+          - OUT_OF_SPECIFICATION
           - OTHER
           - SYSTEM_QC_PASSED
           - SYSTEM_QC_REJECTED
@@ -97706,6 +98724,14 @@ components:
           minLength: 1
       required:
       - contactValue
+    RegisterFiberTestLaboratoryRequest:
+      type: object
+      properties:
+        tradingPartnerId:
+          type: string
+          format: uuid
+      required:
+      - tradingPartnerId
     RejectFiberRequestRequest:
       type: object
       properties:
@@ -97768,6 +98794,15 @@ components:
       required:
       - expectedVersion
       - operationId
+    RenameFiberTestStandardRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - name
     ReopenFinancialPeriodResponse:
       type: object
       properties:

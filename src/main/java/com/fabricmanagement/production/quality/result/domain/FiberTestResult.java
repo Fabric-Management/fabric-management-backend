@@ -1,10 +1,12 @@
 package com.fabricmanagement.production.quality.result.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 /**
  * FiberTestResult - Laboratory test results for fiber batches.
@@ -88,13 +90,29 @@ public class FiberTestResult extends BaseEntity {
   @Builder.Default
   private TestApprovalStatus approvalStatus = TestApprovalStatus.PENDING;
 
+  @Type(JsonBinaryType.class)
+  @Column(name = "evaluation", columnDefinition = "jsonb", updatable = false)
+  private FiberTestEvaluation evaluation;
+
   // ── Metadata ──────────────────────────────────────────────────────────────
 
-  @Column(name = "test_lab", length = 255)
+  @Column(name = "laboratory_id", updatable = false)
+  private UUID laboratoryId;
+
+  @Column(name = "test_standard_id", updatable = false)
+  private UUID testStandardId;
+
+  @Column(name = "test_lab", length = 255, updatable = false)
   private String testLab;
 
-  @Column(name = "test_standard", length = 100)
+  @Column(name = "test_standard", length = 100, updatable = false)
   private String testStandard;
+
+  @Column(name = "test_standard_name", length = 255, updatable = false)
+  private String testStandardName;
+
+  @Column(name = "test_standard_revision", length = 100, updatable = false)
+  private String testStandardRevision;
 
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;

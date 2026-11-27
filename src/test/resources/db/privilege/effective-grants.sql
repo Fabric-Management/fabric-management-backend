@@ -98,6 +98,8 @@ classified_relations AS (
                WHEN 'common_user.onboarding_operation' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_payment_plan' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'common_company.trading_partner_cheque_drawer' THEN 'MUTABLE_SYSTEM_PURGE'
+               WHEN 'production.prod_fiber_test_standard' THEN 'MUTABLE_SYSTEM_PURGE'
+               WHEN 'production.production_quality_fiber_test_laboratory' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_payment_plan_revision' THEN 'MUTABLE_SYSTEM_PURGE'
                WHEN 'sales_ord.order_payment_plan_currency' THEN 'APPEND_ONLY_LEDGER'
                WHEN 'sales_ord.order_payment_plan_line' THEN 'APPEND_ONLY_LEDGER'

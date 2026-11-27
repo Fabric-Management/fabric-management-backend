@@ -15,6 +15,7 @@ import com.fabricmanagement.production.quality.decision.domain.QualityDecisionEl
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionOutcome;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionReasonPolicy;
 import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
+import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
 import com.fabricmanagement.production.quality.decision.dto.QualityBatchSummaryDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOptionsDto;
 import com.fabricmanagement.production.quality.decision.dto.QualityDecisionOutcomeOptionDto;
@@ -27,6 +28,7 @@ import com.fabricmanagement.production.quality.decision.mapper.QualityDecisionMa
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -80,6 +82,17 @@ public class QualityDecisionQueryService {
   public Page<QualityDecision> getHistory(UUID batchId, Pageable pageable) {
     return decisionRepository.findByTenantIdAndBatchIdOrderByDecidedAtDescSeqDesc(
         TenantContext.requireTenantId(), batchId, pageable);
+  }
+
+  /** Finds the original system release, including releases recorded by the former QC listener. */
+  public Optional<UUID> findFullLotQcReleaseId(UUID batchId) {
+    return decisionRepository
+        .findFirstByTenantIdAndBatchIdAndDecisionScopeAndReasonCodeOrderBySeqAsc(
+            TenantContext.requireTenantId(),
+            batchId,
+            QualityDecisionScope.FULL_LOT,
+            QualityReasonCode.SYSTEM_QC_PASSED)
+        .map(QualityDecision::getId);
   }
 
   public QualityBatchSummaryDto getSummary(UUID batchId) {

@@ -26,6 +26,8 @@ import com.fabricmanagement.production.playground.domain.PlaygroundFixtureOrigin
 import com.fabricmanagement.production.playground.domain.PlaygroundFixtureRun;
 import com.fabricmanagement.production.playground.infra.repository.PlaygroundFixtureItemRepository;
 import com.fabricmanagement.production.playground.infra.repository.PlaygroundFixtureRunRepository;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionQueryService;
+import com.fabricmanagement.production.quality.decision.app.QualityDecisionService;
 import com.fabricmanagement.production.quality.result.app.FiberTestResultService;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
@@ -35,6 +37,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -74,6 +77,9 @@ public class PlaygroundFiberFixtureService {
   static final String DEMO_ISSUER = "Demo issuer — not a real certification";
   static final String DEMO_LAB = "Demo lab (illustrative)";
 
+  private static final Set<String> RELEASED_BATCH_KEYS =
+      Set.of("PG-BATCH-CO-PASS", "PG-BATCH-CO60-PASS");
+
   private static final String SYNTHETIC_REMARK =
       "Playground example (illustrative demo data). Synthetic criteria exercise the software only;"
           + " they are not material tolerances.";
@@ -86,6 +92,8 @@ public class PlaygroundFiberFixtureService {
   private final StockUnitService stockUnitService;
   private final BatchCertificationService certificationService;
   private final FiberTestResultService testResultService;
+  private final QualityDecisionService qualityDecisionService;
+  private final QualityDecisionQueryService qualityDecisionQueryService;
   private final Clock clock;
 
   /** A batch fixture: key, product fixture, code and the optional moisture measurement. */
@@ -118,10 +126,7 @@ public class PlaygroundFiberFixtureService {
       return false;
     }
 
-    // Bootstrap has no signed-in user. The QC results created below publish approval events whose
-    // listener records a quality decision and requires a trusted actor; without one each event
-    // failed and stayed an incomplete publication, retried forever. Attribute the fixture work to
-    // the system actor, as other system-triggered production writes do.
+    // Bootstrap has no signed-in user. Attribute the fixture work to the system actor.
     TenantContext.TenantSnapshot previous = TenantContext.capture();
     try {
       if (TenantContext.getCurrentUserId() == null) {
@@ -219,8 +224,8 @@ public class PlaygroundFiberFixtureService {
                 5,
                 10));
 
-    // ISO_CODE CO profile: pass / conditional / reject on shared pure CO.
-    // FIBER CO60/PES40 profile: pass / conditional / reject on the exact blend.
+    // Shared pure CO and the exact CO60/PES40 blend each show an on-target, an off-target
+    // within-limit and an out-of-limit reading. Only the two on-target examples are released.
     // CO62.5/PES37.5 has no applicable profile: stays pending for manual review.
     // CO-VIRGIN: two fictional certificate examples and one equivalent uncertified batch.
     for (BatchFixture fixture :
@@ -239,6 +244,9 @@ public class PlaygroundFiberFixtureService {
       UUID batchId = batch(tenantId, fixture, products.get(fixture.productKey()));
       if (fixture.moisture() != null) {
         measurement(tenantId, fixture.key() + "-QC", batchId, fixture.moisture());
+      }
+      if (RELEASED_BATCH_KEYS.contains(fixture.key())) {
+        release(tenantId, fixture.key() + "-RELEASE", batchId);
       }
     }
     certificate(tenantId, "PG-CERT-COV-GOTS", "PG-BATCH-COV-GOTS", "GOTS", "DEMO-GOTS-0001");
@@ -286,13 +294,7 @@ public class PlaygroundFiberFixtureService {
                 .orElseGet(() -> createBaledBatch(fixture, productId)));
   }
 
-  /**
-   * A fixture lot is two 250 kg bales, not a bare 500 kg figure. The approved or rejected lab
-   * result below publishes an event whose listener records a lot-level quality decision, and a
-   * decision needs physical units to release or reject: on a lot without pieces it failed with "no
-   * eligible StockUnits" and the publication stayed incomplete, retried on every restart. With
-   * bales the fixtures go through the normal QC flow the catalogue ticket asks for.
-   */
+  /** Creates the two 250 kg bales on which the lot's quality decisions operate. */
   private UUID createBaledBatch(BatchFixture fixture, UUID productId) {
     UUID batchId =
         batchService
@@ -350,6 +352,16 @@ public class PlaygroundFiberFixtureService {
                                     .remarks(SYNTHETIC_REMARK)
                                     .build())
                             .getId()));
+  }
+
+  private void release(UUID tenantId, String key, UUID batchId) {
+    // Installation is serialised by the fixture run. Check the ledger so a repair can
+    // rebind a missing fixture item after the release has already been recorded.
+    UUID decisionId =
+        qualityDecisionQueryService
+            .findFullLotQcReleaseId(batchId)
+            .orElseGet(() -> qualityDecisionService.releaseFromQc(batchId).getId());
+    record(tenantId, key, "QUALITY_DECISION", decisionId);
   }
 
   /**

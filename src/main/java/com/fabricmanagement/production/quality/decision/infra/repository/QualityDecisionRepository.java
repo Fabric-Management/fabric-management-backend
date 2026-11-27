@@ -1,6 +1,8 @@
 package com.fabricmanagement.production.quality.decision.infra.repository;
 
 import com.fabricmanagement.production.quality.decision.domain.QualityDecision;
+import com.fabricmanagement.production.quality.decision.domain.QualityDecisionScope;
+import com.fabricmanagement.production.quality.decision.domain.QualityReasonCode;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -27,6 +29,9 @@ public interface QualityDecisionRepository extends JpaRepository<QualityDecision
 
   Optional<QualityDecision> findFirstByTenantIdAndBatchIdOrderByDecidedAtDescSeqDesc(
       UUID tenantId, UUID batchId);
+
+  Optional<QualityDecision> findFirstByTenantIdAndBatchIdAndDecisionScopeAndReasonCodeOrderBySeqAsc(
+      UUID tenantId, UUID batchId, QualityDecisionScope scope, QualityReasonCode reasonCode);
 
   Page<QualityDecision> findByTenantIdAndBatchIdOrderByDecidedAtDescSeqDesc(
       UUID tenantId, UUID batchId, Pageable pageable);

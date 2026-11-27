@@ -33,7 +33,17 @@ class QualityRbacContractTest {
     assertThat(componentNames).doesNotContain("actorId", "origin", "sourceEventId", "decidedAt");
   }
 
+  @Test
+  void baleChoicesRequireExactlyQualityWrite() {
+    assertThat(actionAnnotation(FiberTestResultController.class, "listBaleChoices"))
+        .isEqualTo("@auth.can(authentication, 'quality', 'write')");
+  }
+
   private void assertAction(Class<?> controller, String methodName, String expectedFragment) {
+    assertThat(actionAnnotation(controller, methodName)).contains(expectedFragment);
+  }
+
+  private String actionAnnotation(Class<?> controller, String methodName) {
     Method method =
         Arrays.stream(controller.getDeclaredMethods())
             .filter(candidate -> candidate.getName().equals(methodName))
@@ -41,6 +51,6 @@ class QualityRbacContractTest {
             .orElseThrow();
     PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
     assertThat(annotation).isNotNull();
-    assertThat(annotation.value()).contains(expectedFragment);
+    return annotation.value();
   }
 }

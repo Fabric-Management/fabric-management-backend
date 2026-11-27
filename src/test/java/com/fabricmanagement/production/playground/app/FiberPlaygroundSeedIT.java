@@ -1,6 +1,8 @@
 package com.fabricmanagement.production.playground.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
@@ -12,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeeder;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.generator.app.catalogue.TaskTemplateCatalogueBackfillRunner;
+import com.fabricmanagement.notification.hub.app.adapter.email.EmailNotificationSender;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.communication.app.EmailTemplateRenderer;
@@ -26,6 +29,7 @@ import com.fabricmanagement.product.fiber.domain.FiberCatalog;
 import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import com.fabricmanagement.testsupport.PendingSignupFixtures;
 import com.fabricmanagement.testsupport.PlaygroundSourceFixture;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,6 +71,7 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
   @MockitoBean private DemoTransactionSeeder demoTransactionSeeder;
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private EmailTemplateRenderer emailTemplateRenderer;
+  @MockitoBean private EmailNotificationSender emailNotificationSender;
 
   @BeforeEach
   void stubMail() {
@@ -148,12 +153,128 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
     Map<String, String> qc = qcStatusByBatchCode(tenant);
     assertThat(qc)
         .containsEntry("PG-FIB-CO-001", "APPROVED")
-        .containsEntry("PG-FIB-CO-002", "CONDITIONAL_ACCEPT")
+        .containsEntry("PG-FIB-CO-002", "APPROVED")
         .containsEntry("PG-FIB-CO-003", "REJECTED")
         .containsEntry("PG-FIB-BL6040-001", "APPROVED")
-        .containsEntry("PG-FIB-BL6040-002", "CONDITIONAL_ACCEPT")
+        .containsEntry("PG-FIB-BL6040-002", "APPROVED")
         .containsEntry("PG-FIB-BL6040-003", "REJECTED")
         .containsEntry("PG-FIB-BL625-001", "PENDING");
+    assertThat(
+            jdbc.queryForList(
+                """
+                SELECT b.batch_code,
+                       r.evaluation ->> 'diagnosticCode' AS diagnostic,
+                       (r.evaluation ->> 'complete')::boolean AS complete,
+                       (r.evaluation ->> 'limitDefined')::boolean AS limit_defined,
+                       (r.evaluation ->> 'outsideLimits')::boolean AS outside_limits,
+                       p.value ->> 'outcome' AS outcome,
+                       (p.value ->> 'differenceFromTarget')::double precision AS difference
+                FROM production.production_quality_fiber_test_result r
+                JOIN production.production_execution_batch b
+                  ON b.id = r.batch_id AND b.tenant_id = r.tenant_id
+                CROSS JOIN LATERAL jsonb_array_elements(r.evaluation -> 'parameters') p(value)
+                WHERE r.tenant_id = ? AND p.value ->> 'parameter' = 'MOISTURE'
+                """,
+                tenant))
+        .extracting(
+            row -> row.get("batch_code"),
+            row -> row.get("diagnostic"),
+            row -> row.get("complete"),
+            row -> row.get("limit_defined"),
+            row -> row.get("outside_limits"),
+            row -> row.get("outcome"),
+            row -> row.get("difference"))
+        .containsExactlyInAnyOrder(
+            tuple("PG-FIB-CO-001", null, true, true, false, "WITHIN_LIMITS", 0.0),
+            tuple("PG-FIB-CO-002", null, true, true, false, "WITHIN_LIMITS", 2.0),
+            tuple("PG-FIB-CO-003", null, true, true, true, "OUTSIDE_LIMITS", 6.0),
+            tuple("PG-FIB-BL6040-001", null, true, true, false, "WITHIN_LIMITS", 0.0),
+            tuple("PG-FIB-BL6040-002", null, true, true, false, "WITHIN_LIMITS", 2.0),
+            tuple("PG-FIB-BL6040-003", null, true, true, true, "OUTSIDE_LIMITS", 6.0),
+            tuple(
+                "PG-FIB-BL625-001",
+                "NO_APPLICABLE_QUALITY_PROFILE",
+                false,
+                false,
+                false,
+                "NO_LIMIT",
+                null));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT b.batch_code, b.status, u.quality_disposition, count(*) AS bale_count"
+                    + " FROM production.production_execution_batch b"
+                    + " JOIN production.stock_unit u ON u.tenant_id = b.tenant_id"
+                    + " AND u.batch_id = b.id AND u.is_active"
+                    + " WHERE b.tenant_id = ? AND b.batch_code IN ("
+                    + " 'PG-FIB-CO-001', 'PG-FIB-CO-002', 'PG-FIB-CO-003',"
+                    + " 'PG-FIB-BL6040-001', 'PG-FIB-BL6040-002', 'PG-FIB-BL6040-003',"
+                    + " 'PG-FIB-BL625-001')"
+                    + " GROUP BY b.batch_code, b.status, u.quality_disposition",
+                tenant))
+        .extracting(
+            row -> row.get("batch_code"),
+            row -> row.get("status"),
+            row -> row.get("quality_disposition"),
+            row -> row.get("bale_count"))
+        .containsExactlyInAnyOrder(
+            tuple("PG-FIB-CO-001", "AVAILABLE", "RELEASED", 2L),
+            tuple("PG-FIB-CO-002", "PENDING_QC", "PENDING_INSPECTION", 2L),
+            tuple("PG-FIB-CO-003", "PENDING_QC", "PENDING_INSPECTION", 2L),
+            tuple("PG-FIB-BL6040-001", "AVAILABLE", "RELEASED", 2L),
+            tuple("PG-FIB-BL6040-002", "PENDING_QC", "PENDING_INSPECTION", 2L),
+            tuple("PG-FIB-BL6040-003", "PENDING_QC", "PENDING_INSPECTION", 2L),
+            tuple("PG-FIB-BL625-001", "PENDING_QC", "PENDING_INSPECTION", 2L));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT b.batch_code, d.id, d.decision_scope, d.outcome, d.origin, d.reason_code"
+                    + " FROM production.quality_decision d"
+                    + " JOIN production.production_execution_batch b ON b.tenant_id = d.tenant_id"
+                    + " AND b.id = d.batch_id"
+                    + " WHERE d.tenant_id = ?",
+                tenant))
+        .extracting(
+            row -> row.get("batch_code"),
+            row -> row.get("id"),
+            row -> row.get("decision_scope"),
+            row -> row.get("outcome"),
+            row -> row.get("origin"),
+            row -> row.get("reason_code"))
+        .containsExactlyInAnyOrder(
+            tuple(
+                "PG-FIB-CO-001",
+                entity(tenant, "PG-BATCH-CO-PASS-RELEASE"),
+                "FULL_LOT",
+                "RELEASED",
+                "SYSTEM_RELEASE",
+                "SYSTEM_QC_PASSED"),
+            tuple(
+                "PG-FIB-BL6040-001",
+                entity(tenant, "PG-BATCH-CO60-PASS-RELEASE"),
+                "FULL_LOT",
+                "RELEASED",
+                "SYSTEM_RELEASE",
+                "SYSTEM_QC_PASSED"));
+    assertNoFixtureEmail(tenant);
+    UUID cottonBatch = entity(tenant, "PG-BATCH-CO-REJECT");
+    assertThat(
+            count(
+                "SELECT count(*) FROM notification.notification_queue"
+                    + " WHERE tenant_id = ? AND channel = 'IN_APP'"
+                    + " AND event_type = 'BATCH_MEASUREMENT_OUT_OF_LIMITS'"
+                    + " AND payload ->> 'referenceId' = ?",
+                tenant,
+                cottonBatch.toString()))
+        .as("the signed-up playground receives an in-app notification for PG-FIB-CO-003")
+        .isPositive();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT enabled_by_default FROM notification.notification_template"
+                    + " WHERE tenant_id = ? AND channel = 'EMAIL' AND is_active"
+                    + " AND event_type = 'BATCH_MEASUREMENT_OUT_OF_LIMITS'",
+                Boolean.class,
+                tenant))
+        .as("the e-mail template is available but off by default")
+        .isFalse();
     assertThat(
             jdbc.queryForList(
                 "SELECT standard_name FROM production.prod_fiber_quality_standard"
@@ -212,16 +333,21 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
             "SELECT count(*) FROM production.production_quality_fiber_test_result"
                 + " WHERE tenant_id = ?",
             tenant);
+    long decisions = decisionCount(tenant);
+    UUID cottonRelease = entity(tenant, "PG-BATCH-CO-PASS-RELEASE");
+    UUID blendRelease = entity(tenant, "PG-BATCH-CO60-PASS-RELEASE");
 
-    clearInvocations(notificationService, emailTemplateRenderer);
+    clearInvocations(notificationService, emailTemplateRenderer, emailNotificationSender);
     port.provisionLegacyPlayground(tenant);
+    assertThat(decisionCount(tenant)).isEqualTo(decisions);
     jdbc.update(
         "UPDATE production.playground_fixture_run SET status = 'PENDING', completed_at = NULL"
             + " WHERE tenant_id = ?",
         tenant);
     jdbc.update(
         "DELETE FROM production.playground_fixture_item WHERE tenant_id = ?"
-            + " AND fixture_key IN ('PG-CERT-COV-OEKO', 'PG-BATCH-CO-PASS-QC')",
+            + " AND fixture_key IN ('PG-CERT-COV-OEKO', 'PG-BATCH-CO-PASS-QC',"
+            + " 'PG-BATCH-CO-PASS-RELEASE', 'PG-BATCH-CO60-PASS-RELEASE')",
         tenant);
     port.provisionLegacyPlayground(tenant);
 
@@ -240,12 +366,10 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
                 tenant))
         .isEqualTo(results);
     assertThat(keys(tenant)).contains("PG-CERT-COV-OEKO", "PG-BATCH-CO-PASS-QC");
-    // A18: installing or repairing fixtures never sends an email or renders one.
-    verify(notificationService, never())
-        .sendNotificationSync(anyString(), anyString(), anyString());
-    verify(notificationService, never())
-        .sendNotificationSync(any(UUID.class), anyString(), anyString(), anyString());
-    verifyNoInteractions(emailTemplateRenderer);
+    assertThat(decisionCount(tenant)).isEqualTo(decisions);
+    assertThat(entity(tenant, "PG-BATCH-CO-PASS-RELEASE")).isEqualTo(cottonRelease);
+    assertThat(entity(tenant, "PG-BATCH-CO60-PASS-RELEASE")).isEqualTo(blendRelease);
+    assertNoFixtureEmail(tenant);
 
     UUID regular = insertTenant("REGULAR", false);
     UUID demoRegular = insertTenant("REGULAR", true);
@@ -308,6 +432,48 @@ class FiberPlaygroundSeedIT extends AbstractIntegrationTest {
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
+
+  private long decisionCount(UUID tenant) {
+    return count("SELECT count(*) FROM production.quality_decision WHERE tenant_id = ?", tenant);
+  }
+
+  private void assertNoFixtureEmail(UUID tenant) {
+    awaitQualityNotification(tenant, "PG-BATCH-CO625-PENDING", "onBatchQualityStandardMissing");
+    awaitQualityNotification(tenant, "PG-BATCH-CO-REJECT", "onFiberMeasurementOutOfLimits");
+    awaitQualityNotification(tenant, "PG-BATCH-CO60-REJECT", "onFiberMeasurementOutOfLimits");
+    assertThat(
+            count(
+                "SELECT count(*) FROM notification.notification_queue"
+                    + " WHERE tenant_id = ? AND channel = 'EMAIL'",
+                tenant))
+        .isZero();
+    assertThat(
+            count(
+                "SELECT count(*) FROM notification.notification_log"
+                    + " WHERE tenant_id = ? AND channel = 'EMAIL'",
+                tenant))
+        .isZero();
+    verify(notificationService, never())
+        .sendNotificationSync(anyString(), anyString(), anyString());
+    verify(notificationService, never())
+        .sendNotificationSync(any(UUID.class), anyString(), anyString(), anyString());
+    verifyNoInteractions(emailTemplateRenderer, emailNotificationSender);
+  }
+
+  private void awaitQualityNotification(UUID tenant, String batchKey, String listenerMethod) {
+    UUID batchId = entity(tenant, batchKey);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        count(
+                            "SELECT count(*) FROM event_publication WHERE listener_id LIKE ?"
+                                + " AND serialized_event LIKE ? AND completion_date IS NOT NULL",
+                            "%QualityNotificationListener." + listenerMethod + "%",
+                            "%" + batchId + "%"))
+                    .isEqualTo(1L));
+  }
 
   private UUID signup(SignupIntent intent) {
     String suffix = UUID.randomUUID().toString().substring(0, 8);

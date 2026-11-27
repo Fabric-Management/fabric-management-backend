@@ -185,6 +185,8 @@ public class TenantTransactionalPurgeService {
           "production.prod_recipe_component",
           "production.prod_recipe",
           "production.production_quality_fiber_test_result",
+          "production.production_quality_fiber_test_laboratory",
+          "production.prod_fiber_test_standard",
           "production.production_execution_batch_color_archive",
           "production.production_execution_batch_attribute",
           "production.production_execution_batch_certification",
