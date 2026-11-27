@@ -40,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -148,10 +149,9 @@ class SalesDemoSeederTest {
 
   @Test
   void createsAndConfirmsOneOrderPerDemoCustomer() {
-    // FIBER-CATALOG-1: exact shared cotton and polyester by ISO code, not list positions.
-    ProductDto cotton = fiber();
+    ProductDto wool = fiber();
     ProductDto polyester = fiber();
-    when(productFacade.findCanonicalFiberProduct("CO")).thenReturn(Optional.of(cotton));
+    when(productFacade.findCanonicalFiberProduct("WO")).thenReturn(Optional.of(wool));
     when(productFacade.findCanonicalFiberProduct("PES")).thenReturn(Optional.of(polyester));
     when(tradingPartnerService.searchByName(any(), any()))
         .thenReturn(List.of(TradingPartnerDto.builder().id(UUID.randomUUID()).build()));
@@ -160,12 +160,17 @@ class SalesDemoSeederTest {
 
     seeder.seedFor(TENANT_ID);
 
-    verify(salesOrderService, times(3)).createOrder(any());
+    ArgumentCaptor<CreateSalesOrderRequest> requests =
+        ArgumentCaptor.forClass(CreateSalesOrderRequest.class);
+    verify(salesOrderService, times(3)).createOrder(requests.capture());
+    assertThat(requests.getAllValues())
+        .extracting(request -> request.getLines().getFirst().getProductId())
+        .containsExactly(wool.getId(), wool.getId(), polyester.getId());
     verify(salesOrderService, times(3)).confirmDemoSeedOrder(any());
   }
 
   @Test
-  void skipsWhenTheSharedCottonOrPolyesterIsNotPublished() {
+  void skipsWhenTheSharedWoolOrPolyesterIsNotPublished() {
     when(productFacade.findCanonicalFiberProduct(any())).thenReturn(Optional.empty());
 
     seeder.seedFor(TENANT_ID);

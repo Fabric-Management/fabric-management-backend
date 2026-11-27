@@ -43,15 +43,14 @@ public class SalesDemoSeeder {
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void seedFor(UUID tenantId) {
-    // FIBER-CATALOG-1: exact shared cotton (CO) and polyester (PES), not list positions.
-    Optional<ProductDto> cotton = productFacade.findCanonicalFiberProduct("CO");
+    // Keep the released cotton bales available for the Playground quality scenario.
+    // These orders use the shared wool and polyester catalogue entries.
+    Optional<ProductDto> wool = productFacade.findCanonicalFiberProduct("WO");
     Optional<ProductDto> polyester = productFacade.findCanonicalFiberProduct("PES");
-    if (cotton.isEmpty() || polyester.isEmpty()) {
-      log.warn("Shared CO/PES fibres not published; skipping sales demo orders: {}", tenantId);
+    if (wool.isEmpty() || polyester.isEmpty()) {
+      log.warn("Shared WO/PES fibres not published; skipping sales demo orders: {}", tenantId);
       return;
     }
-    ProductDto fiber1 = cotton.get();
-    ProductDto fiber2 = polyester.get();
 
     UUID cCaledonian = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_CALEDONIAN);
     UUID cEuropa = findPartner(tenantId, FinanceDemoSeeder.CUSTOMER_EUROPA);
@@ -59,9 +58,9 @@ public class SalesDemoSeeder {
 
     LocalDate today = LocalDate.now(clock);
 
-    confirmedOrder(cCaledonian, "GBP", "SO-DEMO-CAL-001", today, fiber1, "1000", "6.60");
-    confirmedOrder(cEuropa, "EUR", "SO-DEMO-EUR-001", today, fiber1, "500", "100.00");
-    confirmedOrder(cGlobal, "USD", "SO-DEMO-GFW-001", today, fiber2, "800", "50.00");
+    confirmedOrder(cCaledonian, "GBP", "SO-DEMO-CAL-001", today, wool.get(), "1000", "6.60");
+    confirmedOrder(cEuropa, "EUR", "SO-DEMO-EUR-001", today, wool.get(), "500", "100.00");
+    confirmedOrder(cGlobal, "USD", "SO-DEMO-GFW-001", today, polyester.get(), "800", "50.00");
 
     log.info("Successfully provisioned sales demo orders for tenant: {}", tenantId);
   }
