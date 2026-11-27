@@ -91,6 +91,10 @@ final class TablePrivilegeClassification {
     // PAYMENT-PLAN-7 R13: deactivated, never deleted by the application.
     entries.put(
         "common_company.trading_partner_cheque_drawer", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put("production.prod_fiber_test_standard", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
+    entries.put(
+        "production.production_quality_fiber_test_laboratory",
+        TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_payment_plan_revision", TablePrivilegeClass.MUTABLE_SYSTEM_PURGE);
     entries.put("sales_ord.order_payment_plan_currency", TablePrivilegeClass.APPEND_ONLY_LEDGER);
     entries.put("sales_ord.order_payment_plan_line", TablePrivilegeClass.APPEND_ONLY_LEDGER);

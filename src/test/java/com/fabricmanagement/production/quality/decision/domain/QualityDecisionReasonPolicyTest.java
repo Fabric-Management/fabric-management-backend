@@ -24,7 +24,30 @@ class QualityDecisionReasonPolicyTest {
             ManualQualityReasonCode.SHADE_VARIATION,
             ManualQualityReasonCode.SHORT_LENGTH,
             ManualQualityReasonCode.MEASURE_MISMATCH,
+            ManualQualityReasonCode.OUT_OF_SPECIFICATION,
             ManualQualityReasonCode.OTHER);
+  }
+
+  @Test
+  void outOfSpecificationIsAManualNonconformingReason() {
+    QualityReasonCode reason = QualityReasonCode.OUT_OF_SPECIFICATION;
+    assertThat(ManualQualityReasonCode.OUT_OF_SPECIFICATION.toDomainCode()).isEqualTo(reason);
+    assertThat(QualityDecisionReasonPolicy.manualReasons(QualityDecisionOutcome.NONCONFORMING))
+        .contains(ManualQualityReasonCode.OUT_OF_SPECIFICATION);
+    assertThat(QualityDecisionReasonPolicy.remarksRequired(reason)).isFalse();
+    assertThat(
+            QualityDecisionReasonPolicy.remarksRequired(
+                ManualQualityReasonCode.OUT_OF_SPECIFICATION))
+        .isFalse();
+    for (QualityDecisionOrigin origin : QualityDecisionOrigin.values()) {
+      for (QualityDecisionOutcome outcome : QualityDecisionOutcome.values()) {
+        assertThat(QualityDecisionReasonPolicy.reasonAllowed(origin, outcome, reason))
+            .as("%s decides %s", origin, outcome)
+            .isEqualTo(
+                origin == QualityDecisionOrigin.MANUAL
+                    && outcome == QualityDecisionOutcome.NONCONFORMING);
+      }
+    }
   }
 
   @Test

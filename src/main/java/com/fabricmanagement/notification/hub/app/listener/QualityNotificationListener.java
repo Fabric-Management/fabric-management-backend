@@ -9,6 +9,8 @@ import com.fabricmanagement.notification.hub.domain.port.PermissionRecipientPort
 import com.fabricmanagement.production.core.batch.domain.event.BatchCertificationsExpiringEvent;
 import com.fabricmanagement.production.quality.result.domain.event.BatchConcessionReviewRequiredEvent;
 import com.fabricmanagement.production.quality.result.domain.event.BatchQualityStandardMissingEvent;
+import com.fabricmanagement.production.quality.result.domain.event.FiberMeasurementOutOfLimitsEvent;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,8 +21,8 @@ import org.springframework.stereotype.Component;
 /**
  * Quality notifications that used to go straight to the legacy store for the hard-coded ADMIN and
  * MANAGER roles (NOTIF-UNIFY-1 S2). The tenant now decides who hears of them by granting the
- * permission that acts on them: {@code quality:approve} for a concession, {@code quality:manage}
- * for a missing quality standard and for expiring certificates.
+ * permission that acts on them: {@code quality:approve} for concessions and out-of-limit
+ * measurements, {@code quality:manage} for missing profiles and expiring certificates.
  */
 @Component
 @RequiredArgsConstructor
@@ -46,6 +48,33 @@ public class QualityNotificationListener {
                         NotificationEventType.BATCH_CONCESSION_REVIEW,
                         Map.of("batchCode", event.getBatchCode()),
                         event.getBatchId())));
+  }
+
+  @ApplicationModuleListener
+  public void onFiberMeasurementOutOfLimits(FiberMeasurementOutOfLimitsEvent event) {
+    TenantContext.executeInTenantContext(
+        event.getTenantId(),
+        () ->
+            idempotentEventHandler.executeOnce(
+                event.getEventId(),
+                this.getClass(),
+                "onFiberMeasurementOutOfLimits",
+                () -> notifyMeasurementApprovers(event)));
+  }
+
+  private void notifyMeasurementApprovers(FiberMeasurementOutOfLimitsEvent event) {
+    Map<String, String> payload = new HashMap<>();
+    payload.put("batchCode", event.getBatchCode());
+    payload.put("parameter", event.getFirstParameter().name());
+    if (event.getAdditionalCount() > 0) {
+      payload.put("additionalCount", Integer.toString(event.getAdditionalCount()));
+    }
+    notifyHolders(
+        event.getTenantId(),
+        PermissionKey.QUALITY_APPROVE,
+        NotificationEventType.BATCH_MEASUREMENT_OUT_OF_LIMITS,
+        payload,
+        event.getBatchId());
   }
 
   @ApplicationModuleListener

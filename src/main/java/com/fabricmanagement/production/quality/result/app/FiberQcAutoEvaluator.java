@@ -5,226 +5,210 @@ import com.fabricmanagement.product.fiber.app.FiberQualityQueryService;
 import com.fabricmanagement.product.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.domain.BatchCompositionSnapshot;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Outcome;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Parameter;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.ParameterEvaluation;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
-import java.math.BigDecimal;
-import java.util.Map;
-import java.util.Optional;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Evaluates a FiberTestResult against the batch's applicable quality profile (FIBER-CATALOG-1).
- *
- * <ul>
- *   <li>The profile comes from the shared resolver applied to the batch's stored composition
- *       snapshot: a stored profile is re-checked and never switched; without one the exact FIBER
- *       default, then the ISO default for a pure fibre at 100%. A blend never borrows its dominant
- *       component's ISO profile.
- *   <li>No evaluable profile (none applies, stored one unavailable/inapplicable, or unknown
- *       composition): the result stays PENDING for manual review with an explicit diagnostic.
- *   <li>Otherwise all seven metrics are compared to min/target/max: all at target → APPROVED; all
- *       within limits, one or more off target → CONDITIONAL_ACCEPT; any outside → REJECTED.
- * </ul>
- */
+/** Evaluates the recorded measurements against the profile applicable to the lot's snapshot. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FiberQcAutoEvaluator {
 
-  private static final double TARGET_TOLERANCE = 1e-6;
+  private static final Limits NO_CRITERIA = new Limits(null, null, null);
+
+  // Keep this order aligned with the fibre test form.
+  private static final List<ParameterInput> INPUTS =
+      List.of(
+          new ParameterInput(
+              Parameter.FINENESS,
+              FiberTestResult::getFineness,
+              standard ->
+                  new Limits(
+                      standard.getFinenessMin(),
+                      standard.getFinenessMax(),
+                      standard.getFinenessTarget())),
+          new ParameterInput(
+              Parameter.LENGTH,
+              FiberTestResult::getLengthMm,
+              standard ->
+                  new Limits(
+                      standard.getLengthMmMin(),
+                      standard.getLengthMmMax(),
+                      standard.getLengthMmTarget())),
+          new ParameterInput(
+              Parameter.STRENGTH,
+              FiberTestResult::getStrengthCndTex,
+              standard ->
+                  new Limits(
+                      standard.getStrengthCndTexMin(),
+                      standard.getStrengthCndTexMax(),
+                      standard.getStrengthCndTexTarget())),
+          new ParameterInput(
+              Parameter.ELONGATION,
+              FiberTestResult::getElongationPercent,
+              standard ->
+                  new Limits(
+                      standard.getElongationPctMin(),
+                      standard.getElongationPctMax(),
+                      standard.getElongationPctTarget())),
+          new ParameterInput(
+              Parameter.MOISTURE,
+              FiberTestResult::getMoisturePercent,
+              standard ->
+                  new Limits(
+                      standard.getMoisturePctMin(),
+                      standard.getMoisturePctMax(),
+                      standard.getMoisturePctTarget())),
+          new ParameterInput(
+              Parameter.TRASH_CONTENT,
+              FiberTestResult::getTrashContentPercent,
+              standard ->
+                  new Limits(
+                      standard.getTrashContentPctMin(),
+                      standard.getTrashContentPctMax(),
+                      standard.getTrashContentPctTarget())),
+          new ParameterInput(
+              Parameter.UNIFORMITY_INDEX,
+              FiberTestResult::getUniformityIndex,
+              standard ->
+                  new Limits(
+                      standard.getUniformityIndexMin(),
+                      standard.getUniformityIndexMax(),
+                      standard.getUniformityIndexTarget())));
 
   private final FiberQualityQueryService fiberQualityQueryService;
 
-  /**
-   * Result of auto-evaluation. {@code hasStandard=false} keeps the manual path; {@code
-   * diagnosticCode} then names why (e.g. NO_APPLICABLE_QUALITY_PROFILE, BATCH_COMPOSITION_UNKNOWN).
-   */
-  public record EvaluationResult(
-      TestApprovalStatus approvalStatus,
-      boolean hasStandard,
-      String targetLabel,
-      String diagnosticCode) {}
+  public record EvaluationResult(FiberTestEvaluation evaluation, String targetLabel) {
+
+    public TestApprovalStatus approvalStatus() {
+      if (evaluation == null || !evaluation.complete() || !evaluation.limitDefined()) {
+        return TestApprovalStatus.PENDING;
+      }
+      return evaluation.outsideLimits() ? TestApprovalStatus.REJECTED : TestApprovalStatus.APPROVED;
+    }
+  }
 
   @Transactional(readOnly = true)
   public EvaluationResult evaluate(FiberTestResult result, Batch batch, UUID tenantId) {
     if (batch.getProductType() != ProductType.FIBER) {
-      log.debug("Skipping QC auto-eval: batch productType={}", batch.getProductType());
-      return new EvaluationResult(TestApprovalStatus.PENDING, false, null, null);
+      log.debug("Skipping QC auto-evaluation: batch productType={}", batch.getProductType());
+      return new EvaluationResult(null, null);
     }
 
-    Optional<Map<UUID, BigDecimal>> snapshot = BatchCompositionSnapshot.read(batch.getAttributes());
-    FiberQualityQueryService.StoredEvaluation stored =
+    var resolved =
         fiberQualityQueryService.evaluateStored(
-            tenantId, batch.getProductId(), snapshot, batch.getQualityStandardId());
+            tenantId,
+            batch.getProductId(),
+            BatchCompositionSnapshot.read(batch.getAttributes()),
+            batch.getQualityStandardId());
+    FiberQualityStandard profile = resolved.standard();
+    List<ParameterEvaluation> parameters =
+        INPUTS.stream()
+            .map(input -> evaluateParameter(input, result, profile, resolved.targetIsoCode()))
+            .filter(Objects::nonNull)
+            .toList();
 
-    if (stored.standard() == null) {
-      log.info(
-          "No evaluable quality profile for batch {} ({}): {}; stays PENDING for manual review",
-          batch.getId(),
-          stored.targetLabel(),
-          stored.diagnosticCode());
+    if (profile == null) {
       return new EvaluationResult(
-          TestApprovalStatus.PENDING, false, stored.targetLabel(), stored.diagnosticCode());
+          new FiberTestEvaluation(
+              null, null, resolved.diagnosticCode(), false, false, false, parameters),
+          resolved.targetLabel());
     }
 
-    FiberQualityStandard standard = stored.standard();
-    TestApprovalStatus status = evaluateAgainstStandard(result, standard);
-    log.info(
-        "QC auto-eval: batchId={}, profile={}, result={}",
-        batch.getId(),
-        standard.getStandardName(),
-        status);
-    return new EvaluationResult(status, true, stored.targetLabel(), null);
+    boolean complete =
+        parameters.stream()
+            .noneMatch(
+                parameter ->
+                    parameter.outcome() == Outcome.NOT_MEASURED
+                        || parameter.outcome() == Outcome.UNIT_UNCONFIRMED);
+    boolean limitDefined =
+        parameters.stream()
+            .anyMatch(parameter -> parameter.min() != null || parameter.max() != null);
+    boolean outsideLimits =
+        parameters.stream().anyMatch(parameter -> parameter.outcome() == Outcome.OUTSIDE_LIMITS);
+    return new EvaluationResult(
+        new FiberTestEvaluation(
+            profile.getId(),
+            profile.getStandardName(),
+            null,
+            complete,
+            limitDefined,
+            outsideLimits,
+            parameters),
+        resolved.targetLabel());
   }
 
-  private TestApprovalStatus evaluateAgainstStandard(
-      FiberTestResult result, FiberQualityStandard standard) {
-    boolean anyRejected = false;
-    boolean anyConditional = false;
-
-    if (checkRejected(
-        result.getFineness(),
-        standard.getFinenessMin(),
-        standard.getFinenessTarget(),
-        standard.getFinenessMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getFineness(),
-        standard.getFinenessMin(),
-        standard.getFinenessTarget(),
-        standard.getFinenessMax())) {
-      anyConditional = true;
+  private static ParameterEvaluation evaluateParameter(
+      ParameterInput input, FiberTestResult result, FiberQualityStandard profile, String isoCode) {
+    Double value = input.measurement().apply(result);
+    Limits limits = profile == null ? NO_CRITERIA : input.limits().apply(profile);
+    if (value == null && !limits.hasCriterion()) {
+      return null;
     }
-
-    if (checkRejected(
-        result.getLengthMm(),
-        standard.getLengthMmMin(),
-        standard.getLengthMmTarget(),
-        standard.getLengthMmMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getLengthMm(),
-        standard.getLengthMmMin(),
-        standard.getLengthMmTarget(),
-        standard.getLengthMmMax())) {
-      anyConditional = true;
-    }
-
-    if (checkRejected(
-        result.getStrengthCndTex(),
-        standard.getStrengthCndTexMin(),
-        standard.getStrengthCndTexTarget(),
-        standard.getStrengthCndTexMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getStrengthCndTex(),
-        standard.getStrengthCndTexMin(),
-        standard.getStrengthCndTexTarget(),
-        standard.getStrengthCndTexMax())) {
-      anyConditional = true;
-    }
-
-    if (checkRejected(
-        result.getElongationPercent(),
-        standard.getElongationPctMin(),
-        standard.getElongationPctTarget(),
-        standard.getElongationPctMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getElongationPercent(),
-        standard.getElongationPctMin(),
-        standard.getElongationPctTarget(),
-        standard.getElongationPctMax())) {
-      anyConditional = true;
-    }
-
-    if (checkRejected(
-        result.getMoisturePercent(),
-        standard.getMoisturePctMin(),
-        standard.getMoisturePctTarget(),
-        standard.getMoisturePctMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getMoisturePercent(),
-        standard.getMoisturePctMin(),
-        standard.getMoisturePctTarget(),
-        standard.getMoisturePctMax())) {
-      anyConditional = true;
-    }
-
-    if (checkRejected(
-        result.getTrashContentPercent(),
-        standard.getTrashContentPctMin(),
-        standard.getTrashContentPctTarget(),
-        standard.getTrashContentPctMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getTrashContentPercent(),
-        standard.getTrashContentPctMin(),
-        standard.getTrashContentPctTarget(),
-        standard.getTrashContentPctMax())) {
-      anyConditional = true;
-    }
-
-    if (checkRejected(
-        result.getUniformityIndex(),
-        standard.getUniformityIndexMin(),
-        standard.getUniformityIndexTarget(),
-        standard.getUniformityIndexMax())) {
-      anyRejected = true;
-    } else if (checkConditional(
-        result.getUniformityIndex(),
-        standard.getUniformityIndexMin(),
-        standard.getUniformityIndexTarget(),
-        standard.getUniformityIndexMax())) {
-      anyConditional = true;
-    }
-
-    if (anyRejected) {
-      return TestApprovalStatus.REJECTED;
-    }
-    if (anyConditional) {
-      return TestApprovalStatus.CONDITIONAL_ACCEPT;
-    }
-    return TestApprovalStatus.APPROVED;
+    boolean comparable = isComparable(input.parameter(), isoCode);
+    Double difference =
+        comparable && value != null && limits.target() != null ? value - limits.target() : null;
+    return new ParameterEvaluation(
+        input.parameter(),
+        value,
+        limits.min(),
+        limits.max(),
+        limits.target(),
+        difference,
+        outcome(value, limits, comparable));
   }
 
-  /** Value outside [min, max] or missing when standard enforces bounds → rejected. */
-  private boolean checkRejected(Double value, Double min, Double target, Double max) {
-    if (min == null && max == null) {
-      return false;
-    }
+  private static boolean isComparable(Parameter parameter, String isoCode) {
+    return switch (parameter) {
+      case FINENESS -> "CO".equals(isoCode);
+      case STRENGTH -> false;
+      case LENGTH, ELONGATION, MOISTURE, TRASH_CONTENT, UNIFORMITY_INDEX -> true;
+    };
+  }
+
+  private static Outcome outcome(Double value, Limits limits, boolean comparable) {
+    // Unmentioned parameters have already been omitted.
     if (value == null) {
-      return true;
+      return Outcome.NOT_MEASURED;
     }
-    if (min != null && value < min) {
-      return true;
+    if (!comparable && limits.hasCriterion()) {
+      return Outcome.UNIT_UNCONFIRMED;
     }
-    if (max != null && value > max) {
-      return true;
+    if (!limits.hasBound()) {
+      return Outcome.NO_LIMIT;
     }
-    return false;
+    if ((limits.min() != null && value < limits.min())
+        || (limits.max() != null && value > limits.max())) {
+      return Outcome.OUTSIDE_LIMITS;
+    }
+    return Outcome.WITHIN_LIMITS;
   }
 
-  /**
-   * Value within [min, max] but outside target, or missing when only target is defined →
-   * conditional.
-   */
-  private boolean checkConditional(Double value, Double min, Double target, Double max) {
-    if (target == null) {
-      return false;
+  private record ParameterInput(
+      Parameter parameter,
+      Function<FiberTestResult, Double> measurement,
+      Function<FiberQualityStandard, Limits> limits) {}
+
+  private record Limits(Double min, Double max, Double target) {
+
+    boolean hasBound() {
+      return min != null || max != null;
     }
-    if (value == null) {
-      return true;
+
+    boolean hasCriterion() {
+      return hasBound() || target != null;
     }
-    boolean withinRange = (min == null || value >= min) && (max == null || value <= max);
-    if (!withinRange) {
-      return false;
-    }
-    return Math.abs(value - target) > TARGET_TOLERANCE;
   }
 }

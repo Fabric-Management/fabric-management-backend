@@ -2,10 +2,14 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +26,23 @@ public class TradingPartnerQueryService {
     return tradingPartnerRepository
         .findByTenantIdAndId(tenantId, partnerId)
         .map(com.fabricmanagement.platform.tradingpartner.domain.TradingPartner::getDisplayName);
+  }
+
+  public Optional<String> findActiveDisplayName(UUID tenantId, UUID partnerId) {
+    return tradingPartnerRepository
+        .findByTenantIdAndIdAndStatusAndIsActiveTrue(tenantId, partnerId, PartnerStatus.ACTIVE)
+        .map(TradingPartner::getDisplayName);
+  }
+
+  /** Search the active partners already eligible for the caller's workflow. */
+  public Page<PartnerName> searchActiveNames(
+      UUID tenantId, Collection<UUID> ids, String search, Pageable pageable) {
+    if (ids.isEmpty()) {
+      return Page.empty(pageable);
+    }
+    return tradingPartnerRepository
+        .searchActivePartnersByName(tenantId, ids, PartnerStatus.ACTIVE, search, pageable)
+        .map(partner -> new PartnerName(partner.getId(), partner.getDisplayName()));
   }
 
   public Optional<PartnerClassification> findClassification(UUID tenantId, UUID partnerId) {
@@ -48,4 +69,6 @@ public class TradingPartnerQueryService {
   }
 
   public record PartnerClassification(PartnerType type, PartnerStatus status, boolean active) {}
+
+  public record PartnerName(UUID id, String name) {}
 }

@@ -295,6 +295,40 @@ class FiberQualityQueryServiceTest {
     assertThat(blend.getKind()).isEqualTo(FiberKind.BLEND);
   }
 
+  @Test
+  void storedEvaluationReportsTheApplicableIsoTargetAndTheCodeOfAPureFibreTarget() {
+    Map<UUID, BigDecimal> pure = Map.of(cotton.getId(), new BigDecimal("100"));
+    FiberQualityStandard iso = isoDefault();
+    FiberQualityStandard exact = fiberProfile(cotton, "Alder Beck cotton");
+    FiberQualityStandard blendProfile = fiberProfile(blend, "Alder Beck blend");
+    when(fiberRepository.findInScopeByProductId(
+            FiberCatalog.readScope(TENANT_ID), cotton.getProductId()))
+        .thenReturn(Optional.of(cotton));
+    when(fiberRepository.findInScopeByProductId(
+            FiberCatalog.readScope(TENANT_ID), blend.getProductId()))
+        .thenReturn(Optional.of(blend));
+    for (FiberQualityStandard profile : List.of(iso, exact, blendProfile)) {
+      when(standardRepository.findByTenantIdAndIdAndIsActiveTrue(TENANT_ID, profile.getId()))
+          .thenReturn(Optional.of(profile));
+    }
+
+    for (FiberQualityStandard profile : List.of(iso, exact)) {
+      StoredEvaluation resolved =
+          queryService.evaluateStored(
+              TENANT_ID, cotton.getProductId(), Optional.of(pure), profile.getId());
+      assertThat(resolved.standard()).isSameAs(profile);
+      assertThat(resolved.targetIsoCode()).isEqualTo("CO");
+    }
+    StoredEvaluation resolved =
+        queryService.evaluateStored(
+            TENANT_ID,
+            blend.getProductId(),
+            Optional.of(blend.getComposition()),
+            blendProfile.getId());
+    assertThat(resolved.standard()).isSameAs(blendProfile);
+    assertThat(resolved.targetIsoCode()).isNull();
+  }
+
   // ── Review finding 3: the default composition takes the same validation path ──────────────
 
   @Test

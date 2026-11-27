@@ -4,9 +4,12 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -31,6 +34,35 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
   /** Find by tenant and ID. */
   Optional<TradingPartner> findByTenantIdAndId(
       @Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+  Optional<TradingPartner> findByTenantIdAndIdAndStatusAndIsActiveTrue(
+      UUID tenantId, UUID id, PartnerStatus status);
+
+  @Query(
+      value =
+          """
+          SELECT partner FROM TradingPartner partner JOIN FETCH partner.registry registry
+          WHERE partner.tenantId = :tenantId AND partner.id IN :ids
+            AND partner.isActive = true AND partner.status = :status
+            AND (locate(lower(:search), lower(partner.customName)) > 0
+              OR locate(lower(:search), lower(registry.officialName)) > 0)
+          ORDER BY lower(coalesce(nullif(trim(partner.customName), ''), registry.officialName)),
+            partner.id
+          """,
+      countQuery =
+          """
+          SELECT count(partner) FROM TradingPartner partner JOIN partner.registry registry
+          WHERE partner.tenantId = :tenantId AND partner.id IN :ids
+            AND partner.isActive = true AND partner.status = :status
+            AND (locate(lower(:search), lower(partner.customName)) > 0
+              OR locate(lower(:search), lower(registry.officialName)) > 0)
+          """)
+  Page<TradingPartner> searchActivePartnersByName(
+      @Param("tenantId") UUID tenantId,
+      @Param("ids") Collection<UUID> ids,
+      @Param("status") PartnerStatus status,
+      @Param("search") String search,
+      Pageable pageable);
 
   List<TradingPartner> findByTenantIdAndOrganizationIdAndIsActiveTrue(
       UUID tenantId, UUID organizationId);

@@ -1,15 +1,21 @@
 package com.fabricmanagement.production.quality.result.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.product.fiber.app.FiberTestStandardCatalogService;
 import com.fabricmanagement.production.core.batch.domain.Batch;
 import com.fabricmanagement.production.core.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.core.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.core.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Outcome;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.ParameterEvaluation;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.BatchQualityStandardMissingEvent;
+import com.fabricmanagement.production.quality.result.domain.event.FiberMeasurementOutOfLimitsEvent;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
+import com.fabricmanagement.production.quality.result.dto.FiberTestBaleChoiceDto;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
 import com.fabricmanagement.production.quality.result.dto.UpdateApprovalRequest;
 import com.fabricmanagement.production.quality.result.infra.repository.FiberTestResultRepository;
@@ -20,6 +26,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +41,8 @@ public class FiberTestResultService {
   private final StockUnitRepository stockUnitRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final FiberQcAutoEvaluator qcAutoEvaluator;
+  private final FiberTestStandardCatalogService testStandards;
+  private final FiberTestLaboratoryService laboratories;
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
@@ -60,6 +70,20 @@ public class FiberTestResultService {
             .findByIdAndTenantId(batchId, tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Fiber batch not found: " + batchId));
 
+    if ((request.getLaboratoryId() != null && request.getTestLab() != null)
+        || (request.getTestStandardId() != null && request.getTestStandard() != null)) {
+      throw new IllegalArgumentException(
+          "Omit legacy text when selecting a laboratory or test standard");
+    }
+    var laboratory =
+        request.getLaboratoryId() == null
+            ? null
+            : laboratories.requireActive(request.getLaboratoryId());
+    var standard =
+        request.getTestStandardId() == null
+            ? null
+            : testStandards.requireActive(request.getTestStandardId());
+
     FiberTestResult result =
         FiberTestResult.builder()
             .batchId(batchId)
@@ -74,44 +98,59 @@ public class FiberTestResultService {
             .trashContentPercent(request.getTrashContentPercent())
             .uniformityIndex(request.getUniformityIndex())
             .approvalStatus(TestApprovalStatus.PENDING)
-            .testLab(request.getTestLab())
-            .testStandard(request.getTestStandard())
+            .laboratoryId(request.getLaboratoryId())
+            .testStandardId(request.getTestStandardId())
+            .testLab(laboratory == null ? request.getTestLab() : laboratory.name())
+            .testStandard(standard == null ? request.getTestStandard() : standard.code())
+            .testStandardName(standard == null ? null : standard.name())
+            .testStandardRevision(standard == null ? null : standard.revision())
             .remarks(request.getRemarks())
             .build();
 
+    var evaluated = qcAutoEvaluator.evaluate(result, batch, tenantId);
+    var snapshot = evaluated.evaluation();
+    result.setEvaluation(snapshot);
+    result.setApprovalStatus(evaluated.approvalStatus());
     FiberTestResult saved = testResultRepository.save(result);
     log.info("Fiber test result created: id={}, batchId={}", saved.getId(), saved.getBatchId());
 
-    // QC auto-decision: evaluate against FiberQualityStandard
-    FiberQcAutoEvaluator.EvaluationResult eval = qcAutoEvaluator.evaluate(saved, batch, tenantId);
-
-    if (eval.hasStandard()) {
-      saved.setApprovalStatus(eval.approvalStatus());
-      saved = testResultRepository.save(saved);
-      applicationEventPublisher.publishEvent(
-          new FiberTestResultApprovedEvent(
-              tenantId,
-              saved.getBatchId(),
-              saved.getStockUnitId(),
-              saved.getApprovalStatus(),
-              TenantContext.getCurrentUserId()));
-    } else if (eval.diagnosticCode() != null) {
-      String target = eval.targetLabel() != null ? eval.targetLabel() : batch.getBatchCode();
+    String diagnosticCode = snapshot == null ? null : snapshot.diagnosticCode();
+    if (diagnosticCode != null) {
+      String target =
+          evaluated.targetLabel() != null ? evaluated.targetLabel() : batch.getBatchCode();
       applicationEventPublisher.publishEvent(
           new BatchQualityStandardMissingEvent(
               tenantId,
               batchId,
               batch.getBatchCode(),
               target,
-              manualReviewReasonCode(eval.diagnosticCode())));
+              manualReviewReasonCode(diagnosticCode)));
       log.info(
           "No applicable quality standard, manual review requested: batchId={}, target={}, reason={}",
           batchId,
           target,
-          eval.diagnosticCode());
+          diagnosticCode);
+    } else if (snapshot != null && snapshot.outsideLimits()) {
+      publishOutOfLimits(tenantId, saved, batch.getBatchCode());
     }
 
     return FiberTestResultDto.from(saved);
+  }
+
+  private void publishOutOfLimits(UUID tenantId, FiberTestResult result, String batchCode) {
+    var findings =
+        result.getEvaluation().parameters().stream()
+            .filter(parameter -> parameter.outcome() == Outcome.OUTSIDE_LIMITS)
+            .map(ParameterEvaluation::parameter)
+            .toList();
+    applicationEventPublisher.publishEvent(
+        new FiberMeasurementOutOfLimitsEvent(
+            tenantId,
+            result.getId(),
+            result.getBatchId(),
+            batchCode,
+            findings.getFirst(),
+            findings.size() - 1));
   }
 
   /**
@@ -148,6 +187,19 @@ public class FiberTestResultService {
     return testResultRepository.findByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batchId).stream()
         .map(FiberTestResultDto::from)
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public Page<FiberTestBaleChoiceDto> listBaleChoices(
+      UUID batchId, String search, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+    if (batchRepository.findByIdAndTenantId(batchId, tenantId).isEmpty()) {
+      throw new NotFoundException("Batch not found: " + batchId);
+    }
+    return stockUnitRepository
+        .findByTenantIdAndBatchIdAndIsActiveTrueAndBarcodeContainingIgnoreCaseOrderByBarcodeAsc(
+            tenantId, batchId, search.strip(), pageable)
+        .map(unit -> new FiberTestBaleChoiceDto(unit.getId(), unit.getBarcode()));
   }
 
   @Transactional(readOnly = true)

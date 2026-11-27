@@ -14,8 +14,10 @@ import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
 import com.fabricmanagement.notification.hub.domain.port.PermissionRecipientPort;
 import com.fabricmanagement.production.core.batch.domain.event.BatchCertificationsExpiringEvent;
+import com.fabricmanagement.production.quality.result.domain.FiberTestEvaluation.Parameter;
 import com.fabricmanagement.production.quality.result.domain.event.BatchConcessionReviewRequiredEvent;
 import com.fabricmanagement.production.quality.result.domain.event.BatchQualityStandardMissingEvent;
+import com.fabricmanagement.production.quality.result.domain.event.FiberMeasurementOutOfLimitsEvent;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDate;
 import java.util.List;
@@ -50,12 +52,12 @@ class QualityNotificationListenerTest {
             hub,
             permissionRecipients,
             new IdempotentEventHandler(processedEvents, new SimpleMeterRegistry()));
-    when(processedEvents.tryInsert(any(), any())).thenReturn(1);
   }
 
   @Test
   @DisplayName("a concession goes to whoever may approve quality decisions")
   void concessionGoesToQualityApprovers() {
+    when(processedEvents.tryInsert(any(), any())).thenReturn(1);
     when(permissionRecipients.findUsersWithPermission(TENANT, PermissionKey.QUALITY_APPROVE))
         .thenReturn(Set.of(HOLDER));
     var event = new BatchConcessionReviewRequiredEvent(TENANT, UUID.randomUUID(), "B-0042");
@@ -73,8 +75,33 @@ class QualityNotificationListenerTest {
   }
 
   @Test
+  void measurementNotifiesOnlyOnceWhenTheSameEventIsRetried() {
+    var event =
+        new FiberMeasurementOutOfLimitsEvent(
+            TENANT, UUID.randomUUID(), UUID.randomUUID(), "AB-0042", Parameter.MOISTURE, 1);
+    when(processedEvents.tryInsert(
+            event.getEventId(), "QualityNotificationListener#onFiberMeasurementOutOfLimits"))
+        .thenReturn(1, 0);
+    when(permissionRecipients.findUsersWithPermission(TENANT, PermissionKey.QUALITY_APPROVE))
+        .thenReturn(Set.of(HOLDER));
+
+    listener.onFiberMeasurementOutOfLimits(event);
+    listener.onFiberMeasurementOutOfLimits(event);
+
+    verify(hub)
+        .notifyAll(
+            List.of(HOLDER),
+            TENANT,
+            NotificationEventType.BATCH_MEASUREMENT_OUT_OF_LIMITS,
+            Map.of("batchCode", "AB-0042", "parameter", "MOISTURE", "additionalCount", "1"),
+            event.getBatchId(),
+            "BATCH");
+  }
+
+  @Test
   @DisplayName("a missing standard carries the reason code for the wording to translate")
   void missingStandardCarriesTheReason() {
+    when(processedEvents.tryInsert(any(), any())).thenReturn(1);
     when(permissionRecipients.findUsersWithPermission(TENANT, PermissionKey.QUALITY_MANAGE))
         .thenReturn(Set.of(HOLDER));
     var event =
@@ -102,6 +129,7 @@ class QualityNotificationListenerTest {
   @Test
   @DisplayName("expiring certificates are counted, and nobody to tell means nothing is sent")
   void expiringCertificates() {
+    when(processedEvents.tryInsert(any(), any())).thenReturn(1);
     when(permissionRecipients.findUsersWithPermission(TENANT, PermissionKey.QUALITY_MANAGE))
         .thenReturn(Set.of());
 

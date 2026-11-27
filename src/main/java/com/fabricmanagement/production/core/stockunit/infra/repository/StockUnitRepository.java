@@ -92,6 +92,16 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
   Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrue(
       UUID tenantId, UUID batchId, Pageable pageable);
 
+  Page<ActiveUnitCode>
+      findByTenantIdAndBatchIdAndIsActiveTrueAndBarcodeContainingIgnoreCaseOrderByBarcodeAsc(
+          UUID tenantId, UUID batchId, String barcode, Pageable pageable);
+
+  interface ActiveUnitCode {
+    UUID getId();
+
+    String getBarcode();
+  }
+
   Page<StockUnit> findByTenantIdAndBatchIdAndIsActiveTrueAndStatusIn(
       UUID tenantId, UUID batchId, Collection<StockUnitStatus> statuses, Pageable pageable);
 
